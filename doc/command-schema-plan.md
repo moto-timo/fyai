@@ -200,6 +200,10 @@ presents it. A handler does not write to the sink for its result.
 - `render.message` is a line, or a list of lines, with `{key}` taken from a
   mapping result. A line that names a key the result does not set is left
   out, so `created branch {created}` shows only when a branch was created.
+- `render.markdown` is a line, or a list of lines, as `render.message` is,
+  and what the lines expand to is rendered as Markdown. A value goes in as Markdown source, so the handler
+  escapes what must not be read as markup. With `display/markdown` off the
+  text is written as its source.
 - `render.document` (`yaml` or `flow`) presents the result as a YAML
   document. A verb writes it as it stands, so it can be read back; a session
   shows it as a YAML block.

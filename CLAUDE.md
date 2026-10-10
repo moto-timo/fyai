@@ -198,8 +198,8 @@ a slash table entry, or a hand-written parser.
   types in a handler. Register it in `cmd_handlers[]` of `src/fyai_cmd.c`.
 - The caller presents the result. Build it in `call->gb`, and describe it in
   `render`: `table` (renderopts), `message` (lines with `{key}`; a line that
-  names an unset key, or tests one with `{?key}`, is left out), or `document`
-  (`yaml` or `flow`). A verb takes `--output json|yaml` for every result;
+  names an unset key, or tests one with `{?key}`, is left out), `markdown`
+  (the same lines, rendered as Markdown), or `document` (`yaml` or `flow`). A verb takes `--output json|yaml` for every result;
   `tests/cases/output_formats.sh` checks it. A backend reports failures and
   returns data; it does not print its outcome. Only work that is itself
   presentation writes through the sink: the transcript renderer (`history`),
