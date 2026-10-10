@@ -194,6 +194,7 @@ bool fyai_branch_entry_contained(struct fy_allocator *a, fy_generic entry,
 		    !root_ref_contained(a, b.config) ||
 		    !root_ref_contained(a, b.catalog) ||
 		    !root_ref_contained(a, b.todos) ||
+		    !root_ref_contained(a, b.skills) ||
 		    !root_ref_contained(a, b.head) ||
 		    !root_ref_contained(a, b.cwd) ||
 		    !root_ref_contained(a, b.description) ||
@@ -833,8 +834,8 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 
 		/*
 		 * An absent branch is created by its first publish. It takes
-		 * the catalogue of the branch HEAD names, as the catalogue was
-		 * there before the branch was.
+		 * the catalogue and the skills of the branch HEAD names, as
+		 * they were there before the branch was.
 		 */
 		exists = fyai_branch_lookup(r.branches, fyai_ctx_branch(ctx), &b);
 		/*
@@ -847,10 +848,13 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 		fyai_error_check(ctx, !claimed, err_out,
 				 "branch '%s' is in the namespace of sub-agent branches; "
 				 "only a sub-agent creates one", fyai_ctx_branch(ctx));
-		if (!exists && name && fyai_branch_lookup(r.branches, name, &lb))
+		if (!exists && name && fyai_branch_lookup(r.branches, name, &lb)) {
 			ctx->arena_catalog = lb.catalog;
-		else
+			ctx->arena_skills = lb.skills;
+		} else {
 			ctx->arena_catalog = b.catalog;
+			ctx->arena_skills = b.skills;
+		}
 		ctx->arena_config = b.config;
 		ctx->branch_desc = b.description;
 		ctx->branch_agent = b.agent;
@@ -873,6 +877,9 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 					ctx->arena_config = lb.config;
 				if (fy_is_valid(lb.catalog))
 					ctx->arena_catalog = lb.catalog;
+				/* Skills follow the configuration. */
+				if (fy_is_valid(lb.config))
+					ctx->arena_skills = lb.skills;
 				free(last);
 			}
 			rc = fyai_branch_session_name(r.branches, session,
@@ -1061,6 +1068,7 @@ static fy_generic fyai_branches_commit(struct fyai_ctx *ctx)
 		nb.store = ctx->branch_store;
 	nb.config = ctx->arena_config;
 	nb.catalog = ctx->arena_catalog;
+	nb.skills = ctx->arena_skills;
 	nb.head = ctx->last_message;
 	nb.created = fy_is_valid(prev.created) ? prev.created : now;
 	nb.updated = now;
@@ -1377,6 +1385,7 @@ static int publish_store_merge(struct fyai_ctx *ctx, const struct fyai_branch *c
 		ours.store = ctx->branch_store;
 	ours.config = ctx->arena_config;
 	ours.catalog = ctx->arena_catalog;
+	ours.skills = ctx->arena_skills;
 	ours.description = ctx->branch_desc;
 	ours.agent = ctx->branch_agent;
 	conflicts = fy_seq_empty;
@@ -1427,6 +1436,7 @@ static int publish_store_merge(struct fyai_ctx *ctx, const struct fyai_branch *c
 
 	ctx->arena_config = merged.config;
 	ctx->arena_catalog = merged.catalog;
+	ctx->arena_skills = merged.skills;
 	ctx->branch_desc = merged.description;
 	ctx->branch_agent = merged.agent;
 	/* The next publish builds on the merged store, unknown members too. */
@@ -1825,6 +1835,7 @@ int fyai_close_storage(struct fyai_ctx *ctx)
 	ctx->last_message = fy_invalid;
 	ctx->arena_config = fy_invalid;
 	ctx->arena_catalog = fy_invalid;
+	ctx->arena_skills = fy_invalid;
 	ctx->arena_branches = fy_invalid;
 	ctx->branch_prev = fy_invalid;
 	ctx->branch_desc = fy_invalid;

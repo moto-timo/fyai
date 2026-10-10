@@ -351,6 +351,7 @@ bool fyai_branch_decode(fy_generic entry, struct fyai_branch *b)
 	b->config = fy_invalid;
 	b->catalog = fy_invalid;
 	b->todos = fy_invalid;
+	b->skills = fy_invalid;
 	b->created = fy_invalid;
 	b->cwd = fy_invalid;
 	b->description = fy_invalid;
@@ -383,6 +384,7 @@ bool fyai_branch_decode_store(fy_generic store, struct fyai_branch *b)
 	b->config = fyai_branch_member(store, "config");
 	b->catalog = fyai_branch_member(store, "catalog");
 	b->todos = fyai_branch_member(store, "todos");
+	b->skills = fyai_branch_member(store, "skills");
 	b->created = fyai_branch_member(store, "created");
 	b->cwd = fyai_branch_member(store, "cwd");
 	b->description = fyai_branch_member(store, "description");
@@ -444,6 +446,7 @@ fy_generic fyai_branch_store_build(struct fy_generic_builder *gb,
 	store = store_member_set(gb, store, "config", b->config);
 	store = store_member_set(gb, store, "catalog", b->catalog);
 	store = store_member_set(gb, store, "todos", b->todos);
+	store = store_member_set(gb, store, "skills", b->skills);
 	store = store_member_set(gb, store, "created", b->created);
 	store = store_member_set(gb, store, "cwd", b->cwd);
 	store = store_member_set(gb, store, "description", b->description);
@@ -1267,6 +1270,7 @@ int fyai_branch_create(struct fyai_ctx *ctx, const char *name,
 		head = ctx->last_message;
 		nb.config = ctx->arena_config;
 		nb.catalog = ctx->arena_catalog;
+		nb.skills = ctx->arena_skills;
 	}
 
 	desc = description ? fy_value(ctx->gb, description) : fy_invalid;
@@ -1536,6 +1540,7 @@ int fyai_branch_adopt(struct fyai_ctx *ctx, const char *name, bool keep_head)
 	ctx->last_message = b.head;
 	ctx->arena_config = b.config;
 	ctx->arena_catalog = b.catalog;
+	ctx->arena_skills = b.skills;
 	ctx->branch_desc = b.description;
 	ctx->branch_agent = b.agent;
 	ctx->branch_prev = b.entry;

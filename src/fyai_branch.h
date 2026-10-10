@@ -63,6 +63,7 @@ struct fyai_branch {
 	fy_generic config;	/* this branch's configuration document */
 	fy_generic catalog;	/* this branch's provider and model catalogue */
 	fy_generic todos;	/* this branch's todo list, a sequence */
+	fy_generic skills;	/* this branch's skills, a mapping by name */
 	fy_generic created;	/* first publication of the branch */
 	fy_generic cwd;		/* directory the branch started in */
 	fy_generic description;	/* free-text purpose of the branch */
@@ -109,6 +110,7 @@ const char *fyai_branch_cwd(const struct fyai_branch *b);
 #define FYAI_BRANCH_OP_REBASE	"rebase"
 #define FYAI_BRANCH_OP_MERGE	"merge"
 #define FYAI_BRANCH_OP_TODO	"todo"
+#define FYAI_BRANCH_OP_SKILL	"skill"
 #define FYAI_BRANCH_OP_COMMAND	"command"
 
 /* Set the operation and previous name for the next publish. */

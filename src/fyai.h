@@ -671,6 +671,8 @@ struct fyai_ctx {
 	fy_generic last_message;
 	fy_generic arena_config;	/* the active branch's config, or fy_invalid */
 	fy_generic arena_catalog;	/* catalogue of the branch, or fy_invalid */
+	/* Skills of the branch, a mapping by name, or fy_invalid. */
+	fy_generic arena_skills;
 	/* Active branch state and its next ref-log predecessor. */
 	char *branch;
 	/* Stored HEAD, which can differ from the active branch. */

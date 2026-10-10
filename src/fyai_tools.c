@@ -5306,6 +5306,8 @@ static fy_generic fyai_agent_spawn_state(struct fyai_ctx *ctx,
 		"branch_config", fyai_generic_or_null(ctx->arena_config),
 		"branch_catalog", fy_is_mapping(ctx->arena_catalog) ?
 			fy_value(gb, (long long)ctx->arena_catalog.v) : fy_null,
+		"branch_skills", fy_is_mapping(ctx->arena_skills) ?
+			fy_value(gb, (long long)ctx->arena_skills.v) : fy_null,
 		"fork", fork,
 		"parent", ctx->agent_execution,
 		"transport", transport_exec ?

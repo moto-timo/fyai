@@ -323,9 +323,9 @@ static int fyai_agent_spawn_adopt(struct fyai_ctx *ctx, fy_generic spawn)
 {
 	struct fyai_branch b;
 	struct fyai_root r;
-	fy_generic branch_config, fork, fork_branch, root, catalog;
+	fy_generic branch_config, fork, fork_branch, root, catalog, skills;
 	const char *branch;
-	fy_generic_value head, catalog_v;
+	fy_generic_value head, catalog_v, skills_v;
 	int rc;
 
 	fyai_error_check(ctx, fy_is_mapping(spawn), err,
@@ -344,6 +344,14 @@ static int fyai_agent_spawn_adopt(struct fyai_ctx *ctx, fy_generic spawn)
 					ctx->durable_allocator, catalog), err,
 				 "the parent catalogue is not in the arena");
 		ctx->arena_catalog = catalog;
+	}
+	skills_v = fy_get(spawn, "branch_skills", fy_invalid_value);
+	if (skills_v != fy_invalid_value && skills_v != fy_null_value) {
+		skills = (fy_generic){ .v = skills_v };
+		fyai_error_check(ctx, fyai_arena_mapping_contained(
+					ctx->durable_allocator, skills), err,
+				 "the parent skills are not in the arena");
+		ctx->arena_skills = skills;
 	}
 	rc = fy_is_valid(ctx->arena_config) ? fyai_config_adopt_arena(ctx) :
 					      fyai_config_rederive(ctx);
@@ -463,6 +471,7 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 			ctx->branch_agent = stored.agent;
 			if (fy_is_valid(stored.catalog))
 				ctx->arena_catalog = stored.catalog;
+			ctx->arena_skills = stored.skills;
 			ctx->last_message = stored.head;
 			rc = fyai_agent_revive_config(ctx, stored.config);
 			fyai_error_check(ctx, !rc, err,

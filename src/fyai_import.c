@@ -539,6 +539,7 @@ static int fyai_import_publish(struct fyai_import *im,
 		} else if (im->catalog_seen) {
 			ctx->arena_catalog = fy_invalid;
 		}
+		ctx->arena_skills = s.skills;
 		ctx->branch_desc = s.description;
 		ctx->branch_store = pu->store;
 	}
