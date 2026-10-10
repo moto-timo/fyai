@@ -60,15 +60,19 @@ int main(int argc, char **argv)
 	 * no context, so this is the only boundary its diagnostics reach. A
 	 * failed setup released cfg itself, leaving a zeroed sink this skips.
 	 */
-	fyai_diag_drain(&cfg.diag);
-	if (rc)
+	if (rc) {
+		fyai_diag_drain(&cfg.diag);
 		return rc > 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
 	cfg.argv = argv;
 
 	/*
 	 * With isolation on, this image is the bootstrap: it starts the
 	 * transport and executes itself again without a credential. That does
-	 * not return. There is no fallback to a direct connection.
+	 * not return. There is no fallback to a direct connection. The next
+	 * image runs the same setup and raises what it raised, so the setup is
+	 * reported after the bootstrap: once, by the image that runs the verb,
+	 * or with the cause when the bootstrap stops.
 	 */
 	if (fyai_transport_bootstrap(&cfg, argc, argv)) {
 		fyai_diag_drain(&cfg.diag);
@@ -76,6 +80,7 @@ int main(int argc, char **argv)
 		curl_global_cleanup();
 		return EXIT_FAILURE;
 	}
+	fyai_diag_drain(&cfg.diag);
 
 	rc = fyai_run(&cfg);
 	ret = rc ? EXIT_FAILURE : cfg.exit_status;
