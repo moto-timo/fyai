@@ -1471,6 +1471,7 @@ static int present_result(struct fyai_cmd_call *call, fy_generic result)
 	struct response_buffer text = { 0 };
 	fy_generic render, table, message, line, document;
 	const char *s;
+	bool markdown;
 	int rc;
 
 	if (!fy_is_valid(result) || fy_is_null(result))
@@ -1480,6 +1481,11 @@ static int present_result(struct fyai_cmd_call *call, fy_generic result)
 
 	render = fy_get(call->def, "render", fy_invalid);
 	message = fy_get(render, "message", fy_invalid);
+	/* A markdown template expands as a message does and renders. */
+	markdown = fy_is_invalid(message) &&
+		   fy_is_valid(fy_get(render, "markdown", fy_invalid));
+	if (markdown)
+		message = fy_get(render, "markdown", fy_invalid);
 	if (fy_is_valid(message) && fy_is_mapping(result)) {
 		if (fy_is_string(message)) {
 			rc = present_template(&text, fy_castp(&message, ""),
@@ -1492,7 +1498,9 @@ static int present_result(struct fyai_cmd_call *call, fy_generic result)
 						fy_castp(&line, ""), result);
 		}
 		if (!rc && text.len)
-			rc = fyai_result(ctx, "%s", text.data) < 0 ? -1 : 0;
+			rc = (markdown && ctx->cfg->markdown ?
+			      fyai_result_md(ctx, text.data) :
+			      fyai_result(ctx, "%s", text.data)) < 0 ? -1 : 0;
 		free(text.data);
 		fyai_error_check(ctx, !rc, err, "%s: cannot present the result",
 				 call->path);

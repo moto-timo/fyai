@@ -150,6 +150,10 @@ $defs:
             oneOf:
               - {type: string}
               - {type: array, items: {type: string}}
+          markdown:
+            oneOf:
+              - {type: string}
+              - {type: array, items: {type: string}}
       commands:
         type: array
         items: {$ref: "#/$defs/command"}
