@@ -152,6 +152,7 @@ initialize each generic field explicitly.
 - `src/fyai_branch.c`: branch storage, references, and root selection.
 - `src/fyai_merge.c`: branch merge and rebase.
 - `src/fyai_catalog.c`: provider and model catalogue.
+- `src/fyai_skill.c`: branch-stored skills and the `skill` tool.
 - `src/*.h`: shared structures and internal interfaces.
 - `data/`: embedded configuration schemas and catalogue data.
 - `tests/`: unit tests, functional cases, mock providers, and scenarios.
@@ -169,6 +170,26 @@ model. The card that echoes it, live and on replay, draws it through
 `fyai_event_pretty()` (`src/fyai_event_fmt.c`); a new producer keeps that
 header form and needs no code of its own. Do not change the text the model
 gets to make the card read better.
+
+### Skills
+
+A skill is branch state in the store member `skills`, as `doc/skills.md`
+describes. It enters the store only through `skill import`, `skill new`, or
+`skill edit`: do not discover skills in the filesystem. `ctx->arena_skills`
+follows `ctx->arena_config`: each path that adopts a configuration from a
+branch adopts its skills too, and the commit writes them. Check every front
+matter against `data/skill.schema.yaml`.
+
+A forked skill runs as a call of the `agent` tool through the `expand`
+function of its registry entry. Do not add a second sub-agent path for it.
+`ctx->tools_allow` holds the tools of a forked skill; `make_tools_filtered()`
+offers only those, and `fyai_execute_tool_call()` refuses any other.
+
+A skill with files is written out to a private `mkdtemp()` directory under
+`$TMPDIR` when it loads, in the process that runs its programs: a view gives
+a sub-agent a `/tmp` of its own. Do not write the files in a parent for a
+child. `fyai_skill_dirs_release()` removes them at cleanup and when a tool
+child exits; `fyai_ctx_fork_disown()` forgets those of the parent.
 
 ## Commands
 

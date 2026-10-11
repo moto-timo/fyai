@@ -50,7 +50,7 @@ Use these rules:
 
 - Keep the tool order: `read_file`, `write_file`, `apply_patch`, `exec_command`,
   `shell_input`, `shell_output`, `shell_close`, `cancel`, `ask_user`, `agent`, `list`,
-  `time`, `wait`.
+  `time`, `wait`, `skill`.
 - Write each description as a literal block scalar (`|-`) on one line. The
   provider receives the parsed text without a change.
 - Give each parameter object `type: object`, `properties`, `required`, and
@@ -144,6 +144,12 @@ tables. An entry holds:
   for the result as it is. The transcript stores that Markdown as the
   `tool_result` fragment, with the language `fyai:markdown`, and replays it;
   the model always gets the result as it is;
+- `describe`: adapts the wire specification of the tool to the run, or
+  returns `fy_invalid` to leave the tool out. The `skill` tool lists the
+  stored skills through it;
+- `expand`: makes the call that a call runs as. The scheduler decides on the
+  expanded call and the job runs it, while the turn keeps the call that the
+  model made. A forked skill runs as an `agent` call through it;
 - `effect`: the ordering class of the call against other calls of a batch;
 - `flags`: `PARENT` (never runs in a job), `SILENT`, `MARKED`,
   `NOT_FOR_CHILD`, `HOSTED` (the provider runs it), and `INSTANT` (a call in
