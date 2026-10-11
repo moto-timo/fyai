@@ -22,12 +22,12 @@ mock_start ui_text_scroll.json
 FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
 FYAI_PTY_INPUT="print the lines" FYAI_PTY_NEEDLE="Print sixty lines" \
 FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:T060|wait-screen:▴|"\
-"click:▴|wait-gone:T060|wait-screen:T055|"\
-"click:▾|wait-screen:T060|"\
-"raw:$(wheel 64 10 9)|wait-gone:T060|wait-screen:T053|"\
-"raw:$(wheel 65 10 9)|wait-screen:T060|"\
-"raw:$(wheel 64 10 9)|wait-gone:T060|wait-screen:T053|raw:78|wait-screen:T060|raw:7f|"\
+FYAI_PTY_AFTER="wait-screen:row-060|wait-screen:▴|"\
+"click:▴|wait-gone:row-060|wait-screen:row-055|"\
+"click:▾|wait-screen:row-060|"\
+"raw:$(wheel 64 10 9)|wait-gone:row-060|wait-screen:row-053|"\
+"raw:$(wheel 65 10 9)|wait-screen:row-060|"\
+"raw:$(wheel 64 10 9)|wait-gone:row-060|wait-screen:row-053|raw:78|wait-screen:row-060|raw:7f|"\
 "release:$PWD/band-release|wait-screen:done." \
 FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
 "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
@@ -47,7 +47,7 @@ mock_start ui_text_scroll.json
 FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
 FYAI_PTY_INPUT="print the lines" FYAI_PTY_NEEDLE="Print sixty lines" \
 FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:T060|release:$PWD/band-release|wait-screen:done." \
+FYAI_PTY_AFTER="wait-screen:row-060|release:$PWD/band-release|wait-screen:done." \
 FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
 "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/none.out" \
     "$FYAI_BIN" -k test-key --theme dark \

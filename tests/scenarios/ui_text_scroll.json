@@ -18,7 +18,7 @@
          "type": "function",
          "function": {
           "name": "exec_command",
-          "arguments": "{\"command\": \"seq -f 'T%03g' 1 60; while [ ! -e band-release ]; do sleep 0.05; done\", \"description\": \"Print sixty lines\"}"
+          "arguments": "{\"command\": \"seq -f 'row-%03g' 1 60; while [ ! -e band-release ]; do sleep 0.05; done\", \"description\": \"Print sixty lines\"}"
          }
         }
        ]
