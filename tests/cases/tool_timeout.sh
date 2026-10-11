@@ -23,6 +23,7 @@ import select
 import struct
 import subprocess
 import sys
+import tempfile
 import termios
 import time
 from term_reply import answer_da1
@@ -42,9 +43,18 @@ faulthandler.dump_traceback_later(100 * SCALE)
 
 
 def tagged():
-    """The process we tagged, by argv. Ours alone - the tag is unique."""
-    ps = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True,
-                        text=True).stdout
+    """The process we tagged, by argv. Ours alone - the tag is unique.
+
+    The terminal is read while ps runs: a pty holds 1 KiB on macOS, and a
+    program that fills it waits in its write for the next read.
+    """
+    with tempfile.TemporaryFile("w+") as out:
+        proc = subprocess.Popen(["ps", "-eo", "pid,args"], stdout=out,
+                                text=True)
+        while proc.poll() is None:
+            drain(0.05)
+        out.seek(0)
+        ps = out.read()
     return [l.strip() for l in ps.split("\n")
             if TAG in l and "ps -eo" not in l]
 

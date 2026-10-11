@@ -15,6 +15,7 @@ import select
 import struct
 import subprocess
 import sys
+import tempfile
 import termios
 import time
 from term_reply import answer_da1
@@ -25,9 +26,18 @@ SCALE = float(os.environ.get("FYAI_TIMEOUT_SCALE", "1"))
 
 
 def descendants(root):
-    """Every process below @root, by walking the parent map once."""
-    ps = subprocess.run(["ps", "-eo", "pid,ppid,args"], capture_output=True,
-                        text=True).stdout
+    """Every process below @root, by walking the parent map once.
+
+    The terminal is read while ps runs: a pty holds 1 KiB on macOS, and a
+    program that fills it waits in its write for the next read.
+    """
+    with tempfile.TemporaryFile("w+") as out:
+        proc = subprocess.Popen(["ps", "-eo", "pid,ppid,args"], stdout=out,
+                                text=True)
+        while proc.poll() is None:
+            drain(0.05)
+        out.seek(0)
+        ps = out.read()
     rows = []
     for line in ps.split("\n")[1:]:
         parts = line.strip().split(None, 2)

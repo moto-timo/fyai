@@ -55,13 +55,14 @@ def settle(fd, pid):
         raise SystemExit("fyai never reached an interactive prompt")
 
 
-def wait_exit(pid, seconds):
+def wait_exit(fd, pid, seconds):
+    """Read the terminal until the child ends: a pty holds 1 KiB on macOS."""
     end = time.monotonic() + seconds
     while time.monotonic() < end:
         w, status = os.waitpid(pid, os.WNOHANG)
         if w:
             return status
-        time.sleep(0.1)
+        drain(fd, 0.1)
     return None
 
 
@@ -79,7 +80,7 @@ try:
     settle(fd, pid)
     os.write(fd, b"\x03")
     drain(fd, 0.5)
-    status = wait_exit(pid, 5)
+    status = wait_exit(fd, pid, 5)
     if status is None:
         raise SystemExit("Ctrl-C on an idle prompt did not end the session")
     if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
@@ -96,11 +97,11 @@ try:
     drain(fd, 0.5)
     os.write(fd, b"\x03")
     drain(fd, 0.5)
-    if wait_exit(pid, 2) is not None:
+    if wait_exit(fd, pid, 2) is not None:
         raise SystemExit("Ctrl-C threw away a typed line and the session")
     os.write(fd, b"\x03")
     drain(fd, 0.5)
-    if wait_exit(pid, 5) is None:
+    if wait_exit(fd, pid, 5) is None:
         raise SystemExit("Ctrl-C after the line was discarded did not exit")
 finally:
     kill(pid)
