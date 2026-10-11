@@ -1,0 +1,121 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "r1",
+        "object": "response",
+        "model": "mock-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "function_call",
+            "id": "fc-r1",
+            "call_id": "call-skill-1",
+            "name": "skill",
+            "status": "completed",
+            "arguments": "{\"skill\": \"greet\", \"args\": \"Ada \\\"Lady Lovelace\\\"\"}"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "r2",
+        "object": "response",
+        "model": "mock-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "function_call",
+            "id": "fc-r2",
+            "call_id": "call-skill-2",
+            "name": "skill",
+            "status": "completed",
+            "arguments": "{\"skill\": \"greet\", \"file\": \"scripts/hello.sh\"}"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "r2b",
+        "object": "response",
+        "model": "mock-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "function_call",
+            "id": "fc-r2b",
+            "call_id": "call-run-1",
+            "name": "exec_command",
+            "status": "completed",
+            "arguments": "{\"command\": \"cd \\\"$TMPDIR\\\"/fyai-skills-*/greet && ./scripts/hello.sh\"}"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "r3",
+        "object": "response",
+        "model": "mock-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "message",
+            "id": "m-r3",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Greeted."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "r4",
+        "object": "response",
+        "model": "mock-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "message",
+            "id": "m-r4",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Ran the slash skill."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "r5",
+        "object": "response",
+        "model": "mock-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "message",
+            "id": "m-r5",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Exec done."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
