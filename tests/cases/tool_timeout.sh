@@ -15,6 +15,7 @@ mock_start tool_timeout.json
 
 "$PYTHON" - "$FYAI_BIN" "$MOCK_URL/v1/responses" <<'EOF' || \
 	fail "the tool time limit did not stop the process group"
+import faulthandler
 import fcntl
 import os
 import pty
@@ -35,6 +36,9 @@ except ValueError:
     SCALE = 1.0
 if SCALE <= 0:
     SCALE = 1.0
+# The deadlines below add up to 75 * SCALE seconds. A driver that is still
+# here after that is blocked in a call: show where, in the output of the case.
+faulthandler.dump_traceback_later(100 * SCALE)
 
 
 def tagged():
