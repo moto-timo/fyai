@@ -59,6 +59,7 @@
 #include "fyai_tool_spec.h"
 #include "fyai_turn.h"
 #include "fyai_branch.h"
+#include "fyai_skill.h"
 
 static enum fyai_event_action fyai_signal_cb(const struct fyai_event *ev)
 {
@@ -2144,6 +2145,7 @@ void fyai_cleanup(struct fyai_ctx *ctx)
 	fyai_output_cleanup(ctx);
 	/* After the output document: its discard still talks to the sink. */
 	fyai_agents_cleanup(ctx);
+	fyai_skill_dirs_release(ctx);
 	fyai_cleanup_transient_builder(ctx);
 	fyai_sink_destroy(ctx->sink);
 	ctx->sink = NULL;
@@ -2242,11 +2244,14 @@ int fyai_curl_easy_reinit(struct fyai_ctx *ctx)
 	return 0;
 }
 
+/* A run with no transport has no request state: there is nothing to apply. */
 int fyai_request_state_apply(struct fyai_ctx *ctx)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
 	int rc;
 
+	if (!ctx->curl)
+		return 0;
 	assert(ctx->transient_gb);
 
 	if (ctx->headers) {
@@ -2353,6 +2358,7 @@ err:
 int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 {
 	struct timespec t_setup;
+	fy_generic skill_msg;
 	char *instr;
 	int rc;
 
@@ -2380,6 +2386,7 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	ctx->arena_config = fy_invalid;
 	ctx->arena_catalog = fy_invalid;
 	ctx->arena_skills = fy_invalid;
+	ctx->tools_allow = fy_invalid;
 	/* A zeroed fy_generic is an empty sequence, not fy_invalid. */
 	ctx->arena_branches = fy_invalid;
 	ctx->branch_prev = fy_invalid;
@@ -2481,8 +2488,18 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	}
 
 	if (cfg->prompt && *cfg->prompt) {
+		/* A prompt "/NAME ARGS" that names a skill runs the skill. */
+		skill_msg = fyai_skill_user_message(ctx,
+				fyai_ctx_transient_gb(ctx), cfg->prompt);
+		fyai_error_check(ctx, fy_is_string(skill_msg) ||
+				 !fyai_skill_exec_line(cfg->prompt), err,
+				 "no enabled skill for '%s' on branch '%s'",
+				 cfg->prompt, fyai_ctx_branch(ctx));
 		ctx->last_message = fyai_turn_append(ctx, ctx->last_message,
-			fy_sequence(fyai_make_user_message(ctx, cfg->prompt)));
+			fy_sequence(fyai_make_user_message(ctx,
+				fy_is_string(skill_msg) ?
+				fy_castp(&skill_msg, cfg->prompt) :
+				cfg->prompt)));
 		ctx->last_message = fyai_output_record(ctx, ctx->last_message,
 			FYAI_OUTPUT_USER, cfg->prompt);
 	}
@@ -3017,6 +3034,9 @@ static int fyai_interactive_handle_slash(struct fyai_ctx *ctx,
 
 	if (line[0] != '/' || line[1] == '/')
 		return -1;
+	/* A skill that the user runs is a turn of the conversation. */
+	if (fyai_skill_user_line(ctx, line))
+		return -1;
 	transcript = !strcmp(ctx->cfg->command_output, "transcript");
 	fyai_ui_history_save(ctx, histfile, line);
 	if (transcript)
@@ -3131,13 +3151,21 @@ static void fyai_interactive_prepare_user_line(struct fyai_ctx *ctx,
 	fyai_ui_drain_output(ctx);
 }
 
+/*
+ * Append the user line to the conversation. A line "/NAME ARGS" that names a
+ * skill gives the model the loaded skill, and the transcript keeps the line
+ * as typed.
+ */
 static fy_generic fyai_interactive_append_user_turn(struct fyai_ctx *ctx,
 						    char *line)
 {
-	fy_generic turn;
+	fy_generic turn, message;
+	const char *text;
 
+	message = fyai_skill_user_message(ctx, fyai_ctx_transient_gb(ctx), line);
+	text = fy_is_string(message) ? fy_castp(&message, line) : line;
 	turn = fyai_turn_append(ctx, ctx->last_message,
-			fy_sequence(fyai_make_user_message(ctx, line)));
+			fy_sequence(fyai_make_user_message(ctx, text)));
 	return fyai_output_record(ctx, turn, FYAI_OUTPUT_USER, line);
 }
 
@@ -3358,6 +3386,9 @@ static bool fyai_interactive_line_runs_beside(struct fyai_ctx *ctx,
 	if (line[0] == '!')
 		return true;
 	if (line[0] != '/' || line[1] == '/')
+		return false;
+	/* A skill is a turn: it waits for the turn in flight. */
+	if (fyai_skill_user_line(ctx, line))
 		return false;
 	return fyai_session_slash_immediate(ctx, line, true);
 }

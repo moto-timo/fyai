@@ -22,6 +22,8 @@
 #include "fyai_sink.h"
 #include "commands.h"
 #include "fyai_session.h"
+#include "fyai_branch.h"
+#include "fyai_skill.h"
 #include "utils.h"
 
 #define FYAI_MODULE FYAIEM_UNKNOWN
@@ -416,6 +418,66 @@ static void help_list(struct response_buffer *out, bool *failp,
 	free(defs);
 }
 
+/*
+ * The skills that the user runs as /NAME. They are branch state, not commands
+ * of the registry, so only a help of a running session lists them, and the
+ * reference that the registry gives does not.
+ */
+static void help_skills(struct fyai_ctx *ctx, struct response_buffer *out,
+			bool *failp, enum fyai_cmd_surface surface)
+{
+	fy_generic names, item, name, desc, hint;
+	const char *n;
+	bool first;
+
+	names = fyai_skill_user_names(ctx, fyai_ctx_transient_gb(ctx));
+	first = true;
+	fy_foreach(item, names) {
+		name = fy_get(item, "name", fy_invalid);
+		desc = fy_get(item, "description", fy_invalid);
+		hint = fy_get(item, "hint", fy_invalid);
+		n = gstr(&name);
+		/* A command of the same name takes /NAME. */
+		if (fyai_cmd_session_exact(n, strlen(n)))
+			continue;
+		if (first)
+			put(out, failp, "\n### Skills\n\n| Skill | Description |\n"
+			    "| --- | --- |\n");
+		first = false;
+		putf(out, failp, "| `%s/%s%s%s` | ",
+		     surface == FYAI_CMD_CLI ? "fyai \"" : "", n,
+		     fy_empty(hint) ? "" : " ", gstr(&hint));
+		put_cell(out, failp, gstr(&desc));
+		put(out, failp, " |\n");
+	}
+}
+
+/* Help for the skill @word, when no command or topic has the name. */
+static bool help_skill(struct fyai_ctx *ctx, struct response_buffer *out,
+		       bool *failp, const char *word)
+{
+	fy_generic skill, fm, desc, hint, when;
+
+	if (*word == '/')
+		word++;
+	if (fyai_cmd_session_exact(word, strlen(word)) || fyai_cmd_is_verb(word))
+		return false;
+	skill = fyai_skill_get(ctx, word);
+	if (fy_is_invalid(skill))
+		return false;
+	fm = fy_get(skill, "frontmatter", fy_map_empty);
+	desc = fy_get(fm, "description", fy_invalid);
+	hint = fy_get(fm, "argument-hint", fy_invalid);
+	when = fy_get(fm, "when_to_use", fy_invalid);
+	putf(out, failp, "## /%s%s%s\n\n%s\n", word,
+	     fy_is_string(hint) ? " " : "", gstr(&hint), gstr(&desc));
+	if (fy_is_string(when))
+		putf(out, failp, "\n%s\n", gstr(&when));
+	putf(out, failp, "\nA skill of branch %s. `skill show %s` shows it.\n",
+	     fyai_ctx_branch(ctx), word);
+	return true;
+}
+
 static fy_generic help_topic(const char *word)
 {
 	fy_generic topic;
@@ -661,6 +723,7 @@ int fyai_cmd_help(struct fyai_cmd_call *call, fy_generic *result)
 {
 	struct response_buffer out = { 0 };
 	const char *words[16];
+	bool fail = false;
 	fy_generic w;
 	size_t n;
 	int rc;
@@ -684,8 +747,16 @@ int fyai_cmd_help(struct fyai_cmd_call *call, fy_generic *result)
 				 "help: too many words");
 		words[n++] = fy_gb_intern_string(call->gb, fy_castp(&w, ""));
 	}
-	rc = fyai_cmd_help_source(call->ctx->cfg, call->surface, n, words,
-				  &out);
+	/* A skill has help of its own when no command has the name. */
+	if (n == 1 && help_skill(call->ctx, &out, &fail, words[0])) {
+		rc = fail ? -1 : 0;
+	} else {
+		rc = fyai_cmd_help_source(call->ctx->cfg, call->surface, n,
+					  words, &out);
+		if (!rc && !n)
+			help_skills(call->ctx, &out, &fail, call->surface);
+		rc = rc || fail ? -1 : 0;
+	}
 	if (!rc) {
 		*result = fy_value(call->gb, out.data ? out.data : "");
 		rc = fy_is_valid(*result) ? 0 : -1;

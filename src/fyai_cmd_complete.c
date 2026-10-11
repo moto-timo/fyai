@@ -21,6 +21,7 @@
 
 #include "fyai.h"
 #include "fyai_cmd.h"
+#include "fyai_skill.h"
 #include "fyai_cmd_int.h"
 #include "fyai_branch.h"
 #include "fyai_catalog.h"
@@ -519,6 +520,57 @@ static void kind_mcp_server(struct complete_req *r)
 		cand(r, gstr(&key), NULL);
 }
 
+/* The supporting files of the skill that the previous word names. */
+static void kind_skill_file(struct complete_req *r, const char *name)
+{
+	fy_generic key, files;
+
+	if (!r->ctx)
+		return;
+	files = fy_get(fyai_skill_get(r->ctx, name), "files", fy_invalid);
+	if (!fy_is_mapping(files))
+		return;
+	fy_foreach(key, files)
+		cand(r, gstr(&key), NULL);
+}
+
+/* The skills that the user runs as /NAME, beside the commands of the session. */
+static void complete_skills(struct complete_req *r)
+{
+	fy_generic names, item, name, desc, hint;
+	const char *n;
+
+	if (!r->ctx)
+		return;
+	names = fyai_skill_user_names(r->ctx, r->gb);
+	fy_foreach(item, names) {
+		name = fy_get(item, "name", fy_invalid);
+		desc = fy_get(item, "description", fy_invalid);
+		hint = fy_get(item, "hint", fy_invalid);
+		n = gstr(&name);
+		/* A command of the same name takes /NAME. */
+		if (fyai_cmd_session_exact(n, strlen(n)))
+			continue;
+		cand(r, n, fy_gb_intern_string(r->gb, fy_sprintfa("skill%s%s: %.*s",
+			fy_empty(hint) ? "" : " ", gstr(&hint),
+			(int)strcspn(gstr(&desc), "\n"), gstr(&desc))));
+	}
+}
+
+/* The stored skills of the branch. */
+static void kind_skill(struct complete_req *r)
+{
+	fy_generic key, skills;
+
+	if (!r->ctx)
+		return;
+	skills = fyai_skills(r->ctx);
+	if (fy_is_invalid(skills))
+		return;
+	fy_foreach(key, skills)
+		cand(r, gstr(&key), NULL);
+}
+
 /* The values of the configuration key that the setting names. */
 static void kind_setting_value(struct complete_req *r)
 {
@@ -583,6 +635,7 @@ static const struct {
 	{ "mcp-server",		kind_mcp_server },
 	{ "setting-value",	kind_setting_value },
 	{ "page-layout",	kind_page_layout },
+	{ "skill",		kind_skill },
 };
 
 bool fyai_cmd_kind_known(const char *name)
@@ -593,7 +646,8 @@ bool fyai_cmd_kind_known(const char *name)
 		if (!strcmp(complete_kinds[i].name, name))
 			return true;
 	/* The value of the item that a path argument named. */
-	return !strcmp(name, "config-value") || !strcmp(name, "catalog-value");
+	return !strcmp(name, "config-value") || !strcmp(name, "catalog-value") ||
+	       !strcmp(name, "skill-file");
 }
 
 /* ---- the engine -------------------------------------------------------------- */
@@ -622,6 +676,11 @@ static void complete_value(struct complete_req *r, struct fyai_cmd_prop *cp,
 	if (!strcmp(k, "catalog-value")) {
 		if (prev_value)
 			kind_catalog_value(r, prev_value);
+		return;
+	}
+	if (!strcmp(k, "skill-file")) {
+		if (prev_value)
+			kind_skill_file(r, prev_value);
 		return;
 	}
 	complete_kind(r, k);
@@ -948,6 +1007,9 @@ unsigned int fyai_cmd_complete(struct fyai_ctx *ctx,
 		}
 		free(defs);
 		cmd_words_emit(&r, &ws);
+		/* A skill runs as /NAME, so the session offers it with the commands. */
+		if (surface == FYAI_CMD_SESSION)
+			complete_skills(&r);
 		goto out;
 	}
 	if (fyai_cmd_walk(surface, nwords - start, words + start,

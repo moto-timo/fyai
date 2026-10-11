@@ -352,6 +352,10 @@ fyai_embed(FYAI_EMBEDDED_PAGE embedded_page.inc data/page.yaml)
 fyai_embed(FYAI_EMBEDDED_PAGE_SCHEMA embedded_page_schema.inc
     data/page.schema.yaml)
 
+# Embed the schema that the front matter of an imported skill is checked against.
+fyai_embed(FYAI_EMBEDDED_SKILL_SCHEMA embedded_skill_schema.inc
+    data/skill.schema.yaml)
+
 # Embed the command definitions and their schema (src/fyai_cmd.c).
 fyai_embed(FYAI_EMBEDDED_COMMANDS embedded_commands.inc data/commands.yaml)
 fyai_embed(FYAI_EMBEDDED_COMMAND_SCHEMA embedded_command_schema.inc
@@ -428,6 +432,7 @@ set(FYAI_SOURCES
     src/fyai_event_fmt.c
     src/fyai_asks.c
     src/fyai_todo.c
+    src/fyai_skill.c
     src/fyai_branch.c
     src/fyai_merge.c
     src/fyai_diff.c
@@ -492,6 +497,7 @@ set(FYAI_SOURCES
     src/fyai_cmd_help.c
     src/fyai_cmd_mcp.c
     src/fyai_cmd_session.c
+    src/fyai_cmd_skill.c
     src/fyai_cmd_page.c
     src/fyai_cmd_misc.c
     src/fyai_cmd_store.c

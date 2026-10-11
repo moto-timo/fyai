@@ -187,12 +187,13 @@ commands:
   - command: help
     title: describe commands and topics
     description: |
-      With no argument, list the commands. With a command path, describe
-      that command. With a topic name, show the topic.
+      With no argument, list the commands and the skills of the branch. With
+      a command path, describe that command. With a topic name, show the
+      topic. With the name of a skill that no command has, describe the skill.
     surfaces: [cli, session]
     handler: help
     mode: result
-    flags: [no-storage]
+    flags: [storage-optional]
     view: true
     while_busy: run
     examples:
@@ -2725,6 +2726,337 @@ commands:
         while_busy: run
         render:
           message: "todos cleared"
+
+  - command: skill
+    title: import, show, or remove the skills of the branch
+    description: |
+      A skill is a SKILL.md with its supporting files: instructions that the
+      model loads with the `skill` tool when a task needs them, or that you
+      run with `/NAME ARGS`. Skills are branch state, as the configuration is:
+      `skill import` reads them into the store of the branch, and a new
+      session, a new branch, and a sub-agent take them with the
+      configuration. Nothing is read from the filesystem until you import it.
+    surfaces: [cli, session]
+    default: list
+    commands:
+      - command: list
+        title: list the skills
+        description: List the skills of the branch.
+        handler: skill_list
+        view: true
+        while_busy: run
+        render:
+          table:
+            title: Skills
+            empty: no skills
+            keys: [name, enabled, invocation, context, arguments, files, description]
+            columns:
+              name: {name: Skill, align: left}
+              enabled: {name: Enabled, align: left}
+              description: {name: Description, align: left}
+              arguments: {name: Arguments, align: left}
+              context: {name: Context, align: left}
+              invocation: {name: Invoked by, align: left}
+              files: {name: Files, align: right}
+      - command: show
+        title: show a skill
+        description: |
+          Show the SKILL.md of a skill as it is stored, or one of its
+          supporting files.
+        handler: skill_show
+        view: true
+        while_busy: run
+        render:
+          markdown:
+            - "{?frontmatter}````yaml"
+            - "{frontmatter}"
+            - "{?frontmatter}````"
+            - "{?frontmatter}"
+            - "{body}"
+            - "{?files}**Files:** `{files}`"
+            - "{?code}````{lang}"
+            - "{code}"
+            - "{?code}````"
+        arguments:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: the skill
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+            file:
+              type: string
+              minLength: 1
+              description: a supporting file of the skill
+              x-fyai-positional: 1
+              x-fyai-meta: FILE
+      - command: import
+        title: store skills, or a supporting file, from the filesystem
+        description: |
+          Read the skill at PATH into the store of the branch: a SKILL.md, a
+          directory that holds one, or a directory of such directories. The
+          text files beside SKILL.md are stored with it. The front matter is
+          checked against the skill schema. With `--into NAME`, PATH is one
+          text file that is stored as a supporting file of that skill, under
+          its base name or the path that `--as` gives.
+
+          `--claude SCOPE` takes no PATH: it imports the skills of Claude
+          Code. `project` reads .claude in the current directory, `user` reads
+          $CLAUDE_CONFIG_DIR or ~/.claude with the skills that claude.ai
+          synced, `plugins` reads the installed plugins, each skill named
+          after its plugin as PLUGIN-NAME, and `all` reads them in that order.
+          A skills directory gives a skill per SKILL.md, and a commands
+          directory a skill per Markdown file. The first source of a name
+          wins. A file that cannot be read is skipped with a warning.
+        handler: skill_import
+        render:
+          message: "skill: imported {names}"
+        arguments:
+          type: object
+          additionalProperties: false
+          properties:
+            claude:
+              type: string
+              enum: [project, user, plugins, all]
+              description: import the skills and commands of Claude Code
+              x-fyai-meta: SCOPE
+            path:
+              type: string
+              minLength: 1
+              description: the SKILL.md or the directory
+              x-fyai-positional: 0
+              x-fyai-meta: PATH
+              x-fyai-complete: file
+            force:
+              type: boolean
+              description: replace a stored skill of the same name
+              x-fyai-short: f
+            into:
+              type: string
+              minLength: 1
+              description: store the file PATH as a supporting file of this skill
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+            as:
+              type: string
+              minLength: 1
+              description: the relative path of the supporting file (with --into)
+              x-fyai-meta: FILE
+      - command: remove
+        aliases: [rm]
+        title: remove skills, or a supporting file
+        description: |
+          Remove skills from the store of the branch. With `--file`, remove
+          that supporting file of the one skill named.
+        handler: skill_remove
+        render:
+          message: "skill: removed {names}"
+        arguments:
+          type: object
+          required: [names]
+          additionalProperties: false
+          properties:
+            names:
+              type: array
+              minItems: 1
+              items: {type: string, minLength: 1}
+              description: the skills
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+            file:
+              type: string
+              minLength: 1
+              description: remove this supporting file of the skill
+              x-fyai-meta: FILE
+      - command: new
+        title: write a new skill in an editor
+        description: |
+          Open $VISUAL or $EDITOR on a SKILL.md template for a new skill, and
+          store the skill when the editor ends. A session runs the editor in
+          the work pane. A text that the skill schema refuses is kept in its
+          file, which the error names.
+        handler: skill_new
+        mode: async
+        render:
+          message: "skill: created {name}"
+        arguments:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: the name of the new skill
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+      - command: edit
+        title: edit a skill in an editor
+        description: |
+          Open $VISUAL or $EDITOR on the SKILL.md of a skill, or on one of its
+          supporting files, and store the edit when the editor ends. A file
+          that the skill does not hold yet is added. The front matter is
+          checked as an import checks it; a text that fails is kept in its
+          file, which the error names.
+        handler: skill_edit
+        mode: async
+        render:
+          message: "skill: stored {file} of {name}"
+        arguments:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: the skill
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+            file:
+              type: string
+              minLength: 1
+              description: a supporting file of the skill, instead of SKILL.md
+              x-fyai-positional: 1
+              x-fyai-meta: FILE
+              x-fyai-complete: skill-file
+      - command: exec
+        title: run a skill as a turn
+        description: |
+          Run the skill NAME with ARGS as a turn of the conversation, as
+          /NAME ARGS does. Use it for a skill whose name a command takes, and
+          on the command line, where it runs one turn.
+        handler: skill_exec
+        prepare: skill_exec
+        flags: [model]
+        arguments:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: the skill
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+            args:
+              type: string
+              description: the arguments of the skill
+              x-fyai-positional: 1
+              x-fyai-rest: true
+              x-fyai-meta: ARGS
+      - command: enable
+        title: let the model and /NAME run skills again
+        description: Enable skills that `skill disable` disabled.
+        handler: skill_enable
+        render:
+          message: "skill: enabled {names}"
+        arguments:
+          type: object
+          required: [names]
+          additionalProperties: false
+          properties:
+            names:
+              type: array
+              minItems: 1
+              items: {type: string, minLength: 1}
+              description: the skills
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+      - command: disable
+        title: keep skills stored but unused
+        description: |
+          Disable skills: they stay stored, but the model does not see them
+          and /NAME does not run them. The state belongs to the branch, not to
+          the SKILL.md, and an export leaves it out.
+        handler: skill_disable
+        render:
+          message: "skill: disabled {names}"
+        arguments:
+          type: object
+          required: [names]
+          additionalProperties: false
+          properties:
+            names:
+              type: array
+              minItems: 1
+              items: {type: string, minLength: 1}
+              description: the skills
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+      - command: files
+        title: list the supporting files of a skill
+        description: List the supporting files of a skill with their sizes.
+        handler: skill_files
+        view: true
+        while_busy: run
+        render:
+          table:
+            title: Files
+            empty: no supporting files
+            keys: [path, executable, bytes, lines]
+            columns:
+              path: {name: File, align: left}
+              executable: {name: Executable, align: left}
+              bytes: {name: Bytes, align: right}
+              lines: {name: Lines, align: right}
+        arguments:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: the skill
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+      - command: export
+        title: write a skill, or one of its files, to a directory
+        description: |
+          Write the SKILL.md and the supporting files of a skill under DIR. A
+          file that exists is not replaced. With `--file`, write that
+          supporting file alone, as DIR/FILE; a DIR of `-` writes it to
+          standard output as it stands.
+        handler: skill_export
+        render:
+          message: "skill: exported {what} to {dir}"
+        arguments:
+          type: object
+          required: [name, dir]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: the skill
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: skill
+            dir:
+              type: string
+              minLength: 1
+              description: the directory to write, or - for standard output
+              x-fyai-positional: 1
+              x-fyai-meta: DIR
+              x-fyai-complete: dir
+            file:
+              type: string
+              minLength: 1
+              description: write this supporting file alone
+              x-fyai-meta: FILE
 
   - command: undo
     title: take back the changes of a group of tool calls

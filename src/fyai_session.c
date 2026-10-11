@@ -755,7 +755,7 @@ int fyai_session_model(struct fyai_ctx *ctx, const char *name, bool live)
 		return -1;
 
 	/* Rebuild the derived request state when a live session exists. */
-	if (ctx->curl && fyai_request_state_apply(ctx))
+	if (fyai_request_state_apply(ctx))
 		return -1;
 
 	session_persist_model(ctx);
@@ -848,7 +848,7 @@ int fyai_session_api(struct fyai_ctx *ctx, const char *arg, bool live)
 		return -1;
 
 	/* Rebuild the derived request state when a live session exists. */
-	if (ctx->curl && fyai_request_state_apply(ctx))
+	if (fyai_request_state_apply(ctx))
 		return -1;
 
 	/*
@@ -1679,7 +1679,7 @@ int fyai_session_branch_switch(struct fyai_ctx *ctx, const char *name,
 	rc = fyai_auth_resolve(ctx);
 	fyai_error_check(ctx, !rc, rollback,
 			 "branch: could not resolve '%s' authentication", name);
-	rc = ctx->curl ? fyai_request_state_apply(ctx) : 0;
+	rc = fyai_request_state_apply(ctx);
 	fyai_error_check(ctx, !rc, rollback,
 			 "branch: could not apply '%s' request state", name);
 
@@ -1704,7 +1704,7 @@ rollback:
 		rc = fyai_config_rederive(ctx);
 	if (!rc)
 		rc = fyai_auth_resolve(ctx);
-	if (!rc && ctx->curl)
+	if (!rc)
 		rc = fyai_request_state_apply(ctx);
 	fyai_session_banner_update(ctx);
 	return -1;

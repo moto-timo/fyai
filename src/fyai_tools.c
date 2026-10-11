@@ -54,6 +54,7 @@
 #include "fyai_terminal_session.h"
 #include "fyai_output.h"
 #include "fyai_ask.h"
+#include "fyai_skill.h"
 #include "fyai_todo.h"
 #include "fyai_tools.h"
 #include "fyai_view.h"
@@ -123,6 +124,46 @@ fyai_tool_call_args(struct fyai_ctx *ctx, fy_generic tool_call)
 		__builtin_unreachable();
 	}
 	return parse_json_string(fyai_ctx_transient_gb(ctx), args_text);
+}
+
+/*
+ * The call that @tool_call runs as: the call itself, or the call that the
+ * expand function of its tool makes of it, with the same id. The scheduler
+ * decides on this call and the job runs it; the turn keeps @tool_call, so
+ * the result answers the call that the model made.
+ */
+static fy_generic fyai_tool_call_effective(struct fyai_ctx *ctx,
+					   fy_generic tool_call)
+{
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	const struct fyai_tool_def *def;
+	const char *name, *call_id, *json;
+	fy_generic args, id;
+
+	if (fy_equal(fy_get(tool_call, "type"), "shell_call"))
+		return tool_call;
+	def = fyai_tool_find(fyai_tool_call_name(ctx, tool_call));
+	if (!def || !def->expand)
+		return tool_call;
+	args = fyai_tool_call_args(ctx, tool_call);
+	if (!fy_is_mapping(args))
+		return tool_call;
+	id = ctx->cfg->api_mode == FYAI_API_CHAT_COMPLETIONS ?
+		fy_get(tool_call, "id", fy_invalid) :
+		fy_get(tool_call, "call_id", fy_invalid);
+	call_id = fy_castp(&id, "");
+	if (!def->expand(ctx, args, call_id, &name, &args))
+		return tool_call;
+	json = emit_json_string(gb, args);
+	if (!json)
+		return tool_call;
+	if (ctx->cfg->api_mode == FYAI_API_CHAT_COMPLETIONS)
+		return fy_assoc(gb, tool_call, "function",
+			fy_assoc(gb, fy_get(tool_call, "function", fy_map_empty),
+				 "name", fy_value(gb, name),
+				 "arguments", fy_value(gb, json)));
+	return fy_assoc(gb, tool_call, "name", fy_value(gb, name),
+			"arguments", fy_value(gb, json));
 }
 
 static bool fyai_shell_tty_requested(struct fyai_ctx *ctx, fy_generic call);
@@ -1610,6 +1651,11 @@ fy_generic fyai_execute_tool_call(struct fyai_ctx *ctx,
 
 	*okp = false;
 	type = fy_get(tool_call, "type");
+	if (fy_equal(type, "shell_call") &&
+	    !fyai_skill_tool_allowed(ctx, "shell"))
+		return fy_value(ctx->transient_gb,
+				"tool error: shell is not one of the tools of "
+				"this skill");
 	if (fy_equal(type, "shell_call")) {
 
 		action = fy_get(tool_call, "action");
@@ -1757,6 +1803,10 @@ fy_generic fyai_execute_tool_call(struct fyai_ctx *ctx,
 	args = parse_json_string(ctx->transient_gb, args_text);
 	if (fy_is_invalid(args))
 		return fy_value(ctx->transient_gb, "tool error: invalid JSON arguments");
+	if (!fyai_skill_tool_allowed(ctx, fyai_tool_name_canonical(name)))
+		return fy_value(ctx->transient_gb,
+				fy_sprintfa("tool error: %s is not one of the "
+					    "tools of this skill", name));
 	if (fyai_mcp_tool_name(name)) {
 		result_generic = fyai_mcp_call(ctx, name, args);
 		goto out;
@@ -2716,7 +2766,11 @@ static void fyai_tool_child_serve_loop(struct fyai_ctx *ctx)
 	while (jsonrpc_conn_has_output(conn))
 		if (fyai_event_loop_step(el, 1000) <= 0)
 			break;
-	/* This child leaves through _exit and never returns to main(). */
+	/*
+	 * This child leaves through _exit and never returns to main(), so it
+	 * removes the skills it wrote out itself.
+	 */
+	fyai_skill_dirs_release(ctx);
 	fyai_prof_report();
 	_exit(ok ? 0 : 1);
 }
@@ -4338,8 +4392,12 @@ static char *fyai_cancel_tool(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 
 int fyai_tool_call_file_effect(struct fyai_ctx *ctx, fy_generic tool_call)
 {
-	const char *name = fyai_tool_call_name(ctx, tool_call);
-	const struct fyai_tool_def *def = fyai_tool_find(name);
+	const char *name;
+	const struct fyai_tool_def *def;
+
+	tool_call = fyai_tool_call_effective(ctx, tool_call);
+	name = fyai_tool_call_name(ctx, tool_call);
+	def = fyai_tool_find(name);
 
 	if (def)
 		return def->effect;
@@ -4351,8 +4409,10 @@ int fyai_tool_call_file_effect(struct fyai_ctx *ctx, fy_generic tool_call)
 /* A call of the parent that returns at once and starts work for later. */
 static bool fyai_tool_call_instant(struct fyai_ctx *ctx, fy_generic tool_call)
 {
-	const struct fyai_tool_def *def =
-		fyai_tool_find(fyai_tool_call_name(ctx, tool_call));
+	const struct fyai_tool_def *def;
+
+	tool_call = fyai_tool_call_effective(ctx, tool_call);
+	def = fyai_tool_find(fyai_tool_call_name(ctx, tool_call));
 
 	if (!def || !(def->flags & FYAI_TOOL_INSTANT))
 		return false;
@@ -4364,8 +4424,12 @@ static bool fyai_tool_call_instant(struct fyai_ctx *ctx, fy_generic tool_call)
 bool fyai_tool_call_parallel_eligible(struct fyai_ctx *ctx,
 				      fy_generic tool_call)
 {
-	const char *name = fyai_tool_call_name(ctx, tool_call);
-	const struct fyai_tool_def *def = fyai_tool_find(name);
+	const char *name;
+	const struct fyai_tool_def *def;
+
+	tool_call = fyai_tool_call_effective(ctx, tool_call);
+	name = fyai_tool_call_name(ctx, tool_call);
+	def = fyai_tool_find(name);
 
 	if (fyai_mcp_tool_name(name))
 		return false;
@@ -5231,6 +5295,7 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	free(ctx->patch_display);
 	ctx->patch_display = NULL;
 	fyai_output_cleanup(ctx);		/* the document it has open */
+	fyai_skill_dirs_abandon(ctx);		/* the skills it wrote out */
 	ctx->ui = NULL;				/* its display */
 	ctx->browser = NULL;
 	ctx->agents = NULL;
@@ -7971,6 +8036,8 @@ int fyai_tool_job_group_add(struct fyai_tool_job_group *group,
 		return 1;
 	if (group->count && (group->exclusive || !parallel))
 		return -1;
+	/* The job runs the call that the tool call expands to. */
+	tool_call = fyai_tool_call_effective(group->ctx, tool_call);
 	text = emit_json_string(group->ctx->transient_gb, tool_call);
 	copy = text ? strdup(text) : NULL;
 	if (!copy)

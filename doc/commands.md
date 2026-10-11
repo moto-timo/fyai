@@ -38,8 +38,9 @@ describe commands and topics
 
 **Usage:** `fyai help [--markdown] [--man] [TOPIC...]`
 
-With no argument, list the commands. With a command path, describe
-that command. With a topic name, show the topic.
+With no argument, list the commands and the skills of the branch. With
+a command path, describe that command. With a topic name, show the
+topic. With the name of a skill that no command has, describe the skill.
 
 
 ### Arguments
@@ -2561,6 +2562,313 @@ Drop the todo list of the branch.
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 
+## fyai skill
+
+import, show, or remove the skills of the branch
+
+**Usage:** `fyai skill {disable|edit|enable|exec|export|files|import|list|new|remove|show} ...`
+
+A skill is a SKILL.md with its supporting files: instructions that the
+model loads with the `skill` tool when a task needs them, or that you
+run with `/NAME ARGS`. Skills are branch state, as the configuration is:
+`skill import` reads them into the store of the branch, and a new
+session, a new branch, and a sub-agent take them with the
+configuration. Nothing is read from the filesystem until you import it.
+
+
+### Commands
+
+| Command | Description |
+| --- | --- |
+| `disable` | keep skills stored but unused |
+| `edit` | edit a skill in an editor |
+| `enable` | let the model and /NAME run skills again |
+| `exec` | run a skill as a turn |
+| `export` | write a skill, or one of its files, to a directory |
+| `files` | list the supporting files of a skill |
+| `import` | store skills, or a supporting file, from the filesystem |
+| `list` | list the skills |
+| `new` | write a new skill in an editor |
+| `remove`, `rm` | remove skills, or a supporting file |
+| `show` | show a skill |
+
+With no command, `list` runs.
+
+## fyai skill list
+
+list the skills
+
+**Usage:** `fyai skill list`
+
+List the skills of the branch.
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill show
+
+show a skill
+
+**Usage:** `fyai skill show NAME [FILE]`
+
+Show the SKILL.md of a skill as it is stored, or one of its
+supporting files.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `FILE` | a supporting file of the skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill import
+
+store skills, or a supporting file, from the filesystem
+
+**Usage:** `fyai skill import [--claude SCOPE] [-f] [--into NAME] [--as FILE] [PATH]`
+
+Read the skill at PATH into the store of the branch: a SKILL.md, a
+directory that holds one, or a directory of such directories. The
+text files beside SKILL.md are stored with it. The front matter is
+checked against the skill schema. With `--into NAME`, PATH is one
+text file that is stored as a supporting file of that skill, under
+its base name or the path that `--as` gives.
+
+`--claude SCOPE` takes no PATH: it imports the skills of Claude
+Code. `project` reads .claude in the current directory, `user` reads
+$CLAUDE_CONFIG_DIR or ~/.claude with the skills that claude.ai
+synced, `plugins` reads the installed plugins, each skill named
+after its plugin as PLUGIN-NAME, and `all` reads them in that order.
+A skills directory gives a skill per SKILL.md, and a commands
+directory a skill per Markdown file. The first source of a name
+wins. A file that cannot be read is skipped with a warning.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `PATH` | the SKILL.md or the directory |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--claude SCOPE` | import the skills and commands of Claude Code (project, user, plugins, all) |
+| `-f`, `--force` | replace a stored skill of the same name |
+| `--into NAME` | store the file PATH as a supporting file of this skill |
+| `--as FILE` | the relative path of the supporting file (with --into) |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill remove
+
+remove skills, or a supporting file
+
+**Usage:** `fyai skill remove [--file FILE] NAME...`
+
+**Aliases:** `rm`
+
+Remove skills from the store of the branch. With `--file`, remove
+that supporting file of the one skill named.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skills |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--file FILE` | remove this supporting file of the skill |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill new
+
+write a new skill in an editor
+
+**Usage:** `fyai skill new NAME`
+
+Open $VISUAL or $EDITOR on a SKILL.md template for a new skill, and
+store the skill when the editor ends. A session runs the editor in
+the work pane. A text that the skill schema refuses is kept in its
+file, which the error names.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the name of the new skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill edit
+
+edit a skill in an editor
+
+**Usage:** `fyai skill edit NAME [FILE]`
+
+Open $VISUAL or $EDITOR on the SKILL.md of a skill, or on one of its
+supporting files, and store the edit when the editor ends. A file
+that the skill does not hold yet is added. The front matter is
+checked as an import checks it; a text that fails is kept in its
+file, which the error names.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `FILE` | a supporting file of the skill, instead of SKILL.md |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill exec
+
+run a skill as a turn
+
+**Usage:** `fyai skill exec NAME [ARGS...]`
+
+Run the skill NAME with ARGS as a turn of the conversation, as
+/NAME ARGS does. Use it for a skill whose name a command takes, and
+on the command line, where it runs one turn.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `ARGS` | the arguments of the skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill enable
+
+let the model and /NAME run skills again
+
+**Usage:** `fyai skill enable NAME...`
+
+Enable skills that `skill disable` disabled.
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skills |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill disable
+
+keep skills stored but unused
+
+**Usage:** `fyai skill disable NAME...`
+
+Disable skills: they stay stored, but the model does not see them
+and /NAME does not run them. The state belongs to the branch, not to
+the SKILL.md, and an export leaves it out.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skills |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill files
+
+list the supporting files of a skill
+
+**Usage:** `fyai skill files NAME`
+
+List the supporting files of a skill with their sizes.
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai skill export
+
+write a skill, or one of its files, to a directory
+
+**Usage:** `fyai skill export [--file FILE] NAME DIR`
+
+Write the SKILL.md and the supporting files of a skill under DIR. A
+file that exists is not replaced. With `--file`, write that
+supporting file alone, as DIR/FILE; a DIR of `-` writes it to
+standard output as it stands.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `DIR` | the directory to write, or - for standard output |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--file FILE` | write this supporting file alone |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
 ## fyai agent
 
 run one sub-agent on a task
@@ -2647,8 +2955,9 @@ describe commands and topics
 
 **Usage:** `/help [TOPIC...]`
 
-With no argument, list the commands. With a command path, describe
-that command. With a topic name, show the topic.
+With no argument, list the commands and the skills of the branch. With
+a command path, describe that command. With a topic name, show the
+topic. With the name of a skill that no command has, describe the skill.
 
 
 ### Arguments
@@ -4825,6 +5134,302 @@ Drop the todo list of the branch.
 
 | Option | Description |
 | --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill
+
+import, show, or remove the skills of the branch
+
+**Usage:** `/skill {disable|edit|enable|exec|export|files|import|list|new|remove|show} ...`
+
+A skill is a SKILL.md with its supporting files: instructions that the
+model loads with the `skill` tool when a task needs them, or that you
+run with `/NAME ARGS`. Skills are branch state, as the configuration is:
+`skill import` reads them into the store of the branch, and a new
+session, a new branch, and a sub-agent take them with the
+configuration. Nothing is read from the filesystem until you import it.
+
+
+### Commands
+
+| Command | Description |
+| --- | --- |
+| `disable` | keep skills stored but unused |
+| `edit` | edit a skill in an editor |
+| `enable` | let the model and /NAME run skills again |
+| `exec` | run a skill as a turn |
+| `export` | write a skill, or one of its files, to a directory |
+| `files` | list the supporting files of a skill |
+| `import` | store skills, or a supporting file, from the filesystem |
+| `list` | list the skills |
+| `new` | write a new skill in an editor |
+| `remove`, `rm` | remove skills, or a supporting file |
+| `show` | show a skill |
+
+With no command, `list` runs.
+
+## /skill list
+
+list the skills
+
+**Usage:** `/skill list`
+
+List the skills of the branch.
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill show
+
+show a skill
+
+**Usage:** `/skill show NAME [FILE]`
+
+Show the SKILL.md of a skill as it is stored, or one of its
+supporting files.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `FILE` | a supporting file of the skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill import
+
+store skills, or a supporting file, from the filesystem
+
+**Usage:** `/skill import [--claude SCOPE] [-f] [--into NAME] [--as FILE] [PATH]`
+
+Read the skill at PATH into the store of the branch: a SKILL.md, a
+directory that holds one, or a directory of such directories. The
+text files beside SKILL.md are stored with it. The front matter is
+checked against the skill schema. With `--into NAME`, PATH is one
+text file that is stored as a supporting file of that skill, under
+its base name or the path that `--as` gives.
+
+`--claude SCOPE` takes no PATH: it imports the skills of Claude
+Code. `project` reads .claude in the current directory, `user` reads
+$CLAUDE_CONFIG_DIR or ~/.claude with the skills that claude.ai
+synced, `plugins` reads the installed plugins, each skill named
+after its plugin as PLUGIN-NAME, and `all` reads them in that order.
+A skills directory gives a skill per SKILL.md, and a commands
+directory a skill per Markdown file. The first source of a name
+wins. A file that cannot be read is skipped with a warning.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `PATH` | the SKILL.md or the directory |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--claude SCOPE` | import the skills and commands of Claude Code (project, user, plugins, all) |
+| `-f`, `--force` | replace a stored skill of the same name |
+| `--into NAME` | store the file PATH as a supporting file of this skill |
+| `--as FILE` | the relative path of the supporting file (with --into) |
+| `-h`, `--help` | show this help |
+
+## /skill remove
+
+remove skills, or a supporting file
+
+**Usage:** `/skill remove [--file FILE] NAME...`
+
+**Aliases:** `rm`
+
+Remove skills from the store of the branch. With `--file`, remove
+that supporting file of the one skill named.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skills |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--file FILE` | remove this supporting file of the skill |
+| `-h`, `--help` | show this help |
+
+## /skill new
+
+write a new skill in an editor
+
+**Usage:** `/skill new NAME`
+
+Open $VISUAL or $EDITOR on a SKILL.md template for a new skill, and
+store the skill when the editor ends. A session runs the editor in
+the work pane. A text that the skill schema refuses is kept in its
+file, which the error names.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the name of the new skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill edit
+
+edit a skill in an editor
+
+**Usage:** `/skill edit NAME [FILE]`
+
+Open $VISUAL or $EDITOR on the SKILL.md of a skill, or on one of its
+supporting files, and store the edit when the editor ends. A file
+that the skill does not hold yet is added. The front matter is
+checked as an import checks it; a text that fails is kept in its
+file, which the error names.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `FILE` | a supporting file of the skill, instead of SKILL.md |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill exec
+
+run a skill as a turn
+
+**Usage:** `/skill exec NAME [ARGS...]`
+
+Run the skill NAME with ARGS as a turn of the conversation, as
+/NAME ARGS does. Use it for a skill whose name a command takes, and
+on the command line, where it runs one turn.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `ARGS` | the arguments of the skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill enable
+
+let the model and /NAME run skills again
+
+**Usage:** `/skill enable NAME...`
+
+Enable skills that `skill disable` disabled.
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skills |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill disable
+
+keep skills stored but unused
+
+**Usage:** `/skill disable NAME...`
+
+Disable skills: they stay stored, but the model does not see them
+and /NAME does not run them. The state belongs to the branch, not to
+the SKILL.md, and an export leaves it out.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skills |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill files
+
+list the supporting files of a skill
+
+**Usage:** `/skill files NAME`
+
+List the supporting files of a skill with their sizes.
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /skill export
+
+write a skill, or one of its files, to a directory
+
+**Usage:** `/skill export [--file FILE] NAME DIR`
+
+Write the SKILL.md and the supporting files of a skill under DIR. A
+file that exists is not replaced. With `--file`, write that
+supporting file alone, as DIR/FILE; a DIR of `-` writes it to
+standard output as it stands.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the skill |
+| `DIR` | the directory to write, or - for standard output |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--file FILE` | write this supporting file alone |
 | `-h`, `--help` | show this help |
 
 ## /undo

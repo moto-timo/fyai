@@ -7,7 +7,8 @@
 # tests consume, so keep them in sync with tests/fyai_tool_spec_test.c.
 #
 # Tool order is fixed: read_file, write_file, apply_patch, shell, shell_input,
-# shell_output, shell_close, ask_user, ask_parent, agent, todo_write, time, wait.
+# shell_output, shell_close, ask_user, ask_parent, agent, todo_write, time, wait,
+# skill.
 - type: function
   function:
     name: read_file
@@ -796,4 +797,34 @@
           description: >-
             Optional short note on what this wait is for. It is shown to the user and given back to
             you when the wait fires.
+      additionalProperties: false
+- type: function
+  function:
+    name: skill
+    description: >-
+      Load a skill. A skill is a packaged set of instructions that the user stored for a kind of
+      task: a workflow, a checklist, a convention of the project. When the task at hand is one that
+      a skill below covers, call this tool first: the instructions of the skill are returned for
+      you to follow in place of your default approach. A skill that runs as a sub-agent returns
+      the report of that sub-agent instead. A user line of the form `/NAME ARGS` that names a skill
+      has already loaded it; do not load it again. A skill can have supporting files: the loaded
+      skill names them, and `file` reads one. Only a name from the list is valid.
+    parameters:
+      type: object
+      properties:
+        skill:
+          type: string
+          description: |-
+            The name of the skill, exactly as the list gives it.
+        args:
+          type: string
+          description: >-
+            Optional arguments for the skill, as the user would type them after its name.
+        file:
+          type: string
+          description: >-
+            Optional relative path of a supporting file of the skill. The call then returns that
+            file and does not load the skill.
+      required:
+        - skill
       additionalProperties: false

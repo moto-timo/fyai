@@ -37,6 +37,25 @@ typedef char *(*fyai_tool_format_fn)(struct fyai_ctx *ctx,
 				     struct fy_generic_builder *gb,
 				     fy_generic args, const char *result);
 
+/*
+ * Adapt the wire specification @tool of the tool to this run, built in @gb.
+ * Return fy_invalid to leave the tool out of the run.
+ */
+typedef fy_generic (*fyai_tool_describe_fn)(struct fyai_ctx *ctx,
+					    struct fy_generic_builder *gb,
+					    fy_generic tool);
+
+/*
+ * Decide whether a call runs as the call of another tool. Given the
+ * arguments and the id of the call, set *@namep and *@argsp, built in the
+ * transient builder, and return true; return false to run the call as it
+ * is. The decision must depend only on the call and on the stored state,
+ * because the scheduler asks it more than once for one call.
+ */
+typedef bool (*fyai_tool_expand_fn)(struct fyai_ctx *ctx, fy_generic args,
+				    const char *call_id, const char **namep,
+				    fy_generic *argsp);
+
 /* Ordering classes of fyai_tool_def.effect. */
 enum {
 	FYAI_TOOL_EFFECT_NONE,		/* reads nothing that others write */
@@ -83,6 +102,10 @@ struct fyai_tool_def {
 	fyai_tool_format_fn format_result;
 	/* When set, a call is kept in the parent if this says so of its arguments. */
 	bool (*in_parent)(fy_generic args);
+	/* When set, the specification of the tool is adapted to the run. */
+	fyai_tool_describe_fn describe;
+	/* When set, a call can run as the call of another tool. */
+	fyai_tool_expand_fn expand;
 	unsigned int flags;
 	int effect;
 };
@@ -98,6 +121,8 @@ extern const struct fyai_tool_def fyai_monitor_defs[];
 extern const size_t fyai_monitor_defs_count;
 extern const struct fyai_tool_def fyai_display_defs[];
 extern const size_t fyai_display_defs_count;
+extern const struct fyai_tool_def fyai_skill_defs[];
+extern const size_t fyai_skill_defs_count;
 
 /* The entry for @name, or NULL. @name may be a wire name of the shell. */
 const struct fyai_tool_def *fyai_tool_find(const char *name);

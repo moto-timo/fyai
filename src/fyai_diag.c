@@ -51,6 +51,7 @@ static const char *const diag_module_names[FYAIEM_COUNT] = {
 	[FYAIEM_INIT]		= "init",
 	[FYAIEM_LOG]		= "logging",
 	[FYAIEM_EVENT]		= "event",
+	[FYAIEM_SKILL]		= "skill",
 };
 
 /* Per-process state for the append-only, unbuffered trace log. */

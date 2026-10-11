@@ -15,6 +15,7 @@ static const struct fyai_tool_table tables[] = {
 	{ fyai_agent_defs, &fyai_agent_defs_count },
 	{ fyai_monitor_defs, &fyai_monitor_defs_count },
 	{ fyai_display_defs, &fyai_display_defs_count },
+	{ fyai_skill_defs, &fyai_skill_defs_count },
 };
 
 const struct fyai_tool_def *fyai_tool_at(size_t index)

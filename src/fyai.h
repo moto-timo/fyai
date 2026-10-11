@@ -589,6 +589,8 @@ struct fyai_usage_sum {
 };
 
 struct fyai_ask_pending;
+struct fyai_skill_dir;
+
 struct fyai_ctx {
 	struct fyai_cfg *cfg;
 	struct fy_allocator *durable_allocator;
@@ -668,11 +670,26 @@ struct fyai_ctx {
 	unsigned int tools_spec_generation;
 	bool tools_spec_agent_child;
 	bool tools_spec_agent_restricted;
+	/* The skills and the tool allow list that tools_spec describes. */
+	uint64_t tools_spec_skills;
+	uint64_t tools_spec_allow;
+	/*
+	 * The tools that a sub-agent run for a skill may call, a sequence of
+	 * canonical names, or fy_invalid for every tool.
+	 */
+	fy_generic tools_allow;
 	fy_generic last_message;
 	fy_generic arena_config;	/* the active branch's config, or fy_invalid */
 	fy_generic arena_catalog;	/* catalogue of the branch, or fy_invalid */
 	/* Skills of the branch, a mapping by name, or fy_invalid. */
 	fy_generic arena_skills;
+	/*
+	 * The private directory under $TMPDIR that this invocation writes its
+	 * skills out to, and the skills written there. Owned by this process:
+	 * cleanup removes the tree, and a forked child forgets it.
+	 */
+	char *skill_root;
+	struct fyai_skill_dir *skill_dirs;
 	/* Active branch state and its next ref-log predecessor. */
 	char *branch;
 	/* Stored HEAD, which can differ from the active branch. */

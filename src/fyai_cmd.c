@@ -117,6 +117,17 @@ static const struct {
 	{ "session_pull",	fyai_cmd_session_pull },
 	{ "todo_show",		fyai_cmd_todo_show },
 	{ "todo_clear",		fyai_cmd_todo_clear },
+	{ "skill_list",		fyai_cmd_skill_list },
+	{ "skill_show",		fyai_cmd_skill_show },
+	{ "skill_import",		fyai_cmd_skill_import },
+	{ "skill_remove",		fyai_cmd_skill_remove },
+	{ "skill_export",		fyai_cmd_skill_export },
+	{ "skill_edit",		fyai_cmd_skill_edit },
+	{ "skill_new",		fyai_cmd_skill_new },
+	{ "skill_enable",		fyai_cmd_skill_enable },
+	{ "skill_disable",		fyai_cmd_skill_disable },
+	{ "skill_exec",		fyai_cmd_skill_exec },
+	{ "skill_files",		fyai_cmd_skill_files },
 	{ "catalog_show",	fyai_cmd_catalog_show },
 	{ "catalog_list",	fyai_cmd_catalog_list },
 	{ "render",		fyai_cmd_render },
@@ -170,6 +181,7 @@ static const struct {
 	{ "init",		fyai_cmd_init_prepare },
 	{ "agent",		fyai_cmd_agent_prepare },
 	{ "resume",		fyai_cmd_resume_prepare },
+	{ "skill_exec",		fyai_cmd_skill_exec_prepare },
 };
 
 fyai_cmd_prepare_fn fyai_cmd_early_hook(const char *name)
@@ -1760,6 +1772,9 @@ int fyai_cmd_configure(struct fyai_cfg *cfg, int argc, char **argv)
 	if (cmd_parse_verb(cfg, argc, argv) ||
 	    cmd_run_hook(cfg, "prepare", fyai_cmd_prepare))
 		return -1;
+	/* A prepare hook that gives the run its prompt makes it a prompt run. */
+	if (cfg->cmd.run == FYAI_RUN_PROMPT)
+		return 0;
 	cfg->cmd.run = FYAI_RUN_CMD;
 	memset(v, 0, sizeof(*v));
 	v->name = fy_gb_intern_string(cfg->gb, argv[0]);

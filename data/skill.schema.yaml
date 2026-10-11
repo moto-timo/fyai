@@ -1,0 +1,70 @@
+# The front matter of a SKILL.md file (see doc/skills.md).
+#
+# `fyai skill import` checks the front matter of each skill against this
+# schema before it stores the skill in the branch store. The keys follow the
+# Agent Skills format that Claude Code reads; `isolated`, `background` and
+# `timeout` are fyai extensions. A key that the schema does not name is kept
+# and has no effect.
+
+type: object
+required: [description]
+additionalProperties: true
+properties:
+  name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9-]*$"
+    maxLength: 64
+    description: >-
+      The name of the skill: lowercase letters, digits and hyphens. When it is
+      absent, the name of the directory that holds SKILL.md is used.
+  description:
+    type: string
+    minLength: 1
+    maxLength: 1024
+    description: >-
+      What the skill does and when to use it. The model chooses a skill on
+      this text, and only this text is in the context until the skill loads.
+  when_to_use:
+    type: string
+    description: Additional text on when to use the skill, shown with the description.
+  argument-hint:
+    type: string
+    maxLength: 128
+    description: The arguments that the skill expects, shown in completion and help.
+  disable-model-invocation:
+    type: boolean
+    description: True keeps the skill out of the list that the model sees.
+  user-invocable:
+    type: boolean
+    description: False keeps the skill out of the slash commands of the user.
+  allowed-tools:
+    description: >-
+      The tools that a skill with `context: fork` can use. A string holds names
+      separated by commas or blanks. Claude Code names map to fyai names.
+    anyOf:
+      - type: string
+      - type: array
+        items: {type: string}
+  model:
+    type: string
+    description: "The model of a skill with `context: fork`, resolved through the catalogue."
+  context:
+    type: string
+    enum: [inline, fork]
+    description: >-
+      `fork` runs the skill as a sub-agent that starts from the skill alone
+      and returns its report. `inline`, the default, loads the skill into the
+      conversation.
+  agent:
+    type: string
+    description: "The persona (agent/personas) of a skill with `context: fork`."
+  isolated:
+    type: boolean
+    description: "True runs a skill with `context: fork` on a private project view."
+  background:
+    type: boolean
+    description: "True starts a skill with `context: fork` without holding the turn."
+  timeout:
+    type: integer
+    minimum: 0
+    description: "The time limit of a skill with `context: fork`, in milliseconds."

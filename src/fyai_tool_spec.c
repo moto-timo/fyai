@@ -17,6 +17,7 @@
 #include "fyai.h"
 #include "fyai_agent.h"
 #include "fyai_config.h"
+#include "fyai_skill.h"
 #include "fyai_tool_spec.h"
 #include "fyai_tool_registry.h"
 #include "fyai_tool_template.h"
@@ -99,6 +100,8 @@ static bool fyai_tool_spec_needs_update(struct fyai_ctx *ctx)
 {
 	return fy_is_invalid(ctx->tools_spec) ||
 	       ctx->tools_spec_generation != ctx->cfg->config_generation ||
+	       ctx->tools_spec_skills != ctx->arena_skills.v ||
+	       ctx->tools_spec_allow != ctx->tools_allow.v ||
 	       ctx->tools_spec_agent_child != fyai_agent_delegated(ctx) ||
 	       ctx->tools_spec_agent_restricted !=
 		(ctx->cfg->agent_child && !ctx->agent_execution);
@@ -108,6 +111,7 @@ static bool fyai_tool_spec_needs_update(struct fyai_ctx *ctx)
 fy_generic make_tools_filtered(struct fyai_ctx *ctx)
 {
 	struct fy_generic_builder *gb = ctx->cfg->gb;
+	const struct fyai_tool_def *def;
 	fy_generic tools, tool, fn, name, out;
 	bool isolation, delegated;
 
@@ -121,6 +125,15 @@ fy_generic make_tools_filtered(struct fyai_ctx *ctx)
 	fy_foreach(tool, tools) {
 		fn = fy_get(tool, "function");
 		name = fy_get(fn, "name");
+		def = fyai_tool_find(fy_castp(&name, ""));
+		/* A skill run offers only the tools of its skill. */
+		if (!fyai_skill_tool_allowed(ctx, fy_castp(&name, "")))
+			continue;
+		if (def && def->describe) {
+			tool = def->describe(ctx, gb, tool);
+			if (fy_is_invalid(tool))
+				continue;
+		}
 		if (!delegated &&
 		    fyai_tool_has(fy_castp(&name, ""), FYAI_TOOL_CHILD_ONLY))
 			continue;
@@ -156,6 +169,8 @@ fy_generic make_tools_filtered(struct fyai_ctx *ctx)
 
 	ctx->tools_spec = out;
 	ctx->tools_spec_generation = ctx->cfg->config_generation;
+	ctx->tools_spec_skills = ctx->arena_skills.v;
+	ctx->tools_spec_allow = ctx->tools_allow.v;
 	ctx->tools_spec_agent_child = delegated;
 	ctx->tools_spec_agent_restricted =
 		ctx->cfg->agent_child && !ctx->agent_execution;

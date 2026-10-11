@@ -8,6 +8,7 @@
 #include "fyai_sink.h"
 #include "fyai.h"
 #include "fyai_agent.h"
+#include "fyai_skill.h"
 #include "fyai_agents.h"
 #include "fyai_ui.h"
 #include "fyai_prof.h"
@@ -396,6 +397,7 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	fy_generic name, description;
 	fy_generic task_v, context_v;
 	fy_generic persona_v, persona, persona_model;
+	fy_generic skill_v, skill_model, skill_tools, skill_name, skill_args;
 	fy_generic turn;
 	fy_generic report, spawn;
 	struct fyai_event_input input = {};
@@ -496,6 +498,27 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 		goto err;
 	}
 
+	/*
+	 * A skill that runs as a sub-agent can name a model, which overlays
+	 * the persona, and the tools the sub-agent may call.
+	 */
+	skill_v = fy_get(args, "_fyai_skill", fy_invalid);
+	skill_model = fy_get(skill_v, "model", fy_invalid);
+	if (fy_is_string(skill_model)) {
+		persona = fy_assoc(ctx->transient_gb,
+				   fy_is_mapping(persona) ? persona : fy_map_empty,
+				   "model", skill_model);
+		fyai_error_check(ctx, fy_is_mapping(persona), err,
+				 "could not apply the model of the skill");
+	}
+	skill_tools = fy_get(skill_v, "tools", fy_invalid);
+	if (fy_is_sequence(skill_tools)) {
+		/* The configuration builder lives as long as the process. */
+		ctx->tools_allow = fy_gb_internalize(cfg->gb, skill_tools);
+		fyai_error_check(ctx, fy_is_sequence(ctx->tools_allow), err,
+				 "could not keep the tools of the skill");
+	}
+
 	/* The call overrides the persona's conversation mode. */
 	context_v = fy_get(args, "context", fy_invalid);
 	if (!fy_is_string(context_v))
@@ -554,6 +577,17 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 			FYAI_OUTPUT_SYSTEM, cfg->system_prompt);
 	}
 	task_v = fy_get(args, "task", fy_invalid);
+	/* A skill run as a sub-agent is loaded here, in its own process. */
+	skill_name = fy_get(skill_v, "name", fy_invalid);
+	if (fy_is_string(skill_name)) {
+		skill_args = fy_get(skill_v, "args", fy_invalid);
+		task_v = fyai_skill_task(ctx, ctx->transient_gb,
+					 fy_castp(&skill_name, ""),
+					 fy_castp(&skill_args, ""));
+		fyai_error_check(ctx, fy_is_string(task_v), err,
+				 "could not load the skill '%s'",
+				 fy_castp(&skill_name, ""));
+	}
 	task = fy_castp(&task_v, "");
 	ctx->last_message = fyai_turn_append(ctx, ctx->last_message,
 		fy_sequence(fyai_make_user_message(ctx, task)));
