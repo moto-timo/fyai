@@ -9,21 +9,21 @@ set -eu
 fyai_test_setup
 
 # A path names an item of a sequence by its name.
-run_fyai catalog get models/claude-opus-5/name
+run_fyai catalog get models/claude-opus-5.5/name
 assert_status 0
-assert_stdout_contains "claude-opus-5"
+assert_stdout_contains "claude-opus-5.5"
 
-run_fyai catalog set models/claude-opus-5/context_window 1234
+run_fyai catalog set models/claude-opus-5.5/context_window 1234
 assert_status 0
-run_fyai catalog get models/claude-opus-5/context_window
+run_fyai catalog get models/claude-opus-5.5/context_window
 assert_status 0
 assert_stdout_contains "1234"
 
 # The schema refuses a value of the wrong type, and nothing is written.
-run_fyai catalog set models/claude-opus-5/context_window '"many"'
+run_fyai catalog set models/claude-opus-5.5/context_window '"many"'
 assert_status 1
 assert_stderr_contains "context_window: type mismatch"
-run_fyai catalog get models/claude-opus-5/context_window
+run_fyai catalog get models/claude-opus-5.5/context_window
 assert_stdout_contains "1234"
 
 # A set on an item that does not exist adds it, named by the path.
@@ -42,9 +42,9 @@ run_fyai branch create other main
 assert_status 0
 run_fyai catalog reset
 assert_status 0
-run_fyai catalog get models/claude-opus-5/context_window
+run_fyai catalog get models/claude-opus-5.5/context_window
 assert_stdout_not_contains "1234"
-run_fyai -b other catalog get models/claude-opus-5/context_window
+run_fyai -b other catalog get models/claude-opus-5.5/context_window
 assert_stdout_contains "1234"
 
 run_fyai catalog validate
@@ -86,7 +86,7 @@ grep -qx -- "--format yaml --curated --provider scrapedprov" scraper.args || \
 	fail "unexpected scraper arguments: $(cat scraper.args)"
 run_fyai catalog get models/scraped-model/context_window
 assert_stdout_contains "7"
-run_fyai catalog get models/claude-opus-5/name
+run_fyai catalog get models/claude-opus-5.5/name
 assert_status 0
 
 # A credential that catalog_update/credentials names reaches the command;
