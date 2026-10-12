@@ -705,6 +705,16 @@ if(BUILD_TESTING)
     # hermetic sandbox (private HOME/XDG_*, localhost only).
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
+    # Explicit external compatibility gate; it downloads a pinned upstream kit.
+    add_custom_target(acp-testsuite
+        COMMAND ${CMAKE_COMMAND} -E env
+            FYAI_BIN=$<TARGET_FILE:fyai>
+            PYTHON=${Python3_EXECUTABLE}
+            bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/acp_testsuite.sh
+                $<TARGET_FILE:fyai> ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS fyai
+        USES_TERMINAL)
+
     # One preflight test reports a missing binary. Without it an incomplete
     # build produces the same "FYAI_BIN not executable" failure once per case,
     # and the build failure behind them is lost in the list.
