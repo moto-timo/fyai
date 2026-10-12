@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {"headers":{"Mcp-Session-Id":"old-session"},"response":{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{},"resources":{}},"serverInfo":{"name":"resources","version":"1"}}}},
+    {"status":202,"raw":""},
+    {"response":{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}},
+    {"response":{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"resource1","type":"function","function":{"name":"mcp_resource","arguments":"{\"server\":\"default\",\"operation\":\"list\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}},
+    {"status":404,"response":{"error":{"message":"session expired"}}},
+    {"headers":{"Mcp-Session-Id":"new-session"},"response":{"jsonrpc":"2.0","id":4,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{},"resources":{}},"serverInfo":{"name":"resources","version":"1"}}}},
+    {"status":202,"raw":""},
+    {"response":{"jsonrpc":"2.0","id":3,"result":{"resources":[{"uri":"test://recovered","name":"Recovered"}]}}},
+    {"response":{"choices":[{"message":{"role":"assistant","content":"Resource reconnect completed."},"finish_reason":"stop"}],"usage":{"prompt_tokens":20,"completion_tokens":4,"total_tokens":24}}},
+    {"status":200,"raw":""}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "steps": [
+    {"response": {"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"list1","type":"function","function":{"name":"mcp_resource","arguments":"{\"server\":\"local\",\"operation\":\"list\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}},
+    {"response": {"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"list2","type":"function","function":{"name":"mcp_resource","arguments":"{\"server\":\"local\",\"operation\":\"list\",\"cursor\":\"page-2\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":20,"completion_tokens":5,"total_tokens":25}}},
+    {"response": {"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"templates","type":"function","function":{"name":"mcp_resource","arguments":"{\"server\":\"local\",\"operation\":\"templates\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":30,"completion_tokens":5,"total_tokens":35}}},
+    {"response": {"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"read1","type":"function","function":{"name":"mcp_resource","arguments":"{\"server\":\"local\",\"operation\":\"read\",\"uri\":\"test://first\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":40,"completion_tokens":5,"total_tokens":45}}},
+    {"response": {"choices":[{"message":{"role":"assistant","content":"Resources completed."},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":4,"total_tokens":54}}}
+  ]
+}

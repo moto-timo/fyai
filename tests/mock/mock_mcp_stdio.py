@@ -53,9 +53,12 @@ for line in sys.stdin:
     if method == "notifications/initialized":
         continue
     if method == "initialize":
+        capabilities = {"tools": {}}
+        if not os.environ.get("MCP_NO_RESOURCES"):
+            capabilities["resources"] = {}
         result = {
             "protocolVersion": "2024-11-05",
-            "capabilities": {"tools": {}},
+            "capabilities": capabilities,
             "serverInfo": {"name": "mock-stdio", "version": "1"},
         }
     elif method == "tools/list":
@@ -67,10 +70,27 @@ for line in sys.stdin:
             "description": "Echo over stdio",
             "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}},
         }]}
+        if os.environ.get("MCP_MANY_TOOLS"):
+            result["tools"].extend({
+                "name": "extra_%02d" % i,
+                "description": "Additional capability %02d" % i,
+                "inputSchema": {"type": "object", "properties": {}},
+            } for i in range(16))
     elif method == "tools/call":
         time.sleep(float(os.environ.get("MCP_CALL_DELAY", "0")))
         result = {"content": [{"type": "text", "text": "stdio: " +
                                 request["params"]["arguments"]["text"]}]}
+    elif method == "resources/list":
+        result = ({"resources": [{"uri": "test://second", "name": "Second"}]}
+                  if request["params"].get("cursor") == "page-2" else
+                  {"resources": [{"uri": "test://first", "name": "First"}],
+                   "nextCursor": "page-2"})
+    elif method == "resources/templates/list":
+        result = {"resourceTemplates": [{"uriTemplate": "test://{name}",
+                                          "name": "Named test resource"}]}
+    elif method == "resources/read":
+        result = {"contents": [{"uri": request["params"]["uri"],
+                                "mimeType": "text/plain", "text": "resource body"}]}
     else:
         result = {}
     print(json.dumps({"jsonrpc": "2.0", "id": request["id"], "result": result}),
