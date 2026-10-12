@@ -63,6 +63,10 @@ typedef fy_generic (*jsonrpc_serve_fn)(struct jsonrpc_conn *conn,
 int jsonrpc_conn_serve(struct jsonrpc_conn *conn, jsonrpc_serve_fn fn,
 		       void *userdata);
 
+/* Enable JSON-RPC batch frames on a stdio server connection. */
+void jsonrpc_conn_accept_batches(struct jsonrpc_conn *conn);
+bool jsonrpc_conn_in_batch(const struct jsonrpc_conn *conn);
+
 /* Return true while the connection has queued output. */
 bool jsonrpc_conn_has_output(const struct jsonrpc_conn *conn);
 bool jsonrpc_conn_closed(const struct jsonrpc_conn *conn);

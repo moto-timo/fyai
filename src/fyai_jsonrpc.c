@@ -58,6 +58,9 @@ struct jsonrpc_conn {
 	void *serve_userdata;
 	bool serve_deferred;	/* handler will answer later */
 	bool expect_close;
+	bool accept_batches;
+	bool batch_active;
+	fy_generic batch_responses;
 
 	/* http */
 	const char *endpoint;
@@ -226,8 +229,8 @@ static int jsonrpc_conn_send(struct jsonrpc_conn *conn, const char *json)
 }
 
 /* Answer an inbound request. @error wins when valid, per JSON-RPC. */
-static void jsonrpc_conn_reply(struct jsonrpc_conn *conn, fy_generic id,
-			       fy_generic result, fy_generic error)
+static int jsonrpc_conn_reply(struct jsonrpc_conn *conn, fy_generic id,
+			      fy_generic result, fy_generic error)
 {
 	struct fy_generic_builder *gb;
 	fy_generic frame;
@@ -235,7 +238,7 @@ static void jsonrpc_conn_reply(struct jsonrpc_conn *conn, fy_generic id,
 
 	gb = fyai_ctx_transient_gb(conn->ctx);
 	if (!gb)
-		return;
+		goto err;
 	if (fy_is_valid(error))
 		frame = fy_gb_mapping(gb, "jsonrpc", "2.0", "id", id,
 				      "error", error);
@@ -243,9 +246,20 @@ static void jsonrpc_conn_reply(struct jsonrpc_conn *conn, fy_generic id,
 		frame = fy_gb_mapping(gb, "jsonrpc", "2.0", "id", id,
 				      "result", fy_is_valid(result) ?
 						result : fy_null);
+	if (conn->batch_active) {
+		conn->batch_responses = fy_append(gb, conn->batch_responses, frame);
+		if (fy_is_invalid(conn->batch_responses))
+			goto err;
+		return 0;
+	}
 	body = emit_json_string(gb, frame);
-	if (body)
-		(void)jsonrpc_conn_send(conn, body);
+	if (!body || jsonrpc_conn_send(conn, body))
+		goto err;
+	return 0;
+err:
+	fyai_error(conn->ctx, "%s could not send JSON-RPC response", conn->name);
+	conn->protocol_failed = true;
+	return -1;
 }
 
 /* Process one decoded frame. */
@@ -307,14 +321,15 @@ static void jsonrpc_conn_frame(struct jsonrpc_conn *conn, fy_generic doc)
 static void jsonrpc_conn_line(struct jsonrpc_conn *conn, const char *line)
 {
 	struct fy_generic_builder *gb;
-	fy_generic doc;
+	fy_generic doc, item, method, id, protocol;
+	const char *body;
 
 	while (*line == ' ' || *line == '\t' || *line == '\r')
 		line++;
 	if (!*line)
 		return;
 	/* Skip and report non-JSON lines without desynchronizing the stream. */
-	if (*line != '{') {
+	if (*line != '{' && (!conn->accept_batches || *line != '[')) {
 		fyai_debug(conn->ctx, "%s skipped a non-frame line: %.60s",
 			   conn->name, line);
 		return;
@@ -326,6 +341,48 @@ static void jsonrpc_conn_line(struct jsonrpc_conn *conn, const char *line)
 		return;
 	}
 	doc = parse_json_string(gb, line);
+	if (conn->accept_batches && fy_is_sequence(doc)) {
+		if (fy_empty(doc)) {
+			jsonrpc_conn_reply(conn, fy_null, fy_invalid,
+				fy_mapping(gb, "code", -32600LL,
+					   "message", "invalid request"));
+			return;
+		}
+		conn->batch_active = true;
+		conn->batch_responses = fy_seq_empty;
+		fy_foreach(item, doc) {
+			method = fy_get(item, "method", fy_invalid);
+			id = fy_get(item, "id", fy_invalid);
+			protocol = fy_get(item, "jsonrpc", fy_invalid);
+			if (!fy_is_mapping(item) ||
+			    !fy_equal(protocol, "2.0") ||
+			    !fy_is_string(method) ||
+			    (fy_is_valid(id) && !fy_is_string(id) &&
+			     !fy_generic_is_int(id))) {
+				if (jsonrpc_conn_reply(conn, fy_null, fy_invalid,
+					fy_mapping(gb, "code", -32600LL,
+						   "message", "invalid request")))
+					break;
+				continue;
+			}
+			jsonrpc_conn_frame(conn, item);
+			if (conn->protocol_failed)
+				break;
+		}
+		conn->batch_active = false;
+		if (!conn->protocol_failed &&
+		    !fy_empty(conn->batch_responses)) {
+			body = emit_json_string(gb, conn->batch_responses);
+			if (!body || jsonrpc_conn_send(conn, body)) {
+				fyai_error(conn->ctx,
+					   "%s could not send JSON-RPC batch",
+					   conn->name);
+				conn->protocol_failed = true;
+			}
+		}
+		conn->batch_responses = fy_invalid;
+		return;
+	}
 	if (!fy_is_mapping(doc)) {
 		parse_diag_report(conn->ctx, doc,
 			fy_is_valid(doc) ? "frame is not an object" :
@@ -336,6 +393,17 @@ static void jsonrpc_conn_line(struct jsonrpc_conn *conn, const char *line)
 		return;
 	}
 	jsonrpc_conn_frame(conn, doc);
+}
+
+void jsonrpc_conn_accept_batches(struct jsonrpc_conn *conn)
+{
+	if (conn && conn->transport == JSONRPC_STDIO)
+		conn->accept_batches = true;
+}
+
+bool jsonrpc_conn_in_batch(const struct jsonrpc_conn *conn)
+{
+	return conn && conn->batch_active;
 }
 
 /* Settle pending and flush-wait requests after connection failure. */
@@ -526,8 +594,7 @@ int jsonrpc_conn_respond(struct jsonrpc_conn *conn, fy_generic id,
 {
 	if (!conn || conn->transport != JSONRPC_STDIO)
 		return -1;
-	jsonrpc_conn_reply(conn, id, result, error);
-	return 0;
+	return jsonrpc_conn_reply(conn, id, result, error);
 }
 
 int jsonrpc_conn_serve(struct jsonrpc_conn *conn, jsonrpc_serve_fn fn,

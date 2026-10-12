@@ -902,6 +902,9 @@ fy_generic fyai_chat_input(struct fyai_ctx *ctx, fy_generic messages)
 		if (fy_equal(fy_get(m, "role"), "tool") && fy_is_mapping(fy_get(m, "content", fy_invalid)))
 			m = fy_assoc(ctx->transient_gb, m, "content",
 				     wire_tool_text(ctx, fy_get(m, "content", fy_invalid)));
+		if (fy_is_valid(fy_get(m, "acp_message_id", fy_invalid)))
+			m = fy_mapping("role", fy_get(m, "role", "user"),
+				       "content", fy_get(m, "content", ""));
 		out = fy_append(ctx->transient_gb, out, m);
 	}
 

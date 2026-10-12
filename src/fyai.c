@@ -40,6 +40,7 @@
 #include "fyai_provider.h"
 #include "fyai_auth_util.h"
 #include "fyai_output.h"
+#include "fyai_acp.h"
 #include "fyai_sink.h"
 #include "fyai_session.h"
 #include "fyai_browser.h"
@@ -1814,6 +1815,7 @@ fyai_turn_run_append_response(struct fyai_turn_run *run, fy_generic response)
 		out_text = fyai_response_output_text(ctx, response);
 		text = fy_castp(&out_text, "");
 		(void)fyai_output_append_string(ctx, text);
+		fyai_acp_worker_text(ctx, text, strlen(text));
 		fyai_tool_progress_emit(ctx, text, strlen(text));
 	}
 	run->turn = fyai_append_assistant_response(ctx, run->turn, response);

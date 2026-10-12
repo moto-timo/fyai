@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "fyai_output.h"
+#include "fyai_acp.h"
 #include "fyai_agents.h"
 #include "fyai_session.h"
 #include "fyai_sink.h"
@@ -310,6 +311,8 @@ int fyai_output_add_tool_head_fragment(struct fyai_ctx *ctx, size_t start,
 				      fragment);
 	fyai_error_check(ctx, fy_is_valid(output->fragments), err,
 			 "could not append tool head fragment");
+	fyai_error_check(ctx, !fyai_acp_worker_tool(ctx, tool, ok, cause), err,
+			 "could not send ACP tool update");
 	return 0;
 err:
 	return -1;

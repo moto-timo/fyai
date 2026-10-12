@@ -427,6 +427,7 @@ set(FYAI_SOURCES
     src/fyai_output.c
     src/fyai.c
     src/fyai_agent.c
+    src/fyai_acp.c
     src/fyai_agents.c
     src/fyai_ask.c
     src/fyai_event_fmt.c

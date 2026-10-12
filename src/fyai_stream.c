@@ -28,6 +28,7 @@
 #include "fyai_xfer.h"
 #include "fyai_event.h"
 #include "fyai_agent.h"
+#include "fyai_acp.h"
 #include "fyai_agents.h"
 #include "fyai_stream.h"
 #include "fyai_terminal.h"
@@ -263,6 +264,7 @@ static void stream_write_content(struct stream_response *stream,
 	/* Record and present the response through the active output document. */
 	if (fyai_output_append(ctx, text, len))
 		stream->failed = true;
+	fyai_acp_worker_text(ctx, text, len);
 	/* Send sub-agent prose to the parent tool band through JSON-RPC. */
 	fyai_tool_progress_emit(ctx, text, len);
 	stream->content_bytes += len;

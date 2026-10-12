@@ -107,6 +107,7 @@ static const struct {
 	{ "status",		fyai_cmd_status },
 	{ "profiles",		fyai_cmd_profiles },
 	{ "agent",		fyai_cmd_agent },
+	{ "acp",		fyai_cmd_acp },
 	{ "transport",		fyai_cmd_transport },
 	{ "setting",		fyai_cmd_setting },
 	{ "lockdown",		fyai_cmd_lockdown },
@@ -180,6 +181,7 @@ static const struct {
 	{ "term",		fyai_cmd_term_prepare },
 	{ "init",		fyai_cmd_init_prepare },
 	{ "agent",		fyai_cmd_agent_prepare },
+	{ "acp",		fyai_cmd_acp_prepare },
 	{ "resume",		fyai_cmd_resume_prepare },
 	{ "skill_exec",		fyai_cmd_skill_exec_prepare },
 };

@@ -444,6 +444,8 @@ struct fyai_cfg {
 	char *const *argv;
 	/* Serve the agent protocol on standard input and output. */
 	bool agent_rpc;
+	bool acp_worker;
+	bool acp_mode;
 	/* An executed tool child: serve the tool channel on fds 3 and 4. */
 	bool tool_exec;
 	/* MCP (Model Context Protocol) server settings. */
@@ -787,6 +789,9 @@ struct fyai_ctx {
 	char *patch_display;
 	/* Forked tool control channel. */
 	struct jsonrpc_conn *tool_rpc;
+	/* ACP worker notifications share the active turn's event loop. */
+	struct jsonrpc_conn *acp_rpc;
+	const char *acp_agent_message_id;
 	/* Set inside a forked tool sub-execution once the environment has been
 	 * sanitized and the sandbox applied, so inner steps (the shell tool's
 	 * own fork) do not re-derive and re-apply the confinement. */

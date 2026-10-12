@@ -1200,6 +1200,10 @@ static FILE *sink_term_stream_file(const struct fyai_sink *s,
 {
 	const struct sink_term *t = s->state;
 
+	/* An ACP worker reserves standard output for protocol frames. */
+	if (s->ctx->cfg->acp_mode && stream != FYAI_SINK_MACHINE)
+		return stream == FYAI_SINK_DIAG ? stderr : NULL;
+
 	switch (stream) {
 	case FYAI_SINK_STATUS:
 	case FYAI_SINK_DIAG:

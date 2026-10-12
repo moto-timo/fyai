@@ -3375,6 +3375,26 @@ commands:
           x-fyai-rest: true
           x-fyai-meta: TASK
 
+  - command: acp
+    title: serve Agent Client Protocol
+    description: |
+      Serve Agent Client Protocol v1 or v2 over standard input and output for an
+      editor or another client. Each line is one JSON-RPC 2.0 message.
+      Sessions are stored on acp/ branches and can be resumed by a later
+      invocation. See doc/acp.md.
+    surfaces: [cli]
+    handler: acp
+    prepare: acp
+    flags: [model]
+    arguments:
+      type: object
+      additionalProperties: false
+      properties:
+        worker:
+          type: boolean
+          description: serve one ACP turn in a child process
+          x-fyai-hidden: true
+
   - command: transport
     title: serve model requests for isolated agents
     description: |

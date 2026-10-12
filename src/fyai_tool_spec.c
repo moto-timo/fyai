@@ -129,6 +129,8 @@ fy_generic make_tools_filtered(struct fyai_ctx *ctx)
 		/* A skill run offers only the tools of its skill. */
 		if (!fyai_skill_tool_allowed(ctx, fy_castp(&name, "")))
 			continue;
+		if (ctx->cfg->acp_worker && fy_equal(name, "ask_user"))
+			continue;
 		if (def && def->describe) {
 			tool = def->describe(ctx, gb, tool);
 			if (fy_is_invalid(tool))
