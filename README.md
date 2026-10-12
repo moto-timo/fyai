@@ -550,6 +550,14 @@ Discovered tools are exposed as `mcp__<server>__<tool>`. Interactive `/mcp`
 commands report connection state, enable or disable MCP, and drive per-server
 OAuth login and logout where configured.
 
+When more than eight tools are discovered, fyai offers `tool_search` instead
+of sending every MCP schema in the model request. A search matches names and
+descriptions, returns up to eight tools, and makes those tools available for
+the rest of the invocation. Narrow the query if the result reports `more`.
+Servers that declare the MCP resources capability also expose `mcp_resource`:
+`list` and `templates` return one page with any `nextCursor`, and `read`
+accepts a concrete URI. Resource responses are limited to 64 KiB.
+
 ## Inspection and maintenance
 
 The human transcript and canonical/provider views serve different purposes:

@@ -98,7 +98,7 @@ controller. Availability in source is not a production reliability claim.
 | Extensions | Skills are branch state with explicit import; no lifecycle hook or trusted extension contract established | Bounded trusted hooks with timeouts and output limits; a shareable package format beyond Claude Code import | P1 |
 | Busy-agent steering | `agent_message` receipts and `ask_parent`; delivery at a model request boundary | Decide whether preempting a long tool call is needed; characterize delivery latency | P3 |
 | Web retrieval | Hosted search depends on endpoint; no native bounded URL fetch | Provider-independent fetch with URL, title, time, source, limits, network policy, and replayable citation metadata | P1 |
-| MCP breadth | Tool calls and OAuth work; native resource/template reads and deferred tool discovery not established | List/read resources and templates, pagination, reconnect handling, bounded lazy metadata | P1 |
+| MCP breadth | Tool calls, OAuth, resource/template list and reads, deferred tool discovery, and HTTP session recovery work; only selected schemas from a large catalog enter requests | Measure context savings with real large catalogs; test OAuth expiry for resource reads | P1 |
 | External control | One-run worker RPC and internal agent protocol; no stable durable-session client contract established | Versioned branch open/resume, input, correlated events, questions, cancellation, and reconnect semantics | P1 |
 | Visual input | Native reader is text-oriented | MIME and size checks, capability negotiation, durable attachment identity, provider serialization, replay | P2; P1 for frontend work |
 | Recovery of unfinished effects | Durable conversation history; no general execution-intent/replay contract established | Characterize crash boundaries before optional unattended jobs; classify ambiguous effects and deduplicate submissions | P2; P1 for unattended work |
@@ -125,8 +125,11 @@ does not make a selected URL retrievable across providers. A native fetch must
 bound redirects, time, size, and MIME types; use the existing network controls;
 and preserve source and failure information in transcript replay. Do not route
 it invisibly through shell output. MCP resources and templates are distinct
-from MCP tool results. Deferred tool discovery should avoid placing every
-server schema in every prompt; measure context cost with a large catalog.
+from MCP tool results. The resource tool returns one page at a time and caps a
+response at 64 KiB. A catalog with more than eight tools exposes a bounded
+search; selected schemas enter later model requests. Measure context savings
+and selection quality with real large catalogs, and exercise resource reads
+after OAuth recovery.
 
 ### Skills, extensions, and external control
 
