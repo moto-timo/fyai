@@ -6,9 +6,49 @@
 # what the model provider, `fyai catalog` markdown, and the tool-spec unit
 # tests consume, so keep them in sync with tests/fyai_tool_spec_test.c.
 #
-# Tool order is fixed: read_file, write_file, apply_patch, shell, shell_input,
+# Tool order is fixed: tool_search, mcp_resource, read_file, write_file,
+# apply_patch, shell, shell_input,
 # shell_output, shell_close, ask_user, ask_parent, agent, todo_write, time, wait,
 # skill.
+- type: function
+  function:
+    name: tool_search
+    description: >-
+      Find MCP tools by name or description. Up to eight matching tools are
+      made available for the next call. Use a narrower query when more match.
+    parameters:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Name or capability to find in connected MCP servers.
+      required: [query]
+      additionalProperties: false
+- type: function
+  function:
+    name: mcp_resource
+    description: >-
+      List or read resources on a connected MCP server. List results may include
+      nextCursor; pass it as cursor to read another page. Templates list URI
+      patterns; read needs a concrete URI. Responses are limited to 64 KiB.
+    parameters:
+      type: object
+      properties:
+        server:
+          type: string
+          description: Configured MCP server name.
+        operation:
+          type: string
+          enum: [list, templates, read]
+          description: Resource operation.
+        uri:
+          type: string
+          description: Concrete URI for read.
+        cursor:
+          type: string
+          description: Page cursor returned by list or templates.
+      required: [server, operation]
+      additionalProperties: false
 - type: function
   function:
     name: read_file

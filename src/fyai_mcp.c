@@ -34,10 +34,14 @@
 #include "fyai_render.h"
 #include "fyai_sandbox.h"
 #include "fyai_secret.h"
+#include "fyai_skill.h"
 #include "fyai_tools.h"
+#include "fyai_tool_registry.h"
 #include "utils.h"
 
 #define MCP_PREFIX "mcp__"
+#define MCP_DIRECT_TOOL_LIMIT 8
+#define MCP_SEARCH_RESULT_LIMIT 8
 
 enum mcp_transport {
 	MCP_TRANSPORT_HTTP,
@@ -72,6 +76,7 @@ struct fyai_mcp_ctx {
 	struct mcp_oauth_discovery *oauth_discovery;
 	struct fyai_event_source *oauth_refresh_timer;
 	fy_generic tools;
+	bool resources_supported;
 	enum mcp_server_state state;
 	enum mcp_transport transport;
 	enum mcp_auth_mode auth_mode;
@@ -259,6 +264,141 @@ fy_generic fyai_mcp_tools(struct fyai_ctx *ctx)
 {
 	return fy_is_valid(ctx->mcp_tools) ? ctx->mcp_tools : fy_seq_empty;
 }
+
+bool fyai_mcp_deferred(struct fyai_ctx *ctx)
+{
+	return ctx->cfg->mcp_enabled &&
+		fy_len(fyai_mcp_tools(ctx)) > MCP_DIRECT_TOOL_LIMIT;
+}
+
+bool fyai_mcp_tool_active(struct fyai_ctx *ctx, const char *name)
+{
+	fy_generic item;
+
+	if (!fy_is_valid(ctx->mcp_active_tools))
+		return false;
+	fy_foreach(item, ctx->mcp_active_tools)
+		if (fy_equal(item, name))
+			return true;
+	return false;
+}
+
+static bool mcp_contains_case(const char *haystack, const char *needle)
+{
+	size_t len = strlen(needle);
+
+	for (; *haystack; haystack++)
+		if (!strncasecmp(haystack, needle, len))
+			return true;
+	return false;
+}
+
+/* A search activates only the returned schemas for later model requests. */
+static fy_generic fyai_mcp_tool_search(struct fyai_ctx *ctx, fy_generic args,
+				       bool *okp)
+{
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	fy_generic query_v = fy_get(args, "query", fy_invalid);
+	fy_generic tools = fyai_mcp_tools(ctx), tool, fn, out = fy_seq_empty;
+	const char *query = fy_castp(&query_v, "");
+	const char *name, *description;
+	size_t count = 0;
+	bool more = false;
+
+	*okp = false;
+	if (!*query)
+		return fy_value(gb, "tool error: query is empty");
+	if (strlen(query) > 128)
+		return fy_value(gb, "tool error: query exceeds 128 bytes");
+	fy_foreach(tool, tools) {
+		fn = fy_get(tool, "function");
+		name = fy_get(fn, "name", "");
+		description = fy_get(fn, "description", "");
+		if (!fyai_skill_tool_allowed(ctx, name))
+			continue;
+		if (!mcp_contains_case(name, query) &&
+		    !mcp_contains_case(description, query))
+			continue;
+		if (count == MCP_SEARCH_RESULT_LIMIT) {
+			more = true;
+			break;
+		}
+		out = fy_append(gb, out, fy_mapping(gb,
+			"name", name, "description",
+			fy_stringf(gb, "%.256s", description)));
+		if (!fyai_mcp_tool_active(ctx, name)) {
+			if (!fy_is_valid(ctx->mcp_active_tools))
+				ctx->mcp_active_tools = fy_seq_empty;
+			ctx->mcp_active_tools = fy_append(ctx->gb,
+				ctx->mcp_active_tools, fy_value(ctx->gb, name));
+		}
+		count++;
+	}
+	if (count && fyai_request_state_apply(ctx))
+		return fy_value(gb, "tool error: could not activate MCP tools");
+	*okp = true;
+	return fy_mapping(gb, "tools", out,
+		"more", more,
+		"total", (long long)fy_len(tools));
+}
+
+static fy_generic mcp_resource_tool(struct fyai_ctx *ctx, fy_generic args,
+				    bool *okp);
+
+static fy_generic mcp_search_describe(struct fyai_ctx *ctx,
+				     struct fy_generic_builder *gb,
+				     fy_generic tool)
+{
+	(void)gb;
+	return fyai_mcp_deferred(ctx) ? tool : fy_invalid;
+}
+
+static fy_generic mcp_resource_describe(struct fyai_ctx *ctx,
+				       struct fy_generic_builder *gb,
+				       fy_generic tool)
+{
+	struct fyai_mcp_ctx *mcp;
+
+	(void)gb;
+	for (mcp = ctx->mcp; mcp; mcp = mcp->next)
+		if (mcp->state == MCP_SRV_READY && mcp->resources_supported)
+			return tool;
+	return fy_invalid;
+}
+
+static void mcp_search_head(struct fyai_ctx *ctx, FILE *mf,
+			    struct fy_generic_builder *gb, fy_generic args,
+			    int preview_lines, struct fyai_md_blocks *blocks)
+{
+	(void)ctx;
+	(void)gb;
+	(void)preview_lines;
+	(void)blocks;
+	fprintf(mf, "**tool search** %s\n\n", fy_get(args, "query", ""));
+}
+
+static void mcp_resource_head(struct fyai_ctx *ctx, FILE *mf,
+			      struct fy_generic_builder *gb, fy_generic args,
+			      int preview_lines, struct fyai_md_blocks *blocks)
+{
+	(void)ctx;
+	(void)gb;
+	(void)preview_lines;
+	(void)blocks;
+	fprintf(mf, "**MCP resource** %s %s\n\n",
+		fy_get(args, "server", ""),
+		fy_get(args, "operation", ""));
+}
+
+const struct fyai_tool_def fyai_mcp_defs[] = {
+	{ .name = "tool_search", .run = fyai_mcp_tool_search,
+	  .head = mcp_search_head, .describe = mcp_search_describe,
+	  .flags = FYAI_TOOL_PARENT },
+	{ .name = "mcp_resource", .run = mcp_resource_tool,
+	  .head = mcp_resource_head, .describe = mcp_resource_describe,
+	  .flags = FYAI_TOOL_PARENT },
+};
+const size_t fyai_mcp_defs_count = ARRAY_SIZE(fyai_mcp_defs);
 
 static bool mcp_server_name_valid(const char *name)
 {
@@ -1712,6 +1852,9 @@ static void mcp_startup_req_done(struct jsonrpc_request *req, void *userdata)
 	switch (su->phase) {
 	case MCP_SU_INIT:
 		protocol = fy_get(result, "protocolVersion", "");
+		mcp->resources_supported = fy_is_mapping(fy_get(
+			fy_get(result, "capabilities", fy_map_empty),
+			"resources", fy_invalid));
 		if (*protocol)
 			mcp->protocol_version =
 				fy_gb_intern_string(ctx->cfg->gb, protocol);
@@ -2103,6 +2246,7 @@ void fyai_mcp_publish_tools(struct fyai_ctx *ctx)
 		    fy_is_valid(mcp->tools))
 			out = fy_concat(ctx->gb, out, mcp->tools);
 	ctx->mcp_tools = fy_gb_internalize(ctx->gb, out);
+	ctx->tools_spec = fy_invalid;
 }
 
 static struct fyai_mcp_ctx *
@@ -2281,6 +2425,7 @@ int fyai_mcp_start(struct fyai_ctx *ctx)
 
 	fyai_mcp_cleanup(ctx);
 	ctx->mcp_tools = fy_invalid;
+	ctx->mcp_active_tools = fy_invalid;
 
 	if (fy_is_mapping(servers) && fy_len(servers)) {
 		fy_foreach(key, servers) {
@@ -2362,6 +2507,8 @@ struct fyai_mcp_call_request {
 	fyai_mcp_call_complete_fn complete;
 	void *userdata;
 	char *tool_name;
+	const char *method;
+	bool raw_result;
 	char *params_text;
 	long long id;			/* the tools/call id, reused across retry */
 	fy_generic result;
@@ -2450,7 +2597,7 @@ fyai_mcp_call_submit_phase(struct fyai_mcp_call_request *request)
 
 	switch (request->state) {
 	case FYAIMCS_PRIMARY:
-		method = "tools/call";
+		method = request->method;
 		id = request->id;
 		params = parse_json_string(ctx->transient_gb,
 					   request->params_text);
@@ -2594,6 +2741,7 @@ static void fyai_mcp_call_req_done(struct jsonrpc_request *req, void *userdata)
 	const char *challenge;
 	const char *response_body;
 	const char *tool_error;
+	const char *encoded;
 	bool result_error;
 
 	challenge = jsonrpc_request_response_header(req, "WWW-Authenticate");
@@ -2606,16 +2754,17 @@ static void fyai_mcp_call_req_done(struct jsonrpc_request *req, void *userdata)
 	if (!ok) {
 		if (response_body && *response_body)
 			mcp_set_error(request->mcp,
-				      "tools/call failed (HTTP %ld): %.512s",
-				      status, response_body);
+				      "%s failed (HTTP %ld): %.512s",
+				      request->method, status, response_body);
 		else if (status || code != CURLE_OK)
 			mcp_set_error(request->mcp,
-				      "tools/call failed: %s (HTTP %ld)",
-				      curl_easy_strerror(code), status);
+				      "%s failed: %s (HTTP %ld)",
+				      request->method, curl_easy_strerror(code),
+				      status);
 		else
 			mcp_set_error(request->mcp,
-				      "tools/call failed: %s transport error",
-				      request->mcp->transport ==
+				      "%s failed: %s transport error",
+				      request->method, request->mcp->transport ==
 				      MCP_TRANSPORT_HTTP ? "http" : "stdio");
 	}
 	jsonrpc_request_destroy(req);
@@ -2630,8 +2779,20 @@ static void fyai_mcp_call_req_done(struct jsonrpc_request *req, void *userdata)
 	if (ok) {
 		switch (request->state) {
 		case FYAIMCS_PRIMARY:
-			result_error = fy_get(result, "isError", false);
-			result = mcp_tool_output(ctx, result);
+			result_error = !request->raw_result &&
+				fy_get(result, "isError", false);
+			if (!request->raw_result)
+				result = mcp_tool_output(ctx, result);
+			else {
+				encoded = emit_json_string(ctx->transient_gb,
+							   result);
+				if (!encoded || strlen(encoded) > 65536) {
+					result_error = true;
+					result = fy_value(ctx->transient_gb,
+						"tool error: MCP resource response "
+						"exceeds 64 KiB");
+				}
+			}
 			fyai_mcp_call_finish(request,
 				result_error ? FYAIMCS_FAILED :
 				FYAIMCS_COMPLETED, result, !result_error);
@@ -2715,6 +2876,8 @@ fyai_mcp_call_submit(struct fyai_ctx *ctx, const char *name,
 	mcp = mcp_find_tool_server(ctx, name, &tool_name);
 	if (!mcp)
 		return NULL;
+	if (fyai_mcp_deferred(ctx) && !fyai_mcp_tool_active(ctx, name))
+		return NULL;
 	params = fy_mapping(ctx->transient_gb,
 			    "name", tool_name, "arguments", args);
 	params_text = emit_json_string(ctx->transient_gb, params);
@@ -2727,6 +2890,7 @@ fyai_mcp_call_submit(struct fyai_ctx *ctx, const char *name,
 	request->complete = complete;
 	request->userdata = userdata;
 	request->tool_name = strdup(tool_name);
+	request->method = "tools/call";
 	request->params_text = strdup(params_text);
 	request->id = jsonrpc_conn_next_id(mcp->conn);
 	request->result = fy_invalid;
@@ -2819,6 +2983,90 @@ fy_generic fyai_mcp_call(struct fyai_ctx *ctx, const char *name,
 	if (fy_is_invalid(result))
 		return fy_value(ctx->transient_gb, "tool error: MCP call failed");
 	return result;
+}
+
+struct fyai_mcp_call_request *
+fyai_mcp_resource_submit(struct fyai_ctx *ctx, fy_generic args,
+			 fyai_mcp_call_complete_fn complete, void *userdata)
+{
+	struct fyai_mcp_call_request *request;
+	struct fyai_mcp_ctx *mcp;
+	fy_generic params;
+	const char *server = fy_get(args, "server", "");
+	const char *operation = fy_get(args, "operation", "");
+	const char *uri = fy_get(args, "uri", "");
+	const char *cursor = fy_get(args, "cursor", "");
+	const char *method, *json;
+
+	mcp = mcp_find_server(ctx, server);
+	if (!mcp || mcp->state == MCP_SRV_FAILED ||
+	    !mcp->resources_supported)
+		return NULL;
+	if (!strcmp(operation, "list"))
+		method = "resources/list";
+	else if (!strcmp(operation, "templates"))
+		method = "resources/templates/list";
+	else if (!strcmp(operation, "read") && *uri)
+		method = "resources/read";
+	else
+		return NULL;
+	params = !strcmp(operation, "read") ?
+		fy_mapping(ctx->transient_gb, "uri", uri) :
+		*cursor ? fy_mapping(ctx->transient_gb, "cursor", cursor) :
+		fy_map_empty;
+	json = emit_json_string(ctx->transient_gb, params);
+	if (!json)
+		return NULL;
+	request = calloc(1, sizeof(*request));
+	if (!request)
+		return NULL;
+	request->ctx = ctx;
+	request->mcp = mcp;
+	request->method = method;
+	request->raw_result = true;
+	request->params_text = strdup(json);
+	request->id = jsonrpc_conn_next_id(mcp->conn);
+	request->result = fy_invalid;
+	request->complete = complete;
+	request->userdata = userdata;
+	if (!request->params_text || fyai_mcp_call_gate(request))
+		goto err_out;
+	return request;
+err_out:
+	fyai_mcp_call_destroy(request);
+	return NULL;
+}
+
+/* Direct callers use a synchronous wrapper; model tool groups submit above. */
+static fy_generic mcp_resource_tool(struct fyai_ctx *ctx, fy_generic args,
+				    bool *okp)
+{
+	struct fyai_mcp_call_request *request;
+	struct fyai_event_loop *el;
+	fy_generic result = fy_invalid;
+	volatile bool done = false;
+	int rc;
+
+	*okp = false;
+	request = fyai_mcp_resource_submit(ctx, args,
+			fyai_mcp_call_sync_done, (void *)&done);
+	if (!request)
+		return fy_value(ctx->transient_gb,
+			"tool error: MCP resource request failed");
+	el = fyai_ctx_loop(ctx);
+	while (el && !done) {
+		rc = fyai_event_loop_step(el, -1);
+		if (rc < 0) {
+			fyai_mcp_call_cancel(request);
+			break;
+		}
+	}
+	if (fyai_mcp_call_done(request))
+		result = fyai_mcp_call_collect(request, okp);
+	fyai_mcp_call_destroy(request);
+	return fy_is_valid(result) ? result :
+		fy_value(ctx->transient_gb,
+			"tool error: MCP resource request failed");
 }
 
 static void mcp_delete_complete(struct fyai_curl_transfer *xfer, void *userdata)

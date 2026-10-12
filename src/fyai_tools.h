@@ -230,6 +230,8 @@ fy_generic fyai_mcp_status_data(struct fyai_ctx *ctx,
 int fyai_mcp_login(struct fyai_ctx *ctx, const char *name);
 int fyai_mcp_logout(struct fyai_ctx *ctx, const char *name);
 fy_generic fyai_mcp_tools(struct fyai_ctx *ctx);
+bool fyai_mcp_deferred(struct fyai_ctx *ctx);
+bool fyai_mcp_tool_active(struct fyai_ctx *ctx, const char *name);
 bool fyai_mcp_tool_name(const char *name);
 fy_generic fyai_mcp_call(struct fyai_ctx *ctx, const char *name,
 			 fy_generic args);
@@ -237,6 +239,9 @@ struct fyai_mcp_call_request *
 fyai_mcp_call_submit(struct fyai_ctx *ctx, const char *name,
 		     fy_generic args, fyai_mcp_call_complete_fn complete,
 		     void *userdata);
+struct fyai_mcp_call_request *
+fyai_mcp_resource_submit(struct fyai_ctx *ctx, fy_generic args,
+			 fyai_mcp_call_complete_fn complete, void *userdata);
 void fyai_mcp_call_cancel(struct fyai_mcp_call_request *request);
 bool fyai_mcp_call_done(const struct fyai_mcp_call_request *request);
 fy_generic fyai_mcp_call_collect(struct fyai_mcp_call_request *request,

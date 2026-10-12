@@ -123,6 +123,8 @@ extern const struct fyai_tool_def fyai_display_defs[];
 extern const size_t fyai_display_defs_count;
 extern const struct fyai_tool_def fyai_skill_defs[];
 extern const size_t fyai_skill_defs_count;
+extern const struct fyai_tool_def fyai_mcp_defs[];
+extern const size_t fyai_mcp_defs_count;
 
 /* The entry for @name, or NULL. @name may be a wire name of the shell. */
 const struct fyai_tool_def *fyai_tool_find(const char *name);

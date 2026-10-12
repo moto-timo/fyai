@@ -4431,7 +4431,8 @@ bool fyai_tool_call_parallel_eligible(struct fyai_ctx *ctx,
 	name = fyai_tool_call_name(ctx, tool_call);
 	def = fyai_tool_find(name);
 
-	if (fyai_mcp_tool_name(name))
+	if (fyai_mcp_tool_name(name) ||
+	    (name && !strcmp(name, "mcp_resource")))
 		return false;
 	if (!def)
 		return true;
@@ -8084,20 +8085,27 @@ static void fyai_tool_job_group_dispatch(struct fyai_tool_job_group *group)
 					 entry->call_text);
 		name = fy_is_valid(call) ?
 			fyai_tool_call_name(group->ctx, call) : NULL;
-		if (name && fyai_mcp_tool_name(name)) {
+		if (name && (fyai_mcp_tool_name(name) ||
+			     !strcmp(name, "mcp_resource"))) {
 			args = fyai_tool_call_args(group->ctx, call);
 			entry->mcp_request =
-				fy_is_valid(args) ?
-				fyai_mcp_call_submit(group->ctx, name, args,
-					fyai_tool_job_group_mcp_complete,
-					group) : NULL;
+				fy_is_valid(args) &&
+				fyai_skill_tool_allowed(group->ctx, name) ?
+				(!strcmp(name, "mcp_resource") ?
+				 fyai_mcp_resource_submit(group->ctx, args,
+					fyai_tool_job_group_mcp_complete, group) :
+				 fyai_mcp_call_submit(group->ctx, name, args,
+					fyai_tool_job_group_mcp_complete, group)) :
+				NULL;
 			if (entry->mcp_request) {
 				entry->state = FYAITGS_RUNNING;
 				group->active++;
 				continue;
 			}
 			result = fy_value(group->ctx->transient_gb,
-					  "tool error: MCP call failed");
+				fyai_skill_tool_allowed(group->ctx, name) ?
+				"tool error: MCP call failed" :
+				"tool error: tool is not allowed by this skill");
 			text = emit_json_string(group->ctx->transient_gb,
 						result);
 			entry->result_text = text ? strdup(text) : NULL;

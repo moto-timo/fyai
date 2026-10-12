@@ -743,6 +743,8 @@ struct fyai_ctx {
 	char *auth_header;
 	char *user_agent;
 	fy_generic mcp_tools;
+	/* Names activated from a large MCP catalogue for this invocation. */
+	fy_generic mcp_active_tools;
 	struct fyai_mcp_ctx *mcp;
 	bool mcp_stopping;
 	struct fyai_credentials auth;

@@ -2224,6 +2224,7 @@ static int fyai_mcp_bringup(struct fyai_ctx *ctx)
 		return fyai_mcp_refresh(ctx);
 	fyai_mcp_cleanup(ctx);
 	ctx->mcp_tools = fy_invalid;
+	ctx->mcp_active_tools = fy_invalid;
 	return 0;
 }
 
@@ -2250,6 +2251,8 @@ int fyai_curl_easy_reinit(struct fyai_ctx *ctx)
 int fyai_request_state_apply(struct fyai_ctx *ctx)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
+	fy_generic native, mt, tool, fn, converted;
+	const char *name;
 	int rc;
 
 	if (!ctx->curl)
@@ -2320,27 +2323,50 @@ int fyai_request_state_apply(struct fyai_ctx *ctx)
 				fyai_make_messages_tools(ctx) : fy_seq_empty;
 			break;
 		}
+		/* MCP discovery and resources remain available in an MCP-only run. */
+		if (cfg->mcp_enabled && !cfg->enable_tools &&
+		    !cfg->enable_builtin_shell) {
+			native = make_tools_filtered(ctx);
+
+			fy_foreach(tool, native) {
+				fn = fy_get(tool, "function");
+				name = fy_get(fn, "name", "");
+				if (strcmp(name, "tool_search") &&
+				    strcmp(name, "mcp_resource"))
+					continue;
+				if (cfg->api_mode == FYAI_API_RESPONSES)
+					tool = fy_mapping("type", "function",
+						"name", name,
+						"description", fy_get(fn, "description", ""),
+						"parameters", fy_get(fn, "parameters"));
+				else if (cfg->api_mode == FYAI_API_MESSAGES)
+					tool = fy_mapping("name", name,
+						"description", fy_get(fn, "description", ""),
+						"input_schema", fy_get(fn, "parameters"));
+				ctx->tools = fy_append(ctx->gb, ctx->tools, tool);
+			}
+		}
 
 		if (cfg->mcp_enabled) {
-			fy_generic mt, tool, fn, converted = fy_seq_empty;
-
+			converted = fy_seq_empty;
 			mt = fyai_mcp_tools(ctx);
-			if (cfg->api_mode == FYAI_API_CHAT_COMPLETIONS) {
-				converted = mt;
-			} else {
-				fy_foreach(tool, mt) {
-					fn = fy_get(tool, "function");
-					if (cfg->api_mode == FYAI_API_RESPONSES)
-						tool = fy_mapping("type", "function",
-							"name", fy_get(fn, "name", ""),
-							"description", fy_get(fn, "description", ""),
-							"parameters", fy_get(fn, "parameters"));
-					else
-						tool = fy_mapping("name", fy_get(fn, "name", ""),
-							"description", fy_get(fn, "description", ""),
-							"input_schema", fy_get(fn, "parameters"));
-					converted = fy_append(ctx->gb, converted, tool);
-				}
+			fy_foreach(tool, mt) {
+				fn = fy_get(tool, "function");
+				name = fy_get(fn, "name", "");
+				if (!fyai_skill_tool_allowed(ctx, name) ||
+				    (fyai_mcp_deferred(ctx) &&
+				     !fyai_mcp_tool_active(ctx, name)))
+					continue;
+				if (cfg->api_mode == FYAI_API_RESPONSES)
+					tool = fy_mapping("type", "function",
+						"name", name,
+						"description", fy_get(fn, "description", ""),
+						"parameters", fy_get(fn, "parameters"));
+				else if (cfg->api_mode == FYAI_API_MESSAGES)
+					tool = fy_mapping("name", name,
+						"description", fy_get(fn, "description", ""),
+						"input_schema", fy_get(fn, "parameters"));
+				converted = fy_append(ctx->gb, converted, tool);
 			}
 			ctx->tools = fy_concat(ctx->gb, ctx->tools, converted);
 		}
@@ -2381,6 +2407,7 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 		goto err;
 
 	ctx->tools = fy_invalid;
+	ctx->mcp_active_tools = fy_invalid;
 	ctx->tools_spec = fy_invalid;
 	ctx->last_message = fy_invalid;
 	ctx->usage_head = fy_invalid;
