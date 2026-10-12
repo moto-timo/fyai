@@ -2899,6 +2899,25 @@ initialize, agent/run, and shutdown. See doc/agent-protocol.md.
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 
+## fyai acp
+
+serve Agent Client Protocol
+
+**Usage:** `fyai acp`
+
+Serve Agent Client Protocol v1 or v2 over standard input and output for an
+editor or another client. Each line is one JSON-RPC 2.0 message.
+Sessions are stored on acp/ branches and can be resumed by a later
+invocation. See doc/acp.md.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
 ## fyai transport
 
 serve model requests for isolated agents
