@@ -825,6 +825,12 @@ struct fyai_ctx {
 	 * it clears it before the turn.
 	 */
 	enum fyai_turn_stop turn_stop;
+	/*
+	 * The JSON Schema of the answer that a front end asks for, or fy_invalid,
+	 * and the answer that the structured_output tool accepted.
+	 */
+	fy_generic output_schema;
+	fy_generic structured_output;
 	/* Stop before a model request once usage_cost reaches this; 0 for none. */
 	double turn_cost_limit;
 	/* A tool asks the turn to end before its next model request. */

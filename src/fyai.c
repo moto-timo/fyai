@@ -2763,6 +2763,8 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	ctx->arena_catalog = fy_invalid;
 	ctx->arena_skills = fy_invalid;
 	ctx->tools_allow = fy_invalid;
+	ctx->output_schema = fy_invalid;
+	ctx->structured_output = fy_invalid;
 	/* A zeroed fy_generic is an empty sequence, not fy_invalid. */
 	ctx->arena_branches = fy_invalid;
 	ctx->branch_prev = fy_invalid;

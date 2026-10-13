@@ -9,7 +9,7 @@
 # Tool order is fixed: tool_search, mcp_resource, read_file, write_file,
 # apply_patch, shell, shell_input,
 # shell_output, shell_close, ask_user, ask_parent, agent, todo_write, time, wait,
-# skill.
+# skill, structured_output.
 - type: function
   function:
     name: tool_search
@@ -868,3 +868,14 @@
       required:
         - skill
       additionalProperties: false
+- type: function
+  function:
+    name: structured_output
+    description: >-
+      Give the final answer of the task as the arguments of this tool, in the
+      shape that its parameters describe. Call it one time, when the answer is
+      complete. The turn ends after the call is accepted. A call whose
+      arguments do not match gets the problems as its result: correct them
+      and call it again.
+    parameters:
+      type: object
