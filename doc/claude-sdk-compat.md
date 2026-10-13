@@ -76,12 +76,18 @@ fyai sends the messages that the SDK parses:
 - `result` at the end of each turn, with the text of the last answer, the
   number of model responses, the token usage, and the cost.
 
-The names of tools and the arguments in `tool_use` blocks are those of fyai,
-for example `read_file` with `path`. They are not the names of Claude Code.
+The SDK sees three tools under the names and inputs of Claude Code: the
+shell tool as `Bash` with `command` and `timeout`, `read_file` as `Read` with
+`file_path`, `offset` and `limit`, and `write_file` as `Write` with
+`file_path` and `content`. These names appear in `tool_use` blocks, in the
+tools of `init`, in permission requests and in hook inputs. An input that
+the SDK changes goes back to the fyai arguments of the call. Each other
+tool keeps its fyai name and arguments.
 
 A turn that fails or is interrupted ends with a `result` that has `is_error`
 set and the subtype `error_during_execution`. The process exits with status 1
-after such a result, when the SDK closes standard input.
+after such a result, when the SDK closes standard input. The `result` lists
+the tool calls that were denied in `permission_denials`.
 
 ## Options
 
@@ -91,26 +97,108 @@ after such a result, when the SDK closes standard input.
 | `system_prompt` (preset with `append`) | Appends the text to the system prompt of a new session. |
 | `model` | Selects the model of the session. |
 | `max_turns` | Sets `max_tool_iterations` for the session. |
-| `tools` | Limits the built-in tools. Claude Code names map to fyai tools: `Bash` to the shell tools, `Read` to `read_file`, `Write` to `write_file`, `Edit` to `apply_patch`, `Task` to `agent`, `TodoWrite` to `todo_write`. A fyai tool name names the tool itself. An empty list turns tools off. |
-| `disallowed_tools` | Removes tools, with the same names. |
-| `allowed_tools`, `permission_mode` | Accepted. fyai runs tools in its sandbox and asks for no permission. |
+| `tools` | Limits the built-in tools. Claude Code names map to fyai tools: `Bash` to the shell tools, `Read` to `read_file`, `Write` to `write_file`, `Edit` to `apply_patch`, `Task` to `agent`, `TodoWrite` to `todo_write`. A fyai tool name names the tool itself. An empty list turns tools off. MCP tools stay. |
+| `disallowed_tools` | Removes the tools that it names, MCP tools included. A rule with parentheses denies the calls that it covers. |
+| `allowed_tools` | Rules of the calls that run without a permission request. |
+| `permission_mode` | See [Permissions](#permissions). |
+| `can_use_tool` | Asks the SDK before a call that no rule allows. |
+| `hooks` | See [Hooks](#hooks). |
+| `mcp_servers` | Starts the servers for the session. See [MCP servers](#mcp-servers). |
 | `resume`, `session_id` | Select the session. |
 | `cwd`, `env` | Apply to the fyai process, as to any CLI. |
 
 These options stop the session with an error, because they change what the
-session does and fyai does not support them yet: `can_use_tool`, `hooks`,
-`agents`, `mcp_servers`, `continue_conversation`, `fork_session`,
-`max_budget_usd`, `output_format`, `plugins`, and the permission mode `plan`.
-A permission rule in `disallowed_tools`, such as `Bash(rm:*)`, also stops it.
+session does and fyai does not support them yet: `agents`,
+`continue_conversation`, `fork_session`, `max_budget_usd`, `output_format`,
+`plugins`, and the permission mode `plan`.
 
 fyai ignores the options that change only what the SDK receives or that have
 no meaning in fyai: `include_partial_messages`, `thinking`, `effort`,
 `setting_sources`, `settings`, `add_dirs`, and `betas`.
 
+## Permissions
+
+fyai decides on each tool call of a response before any of the calls runs.
+It stops at the first step that decides:
+
+1. A rule of `disallowed_tools` that covers the call denies it.
+2. The `PreToolUse` hooks decide with `permissionDecision`: `deny` denies the
+   call, `allow` runs it, and `ask` goes to `can_use_tool` whatever the rules
+   say. An `updatedInput` replaces the input of the call.
+3. The permission mode `bypassPermissions` runs the call.
+4. A rule of `allowed_tools` that covers the call runs it.
+5. A tool that changes nothing runs: the entry of the tool in the registry
+   of fyai gives it no effect. Examples are `Read`, `list`, `time`, `wait`,
+   `todo_write`, `tool_search`, `mcp_resource`, and `shell_output`.
+6. The mode `acceptEdits` runs a tool that writes project files: `Write` and
+   `apply_patch`.
+7. The mode `dontAsk` denies the call.
+8. `can_use_tool` decides. A denial with `interrupt` stops the turn.
+9. Without `can_use_tool`, the call is denied, as in Claude Code.
+
+Thus a call of `Bash`, of `Task`, or of an MCP tool runs only when a rule,
+the permission mode, a hook, or `can_use_tool` allows it. A sub-agent of an
+allowed `Task` call runs its own calls without a question.
+
+The provider runs web search, and no one can be asked about a search. Thus
+web search is on only when the session starts with the mode
+`bypassPermissions` or with `WebSearch` in `allowed_tools`.
+
+A rule is a tool name, a Claude Code name or an MCP tool name, alone or with
+text in parentheses. The text of a `Bash` rule is a command: `git log:*`
+covers each command that starts with `git log`, and other text is a shell
+pattern of the whole command. The text of a `Read` or `Write` rule is a
+shell pattern of the path. Text for another tool covers no call.
+
+A denied call gets the reason as its result, and the model goes on.
+
+## Hooks
+
+fyai calls the hooks of these events:
+
+| Event | When | What the output does |
+| --- | --- | --- |
+| `UserPromptSubmit` | before the turn of a prompt | `additionalContext` follows the prompt; `decision: block` or `continue: false` stops the prompt with an error result. |
+| `PreToolUse` | before a tool call | See [Permissions](#permissions). `continue: false` stops the turn. |
+| `PostToolUse` | after a tool call that succeeded | `additionalContext`, and the `reason` of `decision: block`, go to the model before its next request; `continue: false` stops the turn. |
+| `PostToolUseFailure` | after a tool call that failed | As `PostToolUse`. |
+| `Stop` | when the model ends the turn | `decision: block` sends the `reason` to the model, which goes on; the next `Stop` input has `stop_hook_active` set. |
+
+A matcher is a regular expression of the tool name; an empty matcher, `*`, or
+none matches each tool. fyai accepts the hooks of other events and does not
+call them. `updatedToolOutput` is not applied.
+
+## MCP servers
+
+`mcp_servers` can give three kinds of server:
+
+- a server of the SDK, from `create_sdk_mcp_server()`: it runs in the SDK
+  process, and fyai sends it each message through the `mcp_message` control
+  request;
+- a program (`type: stdio`, or a `command`), with `args` and `env`; and
+- an HTTP server (`type: http`) with a `url` and no `headers`. fyai takes the
+  credentials of a server from its configuration, so a server that needs a
+  header is configured in fyai.
+
+Their tools are named `mcp__SERVER__TOOL`, as in Claude Code. fyai answers
+`initialize` when each server has connected or failed, so the first turn has
+their tools. The MCP servers of the fyai
+configuration also start, unless the SDK gives `--strict-mcp-config`.
+
 ## Control requests
 
-fyai answers `initialize`, `interrupt`, and `set_permission_mode`. It
-answers each other control request with an error.
+fyai answers these control requests of the SDK:
+
+- `initialize`, which brings the hooks;
+- `interrupt`, which stops the running turn;
+- `set_permission_mode`;
+- `set_model`, which changes the model for the process, as in Claude Code,
+  from the next turn: nothing stores it. A model that fyai cannot use leaves
+  the session as it was, and no model returns to the model that the session
+  started with; and
+- `mcp_status`.
+
+It answers each other control request with an error.
 
 ## Standard input and output
 
