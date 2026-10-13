@@ -250,6 +250,11 @@ static int reg_check_props(fy_generic def, const char *path)
 
 	props = fy_get(fy_get(def, "arguments", fy_invalid), "properties",
 		       fy_invalid);
+	/* Each parser of a command line holds this many arguments. */
+	if (fy_is_mapping(props) && fy_len(props) > FYAI_CMD_MAX_PROPS) {
+		reg_fail("%s: more than %d arguments", path, FYAI_CMD_MAX_PROPS);
+		return -1;
+	}
 	memset(seen, 0, sizeof(seen));
 	npos = 0;
 	rest_pos = -1;
