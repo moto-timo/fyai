@@ -2647,15 +2647,32 @@ bool fyai_config_session_scoped(const char *path)
 	return session;
 }
 
+static int config_session_layer_set(struct fyai_ctx *ctx, const char *key,
+				    fy_generic value);
+
 int fyai_config_session_set(struct fyai_ctx *ctx, const char *key,
 			    fy_generic value)
+{
+	fyai_error_check(ctx, fyai_config_session_scoped(key), err,
+			 "%s is stored configuration; it has no session value",
+			 key);
+	return config_session_layer_set(ctx, key, value);
+err:
+	return -1;
+}
+
+int fyai_config_invocation_set(struct fyai_ctx *ctx, const char *key,
+			       fy_generic value)
+{
+	return config_session_layer_set(ctx, key, value);
+}
+
+static int config_session_layer_set(struct fyai_ctx *ctx, const char *key,
+				    fy_generic value)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
 	fy_generic layer, base, doc, report;
 
-	fyai_error_check(ctx, fyai_config_session_scoped(key), err,
-			 "%s is stored configuration; it has no session value",
-			 key);
 	layer = fy_is_valid(cfg->config_session) ? cfg->config_session :
 		fy_map_empty;
 	layer = fy_set_at_pathstr(cfg->gb, layer, key, value);

@@ -234,6 +234,14 @@ int fyai_config_session_set(struct fyai_ctx *ctx, const char *key,
 			    fy_generic value);
 
 /*
+ * The same for any @key: the invocation owns the value, as a protocol front
+ * end owns the settings its client gives. A session command does not use it;
+ * it changes only the keys that a session may change for itself.
+ */
+int fyai_config_invocation_set(struct fyai_ctx *ctx, const char *key,
+			       fy_generic value);
+
+/*
  * True when a session changes @path for itself: the schema marks the key, or
  * a group above it, with `x-fyai-scope: session`.
  */
