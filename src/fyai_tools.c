@@ -2520,6 +2520,8 @@ static fy_generic fyai_tool_child_serve(struct jsonrpc_conn *conn,
 		}
 		tc->args = fy_get(params, "call", fy_invalid);
 		tc->branch = fy_get(params, "branch", fy_invalid);
+		tc->ctx->relay_gate = fy_get(params, "gate", false);
+		tc->ctx->relay_steps = fy_get(params, "steps", false);
 		tc->size_rows = (int)fy_get(fy_get(params, "size", fy_invalid),
 					   "rows", 0LL);
 		tc->size_cols = (int)fy_get(fy_get(params, "size", fy_invalid),
@@ -5274,6 +5276,19 @@ static struct fyai_tool_job *fyai_tool_job_by_branch(struct fyai_ctx *ctx,
 	return NULL;
 }
 
+int fyai_tool_agent_respond(struct fyai_ctx *ctx, const char *branch,
+			    long long rpc_id, fy_generic result)
+{
+	struct fyai_tool_job *job;
+
+	job = fyai_tool_job_by_branch(ctx, branch);
+	if (!job || !job->conn)
+		return -1;
+	return jsonrpc_conn_respond(job->conn,
+				    fy_value(fyai_ctx_transient_gb(ctx), rpc_id),
+				    result, fy_invalid);
+}
+
 uint64_t fyai_tool_agent_transport_exec(struct fyai_ctx *ctx, const char *name)
 {
 	struct fyai_tool_job *job;
@@ -5345,6 +5360,11 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	ctx->tool_gate = NULL;			/* and the policy of its calls */
 	ctx->tool_gate_data = NULL;
 	ctx->tool_gate_run = NULL;
+	ctx->gate_relays = NULL;		/* the calls of its sub-agents */
+	ctx->agent_observe = NULL;
+	ctx->agent_observe_data = NULL;
+	ctx->relay_gate = false;		/* what its own parent asked */
+	ctx->relay_steps = false;
 	ctx->turn_cost_limit = 0;		/* the budget of the parent's run */
 	ctx->output_schema = fy_invalid;	/* and the answer it asks for */
 	ctx->structured_output = fy_invalid;
@@ -6555,6 +6575,39 @@ static void fyai_tool_job_progress_retain(struct fyai_tool_job *job,
 	buf->data[buf->len] = '\0';
 }
 
+/*
+ * Put a tool call of a delegated sub-agent before the gate of this process.
+ * With no gate, the call runs as it would here.
+ */
+static fy_generic fyai_tool_job_gate(struct fyai_tool_job *job,
+				     struct jsonrpc_conn *conn, fy_generic id,
+				     fy_generic params)
+{
+	struct fyai_ctx *ctx = job->ctx;
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	bool after;
+	int rc;
+
+	after = fy_equal(fy_get(params, "phase", fy_invalid), "after");
+	if (!ctx->tool_gate)
+		return after ? fy_mapping(gb, "stop", false) :
+			       fy_mapping(gb, "allow", true);
+	/* The gate can answer during the relay. */
+	jsonrpc_conn_defer(conn);
+	rc = fyai_tool_gate_relay(ctx, job->branch, fy_cast(id, -1LL), params);
+	if (!rc)
+		return fy_invalid;
+	rc = jsonrpc_conn_respond(conn, id, after ?
+		fy_mapping(gb, "stop", false) :
+		fy_mapping(gb, "allow", false,
+			   "message", "the tool call could not be decided",
+			   "stop", true), fy_invalid);
+	if (rc)
+		fyai_warning(ctx, "could not answer the tool call of the "
+			     "sub-agent '%s'", fyai_agent_job_name(job));
+	return fy_invalid;
+}
+
 /* The child's tool/progress notifications: its live output. */
 static fy_generic fyai_tool_job_serve(struct jsonrpc_conn *conn,
 				      const char *method, fy_generic params,
@@ -6569,6 +6622,14 @@ static fy_generic fyai_tool_job_serve(struct jsonrpc_conn *conn,
 
 	if (fyai_agents_serve(job->ctx, conn, method, params, id, &text, errorp))
 		return text;
+	if (job->agent && fy_is_valid(id) && !strcmp(method, "tool/gate"))
+		return fyai_tool_job_gate(job, conn, id, params);
+	if (job->agent && !strcmp(method, "turn/step")) {
+		if (job->ctx->agent_observe)
+			job->ctx->agent_observe(job->ctx, job->call, params,
+						job->ctx->agent_observe_data);
+		return fy_invalid;
+	}
 	/* Handle the question request a delegated child sends to its parent. */
 	if (fy_is_valid(id)) {
 		if (strcmp(method, "user/ask"))
@@ -6710,6 +6771,11 @@ static int fyai_tool_job_attach(struct fyai_ctx *ctx,
 	if (job->exec)
 		params = fy_assoc(gb, params, fy_value(gb, "spawn"),
 				     fyai_agent_spawn_state(job->ctx, gb, job->transport_exec));
+	/* A sub-agent asks the gate of this process, and reports its steps. */
+	if (job->agent && ctx->tool_gate)
+		params = fy_assoc(gb, params, "gate", true);
+	if (job->agent && ctx->agent_observe)
+		params = fy_assoc(gb, params, "steps", true);
 	if (job->start_cols > 0)
 		params = fy_assoc(gb, params, fy_value(gb, "size"),
 				  fy_gb_mapping(gb,

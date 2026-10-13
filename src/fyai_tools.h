@@ -88,6 +88,12 @@ int fyai_tool_child_exec_serve(struct fyai_ctx *ctx);
  * designates: its branch, or the name it was delegated under. 0 when there is
  * none or the agent has no transport execution.
  */
+/*
+ * Send @result as the response to request @rpc_id of the live job that owns
+ * @branch. Returns -1 when that job has gone.
+ */
+int fyai_tool_agent_respond(struct fyai_ctx *ctx, const char *branch,
+			    long long rpc_id, fy_generic result);
 uint64_t fyai_tool_agent_transport_exec(struct fyai_ctx *ctx, const char *name);
 /* Borrow the branch of a live direct sub-agent, including one still admitting. */
 const char *fyai_tool_agent_live_branch(struct fyai_ctx *ctx, const char *name);

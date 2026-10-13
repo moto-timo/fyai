@@ -1872,12 +1872,107 @@ static void fyai_tool_gate_answered(struct fyai_turn_run *run,
 				       fyai_turn_run_service, run);
 }
 
+/* A round that a delegated sub-agent asked for: one call of its turn. */
+struct fyai_gate_relay {
+	struct fyai_gate_relay *next;
+	uint64_t id;
+	bool after;
+	char *branch;		/* the job that asked */
+	long long rpc_id;	/* and its request */
+};
+
+static void fyai_gate_relay_free(struct fyai_gate_relay *r)
+{
+	free(r->branch);
+	free(r);
+}
+
+void fyai_tool_gate_relays_drop(struct fyai_ctx *ctx)
+{
+	struct fyai_gate_relay *r;
+
+	while ((r = ctx->gate_relays)) {
+		ctx->gate_relays = r->next;
+		fyai_gate_relay_free(r);
+	}
+}
+
+/* Take the relayed round @id of the kind @after, or NULL. */
+static struct fyai_gate_relay *fyai_gate_relay_take(struct fyai_ctx *ctx,
+						    uint64_t id, bool after)
+{
+	struct fyai_gate_relay **pp, *r;
+
+	for (pp = &ctx->gate_relays; (r = *pp); pp = &r->next)
+		if (r->id == id) {
+			if (r->after != after)
+				return NULL;
+			*pp = r->next;
+			return r;
+		}
+	return NULL;
+}
+
+/* Send @answer to the sub-agent that asked for round @r, and free it. */
+static void fyai_gate_relay_answer(struct fyai_ctx *ctx,
+				   struct fyai_gate_relay *r, fy_generic answer)
+{
+	int rc;
+
+	rc = fyai_tool_agent_respond(ctx, r->branch, r->rpc_id, answer);
+	if (rc)
+		fyai_warning(ctx, "could not answer the tool call of the "
+			     "sub-agent '%s'", r->branch);
+	fyai_gate_relay_free(r);
+}
+
+int fyai_tool_gate_relay(struct fyai_ctx *ctx, const char *branch,
+			 long long rpc_id, fy_generic params)
+{
+	const struct fyai_tool_gate_ops *ops = ctx->tool_gate;
+	struct fyai_gate_relay *r;
+	fy_generic call;
+
+	if (!ops)
+		return -1;
+	r = calloc(1, sizeof(*r));
+	fyai_error_check(ctx, r, err, "could not relay a tool call");
+	r->branch = strdup(branch ? branch : "");
+	fyai_error_check(ctx, r->branch, err_free,
+			 "could not relay a tool call");
+	r->id = ++ctx->tool_gate_seq;
+	r->after = fy_equal(fy_get(params, "phase", fy_invalid), "after");
+	r->rpc_id = rpc_id;
+	/* The gate can answer during the call. */
+	r->next = ctx->gate_relays;
+	ctx->gate_relays = r;
+	call = fy_get(params, "call", fy_invalid);
+	if (r->after)
+		ops->after(ctx, r->id, 0, call,
+			   fy_get(params, "result", fy_invalid),
+			   fy_get(params, "ok", false), ctx->tool_gate_data);
+	else
+		ops->before(ctx, r->id, 0, call, ctx->tool_gate_data);
+	return 0;
+err_free:
+	free(r);
+err:
+	return -1;
+}
+
 void fyai_tool_gate_allow(struct fyai_ctx *ctx, uint64_t id, size_t index,
 			  fy_generic args)
 {
 	struct fyai_gate_answer *a;
+	struct fyai_gate_relay *r;
 	struct fyai_turn_run *run;
 
+	r = fyai_gate_relay_take(ctx, id, false);
+	if (r) {
+		fyai_gate_relay_answer(ctx, r, fy_mapping(fyai_ctx_transient_gb(ctx),
+			"allow", true, "args", fyai_generic_or_null(args)));
+		return;
+	}
 	a = fyai_tool_gate_slot(ctx, id, index, &run);
 	if (!a || run->gate_after)
 		return;
@@ -1891,21 +1986,38 @@ void fyai_tool_gate_deny(struct fyai_ctx *ctx, uint64_t id, size_t index,
 			 const char *message, bool stop)
 {
 	struct fyai_gate_answer *a;
+	struct fyai_gate_relay *r;
 	struct fyai_turn_run *run;
 
+	if (!message || !*message)
+		message = "the tool call was denied";
+	r = fyai_gate_relay_take(ctx, id, false);
+	if (r) {
+		fyai_gate_relay_answer(ctx, r, fy_mapping(fyai_ctx_transient_gb(ctx),
+			"allow", false, "message", message,
+			"stop", (_Bool)stop));
+		return;
+	}
 	a = fyai_tool_gate_slot(ctx, id, index, &run);
 	if (!a || run->gate_after)
 		return;
-	fyai_tool_gate_answered(run, a, message && *message ? message :
-				"the tool call was denied", stop);
+	fyai_tool_gate_answered(run, a, message, stop);
 }
 
 void fyai_tool_gate_done(struct fyai_ctx *ctx, uint64_t id, size_t index,
 			 const char *context, bool stop)
 {
 	struct fyai_gate_answer *a;
+	struct fyai_gate_relay *r;
 	struct fyai_turn_run *run;
 
+	r = fyai_gate_relay_take(ctx, id, true);
+	if (r) {
+		fyai_gate_relay_answer(ctx, r, fy_mapping(fyai_ctx_transient_gb(ctx),
+			"context", context ? context : "",
+			"stop", (_Bool)stop));
+		return;
+	}
 	a = fyai_tool_gate_slot(ctx, id, index, &run);
 	if (!a || !run->gate_after)
 		return;
@@ -2486,6 +2598,7 @@ void fyai_cleanup(struct fyai_ctx *ctx)
 	fyai_asks_release(ctx);
 	fyai_waits_release(ctx);
 	fyai_waiters_release(ctx);
+	fyai_tool_gate_relays_drop(ctx);
 	fyai_agent_background_close(ctx);
 	fyai_monitor_close(ctx);
 	fyai_tool_diff_cleanup(ctx);

@@ -390,6 +390,115 @@ err:
 	return -1;
 }
 
+/*
+ * A sub-agent whose parent has a tool gate asks that gate about each of its
+ * calls, one tool/gate request for each call.
+ */
+struct agent_gate_ask {
+	struct fyai_ctx *ctx;
+	uint64_t id;
+	size_t index;
+	bool after;
+};
+
+static void agent_gate_answer(struct jsonrpc_request *req, void *userdata)
+{
+	struct agent_gate_ask *ask = userdata;
+	struct fyai_ctx *ctx = ask->ctx;
+	fy_generic r, v;
+
+	r = jsonrpc_request_ok(req) ? jsonrpc_request_result(req) : fy_invalid;
+	if (ask->after) {
+		v = fy_get(r, "context", fy_invalid);
+		fyai_tool_gate_done(ctx, ask->id, ask->index,
+				    fy_castp(&v, ""), fy_get(r, "stop", false));
+	} else if (fy_get(r, "allow", false)) {
+		fyai_tool_gate_allow(ctx, ask->id, ask->index,
+				     fy_get(r, "args", fy_invalid));
+	} else if (fy_is_mapping(r)) {
+		v = fy_get(r, "message", fy_invalid);
+		fyai_tool_gate_deny(ctx, ask->id, ask->index, fy_castp(&v, ""),
+				    fy_get(r, "stop", false));
+	} else {
+		fyai_tool_gate_deny(ctx, ask->id, ask->index,
+				    "the parent did not decide on the tool call",
+				    true);
+	}
+	jsonrpc_request_destroy(req);
+	free(ask);
+}
+
+static void agent_gate_ask(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			   bool after, fy_generic params)
+{
+	struct jsonrpc_request *req = NULL;
+	struct agent_gate_ask *ask;
+
+	ask = calloc(1, sizeof(*ask));
+	if (ask) {
+		ask->ctx = ctx;
+		ask->id = id;
+		ask->index = index;
+		ask->after = after;
+		req = jsonrpc_request_submit(ctx->tool_rpc, "tool/gate", params,
+					     jsonrpc_conn_next_id(ctx->tool_rpc),
+					     false, agent_gate_answer, ask);
+	}
+	if (req)
+		return;
+	free(ask);
+	fyai_error(ctx, "could not ask the parent about a tool call");
+	if (after)
+		fyai_tool_gate_done(ctx, id, index, NULL, false);
+	else
+		fyai_tool_gate_deny(ctx, id, index, "the parent could not be "
+				    "asked about the tool call", true);
+}
+
+static void agent_gate_before(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			      fy_generic call, void *data)
+{
+	(void)data;
+	agent_gate_ask(ctx, id, index, false,
+		       fy_mapping(fyai_ctx_transient_gb(ctx),
+				  "phase", "before", "call", call));
+}
+
+static void agent_gate_after(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			     fy_generic call, fy_generic result, bool ok,
+			     void *data)
+{
+	(void)data;
+	agent_gate_ask(ctx, id, index, true,
+		       fy_mapping(fyai_ctx_transient_gb(ctx),
+				  "phase", "after", "call", call,
+				  "result", fyai_generic_or_null(result),
+				  "ok", (_Bool)ok));
+}
+
+static const struct fyai_tool_gate_ops agent_gate_ops = {
+	.before = agent_gate_before,
+	.after = agent_gate_after,
+};
+
+/* Send each step of the turn to the parent. */
+static void agent_step_relay(struct fyai_ctx *ctx, fy_generic turn, void *data)
+{
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	fy_generic usage;
+	int rc;
+
+	(void)data;
+	usage = fy_get(fyai_turn_meta(turn), "usage", fy_invalid);
+	rc = jsonrpc_notify(ctx->tool_rpc, "turn/step", fy_mapping(gb,
+		"messages", fy_get(turn, "messages", fy_seq_empty),
+		"usage", fyai_generic_or_null(usage),
+		"model", ctx->cfg->model ? ctx->cfg->model : ""));
+	if (rc)
+		fyai_warning(ctx, "could not send a step of the turn to the "
+			     "parent");
+}
+
 fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
@@ -601,6 +710,15 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 
 	/* Render only when the parent supplied a terminal. */
 	ctx->stdout_tty = cfg->agent_pty;
+
+	if (ctx->tool_rpc && ctx->relay_gate) {
+		ctx->tool_gate = &agent_gate_ops;
+		ctx->tool_gate_data = NULL;
+	}
+	if (ctx->tool_rpc && ctx->relay_steps) {
+		ctx->turn_observe = agent_step_relay;
+		ctx->turn_observe_data = NULL;
+	}
 
 	/* Open a promptless display on the supplied terminal. */
 	if (cfg->agent_pty && !fyai_ui_open(ctx))

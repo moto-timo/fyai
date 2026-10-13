@@ -35,6 +35,7 @@ struct fyai_shell_session;
 struct fyai_sink;
 struct fyai_turn_run;
 struct fyai_tool_gate_ops;
+struct fyai_gate_relay;
 
 /* What stopped a turn before the model ended it. */
 enum fyai_turn_stop {
@@ -825,6 +826,14 @@ struct fyai_ctx {
 	 */
 	void (*turn_observe)(struct fyai_ctx *ctx, fy_generic turn, void *data);
 	void *turn_observe_data;
+	/*
+	 * Called with each step that a delegated sub-agent appends to its
+	 * turn: {messages, usage, model}. @call is the agent call of this
+	 * turn that started it. The step is valid during the call.
+	 */
+	void (*agent_observe)(struct fyai_ctx *ctx, fy_generic call,
+			      fy_generic step, void *data);
+	void *agent_observe_data;
 	/* Called with each chunk of answer text as it arrives. */
 	void (*text_observe)(struct fyai_ctx *ctx, const char *text, size_t len,
 			     void *data);
@@ -849,6 +858,14 @@ struct fyai_ctx {
 	void *tool_gate_data;
 	struct fyai_turn_run *tool_gate_run;
 	uint64_t tool_gate_seq;
+	/* The rounds that delegated sub-agents asked the gate for. */
+	struct fyai_gate_relay *gate_relays;
+	/*
+	 * A delegated sub-agent: the parent asks for its tool calls to go
+	 * through the gate of the parent, and for each step of its turns.
+	 */
+	bool relay_gate;
+	bool relay_steps;
 	/* Set inside a forked tool sub-execution once the environment has been
 	 * sanitized and the sandbox applied, so inner steps (the shell tool's
 	 * own fork) do not re-derive and re-apply the confinement. */
@@ -998,6 +1015,18 @@ void fyai_tool_gate_deny(struct fyai_ctx *ctx, uint64_t id, size_t index,
  */
 void fyai_tool_gate_done(struct fyai_ctx *ctx, uint64_t id, size_t index,
 			 const char *context, bool stop);
+
+/*
+ * Put the call of a delegated sub-agent before the gate of this context, in
+ * a round of its own: @params is {phase: before, call} or {phase: after,
+ * call, result, ok}. The answer goes back as the response to request @rpc_id
+ * of the job that owns @branch: {allow, args, message, stop} or {context,
+ * stop}. Returns -1 when no gate is set and the call needs no answer.
+ */
+int fyai_tool_gate_relay(struct fyai_ctx *ctx, const char *branch,
+			 long long rpc_id, fy_generic params);
+/* Forget the relayed rounds without an answer. */
+void fyai_tool_gate_relays_drop(struct fyai_ctx *ctx);
 
 /* Queue owned @text for the event-loop owner to submit between turns. */
 int fyai_event_inject(struct fyai_ctx *ctx, char *text);
