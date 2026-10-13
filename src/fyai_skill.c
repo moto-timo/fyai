@@ -1737,7 +1737,7 @@ static const char *skill_file_list(struct fy_generic_builder *gb,
 	if (fy_empty(list))
 		return "";
 	list = fyai_skill_join(gb, list, ", ");
-	return fy_castp(&list, "");
+	return fy_gb_intern_string(gb, fy_castp(&list, ""));
 }
 
 /* The text that loads @skill into the conversation, built in @gb. */
@@ -2032,7 +2032,7 @@ static const char *skill_model_names(struct fyai_ctx *ctx,
 	if (fy_empty(list))
 		return "none";
 	list = fyai_skill_join(gb, list, ", ");
-	return fy_castp(&list, "none");
+	return fy_gb_intern_string(gb, fy_castp(&list, "none"));
 }
 
 static fy_generic tool_skill(struct fyai_ctx *ctx, fy_generic args, bool *okp)
