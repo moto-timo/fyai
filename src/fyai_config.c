@@ -43,6 +43,7 @@
 #include "fyai_markdown.h"
 #include "fyai_storage.h"
 #include "commands.h"
+#include "fyai_claude_sdk.h"
 #include "fyai_cmd.h"
 #include "fyai_fsview.h"
 #include "utils.h"
@@ -2880,6 +2881,7 @@ void fyai_config_cleanup(struct fyai_cfg *cfg)
 	free(cfg->reload_key);
 	free(cfg->reload_arena);
 	free(cfg->root_spec);
+	free(cfg->fresh_session_name);
 	free(cfg->terminal_input);
 	markdown_palettes_destroy(cfg);
 	fy_generic_builder_destroy(cfg->gb);
@@ -3265,6 +3267,13 @@ static int config_queue_set_quoted(struct fyai_cfg *cfg, const char *key,
 	return rc;
 }
 
+int fyai_config_queue_set(struct fyai_cfg *cfg, const char *key,
+			  const char *value, bool quoted)
+{
+	return quoted ? config_queue_set_quoted(cfg, key, value, false, false) :
+		config_queue_set_literal(cfg, key, value, false, false);
+}
+
 static bool config_has_command_ops(struct fyai_cfg *cfg)
 {
 	size_t i;
@@ -3378,12 +3387,13 @@ static int config_parse_cli_options(struct fyai_cfg *cfg, int argc, char *argv[]
 	optarg = NULL;
 
 	/* '+' stops parsing at the first non-option (the verb or prompt). */
-	while ((opt = getopt_long(argc, argv, "+hC:e:m:k:b:id",
+	while ((opt = getopt_long(argc, argv, "+hvC:e:m:k:b:id",
 				  long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'h':
 			options->help = true;
 			break;
+		case 'v':
 		case OPT_VERSION:
 			printf("fyai %s\n", VERSION);
 			return 1;
@@ -3544,6 +3554,7 @@ int fyai_config_setup(struct fyai_cfg *cfg, int argc, char *argv[])
 	char *prompt = NULL;
 	int ret = -1;
 	char **help_argv = NULL;
+	const char *version;
 	int i;
 
 	if (!cfg)
@@ -3573,6 +3584,20 @@ int fyai_config_setup(struct fyai_cfg *cfg, int argc, char *argv[])
 			fyai_cfg_error(cfg, "reload: missing arena path");
 			goto err_out;
 		}
+	}
+
+	/*
+	 * main() gives the command line of a Claude Agent SDK the claude-sdk
+	 * command. A command line that still has the form of an SDK asks for
+	 * the version, or could not be given the command.
+	 */
+	if (fyai_claude_sdk_argv(argc, argv)) {
+		version = fyai_claude_sdk_version(argc, argv);
+		fyai_cfg_error_check(cfg, version, err_out,
+				     "cannot make the arguments of claude-sdk");
+		printf("%s\n", version);
+		ret = 1;
+		goto out;
 	}
 
 	rc = config_parse_cli_options(cfg, argc, argv, &cli);

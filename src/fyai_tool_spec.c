@@ -16,6 +16,7 @@
 
 #include "fyai.h"
 #include "fyai_agent.h"
+#include "fyai_cmd.h"
 #include "fyai_config.h"
 #include "fyai_skill.h"
 #include "fyai_tool_spec.h"
@@ -129,7 +130,10 @@ fy_generic make_tools_filtered(struct fyai_ctx *ctx)
 		/* A skill run offers only the tools of its skill. */
 		if (!fyai_skill_tool_allowed(ctx, fy_castp(&name, "")))
 			continue;
-		if (ctx->cfg->acp_worker && fy_equal(name, "ask_user"))
+		/* No person answers a question of a protocol client. */
+		if ((ctx->cfg->acp_worker ||
+		     fyai_cmd_state_is(&ctx->cfg->cmd.reg, "claude-sdk")) &&
+		    fy_equal(name, "ask_user"))
 			continue;
 		if (def && def->describe) {
 			tool = def->describe(ctx, gb, tool);

@@ -11,7 +11,7 @@
 
 #include "fyai_cmd.h"
 
-#define FYAI_CMD_MAX_PROPS	32
+#define FYAI_CMD_MAX_PROPS	64
 
 /* The command that a list of words resolves to. */
 struct fyai_cmd_walk {
@@ -209,10 +209,13 @@ int fyai_cmd_term_prepare(struct fyai_cfg *cfg, fy_generic args);
 int fyai_cmd_init_prepare(struct fyai_cfg *cfg, fy_generic args);
 int fyai_cmd_agent_prepare(struct fyai_cfg *cfg, fy_generic args);
 int fyai_cmd_acp_prepare(struct fyai_cfg *cfg, fy_generic args);
+int fyai_cmd_claude_sdk_early(struct fyai_cfg *cfg, fy_generic args);
+int fyai_cmd_claude_sdk_prepare(struct fyai_cfg *cfg, fy_generic args);
 int fyai_cmd_transport_early(struct fyai_cfg *cfg, fy_generic args);
 int fyai_cmd_transport(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_agent(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_acp(struct fyai_cmd_call *call, fy_generic *result);
+int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_setting(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_lockdown(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_yolo(struct fyai_cmd_call *call, fy_generic *result);

@@ -200,6 +200,14 @@ const char *fyai_config_provider_env_key(struct fy_generic_builder *gb,
 int fyai_config_messages_gate(struct fyai_cfg *cfg);
 
 int fyai_config_setup(struct fyai_cfg *cfg, int argc, char *argv[]);
+
+/*
+ * Queue a --set of @key for this invocation, before the configuration loads.
+ * A @quoted value is a string; else it is parsed as a YAML flow value. The
+ * change is not stored.
+ */
+int fyai_config_queue_set(struct fyai_cfg *cfg, const char *key,
+			  const char *value, bool quoted);
 /* Replace this invocation after its context has closed. Return on error. */
 int fyai_config_reload_exec(struct fyai_cfg *cfg);
 void fyai_config_cleanup(struct fyai_cfg *cfg);

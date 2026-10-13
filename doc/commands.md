@@ -8,7 +8,7 @@ Do not edit; run `ninja docs-commands` to write it again.
 | Option | Description |
 | --- | --- |
 | `-h`, `--help` | show the help, as fyai help does with the words that follow |
-| `--version` | print the fyai version |
+| `-v`, `--version` | print the fyai version |
 | `-C`, `--config FILE` | load an explicit configuration file |
 | `-e`, `--env FILE` | source a .env file (only the variables that are used) |
 | `-m`, `--model MODEL` | model, optionally as provider/model |

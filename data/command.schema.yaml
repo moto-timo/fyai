@@ -66,7 +66,11 @@ $defs:
       description: {type: string, minLength: 1}
       x-fyai-positional: {type: integer, minimum: 0}
       x-fyai-rest: {type: boolean}
-      x-fyai-long: {$ref: "#/$defs/word"}
+      # A long option of a foreign grammar, such as the Claude CLI, can
+      # have capitals.
+      x-fyai-long:
+        type: string
+        pattern: "^[A-Za-z_][A-Za-z0-9_-]*$"
       x-fyai-short:
         type: string
         pattern: "^[A-Za-z0-9]$"

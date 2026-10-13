@@ -417,6 +417,12 @@ struct fyai_cfg {
 	 * the conversation the last one left.
 	 */
 	bool fresh_session;
+	/*
+	 * Owned name of the fresh session, else storage names it. A session
+	 * that a program names takes the configuration of the branch HEAD names,
+	 * not of the session that ran last in its directory.
+	 */
+	char *fresh_session_name;
 	/* Owned branch name for a restart after the session closes. */
 	char *reload_branch;
 	char *reload_config;

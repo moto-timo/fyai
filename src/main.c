@@ -32,6 +32,7 @@
 #include <unistd.h>
 
 #include "fyai.h"
+#include "fyai_claude_sdk.h"
 #include "fyai_config.h"
 #include "fyai_storage.h"
 #include "commands.h"
@@ -42,6 +43,7 @@
 int main(int argc, char **argv)
 {
 	struct fyai_cfg cfg = { };
+	char **sdk_argv;
 	int rc, ret = EXIT_FAILURE;
 
 	fyai_prof_init();
@@ -54,6 +56,18 @@ int main(int argc, char **argv)
 	fyai_reserve_arena_ranges();
 	curl_global_init(CURL_GLOBAL_DEFAULT);
 
+	/*
+	 * A Claude Agent SDK runs this program as its CLI. Its command line is
+	 * the argument list of the claude-sdk command, whose grammar is not
+	 * that of the global options. A program that runs this one again takes
+	 * the command line with the command.
+	 */
+	sdk_argv = fyai_claude_sdk_args(argc, argv);
+	if (sdk_argv) {
+		argc++;
+		argv = sdk_argv;
+	}
+
 	rc = fyai_config_setup(&cfg, argc, argv);
 	/*
 	 * Report what the option parsing raised before the verb runs - it has
@@ -62,6 +76,7 @@ int main(int argc, char **argv)
 	 */
 	if (rc) {
 		fyai_diag_drain(&cfg.diag);
+		free(sdk_argv);
 		return rc > 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
 	cfg.argv = argv;
@@ -78,6 +93,7 @@ int main(int argc, char **argv)
 		fyai_diag_drain(&cfg.diag);
 		fyai_config_cleanup(&cfg);
 		curl_global_cleanup();
+		free(sdk_argv);
 		return EXIT_FAILURE;
 	}
 	fyai_diag_drain(&cfg.diag);
@@ -92,5 +108,6 @@ int main(int argc, char **argv)
 	fyai_config_cleanup(&cfg);
 	curl_global_cleanup();
 	fyai_prof_report();
+	free(sdk_argv);
 	return ret;
 }

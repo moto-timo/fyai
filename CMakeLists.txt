@@ -428,6 +428,7 @@ set(FYAI_SOURCES
     src/fyai.c
     src/fyai_agent.c
     src/fyai_acp.c
+    src/fyai_claude_sdk.c
     src/fyai_agents.c
     src/fyai_ask.c
     src/fyai_event_fmt.c

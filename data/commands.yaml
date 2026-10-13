@@ -24,6 +24,7 @@ global:
       version:
         type: boolean
         description: print the fyai version
+        x-fyai-short: v
       config:
         type: string
         description: load an explicit configuration file
@@ -3394,6 +3395,146 @@ commands:
           type: boolean
           description: serve one ACP turn in a child process
           x-fyai-hidden: true
+
+  - command: claude-sdk
+    title: serve the Claude Agent SDK protocol
+    description: |
+      Serve the stream-json protocol of the Claude Agent SDK on standard input
+      and output, so that an SDK program can use fyai as its CLI. An SDK
+      starts fyai with `cli_path` (Python) or `pathToClaudeCodeExecutable`
+      (TypeScript). fyai takes this command when it runs as `claude` or when
+      its arguments include `--input-format`; a person does not give it.
+      Each session is an `sdk/` branch. See doc/claude-sdk-compat.md.
+    surfaces: [cli]
+    handler: claude_sdk
+    early: claude_sdk
+    prepare: claude_sdk
+    hidden: true
+    flags: [model]
+    arguments:
+      type: object
+      additionalProperties: false
+      properties:
+        output_format:
+          type: string
+          enum: [stream-json]
+          description: the format of standard output
+        input_format:
+          type: string
+          enum: [stream-json]
+          description: the format of standard input
+        verbose:
+          type: boolean
+          description: accepted; the stream is always complete
+        model:
+          type: string
+          description: the model of the session
+        fallback_model:
+          type: string
+          description: not supported; ignored
+        system_prompt:
+          type: string
+          description: replace the system prompt of a new session; empty keeps it
+        system_prompt_file:
+          type: string
+          description: replace the system prompt of a new session with a file
+        append_system_prompt:
+          type: string
+          description: append text to the system prompt of a new session
+        tools:
+          type: string
+          description: the available tools, as Claude Code names separated by commas; empty for none, default for all
+        allowed_tools:
+          type: string
+          description: tools that run without a permission request; fyai asks for none
+          x-fyai-long: allowedTools
+        disallowed_tools:
+          type: string
+          description: tools to remove, as Claude Code names separated by commas
+          x-fyai-long: disallowedTools
+        max_turns:
+          type: integer
+          minimum: 1
+          description: the limit of tool iterations in one turn
+        max_budget_usd:
+          type: number
+          description: not supported
+        task_budget:
+          type: integer
+          description: not supported; ignored
+        betas:
+          type: string
+          description: not supported; ignored
+        permission_mode:
+          type: string
+          description: the permission mode; fyai runs tools in its sandbox and asks for no permission
+        permission_prompt_tool:
+          type: string
+          description: not supported
+        continue:
+          type: boolean
+          description: not supported
+        resume:
+          type: string
+          description: continue the session with this ID
+        session_id:
+          type: string
+          description: the ID of a new session
+        resume_session_at:
+          type: string
+          description: not supported
+        resume_drops_turn:
+          type: string
+          description: not supported
+        fork_session:
+          type: boolean
+          description: not supported
+        session_mirror:
+          type: boolean
+          description: not supported
+        settings:
+          type: string
+          description: not supported; ignored
+        setting_sources:
+          type: string
+          description: not supported; ignored
+        add_dir:
+          type: array
+          items: {type: string}
+          description: not supported; ignored
+          x-fyai-repeat: true
+        plugin_dir:
+          type: array
+          items: {type: string}
+          description: not supported
+          x-fyai-repeat: true
+        mcp_config:
+          type: string
+          description: not supported
+        strict_mcp_config:
+          type: boolean
+          description: accepted; fyai uses only the MCP servers of its configuration
+        include_partial_messages:
+          type: boolean
+          description: not supported; ignored
+        include_hook_events:
+          type: boolean
+          description: not supported; ignored
+        json_schema:
+          type: string
+          description: not supported
+        thinking:
+          type: string
+          description: not supported; ignored
+        thinking_display:
+          type: string
+          description: not supported; ignored
+        max_thinking_tokens:
+          type: integer
+          description: not supported; ignored
+        effort:
+          type: string
+          description: not supported; ignored
 
   - command: transport
     title: serve model requests for isolated agents

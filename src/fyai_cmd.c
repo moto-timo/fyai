@@ -108,6 +108,7 @@ static const struct {
 	{ "profiles",		fyai_cmd_profiles },
 	{ "agent",		fyai_cmd_agent },
 	{ "acp",		fyai_cmd_acp },
+	{ "claude_sdk",		fyai_cmd_claude_sdk },
 	{ "transport",		fyai_cmd_transport },
 	{ "setting",		fyai_cmd_setting },
 	{ "lockdown",		fyai_cmd_lockdown },
@@ -171,6 +172,7 @@ static const struct {
 	fyai_cmd_prepare_fn fn;
 } cmd_earlies[] = {
 	{ "resume",		fyai_cmd_resume_early },
+	{ "claude_sdk",		fyai_cmd_claude_sdk_early },
 	{ "transport",		fyai_cmd_transport_early },
 };
 
@@ -182,6 +184,7 @@ static const struct {
 	{ "init",		fyai_cmd_init_prepare },
 	{ "agent",		fyai_cmd_agent_prepare },
 	{ "acp",		fyai_cmd_acp_prepare },
+	{ "claude_sdk",		fyai_cmd_claude_sdk_prepare },
 	{ "resume",		fyai_cmd_resume_prepare },
 	{ "skill_exec",		fyai_cmd_skill_exec_prepare },
 };

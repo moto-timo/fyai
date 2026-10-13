@@ -743,8 +743,8 @@ static int storage_bootstrap_seed(struct fyai_ctx *ctx)
 int fyai_setup_storage(struct fyai_ctx *ctx)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
-	struct fyai_branch b, lb;
-	bool exists, claimed;
+	struct fyai_branch b, lb, sb;
+	bool exists, claimed, taken;
 	struct fyai_root r;
 	char session[FYAI_BRANCH_NAME_MAX + 1];
 	char cwd[PATH_MAX];
@@ -868,7 +868,8 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 		 */
 		if (cfg->fresh_session) {
 			last = NULL;
-			if (getcwd(cwd, sizeof(cwd)))
+			if (!cfg->fresh_session_name &&
+			    getcwd(cwd, sizeof(cwd)))
 				last = fyai_branch_pick_last(ctx, r.branches,
 							     cwd, false);
 			if (last) {
@@ -882,8 +883,24 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 					ctx->arena_skills = lb.skills;
 				free(last);
 			}
-			rc = fyai_branch_session_name(r.branches, session,
-						      sizeof(session));
+			if (cfg->fresh_session_name) {
+				rc = snprintf(session, sizeof(session), "%s",
+					      cfg->fresh_session_name);
+				fyai_error_check(ctx, rc > 0 &&
+						 (size_t)rc < sizeof(session),
+						 err_out,
+						 "session name '%s' is too long",
+						 cfg->fresh_session_name);
+				taken = fyai_branch_lookup(r.branches, session,
+							   &sb);
+				fyai_error_check(ctx, !taken, err_out,
+						 "session '%s' exists already",
+						 session);
+				rc = 0;
+			} else {
+				rc = fyai_branch_session_name(r.branches, session,
+							      sizeof(session));
+			}
 			fyai_error_check(ctx, !rc, err_out,
 					 "could not name a new session");
 			rc = fyai_ctx_set_branch(ctx, session);
