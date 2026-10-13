@@ -717,6 +717,14 @@ if(BUILD_TESTING)
         DEPENDS fyai
         USES_TERMINAL)
 
+    # The end-to-end suite of the Claude Agent SDK for Python with fyai as its
+    # CLI. It downloads the pinned SDK and calls a real model, so it costs money.
+    add_custom_target(claude-agent-sdk-testsuite
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/claude_sdk_testsuite.sh
+                $<TARGET_FILE:fyai> ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS fyai
+        USES_TERMINAL)
+
     # One preflight test reports a missing binary. Without it an incomplete
     # build produces the same "FYAI_BIN not executable" failure once per case,
     # and the build failure behind them is lost in the list.
