@@ -89,6 +89,16 @@ check_c_compiler_flag("-Wdeclaration-after-statement" FYAI_HAVE_WDECL_AFTER_STMT
 if(FYAI_HAVE_WDECL_AFTER_STMT)
     list(APPEND FYAI_C_WARNINGS -Wdeclaration-after-statement)
 endif()
+# A returned address of stack storage, such as fy_sprintfa() text, is NULL
+# in an optimized build. GCC detects it only when it optimizes.
+check_c_compiler_flag("-Werror=return-local-addr" FYAI_HAVE_WERROR_LOCAL_ADDR)
+if(FYAI_HAVE_WERROR_LOCAL_ADDR)
+    list(APPEND FYAI_C_WARNINGS -Werror=return-local-addr)
+endif()
+check_c_compiler_flag("-Werror=return-stack-address" FYAI_HAVE_WERROR_STACK_ADDR)
+if(FYAI_HAVE_WERROR_STACK_ADDR)
+    list(APPEND FYAI_C_WARNINGS -Werror=return-stack-address)
+endif()
 
 set(WITH_LIBFYAML "" CACHE PATH "Path to a libfyaml checkout build directory")
 option(FYAI_WITH_LIBFYAML_TAGS "Include fetched libfyaml sources in fyai tags" ON)
