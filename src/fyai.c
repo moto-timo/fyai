@@ -852,7 +852,7 @@ fyai_model_step_add_tools(struct fyai_ctx *ctx, struct fyai_cfg *cfg,
 	fy_generic tool_choice;
 
 	if (!cfg->enable_tools && !cfg->enable_builtin_shell &&
-	    !cfg->mcp_enabled && !fyai_provider_native_web_search(cfg))
+	    !fyai_mcp_enabled(ctx) && !fyai_provider_native_web_search(cfg))
 		return request;
 	if (cfg->api_mode == FYAI_API_CHAT_COMPLETIONS &&
 	    fyai_provider_native_web_search(cfg)) {
@@ -867,7 +867,7 @@ fyai_model_step_add_tools(struct fyai_ctx *ctx, struct fyai_cfg *cfg,
 	}
 	if (cfg->api_mode == FYAI_API_CHAT_COMPLETIONS &&
 	    !cfg->enable_tools && !cfg->enable_builtin_shell &&
-	    !cfg->mcp_enabled)
+	    !fyai_mcp_enabled(ctx))
 		return request;
 
 	/* Messages spells tool_choice as an object, not a string. */
@@ -2636,8 +2636,8 @@ int fyai_request_state_apply(struct fyai_ctx *ctx)
 	fyai_xfer_set_endpoint(ctx, NULL, NULL);
 	curl_easy_setopt(ctx->curl, CURLOPT_HTTPHEADER, ctx->headers);
 
-	if (cfg->enable_tools || cfg->enable_builtin_shell || cfg->mcp_enabled ||
-	    cfg->web_search) {
+	if (cfg->enable_tools || cfg->enable_builtin_shell ||
+	    fyai_mcp_enabled(ctx) || cfg->web_search) {
 
 		switch (cfg->api_mode) {
 		case FYAI_API_RESPONSES:
@@ -2654,7 +2654,7 @@ int fyai_request_state_apply(struct fyai_ctx *ctx)
 			break;
 		}
 		/* MCP discovery and resources remain available in an MCP-only run. */
-		if (cfg->mcp_enabled && !cfg->enable_tools &&
+		if (fyai_mcp_enabled(ctx) && !cfg->enable_tools &&
 		    !cfg->enable_builtin_shell) {
 			native = make_tools_filtered(ctx);
 
@@ -2677,7 +2677,7 @@ int fyai_request_state_apply(struct fyai_ctx *ctx)
 			}
 		}
 
-		if (cfg->mcp_enabled) {
+		if (fyai_mcp_enabled(ctx)) {
 			converted = fy_seq_empty;
 			mt = fyai_mcp_tools(ctx);
 			fy_foreach(tool, mt) {

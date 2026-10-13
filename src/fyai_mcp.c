@@ -46,7 +46,14 @@
 enum mcp_transport {
 	MCP_TRANSPORT_HTTP,
 	MCP_TRANSPORT_STDIO,
+	MCP_TRANSPORT_TUNNEL,
 };
+
+static const char *mcp_transport_name(enum mcp_transport transport)
+{
+	return transport == MCP_TRANSPORT_STDIO ? "stdio" :
+	       transport == MCP_TRANSPORT_TUNNEL ? "tunnel" : "http";
+}
 
 enum mcp_auth_mode {
 	MCP_AUTH_BEARER,
@@ -265,9 +272,14 @@ fy_generic fyai_mcp_tools(struct fyai_ctx *ctx)
 	return fy_is_valid(ctx->mcp_tools) ? ctx->mcp_tools : fy_seq_empty;
 }
 
+bool fyai_mcp_enabled(const struct fyai_ctx *ctx)
+{
+	return ctx->cfg->mcp_enabled || ctx->mcp_invocation;
+}
+
 bool fyai_mcp_deferred(struct fyai_ctx *ctx)
 {
-	return ctx->cfg->mcp_enabled &&
+	return fyai_mcp_enabled(ctx) &&
 		fy_len(fyai_mcp_tools(ctx)) > MCP_DIRECT_TOOL_LIMIT;
 }
 
@@ -1751,7 +1763,7 @@ static enum fyai_event_action mcp_startup_retry(const struct fyai_event *ev)
 static bool mcp_startup_terminal(struct fyai_mcp_ctx *mcp, long status,
 				 CURLcode code)
 {
-	if (mcp->transport == MCP_TRANSPORT_STDIO)
+	if (mcp->transport != MCP_TRANSPORT_HTTP)
 		return true;
 	if (status == 401 || status == 403)
 		return true;
@@ -2181,8 +2193,9 @@ static int mcp_create_server(struct fyai_ctx *ctx, const char *server_name,
 	if (ctx->cfg->mcp_logging)
 		(void)fyai_log_generic(ctx, "mcp", fy_mapping(
 			"event", "connect", "server", mcp->name,
-			"transport", mcp->transport == MCP_TRANSPORT_STDIO ?
-				"stdio" : "streamable-http"));
+			"transport", mcp->transport == MCP_TRANSPORT_HTTP ?
+				"streamable-http" :
+				mcp_transport_name(mcp->transport)));
 
 	return 0;
 
@@ -2307,8 +2320,7 @@ fy_generic fyai_mcp_status_data(struct fyai_ctx *ctx,
 		rows = fy_append(gb, rows, fy_null_filtered_mapping(gb,
 			"server", mcp->name,
 			"state", state,
-			"transport", mcp->transport == MCP_TRANSPORT_STDIO ?
-				"stdio" : "http",
+			"transport", mcp_transport_name(mcp->transport),
 			"auth", oauth,
 			"tools", (long long)(
 				fy_is_valid(mcp->tools) ?
@@ -2457,6 +2469,72 @@ int fyai_mcp_start(struct fyai_ctx *ctx)
 	for (mcp = ctx->mcp; mcp; mcp = mcp->next)
 		mcp_startup_begin(mcp);
 	return 0;
+}
+
+int fyai_mcp_add(struct fyai_ctx *ctx, const char *name, fy_generic config)
+{
+	struct fyai_mcp_ctx *mcp;
+	int rc;
+
+	fyai_error_check(ctx, !mcp_find_server(ctx, name), err,
+			 "MCP server '%s' exists already", name);
+	rc = mcp_create_server(ctx, name, config);
+	if (rc)		/* mcp_create_server() says why */
+		goto err;
+	mcp = mcp_find_server(ctx, name);
+	fyai_error_check(ctx, mcp, err, "MCP server '%s' did not start", name);
+	ctx->mcp_invocation = true;
+	mcp_startup_begin(mcp);
+	return 0;
+err:
+	return -1;
+}
+
+int fyai_mcp_add_tunnel(struct fyai_ctx *ctx, const char *name,
+			int (*send)(void *userdata, fy_generic frame),
+			void *userdata, struct jsonrpc_conn **connp)
+{
+	struct fyai_mcp_ctx *mcp, **tail;
+
+	*connp = NULL;
+	fyai_error_check(ctx, mcp_server_name_valid(name), err,
+			 "invalid MCP server name '%s'", name);
+	fyai_error_check(ctx, !mcp_find_server(ctx, name), err,
+			 "MCP server '%s' exists already", name);
+	mcp = calloc(1, sizeof(*mcp));
+	fyai_error_check(ctx, mcp, err,
+			 "MCP server '%s' could not allocate context", name);
+	mcp->ctx = ctx;
+	mcp->tools = fy_seq_empty;
+	mcp->state = MCP_SRV_CONNECTING;
+	mcp->pid = -1;
+	mcp->stdin_fd = -1;
+	mcp->stdout_fd = -1;
+	mcp->transport = MCP_TRANSPORT_TUNNEL;
+	mcp->auth_mode = MCP_AUTH_BEARER;
+	mcp->name = fy_gb_intern_string(ctx->cfg->gb, name);
+	mcp->protocol_version = fy_gb_intern_string(ctx->cfg->gb,
+					ctx->cfg->mcp_protocol_version);
+	mcp->timeout = ctx->cfg->mcp_timeout;
+	mcp->conn = mcp->name ? jsonrpc_conn_tunnel(ctx, mcp->timeout,
+					mcp->name, "mcp", send, userdata) : NULL;
+	if (!mcp->conn || !mcp->protocol_version) {
+		fyai_error(ctx, "MCP server '%s' could not create connection",
+			   name);
+		jsonrpc_conn_destroy(mcp->conn);
+		free(mcp);
+		goto err;
+	}
+	tail = &ctx->mcp;
+	while (*tail)
+		tail = &(*tail)->next;
+	*tail = mcp;
+	ctx->mcp_invocation = true;
+	*connp = mcp->conn;
+	mcp_startup_begin(mcp);
+	return 0;
+err:
+	return -1;
 }
 
 /*
@@ -2764,8 +2842,8 @@ static void fyai_mcp_call_req_done(struct jsonrpc_request *req, void *userdata)
 		else
 			mcp_set_error(request->mcp,
 				      "%s failed: %s transport error",
-				      request->method, request->mcp->transport ==
-				      MCP_TRANSPORT_HTTP ? "http" : "stdio");
+				      request->method,
+				      mcp_transport_name(request->mcp->transport));
 	}
 	jsonrpc_request_destroy(req);
 	request->req = NULL;

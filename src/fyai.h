@@ -756,6 +756,8 @@ struct fyai_ctx {
 	fy_generic mcp_active_tools;
 	struct fyai_mcp_ctx *mcp;
 	bool mcp_stopping;
+	/* The invocation added servers: MCP is on whatever the configuration says. */
+	bool mcp_invocation;
 	struct fyai_credentials auth;
 	struct fy_generic_builder *auth_gb;
 	bool auth_retry_done;

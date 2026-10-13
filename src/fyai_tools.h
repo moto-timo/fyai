@@ -232,6 +232,22 @@ int fyai_mcp_refresh(struct fyai_ctx *ctx);
  * then call fyai_mcp_publish_tools(). fyai_mcp_refresh() is the sync wrapper. */
 int fyai_mcp_start(struct fyai_ctx *ctx);
 bool fyai_mcp_settled(struct fyai_ctx *ctx);
+/*
+ * Start server @name of @config for this invocation, beside the servers of
+ * the configuration. Its tools are published as theirs are.
+ */
+int fyai_mcp_add(struct fyai_ctx *ctx, const char *name, fy_generic config);
+/*
+ * Start server @name whose frames the caller carries: @send takes each
+ * frame, and the caller gives each frame of the server to
+ * jsonrpc_conn_tunnel_receive() on *@connp. The connection lives until MCP
+ * stops.
+ */
+int fyai_mcp_add_tunnel(struct fyai_ctx *ctx, const char *name,
+			int (*send)(void *userdata, fy_generic frame),
+			void *userdata, struct jsonrpc_conn **connp);
+/* True when MCP is on: by the configuration, or by an added server. */
+bool fyai_mcp_enabled(const struct fyai_ctx *ctx);
 void fyai_mcp_publish_tools(struct fyai_ctx *ctx);
 /*
  * The live MCP connections: server, state, transport, auth, tools, expiry,
