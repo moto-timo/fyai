@@ -764,7 +764,7 @@ static int branch_pick_compare(const void *a, const void *b)
  * be NULL on a path that selects a branch before a context exists.
  */
 static ssize_t branch_collect(struct fyai_ctx *ctx, fy_generic branches,
-			      const char *cwd, bool all,
+			      const char *cwd, bool all, const char *prefix,
 			      struct branch_pick **pickp)
 {
 	struct branch_pick *picks;
@@ -788,6 +788,8 @@ static ssize_t branch_collect(struct fyai_ctx *ctx, fy_generic branches,
 	fy_foreach_key_value(name, entry, branches) {
 		nm = fy_castp(&name, "");
 		if (fy_str_empty(nm))
+			continue;
+		if (prefix && strncmp(nm, prefix, strlen(prefix)))
 			continue;
 		if (!fyai_branch_decode(entry, &b))
 			continue;
@@ -824,7 +826,7 @@ fy_generic fyai_branch_select_rows(struct fyai_ctx *ctx,
 	out = fy_seq_empty;
 	if (!gb)
 		return out;
-	n = branch_collect(ctx, branches, cwd, all, &picks);
+	n = branch_collect(ctx, branches, cwd, all, NULL, &picks);
 	for (i = 0; i < n; i++) {
 		if (!fyai_branch_decode(picks[i].entry, &b))
 			continue;
@@ -850,13 +852,13 @@ fy_generic fyai_branch_select_rows(struct fyai_ctx *ctx,
 }
 
 char *fyai_branch_pick_last(struct fyai_ctx *ctx, fy_generic branches,
-			    const char *cwd, bool all)
+			    const char *cwd, bool all, const char *prefix)
 {
 	struct branch_pick *picks;
 	char *name;
 	ssize_t n;
 
-	n = branch_collect(ctx, branches, cwd, all, &picks);
+	n = branch_collect(ctx, branches, cwd, all, prefix, &picks);
 	name = NULL;
 	if (n > 0) {
 		name = strdup(fy_castp(&picks[0].name, ""));

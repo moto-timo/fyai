@@ -2899,6 +2899,7 @@ void fyai_config_cleanup(struct fyai_cfg *cfg)
 	free(cfg->reload_arena);
 	free(cfg->root_spec);
 	free(cfg->fresh_session_name);
+	free(cfg->fresh_session_from);
 	free(cfg->terminal_input);
 	markdown_palettes_destroy(cfg);
 	fy_generic_builder_destroy(cfg->gb);
@@ -3543,7 +3544,7 @@ int fyai_config_select_resume(struct fyai_cfg *cfg)
 		fyai_cfg_error(cfg, "resume: cannot read the current directory");
 		return -1;
 	}
-	name = fyai_peek_branch_pick(NULL, cfg->root_spec, cwd, args->all);
+	name = fyai_peek_branch_pick(NULL, cfg->root_spec, cwd, args->all, NULL);
 	if (!name) {
 		fyai_cfg_error(cfg, args->all ?
 			"resume: no resumable session; run fyai to start one" :

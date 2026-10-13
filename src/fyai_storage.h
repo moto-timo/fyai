@@ -86,11 +86,11 @@ bool fyai_config_has_raw_secret(fy_generic doc);
  */
 /*
  * The most recently updated resumable branch, without a context. @cwd and @all
- * select as fyai_branch_select_rows() does. Returns an allocated name, or NULL
- * when no branch matches.
+ * select as fyai_branch_select_rows() does, and @prefix, when given, starts
+ * its name. Returns an allocated name, or NULL when no branch matches.
  */
 char *fyai_peek_branch_pick(const char *arena_dir_opt, const char *root_spec,
-			    const char *cwd, bool all);
+			    const char *cwd, bool all, const char *prefix);
 
 int fyai_peek_arena_config(const char *arena_dir_opt, const char *branch_opt,
 			   const char *root_spec, struct fy_generic_builder *gb,

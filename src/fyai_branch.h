@@ -221,10 +221,11 @@ fy_generic fyai_branch_select_rows(struct fyai_ctx *ctx,
 
 /*
  * The most recently updated branch that fyai_branch_select_rows() would list,
- * as a string the caller frees, or NULL when there is none. @ctx may be NULL.
+ * of those whose name @prefix starts when it is given, as a string the caller
+ * frees, or NULL when there is none. @ctx may be NULL.
  */
 char *fyai_branch_pick_last(struct fyai_ctx *ctx, fy_generic branches,
-			    const char *cwd, bool all);
+			    const char *cwd, bool all, const char *prefix);
 
 /*
  * Count the turns on a branch, capped at @limit so a listing of many branches

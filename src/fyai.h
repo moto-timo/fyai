@@ -433,6 +433,11 @@ struct fyai_cfg {
 	 * not of the session that ran last in its directory.
 	 */
 	char *fresh_session_name;
+	/*
+	 * Owned name of a branch that the fresh session starts from: its
+	 * conversation and configuration, as a fork of it.
+	 */
+	char *fresh_session_from;
 	/* Owned branch name for a restart after the session closes. */
 	char *reload_branch;
 	char *reload_config;

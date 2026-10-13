@@ -744,7 +744,7 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
 	struct fyai_branch b, lb, sb;
-	bool exists, claimed, taken;
+	bool exists, claimed, taken, found;
 	struct fyai_root r;
 	char session[FYAI_BRANCH_NAME_MAX + 1];
 	char cwd[PATH_MAX];
@@ -868,10 +868,23 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 		 */
 		if (cfg->fresh_session) {
 			last = NULL;
-			if (!cfg->fresh_session_name &&
-			    getcwd(cwd, sizeof(cwd)))
+			if (cfg->fresh_session_from) {
+				found = fyai_branch_lookup(r.branches,
+						cfg->fresh_session_from, &lb);
+				fyai_error_check(ctx, found, err_out,
+						 "no branch '%s' to start the "
+						 "session from",
+						 cfg->fresh_session_from);
+				last = strdup(cfg->fresh_session_from);
+				fyai_error_check(ctx, last, err_out,
+						 "could not keep the name of "
+						 "branch '%s'",
+						 cfg->fresh_session_from);
+			} else if (!cfg->fresh_session_name &&
+				   getcwd(cwd, sizeof(cwd))) {
 				last = fyai_branch_pick_last(ctx, r.branches,
-							     cwd, false);
+							     cwd, false, NULL);
+			}
 			if (last) {
 				fyai_branch_lookup(r.branches, last, &lb);
 				if (fy_is_valid(lb.config))
@@ -912,6 +925,9 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 			ctx->branch_desc = fy_invalid;
 			ctx->branch_agent = fy_invalid;
 			ctx->branch_prev = fy_invalid;
+			if (cfg->fresh_session_from)
+				fyai_branch_op_set(ctx, FYAI_BRANCH_OP_CREATE,
+						   cfg->fresh_session_from);
 		}
 		/*
 		 * --new is a clear: drop the head and publish the reset as a
@@ -920,7 +936,8 @@ int fyai_setup_storage(struct fyai_ctx *ctx)
 		 * branch and leaves every other branch alone.
 		 */
 		if (cfg->fresh_session)
-			ctx->last_message = fy_invalid;
+			ctx->last_message = cfg->fresh_session_from ?
+				lb.head : fy_invalid;
 		else if (!cfg->new_conversation)
 			ctx->last_message = b.head;
 		else {
@@ -1281,7 +1298,7 @@ out:
 }
 
 char *fyai_peek_branch_pick(const char *arena_dir_opt, const char *root_spec,
-			    const char *cwd, bool all)
+			    const char *cwd, bool all, const char *prefix)
 {
 	struct fy_allocator *allocator;
 	struct fyai_root r;
@@ -1299,7 +1316,7 @@ char *fyai_peek_branch_pick(const char *arena_dir_opt, const char *root_spec,
 		if (fyai_root_validate(allocator, root) &&
 		    fyai_root_decode(root, &r) >= 0)
 			name = fyai_branch_pick_last(NULL, r.branches, cwd,
-						     all);
+						     all, prefix);
 	}
 	fy_allocator_destroy(allocator);
 	return name;
