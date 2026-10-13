@@ -35,6 +35,14 @@ struct fyai_shell_session;
 struct fyai_sink;
 struct fyai_turn_run;
 struct fyai_tool_gate_ops;
+
+/* What stopped a turn before the model ended it. */
+enum fyai_turn_stop {
+	FYAI_TURN_STOP_NONE,
+	FYAI_TURN_STOP_LIMIT,		/* max_tool_iterations */
+	FYAI_TURN_STOP_COST,		/* turn_cost_limit */
+	FYAI_TURN_STOP_REQUEST,		/* the provider request failed */
+};
 struct fyai_patch_display;	/* resolved patch presentation (fyai_tools.c) */
 
 #define OPENAI_RESPONSES_URL "https://api.openai.com/v1/responses"
@@ -812,6 +820,15 @@ struct fyai_ctx {
 	 */
 	void (*turn_observe)(struct fyai_ctx *ctx, fy_generic turn, void *data);
 	void *turn_observe_data;
+	/*
+	 * Why the last turn stopped short. A turn sets it; a caller that reports
+	 * it clears it before the turn.
+	 */
+	enum fyai_turn_stop turn_stop;
+	/* Stop before a model request once usage_cost reaches this; 0 for none. */
+	double turn_cost_limit;
+	/* A tool asks the turn to end before its next model request. */
+	bool turn_end_requested;
 	/* The tool gate of the turns of this context, and its open round. */
 	const struct fyai_tool_gate_ops *tool_gate;
 	void *tool_gate_data;

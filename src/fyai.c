@@ -1540,6 +1540,7 @@ fyai_turn_run_request_failed(struct fyai_turn_run *run, fy_generic response)
 	fy_generic diag;
 	const char *msg;
 
+	run->ctx->turn_stop = FYAI_TURN_STOP_REQUEST;
 	diag = fy_generic_get_diag(response);
 	msg = fy_is_valid(diag) &&
 	      !fy_is_null(diag) ?
@@ -1642,11 +1643,25 @@ static int fyai_turn_run_submit_model(struct fyai_turn_run *run)
 
 	ctx = run->ctx;
 	cfg = ctx->cfg;
+	/* A tool that answers for the turn ends it, as a final response does. */
+	if (ctx->turn_end_requested) {
+		ctx->turn_end_requested = false;
+		fyai_turn_run_finish(run, run->turn, true);
+		return 0;
+	}
 	if (run->iteration >= cfg->max_tool_iterations) {
 		/* tool loop limit reached */
+		ctx->turn_stop = FYAI_TURN_STOP_LIMIT;
 		fyai_turn_run_stop(run,
 			fy_sprintfa("the tool loop reached its limit of %d iterations",
 				    cfg->max_tool_iterations));
+		return -1;
+	}
+	if (ctx->turn_cost_limit > 0 && ctx->usage_cost >= ctx->turn_cost_limit) {
+		ctx->turn_stop = FYAI_TURN_STOP_COST;
+		fyai_turn_run_stop(run,
+			fy_sprintfa("the cost reached its limit of $%.4f",
+				    ctx->turn_cost_limit));
 		return -1;
 	}
 	if (fyai_turn_run_take_pending_user(run)) {
@@ -2276,6 +2291,8 @@ fyai_turn_run_submit(struct fyai_ctx *ctx, fy_generic turn)
 	run->result = fy_invalid;
 	run->gate_items = fy_invalid;
 	run->state = FYAITRS_NEW;
+	/* A request of a turn that stopped does not end this one. */
+	ctx->turn_end_requested = false;
 	ctx->tool_output_displayed = false;
 	rc = fyai_output_begin(ctx, FYAI_OUTPUT_ASSISTANT);
 	fyai_error_check(ctx, !rc, err_free,

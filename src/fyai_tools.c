@@ -5343,6 +5343,7 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	ctx->tool_gate = NULL;			/* and the policy of its calls */
 	ctx->tool_gate_data = NULL;
 	ctx->tool_gate_run = NULL;
+	ctx->turn_cost_limit = 0;		/* the budget of the parent's run */
 	/*
 	 * What the parent spent is the accounting of its run, and the extents
 	 * of its last call point into storage this child does not use.
