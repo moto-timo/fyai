@@ -1323,6 +1323,7 @@ enum fyai_turn_run_state {
 	FYAITRS_NEW,
 	FYAITRS_MODEL,
 	FYAITRS_TOOLS,
+	FYAITRS_GATE,
 	FYAITRS_DONE,
 	FYAITRS_FAILED,
 };
@@ -1345,6 +1346,27 @@ struct fyai_turn_run {
 	const char *histfile;
 	/* The project state before the next group of tool calls, when the diffs are shown. */
 	fy_generic diff_before;
+	/*
+	 * The open round of the tool gate: its ID, its calls, what each came
+	 * to, and the answers that it waits for. An after round resumes the
+	 * exclusive calls at @gate_next.
+	 */
+	uint64_t gate_id;
+	fy_generic gate_items;
+	struct fyai_gate_answer *gate;
+	size_t gate_count;
+	size_t gate_pending;
+	size_t gate_next;
+	bool gate_after;
+};
+
+/* The answer of the tool gate for one call of a round. */
+struct fyai_gate_answer {
+	bool answered;
+	bool allowed;
+	bool stop;
+	fy_generic args;
+	char *text;
 };
 
 /* A diff that is longer than this is cut: the human reads it, and a full tree is not that. */
@@ -1366,6 +1388,8 @@ fyai_turn_run_state_name(enum fyai_turn_run_state state)
 		return "model";
 	case FYAITRS_TOOLS:
 		return "tools";
+	case FYAITRS_GATE:
+		return "gate";
 	case FYAITRS_DONE:
 		return "done";
 	case FYAITRS_FAILED:
@@ -1382,11 +1406,11 @@ fyai_turn_run_transition_valid(enum fyai_turn_run_state from,
 	case FYAITRS_NEW:
 		return to == FYAITRS_MODEL || to == FYAITRS_FAILED;
 	case FYAITRS_MODEL:
-		return to == FYAITRS_MODEL || to == FYAITRS_TOOLS ||
-		       to == FYAITRS_DONE || to == FYAITRS_FAILED;
 	case FYAITRS_TOOLS:
+	case FYAITRS_GATE:
 		return to == FYAITRS_MODEL || to == FYAITRS_TOOLS ||
-		       to == FYAITRS_DONE || to == FYAITRS_FAILED;
+		       to == FYAITRS_GATE || to == FYAITRS_DONE ||
+		       to == FYAITRS_FAILED;
 	case FYAITRS_DONE:
 	case FYAITRS_FAILED:
 		return false;
@@ -1613,6 +1637,7 @@ static int fyai_turn_run_submit_model(struct fyai_turn_run *run)
 	struct fyai_ctx *ctx;
 	struct fyai_cfg *cfg;
 	fy_generic previous;
+	bool open_group;
 	int rc;
 
 	ctx = run->ctx;
@@ -1635,10 +1660,12 @@ static int fyai_turn_run_submit_model(struct fyai_turn_run *run)
 	 * run began from.
 	 */
 	previous = cfg->response_chain ? run->previous : fy_null;
-	run->tool_group = cfg->stream ?
+	/* A gate decides on the calls of a response before any of them runs. */
+	open_group = cfg->stream && !ctx->tool_gate;
+	run->tool_group = open_group ?
 		fyai_tool_job_group_create_open(ctx,
 			fyai_turn_run_tool_complete, run) : NULL;
-	fyai_error_check(ctx, !cfg->stream || run->tool_group, err,
+	fyai_error_check(ctx, !open_group || run->tool_group, err,
 			 "could not create streaming tool group");
 	rc = fyai_turn_run_transition(run, FYAITRS_MODEL);
 	fyai_error_check(ctx, !rc, err,
@@ -1729,13 +1756,279 @@ static void fyai_turn_run_tool_diff(struct fyai_turn_run *run)
 	run->diff_before = after;
 }
 
+static int fyai_turn_run_dispatch_tools(struct fyai_turn_run *run);
+
+static void fyai_turn_run_gate_clear(struct fyai_turn_run *run)
+{
+	size_t i;
+
+	for (i = 0; i < run->gate_count; i++)
+		free(run->gate[i].text);
+	free(run->gate);
+	run->gate = NULL;
+	run->gate_count = 0;
+	run->gate_pending = 0;
+	run->gate_items = fy_invalid;
+	if (run->ctx->tool_gate_run == run)
+		run->ctx->tool_gate_run = NULL;
+}
+
+/*
+ * Open a round of the tool gate over @items: the calls of a response, or after
+ * a group of calls {call, result, ok} for each of them. An after round goes on
+ * with the exclusive calls at @next. The items live in the transient builder,
+ * which the turn keeps.
+ */
+static int fyai_turn_run_gate_open(struct fyai_turn_run *run, fy_generic items,
+				   bool after, size_t next)
+{
+	struct fyai_ctx *ctx = run->ctx;
+	const struct fyai_tool_gate_ops *ops = ctx->tool_gate;
+	fy_generic item;
+	uint64_t id;
+	size_t i, n;
+	int rc;
+
+	n = fy_len(items);
+	run->gate = calloc(n ? n : 1, sizeof(*run->gate));
+	fyai_error_check(ctx, run->gate, err, "could not open the tool gate");
+	for (i = 0; i < n; i++)
+		run->gate[i].args = fy_invalid;
+	run->gate_items = items;
+	run->gate_count = n;
+	run->gate_pending = n;
+	run->gate_after = after;
+	run->gate_next = next;
+	id = ++ctx->tool_gate_seq;
+	run->gate_id = id;
+	ctx->tool_gate_run = run;
+	rc = fyai_turn_run_transition(run, FYAITRS_GATE);
+	fyai_error_check(ctx, !rc, err,
+			 "could not advance turn to the tool gate");
+	/* An answer can come during the call, and the last one ends the round. */
+	for (i = 0; i < n && ctx->tool_gate_run == run && run->gate_id == id;
+	     i++) {
+		item = fy_get_at(items, i);
+		if (after)
+			ops->after(ctx, id, i, fy_get(item, "call", fy_invalid),
+				   fy_get(item, "result", fy_invalid),
+				   fy_get(item, "ok", false), ctx->tool_gate_data);
+		else
+			ops->before(ctx, id, i, item, ctx->tool_gate_data);
+	}
+	if (!n)
+		(void)fyai_event_defer(fyai_ctx_loop(ctx), fyai_turn_run_service,
+				       run);
+	return 0;
+err:
+	fyai_turn_run_gate_clear(run);
+	fyai_turn_run_stop(run, "the tool gate could not open");
+	return -1;
+}
+
+static struct fyai_gate_answer *
+fyai_tool_gate_slot(struct fyai_ctx *ctx, uint64_t id, size_t index,
+		    struct fyai_turn_run **runp)
+{
+	struct fyai_turn_run *run;
+
+	run = ctx ? ctx->tool_gate_run : NULL;
+	if (!run || run->gate_id != id || index >= run->gate_count ||
+	    run->gate[index].answered)
+		return NULL;
+	*runp = run;
+	return &run->gate[index];
+}
+
+static void fyai_tool_gate_answered(struct fyai_turn_run *run,
+				    struct fyai_gate_answer *a,
+				    const char *text, bool stop)
+{
+	a->answered = true;
+	a->stop = stop;
+	if (text && *text) {
+		a->text = strdup(text);
+		if (!a->text)
+			fyai_error(run->ctx, "could not keep the answer of the "
+				   "tool gate");
+	}
+	if (!--run->gate_pending)
+		(void)fyai_event_defer(fyai_ctx_loop(run->ctx),
+				       fyai_turn_run_service, run);
+}
+
+void fyai_tool_gate_allow(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			  fy_generic args)
+{
+	struct fyai_gate_answer *a;
+	struct fyai_turn_run *run;
+
+	a = fyai_tool_gate_slot(ctx, id, index, &run);
+	if (!a || run->gate_after)
+		return;
+	a->allowed = true;
+	if (fy_is_mapping(args))
+		a->args = fy_gb_internalize(ctx->transient_gb, args);
+	fyai_tool_gate_answered(run, a, NULL, false);
+}
+
+void fyai_tool_gate_deny(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			 const char *message, bool stop)
+{
+	struct fyai_gate_answer *a;
+	struct fyai_turn_run *run;
+
+	a = fyai_tool_gate_slot(ctx, id, index, &run);
+	if (!a || run->gate_after)
+		return;
+	fyai_tool_gate_answered(run, a, message && *message ? message :
+				"the tool call was denied", stop);
+}
+
+void fyai_tool_gate_done(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			 const char *context, bool stop)
+{
+	struct fyai_gate_answer *a;
+	struct fyai_turn_run *run;
+
+	a = fyai_tool_gate_slot(ctx, id, index, &run);
+	if (!a || !run->gate_after)
+		return;
+	fyai_tool_gate_answered(run, a, context, stop);
+}
+
+/* Answer the calls of an open before round that have no result. */
+static int fyai_turn_run_gate_refuse(struct fyai_turn_run *run,
+				     const char *why)
+{
+	struct fyai_ctx *ctx = run->ctx;
+	size_t i;
+
+	for (i = 0; i < run->gate_count && !run->gate_after; i++) {
+		if (run->gate[i].answered && !run->gate[i].allowed)
+			continue;
+		run->turn = fyai_finish_tool_call(ctx, run->turn,
+			fy_get_at(run->gate_items, i),
+			fy_value(ctx->transient_gb, why), false, false);
+		fyai_error_check(ctx, fy_is_valid(run->turn), err,
+				 "could not answer a held tool call");
+		fyai_turn_run_observe(run);
+	}
+	return 0;
+err:
+	return -1;
+}
+
+/* Finish the turn that a round of the gate ends, with @cause. */
+static void fyai_turn_run_gate_finish(struct fyai_turn_run *run,
+				      const char *cause)
+{
+	struct fyai_ctx *ctx = run->ctx;
+	fy_generic result;
+
+	fyai_turn_run_gate_clear(run);
+	result = fy_gb_internalize(ctx->gb, run->turn);
+	result = fyai_with_diag(ctx->gb, result, cause);
+	fyai_turn_run_finish(run, result, false);
+}
+
+/* Act on the answers of a round that has all of them. */
+static int fyai_turn_run_gate_resolve(struct fyai_turn_run *run)
+{
+	struct fyai_ctx *ctx = run->ctx;
+	struct fyai_gate_answer *a;
+	fy_generic item, calls;
+	char *cause = NULL;
+	bool after, stop, context;
+	size_t i, next;
+	int rc;
+
+	calls = fy_seq_empty;
+	stop = false;
+	context = false;
+	for (i = 0; i < run->gate_count; i++) {
+		a = &run->gate[i];
+		item = fy_get_at(run->gate_items, i);
+		if (a->stop && !stop) {
+			stop = true;
+			cause = a->text ? strdup(a->text) : NULL;
+		}
+		if (run->gate_after) {
+			if (!a->text || a->stop)
+				continue;
+			/* Context enters as pending input does: between documents. */
+			if (!context) {
+				run->turn = fyai_output_finalize(ctx, run->turn,
+								 false);
+				fyai_error_check(ctx, fy_is_valid(run->turn),
+						 err, "could not finish output "
+						 "before the context of a tool "
+						 "gate");
+				context = true;
+			}
+			rc = fyai_turn_run_append_user(run, a->text);
+			fyai_error_check(ctx, !rc, err,
+					 "could not add the context of a tool "
+					 "gate");
+			continue;
+		}
+		if (a->allowed) {
+			if (fy_is_mapping(a->args))
+				item = fyai_tool_call_set_args(ctx, item,
+							       a->args);
+			fyai_error_check(ctx, fy_is_valid(item), err,
+					 "could not change the arguments of "
+					 "a tool call");
+			calls = fy_append(ctx->transient_gb, calls, item);
+			continue;
+		}
+		run->turn = fyai_finish_tool_call(ctx, run->turn, item,
+			fy_value(ctx->transient_gb, a->text), false, false);
+		fyai_error_check(ctx, fy_is_valid(run->turn), err,
+				 "could not answer a denied tool call");
+		fyai_turn_run_observe(run);
+	}
+	if (stop) {
+		/* A call that a stop holds back still needs its result. */
+		rc = fyai_turn_run_gate_refuse(run, cause ? cause :
+					       "the turn stopped");
+		fyai_error_check(ctx, !rc, err,
+				 "could not stop at the tool gate");
+		fyai_turn_run_gate_finish(run, cause ? cause :
+					  "a tool gate stopped the turn");
+		free(cause);
+		return 0;
+	}
+	if (context) {
+		rc = fyai_output_begin(ctx, FYAI_OUTPUT_ASSISTANT);
+		fyai_error_check(ctx, !rc, err,
+				 "could not resume assistant output");
+	}
+	after = run->gate_after;
+	next = run->gate_next;
+	fyai_turn_run_gate_clear(run);
+	if (after)
+		return fyai_turn_run_submit_exclusive(run, next);
+	run->tool_calls = calls;
+	if (fy_empty(calls)) {
+		run->iteration++;
+		return fyai_turn_run_submit_model(run);
+	}
+	return fyai_turn_run_dispatch_tools(run);
+err:
+	free(cause);
+	fyai_turn_run_gate_clear(run);
+	fyai_turn_run_abort_output(run);
+	return -1;
+}
+
 static int fyai_turn_run_collect_tools(struct fyai_turn_run *run)
 {
 	struct fyai_ctx *ctx;
 	fy_generic tool_call;
-	fy_generic result;
+	fy_generic result, reports;
 	size_t group_index;
-	size_t i;
+	size_t i, next;
 	size_t total;
 	bool interrupted;
 	bool ok;
@@ -1745,6 +2038,7 @@ static int fyai_turn_run_collect_tools(struct fyai_turn_run *run)
 	total = fy_len(run->tool_calls);
 	group_index = 0;
 	effect = 0;
+	reports = fy_seq_empty;
 	for (i = 0; i < total; i++) {
 		tool_call = fy_get_at(run->tool_calls, i);
 		if (run->group_parallel !=
@@ -1766,6 +2060,10 @@ static int fyai_turn_run_collect_tools(struct fyai_turn_run *run)
 		fyai_error_check(ctx, fy_is_valid(run->turn), err,
 				 "could not append tool job result");
 		fyai_turn_run_observe(run);
+		if (ctx->tool_gate)
+			reports = fy_append(ctx->transient_gb, reports,
+				fy_mapping(ctx->transient_gb, "call", tool_call,
+					   "result", result, "ok", (_Bool)ok));
 		/* Present the completed exchange before opening the next band. */
 		fyai_ui_drain_output(ctx);
 	}
@@ -1786,10 +2084,10 @@ static int fyai_turn_run_collect_tools(struct fyai_turn_run *run)
 		fyai_turn_run_finish(run, result, false);
 		return 0;
 	}
-	return run->group_parallel ?
-		fyai_turn_run_submit_exclusive(run, 0) :
-		fyai_turn_run_submit_exclusive(run,
-					       run->exclusive_index + 1);
+	next = run->group_parallel ? 0 : run->exclusive_index + 1;
+	if (ctx->tool_gate && !fy_empty(reports))
+		return fyai_turn_run_gate_open(run, reports, true, next);
+	return fyai_turn_run_submit_exclusive(run, next);
 
 err:
 	fyai_turn_run_drop_tool_group(run);
@@ -1860,16 +2158,16 @@ static int fyai_turn_run_submit_parallel(struct fyai_turn_run *run,
 					 size_t parallel_total)
 {
 	struct fyai_ctx *ctx;
-	struct fyai_cfg *cfg;
 	fy_generic tool_call;
+	bool streamed;
 	int rc;
 
 	ctx = run->ctx;
-	cfg = ctx->cfg;
 	fyai_error_check(ctx, !run->tool_group ||
 			 fyai_tool_job_group_count(run->tool_group) ==
 				parallel_total,
 			 err, "streamed tool group does not match response");
+	streamed = run->tool_group != NULL;
 	if (!run->tool_group) {
 		run->tool_group = fyai_tool_job_group_create_notify(ctx,
 					fyai_turn_run_tool_complete, run);
@@ -1887,7 +2185,7 @@ static int fyai_turn_run_submit_parallel(struct fyai_turn_run *run,
 	rc = fyai_turn_run_transition(run, FYAITRS_TOOLS);
 	fyai_error_check(ctx, !rc, err,
 			 "could not advance turn to tool group");
-	if (cfg->stream)
+	if (streamed)
 		rc = fyai_tool_job_group_seal(run->tool_group);
 	else
 		rc = fyai_tool_job_group_submit(run->tool_group);
@@ -1901,19 +2199,28 @@ err:
 	return -1;
 }
 
-static int
-fyai_turn_run_start_tools(struct fyai_turn_run *run, fy_generic response)
+static int fyai_turn_run_dispatch_tools(struct fyai_turn_run *run)
 {
 	size_t parallel_total;
 
-	if (run->ctx->cfg->response_chain)
-		run->previous = run->turn;
-	run->tool_calls = fyai_response_tool_calls(run->ctx, response);
 	parallel_total = fyai_turn_run_parallel_count(run);
 	if (parallel_total)
 		return fyai_turn_run_submit_parallel(run, parallel_total);
 	fyai_turn_run_drop_tool_group(run);
 	return fyai_turn_run_submit_exclusive(run, 0);
+}
+
+static int
+fyai_turn_run_start_tools(struct fyai_turn_run *run, fy_generic response)
+{
+	if (run->ctx->cfg->response_chain)
+		run->previous = run->turn;
+	run->tool_calls = fyai_response_tool_calls(run->ctx, response);
+	if (run->ctx->tool_gate) {
+		fyai_turn_run_drop_tool_group(run);
+		return fyai_turn_run_gate_open(run, run->tool_calls, false, 0);
+	}
+	return fyai_turn_run_dispatch_tools(run);
 }
 
 static int fyai_turn_run_process_model(struct fyai_turn_run *run)
@@ -1967,6 +2274,7 @@ fyai_turn_run_submit(struct fyai_ctx *ctx, fy_generic turn)
 	run->previous = fy_get(turn, "previous", fy_null);
 	run->tool_calls = fy_null;
 	run->result = fy_invalid;
+	run->gate_items = fy_invalid;
 	run->state = FYAITRS_NEW;
 	ctx->tool_output_displayed = false;
 	rc = fyai_output_begin(ctx, FYAI_OUTPUT_ASSISTANT);
@@ -2011,6 +2319,9 @@ static void fyai_turn_run_service(void *userdata)
 			   fyai_tool_job_group_done(run->tool_group)) {
 			(void)fyai_turn_run_collect_tools(run);
 			progress = true;
+		} else if (run->state == FYAITRS_GATE && !run->gate_pending) {
+			(void)fyai_turn_run_gate_resolve(run);
+			progress = true;
 		}
 	} while (progress && !fyai_turn_run_done(run));
 }
@@ -2020,6 +2331,14 @@ static void fyai_turn_run_cancel(struct fyai_turn_run *run)
 	if (!run || fyai_turn_run_done(run) || run->cancel_requested)
 		return;
 	run->cancel_requested = true;
+	/* A round of the gate waits on nothing that a cancel can stop. */
+	if (run->state == FYAITRS_GATE) {
+		if (!fyai_turn_run_gate_refuse(run, "interrupted"))
+			fyai_turn_run_gate_finish(run, "interrupted");
+		else
+			fyai_turn_run_stop(run, "interrupted");
+		return;
+	}
 	if (run->model_step)
 		fyai_model_step_cancel(run->model_step);
 	if (run->tool_group)
@@ -2042,6 +2361,7 @@ static void fyai_turn_run_destroy(struct fyai_turn_run *run)
 				run);
 	fyai_model_step_destroy(run->model_step);
 	fyai_turn_run_drop_tool_group(run);
+	fyai_turn_run_gate_clear(run);
 	run->ctx->tool_diff_tracking = false;
 	free(run);
 }

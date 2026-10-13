@@ -65,6 +65,18 @@ int fyai_tool_call_file_effect(struct fyai_ctx *ctx, fy_generic tool_call);
 
 bool fyai_tool_call_parallel_eligible(struct fyai_ctx *ctx,
 				      fy_generic tool_call);
+/* The canonical tool name of @tool_call, in the transient builder. */
+const char *fyai_tool_call_name(struct fyai_ctx *ctx, fy_generic tool_call);
+/* The parsed arguments of @tool_call, or fy_invalid; transient. */
+fy_generic fyai_tool_call_args(struct fyai_ctx *ctx, fy_generic tool_call);
+/* The ID that the result of @tool_call answers, in the transient builder. */
+const char *fyai_tool_call_id(struct fyai_ctx *ctx, fy_generic tool_call);
+/*
+ * @tool_call with @args as its arguments, in the transient builder. A native
+ * shell call stays as it is. fy_invalid when @args cannot be encoded.
+ */
+fy_generic fyai_tool_call_set_args(struct fyai_ctx *ctx, fy_generic tool_call,
+				   fy_generic args);
 struct fyai_tool_job *fyai_tool_job_submit(struct fyai_ctx *ctx,
 					    fy_generic tool_call);
 bool fyai_tool_job_done(const struct fyai_tool_job *job);

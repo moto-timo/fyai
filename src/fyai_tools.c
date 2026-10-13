@@ -72,7 +72,7 @@ const char *fyai_tool_name_canonical(const char *name)
 	return name && !strcmp(name, FYAI_TOOL_EXEC_WIRE_NAME) ? "shell" : name;
 }
 
-static const char *fyai_tool_call_name(struct fyai_ctx *ctx, fy_generic tool_call)
+const char *fyai_tool_call_name(struct fyai_ctx *ctx, fy_generic tool_call)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
 	fy_generic v;
@@ -105,8 +105,7 @@ static const char *fyai_tool_call_name(struct fyai_ctx *ctx, fy_generic tool_cal
 		fy_gb_intern_string(ctx->transient_gb, fy_cast(v, "")));
 }
 
-static fy_generic
-fyai_tool_call_args(struct fyai_ctx *ctx, fy_generic tool_call)
+fy_generic fyai_tool_call_args(struct fyai_ctx *ctx, fy_generic tool_call)
 {
 	const char *args_text;
 
@@ -124,6 +123,37 @@ fyai_tool_call_args(struct fyai_ctx *ctx, fy_generic tool_call)
 		__builtin_unreachable();
 	}
 	return parse_json_string(fyai_ctx_transient_gb(ctx), args_text);
+}
+
+const char *fyai_tool_call_id(struct fyai_ctx *ctx, fy_generic tool_call)
+{
+	fy_generic id;
+
+	id = ctx->cfg->api_mode == FYAI_API_CHAT_COMPLETIONS &&
+	     !fy_equal(fy_get(tool_call, "type"), "shell_call") ?
+		fy_get(tool_call, "id", fy_invalid) :
+		fy_get(tool_call, "call_id", fy_invalid);
+	return fy_gb_intern_string(fyai_ctx_transient_gb(ctx),
+				   fy_castp(&id, ""));
+}
+
+fy_generic fyai_tool_call_set_args(struct fyai_ctx *ctx, fy_generic tool_call,
+				   fy_generic args)
+{
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	const char *json;
+
+	/* A native shell call has no arguments of a function to replace. */
+	if (fy_equal(fy_get(tool_call, "type"), "shell_call"))
+		return tool_call;
+	json = emit_json_string(gb, args);
+	if (!json)
+		return fy_invalid;
+	if (ctx->cfg->api_mode == FYAI_API_CHAT_COMPLETIONS)
+		return fy_assoc(gb, tool_call, "function",
+			fy_assoc(gb, fy_get(tool_call, "function", fy_map_empty),
+				 "arguments", fy_value(gb, json)));
+	return fy_assoc(gb, tool_call, "arguments", fy_value(gb, json));
 }
 
 /*
@@ -5310,6 +5340,9 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	ctx->mcp_tools = fy_invalid;
 	ctx->turn_observe = NULL;		/* a stream to the parent's peer */
 	ctx->turn_observe_data = NULL;
+	ctx->tool_gate = NULL;			/* and the policy of its calls */
+	ctx->tool_gate_data = NULL;
+	ctx->tool_gate_run = NULL;
 	/*
 	 * What the parent spent is the accounting of its run, and the extents
 	 * of its last call point into storage this child does not use.

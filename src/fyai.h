@@ -33,6 +33,8 @@ struct fyai_tool_job;
 struct fyai_btw_run;
 struct fyai_shell_session;
 struct fyai_sink;
+struct fyai_turn_run;
+struct fyai_tool_gate_ops;
 struct fyai_patch_display;	/* resolved patch presentation (fyai_tools.c) */
 
 #define OPENAI_RESPONSES_URL "https://api.openai.com/v1/responses"
@@ -808,6 +810,11 @@ struct fyai_ctx {
 	 */
 	void (*turn_observe)(struct fyai_ctx *ctx, fy_generic turn, void *data);
 	void *turn_observe_data;
+	/* The tool gate of the turns of this context, and its open round. */
+	const struct fyai_tool_gate_ops *tool_gate;
+	void *tool_gate_data;
+	struct fyai_turn_run *tool_gate_run;
+	uint64_t tool_gate_seq;
 	/* Set inside a forked tool sub-execution once the environment has been
 	 * sanitized and the sandbox applied, so inner steps (the shell tool's
 	 * own fork) do not re-derive and re-apply the confinement. */
@@ -915,6 +922,40 @@ struct fy_generic_builder *fyai_ctx_transient_gb(struct fyai_ctx *ctx);
  * wrapped value is the partial turn, otherwise fy_invalid.
  */
 fy_generic fyai_run_turn(struct fyai_ctx *ctx, fy_generic turn);
+
+/*
+ * A policy that a protocol front end puts on the tool calls of a turn. The
+ * turn asks @before about each call of a model response before any of them
+ * runs, and tells @after about each result before the next model request.
+ * The turn waits on the event loop for each answer: fyai_tool_gate_allow()
+ * or fyai_tool_gate_deny() for @before, fyai_tool_gate_done() for @after,
+ * each with the round @id. An answer can come during the call. An answer to
+ * a round that has ended is ignored. Streamed tool calls do not start before
+ * the response ends while a gate is set.
+ */
+struct fyai_tool_gate_ops {
+	void (*before)(struct fyai_ctx *ctx, uint64_t id, size_t index,
+		       fy_generic call, void *data);
+	void (*after)(struct fyai_ctx *ctx, uint64_t id, size_t index,
+		      fy_generic call, fy_generic result, bool ok, void *data);
+};
+
+/* Let call @index of round @id run, with @args when they are valid. */
+void fyai_tool_gate_allow(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			  fy_generic args);
+/*
+ * Answer call @index of round @id with @message in place of running it. @stop
+ * ends the turn after the round.
+ */
+void fyai_tool_gate_deny(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			 const char *message, bool stop);
+/*
+ * End the report of result @index of round @id. @context, when given, goes to
+ * the model before its next request. @stop ends the turn with @context as
+ * its cause.
+ */
+void fyai_tool_gate_done(struct fyai_ctx *ctx, uint64_t id, size_t index,
+			 const char *context, bool stop);
 
 /* Queue owned @text for the event-loop owner to submit between turns. */
 int fyai_event_inject(struct fyai_ctx *ctx, char *text);
