@@ -29,6 +29,7 @@
 enum jsonrpc_transport {
 	JSONRPC_STDIO,
 	JSONRPC_HTTP,
+	JSONRPC_TUNNEL,
 };
 
 /* Maximum newline-terminated standard-I/O frame size. */
@@ -70,7 +71,20 @@ struct jsonrpc_conn {
 	const char *endpoint;
 	struct jsonrpc_http_hooks hooks;
 	bool has_hooks;
+
+	/* tunnel: the owner carries each frame to the peer */
+	jsonrpc_tunnel_send_fn tunnel_send;
+	void *tunnel_userdata;
 };
+
+static void jsonrpc_tunnel_flush(void *userdata);
+
+/* True for a transport that matches responses to pending requests. */
+static bool jsonrpc_conn_framed(const struct jsonrpc_conn *conn)
+{
+	return conn->transport == JSONRPC_STDIO ||
+	       conn->transport == JSONRPC_TUNNEL;
+}
 
 struct jsonrpc_request {
 	struct jsonrpc_conn *conn;
@@ -120,7 +134,8 @@ static void jsonrpc_log(struct jsonrpc_request *req, bool success)
 		fy_null_filtered_mapping(
 			"event", "request", "server", conn->name,
 			"transport", conn->transport == JSONRPC_STDIO ?
-				"stdio" : "http",
+				"stdio" : conn->transport == JSONRPC_TUNNEL ?
+				"tunnel" : "http",
 			"method", req->method,
 			"id", req->notification ? fy_null : fy_value(req->id),
 			"notification", req->notification, "success", success,
@@ -192,7 +207,7 @@ static void jsonrpc_list_remove(struct jsonrpc_request **head,
 /* Remove a request from its connection list. */
 static void jsonrpc_conn_unlink(struct jsonrpc_request *req)
 {
-	if (!req || !req->conn || req->conn->transport != JSONRPC_STDIO)
+	if (!req || !req->conn || !jsonrpc_conn_framed(req->conn))
 		return;
 	jsonrpc_list_remove(&req->conn->pending, req);
 	jsonrpc_list_remove(&req->conn->flush_wait, req);
@@ -253,6 +268,11 @@ static int jsonrpc_conn_reply(struct jsonrpc_conn *conn, fy_generic id,
 	if (conn->batch_active) {
 		conn->batch_responses = fy_append(gb, conn->batch_responses, frame);
 		if (fy_is_invalid(conn->batch_responses))
+			goto err;
+		return 0;
+	}
+	if (conn->transport == JSONRPC_TUNNEL) {
+		if (conn->tunnel_send(conn->tunnel_userdata, frame))
 			goto err;
 		return 0;
 	}
@@ -946,6 +966,14 @@ err_out:
 
 void jsonrpc_conn_destroy(struct jsonrpc_conn *conn)
 {
+	struct fyai_event_loop *el;
+
+	if (conn && conn->transport == JSONRPC_TUNNEL) {
+		el = fyai_ctx_loop(conn->ctx);
+		if (el)
+			fyai_event_defer_cancel(el, jsonrpc_tunnel_flush, conn);
+		jsonrpc_conn_settle(conn, "was destroyed", true);
+	}
 	if (conn && conn->transport == JSONRPC_STDIO) {
 		jsonrpc_drop_source(&conn->read_src);
 		jsonrpc_drop_source(&conn->write_src);
@@ -972,6 +1000,116 @@ void jsonrpc_conn_expect_close(struct jsonrpc_conn *conn)
 {
 	if (conn)
 		conn->expect_close = true;
+}
+
+/*
+ * tunnel transport
+ */
+
+/* Complete the notifications that the owner has carried. */
+static void jsonrpc_tunnel_flush(void *userdata)
+{
+	struct jsonrpc_conn *conn = userdata;
+	struct jsonrpc_request *req;
+
+	while ((req = conn->flush_wait)) {
+		conn->flush_wait = req->next;
+		req->next = NULL;
+		jsonrpc_finish(req, true, fy_null, 0, CURLE_OK);
+	}
+}
+
+static int jsonrpc_tunnel_submit(struct jsonrpc_request *req, fy_generic params)
+{
+	struct jsonrpc_conn *conn = req->conn;
+	struct fyai_ctx *ctx = conn->ctx;
+	struct fy_generic_builder *gb;
+	struct fyai_event_loop *el;
+	fy_generic rpc;
+	int rc;
+
+	fyai_error_check(ctx, !conn->closed, err_out,
+			 "%s is closed", conn->name);
+	el = fyai_ctx_loop(ctx);
+	fyai_error_check(ctx, el, err_out,
+			 "could not acquire the application event loop");
+	gb = fyai_ctx_transient_gb(ctx);
+	fyai_error_check(ctx, gb, err_out,
+			 "could not acquire transient storage");
+	rpc = fy_mapping(gb, "jsonrpc", "2.0",
+			 "method", req->method, "params", params);
+	if (!req->notification)
+		rpc = fy_assoc(gb, rpc, "id", req->id);
+	fyai_error_check(ctx, fy_is_valid(rpc), err_out,
+			 "could not build the JSON-RPC tunnel request");
+
+	/* Register the request before the peer can reply. */
+	if (req->notification) {
+		req->next = conn->flush_wait;
+		conn->flush_wait = req;
+	} else {
+		req->next = conn->pending;
+		conn->pending = req;
+	}
+	rc = conn->tunnel_send(conn->tunnel_userdata, rpc);
+	fyai_error_check(ctx, !rc, err_dequeue,
+			 "%s could not carry the request", conn->name);
+	/* A notification completes after the submit returns, as on stdio. */
+	if (req->notification)
+		return fyai_event_defer(el, jsonrpc_tunnel_flush, conn);
+	if (conn->timeout_s > 0) {
+		rc = fyai_event_add_timer(el, conn->timeout_s * 1000, 0,
+					  jsonrpc_stdio_timeout, req,
+					  &req->timer_src);
+		fyai_error_check(ctx, !rc, err_dequeue,
+				 "could not arm response timeout");
+	}
+	return 0;
+
+err_dequeue:
+	jsonrpc_conn_unlink(req);
+err_out:
+	return -1;
+}
+
+struct jsonrpc_conn *
+jsonrpc_conn_tunnel(struct fyai_ctx *ctx, int timeout_s, const char *name,
+		    const char *log_channel, jsonrpc_tunnel_send_fn send,
+		    void *userdata)
+{
+	struct jsonrpc_conn *conn;
+
+	conn = calloc(1, sizeof(*conn));
+	fyai_error_check(ctx, conn, err_out, "out of memory");
+	conn->ctx = ctx;
+	conn->transport = JSONRPC_TUNNEL;
+	conn->name = name;
+	conn->log_channel = log_channel;
+	conn->timeout_s = timeout_s;
+	conn->stdin_fd = -1;
+	conn->stdout_fd = -1;
+	conn->tunnel_send = send;
+	conn->tunnel_userdata = userdata;
+	return conn;
+
+err_out:
+	return NULL;
+}
+
+void jsonrpc_conn_tunnel_receive(struct jsonrpc_conn *conn, fy_generic frame)
+{
+	if (!conn || conn->transport != JSONRPC_TUNNEL || conn->closed ||
+	    !fy_is_mapping(frame))
+		return;
+	jsonrpc_conn_frame(conn, frame);
+}
+
+void jsonrpc_conn_tunnel_close(struct jsonrpc_conn *conn, const char *why)
+{
+	if (!conn || conn->transport != JSONRPC_TUNNEL || conn->closed)
+		return;
+	conn->closed = true;
+	jsonrpc_conn_settle(conn, why, false);
 }
 
 long long jsonrpc_conn_next_id(struct jsonrpc_conn *conn)
@@ -1001,6 +1139,8 @@ jsonrpc_request_submit(struct jsonrpc_conn *conn, const char *method,
 
 	rc = conn->transport == JSONRPC_STDIO ?
 		jsonrpc_stdio_submit(req, params) :
+	     conn->transport == JSONRPC_TUNNEL ?
+		jsonrpc_tunnel_submit(req, params) :
 		jsonrpc_http_submit(req, params);
 	fyai_error_check(conn->ctx, !rc, err_free, "%s could not submit %s",
 			 conn->name, method);
@@ -1017,7 +1157,7 @@ void jsonrpc_request_cancel(struct jsonrpc_request *req)
 	if (!req || req->done)
 		return;
 	req->cancel_requested = true;
-	if (req->conn->transport == JSONRPC_STDIO)
+	if (jsonrpc_conn_framed(req->conn))
 		jsonrpc_finish(req, false, fy_invalid, 0, CURLE_OK);
 	else if (req->transfer)
 		fyai_curl_cancel(req->transfer);
@@ -1054,7 +1194,7 @@ const char *jsonrpc_request_response_body(
 	if (!req)
 		return NULL;
 	/* Only HTTP requests retain a response body. */
-	if (req->conn->transport == JSONRPC_STDIO)
+	if (req->conn->transport != JSONRPC_HTTP)
 		return NULL;
 	return req->response.data;
 }

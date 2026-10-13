@@ -49,6 +49,21 @@ struct jsonrpc_conn *
 jsonrpc_conn_http(struct fyai_ctx *ctx, const char *endpoint, int timeout_s,
 		  const char *name, const char *log_channel,
 		  const struct jsonrpc_http_hooks *hooks);
+/*
+ * A connection whose owner carries each frame to the peer: @send takes a
+ * request, a notification or a reply as a generic that is valid during the
+ * call, and returns 0 when it took it. The owner hands each frame of the peer
+ * to jsonrpc_conn_tunnel_receive().
+ */
+typedef int (*jsonrpc_tunnel_send_fn)(void *userdata, fy_generic frame);
+
+struct jsonrpc_conn *
+jsonrpc_conn_tunnel(struct fyai_ctx *ctx, int timeout_s, const char *name,
+		    const char *log_channel, jsonrpc_tunnel_send_fn send,
+		    void *userdata);
+void jsonrpc_conn_tunnel_receive(struct jsonrpc_conn *conn, fy_generic frame);
+/* Fail the pending requests with @why: the peer is gone. */
+void jsonrpc_conn_tunnel_close(struct jsonrpc_conn *conn, const char *why);
 void jsonrpc_conn_destroy(struct jsonrpc_conn *conn);
 
 /*
