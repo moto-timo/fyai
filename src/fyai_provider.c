@@ -962,9 +962,10 @@ static fy_generic messages_text_block(struct fyai_ctx *ctx, fy_generic text)
  * tool_calls) become assistant `tool_use` blocks; tool results
  * (function_call_output/shell_call_output items, or Chat {role: tool})
  * become user `tool_result` blocks. Reasoning items are provider wire
- * detail with no Messages analogue and are dropped.
+ * detail with no Messages analogue and are dropped. It adds no cache
+ * marker. The result is in the transient builder.
  */
-fy_generic fyai_messages_input(struct fyai_ctx *ctx, fy_generic messages)
+fy_generic fyai_messages_blocks(struct fyai_ctx *ctx, fy_generic messages)
 {
 	struct fy_generic_builder *gb = ctx->transient_gb;
 	fy_generic out = fy_seq_empty;
@@ -972,7 +973,6 @@ fy_generic fyai_messages_input(struct fyai_ctx *ctx, fy_generic messages)
 	fy_generic type, role;
 	fy_generic tmp;
 	const char *cmd, *text;
-	size_t j, n;
 
 	fy_foreach(m, messages) {
 		type = fy_get(m, "type");
@@ -1092,6 +1092,20 @@ fy_generic fyai_messages_input(struct fyai_ctx *ctx, fy_generic messages)
 				fy_is_string(role) ? fy_castp(&role, "") : "user",
 				messages_text_block(ctx, content));
 	}
+	return fy_gb_internalize(gb, out);
+}
+
+/* The Messages request input: the blocks with a prompt-cache breakpoint. */
+fy_generic fyai_messages_input(struct fyai_ctx *ctx, fy_generic messages)
+{
+	struct fy_generic_builder *gb = ctx->transient_gb;
+	fy_generic out, m, content, tc;
+	size_t j, n;
+
+	out = fyai_messages_blocks(ctx, messages);
+	if (fy_is_invalid(out))
+		return provider_result(ctx, out,
+				       "could not build the Messages input");
 
 	/*
 	 * Prompt-cache breakpoint on the last block of the history: Anthropic

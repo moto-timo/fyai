@@ -34,6 +34,11 @@ fy_generic fyai_responses_input(struct fyai_ctx *ctx, fy_generic messages);
 fy_generic fyai_item_text(struct fyai_ctx *ctx, fy_generic item);
 fy_generic fyai_chat_input(struct fyai_ctx *ctx, fy_generic messages);
 fy_generic fyai_make_messages_tools(struct fyai_ctx *ctx);
+/*
+ * The canonical @messages as Anthropic messages of content blocks, with no
+ * cache marker. The result is in the transient builder.
+ */
+fy_generic fyai_messages_blocks(struct fyai_ctx *ctx, fy_generic messages);
 fy_generic fyai_messages_input(struct fyai_ctx *ctx, fy_generic messages);
 fy_generic fyai_response_output_text(struct fyai_ctx *ctx, fy_generic doc);
 fy_generic fyai_response_tool_calls(struct fyai_ctx *ctx, fy_generic doc);
