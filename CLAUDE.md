@@ -137,6 +137,8 @@ initialize each generic field explicitly.
 - `src/fyai_output.c`: transcript document source and fragments.
 - `src/fyai_session.c`: interactive input and slash commands.
 - `src/fyai_agent.c`: sub-agent execution and agent RPC.
+- `src/fyai_claude_sdk.c`: the Claude Agent SDK protocol
+  (`doc/claude-sdk-compat.md`).
 - `src/fyai_event*.c`: the portable event loop and signal handling.
 - `src/fyai_event_dump.c`: SIGUSR2 event-loop diagnostics.
 - `src/fyai_render.c`: generic-to-Markdown table rendering.
