@@ -63,6 +63,20 @@ typedef fy_generic (*jsonrpc_serve_fn)(struct jsonrpc_conn *conn,
 int jsonrpc_conn_serve(struct jsonrpc_conn *conn, jsonrpc_serve_fn fn,
 		       void *userdata);
 
+/*
+ * Receive each JSON object of a stdio connection as one frame, for a protocol
+ * that is framed as JSON-RPC is but is not JSON-RPC. The connection then
+ * matches no response and serves no method. @frame is valid during the call.
+ */
+typedef void (*jsonrpc_frame_fn)(struct jsonrpc_conn *conn, fy_generic frame,
+				 void *userdata);
+
+int jsonrpc_conn_frames(struct jsonrpc_conn *conn, jsonrpc_frame_fn fn,
+			void *userdata);
+
+/* Queue @frame as one line of compact JSON. */
+int jsonrpc_conn_send_frame(struct jsonrpc_conn *conn, fy_generic frame);
+
 /* Enable JSON-RPC batch frames on a stdio server connection. */
 void jsonrpc_conn_accept_batches(struct jsonrpc_conn *conn);
 bool jsonrpc_conn_in_batch(const struct jsonrpc_conn *conn);

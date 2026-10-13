@@ -54,11 +54,15 @@ struct jsonrpc_conn {
 	struct jsonrpc_request *flush_wait;	/* notifications awaiting write */
 	bool protocol_failed;			/* peer sent an invalid frame */
 	bool closed;
+	bool write_failed;			/* the peer takes no more output */
 	jsonrpc_serve_fn serve;
 	void *serve_userdata;
 	bool serve_deferred;	/* handler will answer later */
 	bool expect_close;
 	bool accept_batches;
+	/* Every frame goes here, and none is read as JSON-RPC. */
+	jsonrpc_frame_fn frame;
+	void *frame_userdata;
 	bool batch_active;
 	fy_generic batch_responses;
 
@@ -392,6 +396,10 @@ static void jsonrpc_conn_line(struct jsonrpc_conn *conn, const char *line)
 		conn->protocol_failed = true;
 		return;
 	}
+	if (conn->frame) {
+		conn->frame(conn, doc, conn->frame_userdata);
+		return;
+	}
 	jsonrpc_conn_frame(conn, doc);
 }
 
@@ -521,6 +529,7 @@ static enum fyai_event_action jsonrpc_conn_writable(const struct fyai_event *ev)
 		 * would hide the cause that ended the peer.
 		 */
 		peer_closed = n < 0 && errno == EPIPE;
+		conn->write_failed = true;
 		if (!peer_closed)
 			fyai_error(conn->ctx, "%s stdio write failed", conn->name);
 		jsonrpc_drop_source(&conn->write_src);
@@ -606,6 +615,38 @@ int jsonrpc_conn_serve(struct jsonrpc_conn *conn, jsonrpc_serve_fn fn,
 	conn->serve_userdata = userdata;
 	/* A server must listen before anyone calls it. */
 	return fn ? jsonrpc_conn_arm_read(conn) : 0;
+}
+
+int jsonrpc_conn_frames(struct jsonrpc_conn *conn, jsonrpc_frame_fn fn,
+			void *userdata)
+{
+	if (!conn || conn->transport != JSONRPC_STDIO || !fn)
+		return -1;
+	conn->frame = fn;
+	conn->frame_userdata = userdata;
+	return jsonrpc_conn_arm_read(conn);
+}
+
+int jsonrpc_conn_send_frame(struct jsonrpc_conn *conn, fy_generic frame)
+{
+	struct fy_generic_builder *gb;
+	const char *body;
+	int rc;
+
+	/* A peer that closed its output can still read: only a failed write
+	 * ends the frames that go to it. */
+	if (!conn || conn->transport != JSONRPC_STDIO || conn->write_failed)
+		return -1;
+	gb = fyai_ctx_transient_gb(conn->ctx);
+	body = gb ? emit_json_string(gb, frame) : NULL;
+	fyai_error_check(conn->ctx, body, err,
+			 "%s could not encode a frame", conn->name);
+	rc = jsonrpc_conn_send(conn, body);
+	fyai_error_check(conn->ctx, !rc, err,
+			 "%s could not queue a frame", conn->name);
+	return 0;
+err:
+	return -1;
 }
 
 static enum fyai_event_action jsonrpc_stdio_timeout(const struct fyai_event *ev)
