@@ -130,4 +130,56 @@ PYEOF
 
 mock_stop 5
 assert_request 4 'r["body"]["messages"][-1]["content"] == "keep going"'
+
+mock_start claude_sdk_extra.json
+"$FYAI_BIN" --set "api_url=$MOCK_URL/v1/chat/completions" >/dev/null 2>&1 ||
+	fail "point the project at the third mock"
+
+"$PYTHON" - "$FYAI_BIN" "$TEST_DIR" <<'PYEOF' || fail "Python SDK structured output"
+import sys
+
+import anyio
+from claude_agent_sdk import (ClaudeAgentOptions, ClaudeSDKClient,
+                              ResultMessage, StreamEvent, query)
+
+binary, cwd = sys.argv[1], sys.argv[2]
+
+async def main():
+    schema = {"type": "object", "properties": {"answer": {"type": "integer"}},
+              "required": ["answer"]}
+    options = ClaudeAgentOptions(
+        cli_path=binary, cwd=cwd, include_partial_messages=True,
+        output_format={"type": "json_schema", "schema": schema})
+    events = []
+    async with ClaudeSDKClient(options=options) as client:
+        await client.query("answer")
+        async for message in client.receive_response():
+            if isinstance(message, StreamEvent):
+                events.append(message.event["type"])
+            if isinstance(message, ResultMessage):
+                result = message
+        usage = await client.get_context_usage()
+    assert result.structured_output == {"answer": 42}, result
+    assert events[0] == "message_start" and events[-1] == "message_stop", events
+    assert usage["totalTokens"] == 24, usage
+
+    options = ClaudeAgentOptions(cli_path=binary, cwd=cwd,
+                                 resume=result.session_id, fork_session=True)
+    async for message in query(prompt="fork it", options=options):
+        if isinstance(message, ResultMessage):
+            fork = message
+    assert fork.result == "forked", fork
+    assert fork.session_id != result.session_id, fork
+
+    options = ClaudeAgentOptions(cli_path=binary, cwd=cwd,
+                                 continue_conversation=True)
+    async for message in query(prompt="go on", options=options):
+        if isinstance(message, ResultMessage):
+            assert message.session_id == fork.session_id, message
+            assert message.result == "continued", message
+
+anyio.run(main)
+PYEOF
+
+mock_stop
 pass

@@ -142,7 +142,11 @@ assert "the permission prompt tool 'mcp__perm__ask' is not supported" in err, er
 
 proc = start(["--fork-session"])
 err = finish(proc, 1)
-assert "--fork-session is not supported" in err, err
+assert "--fork-session needs a session to fork" in err, err
+
+proc = start(["--plugin-dir", "plugins"])
+err = finish(proc, 1)
+assert "--plugin-dir is not supported" in err, err
 
 proc = start(["--resume=no-such-session"])
 err = finish(proc, 1)
