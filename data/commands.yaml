@@ -3458,7 +3458,7 @@ commands:
           description: the limit of tool iterations in one turn
         max_budget_usd:
           type: number
-          description: not supported
+          description: stop before a model request once the cost of the run reaches this
         task_budget:
           type: integer
           description: not supported; ignored
@@ -3473,7 +3473,7 @@ commands:
           description: stdio asks the SDK before a tool call that no rule allows
         continue:
           type: boolean
-          description: not supported
+          description: continue the last session of this directory
         resume:
           type: string
           description: continue the session with this ID
@@ -3488,7 +3488,7 @@ commands:
           description: not supported
         fork_session:
           type: boolean
-          description: not supported
+          description: start a new session from the resumed one
         session_mirror:
           type: boolean
           description: not supported
@@ -3516,13 +3516,13 @@ commands:
           description: use only the MCP servers of --mcp-config
         include_partial_messages:
           type: boolean
-          description: not supported; ignored
+          description: send the text of each response as stream events
         include_hook_events:
           type: boolean
           description: not supported; ignored
         json_schema:
           type: string
-          description: not supported
+          description: the JSON Schema of the structured output of each turn
         thinking:
           type: string
           description: not supported; ignored

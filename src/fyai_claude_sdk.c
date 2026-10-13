@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -35,11 +36,13 @@
 #include "fyai_jsonrpc.h"
 #include "fyai_output.h"
 #include "fyai_provider.h"
+#include "fyai_session.h"
 #include "fyai_storage.h"
 #include "fyai_tool_registry.h"
 #include "fyai_tool_spec.h"
 #include "fyai_tools.h"
 #include "fyai_turn.h"
+#include "fyai_xfer.h"
 #include "utils.h"
 
 #define FYAI_MODULE FYAIEM_UNKNOWN
@@ -51,6 +54,8 @@
 struct sdk_input {
 	struct sdk_input *next;
 	char *text;
+	char *origin_json;		/* the origin that the SDK stamped */
+	bool composed;			/* the text goes as written */
 };
 
 /* A permission rule: a tool, and the text in its parentheses or NULL. */
@@ -144,7 +149,8 @@ struct sdk_server {
 	struct jsonrpc_conn *conn;
 	struct sdk_input *head;
 	struct sdk_input **tail;
-	const char *session_id;		/* the branch name without its prefix */
+	char *session_id;		/* the branch name without its prefix */
+	const char *append;		/* --append-system-prompt */
 	const char *permission_mode;
 	bool initialized;
 	bool mcp_starting;		/* the servers of --mcp-config connect */
@@ -162,6 +168,10 @@ struct sdk_server {
 	struct sdk_decision *decisions;
 	struct sdk_tunnel *tunnels;
 	unsigned long long requests;
+	fy_generic agents;		/* the names of the agents of the SDK */
+	bool partial;			/* stream_event frames of the text */
+	bool forward_text;		/* the text of sub-agents too */
+	bool stream_open;		/* a streamed message is open */
 	/* State of the running turn. */
 	long long num_turns;
 	char *result_text;		/* the text of the last answer */
@@ -189,11 +199,12 @@ static const struct {
 	{ "NotebookEdit",	{ "apply_patch" } },
 	{ "TodoWrite",		{ "todo_write" } },
 	{ "Task",		{ "agent", "agent_message", "agent_input" } },
+	{ "StructuredOutput",	{ "structured_output" } },
+	{ "WebSearch",		{ "web_search" } },
 	{ "Agent",		{ "agent", "agent_message", "agent_input" } },
 	{ "Skill",		{ "skill" } },
 	{ "Monitor",		{ "monitor" } },
 	{ "AskUserQuestion",	{ "ask_user" } },
-	{ "WebSearch",		{ "web_search" } },
 };
 
 /* The MCP tools stay with any base set, as the MCP servers do. */
@@ -407,8 +418,7 @@ static fy_generic sdk_tools_allowed(struct fy_generic_builder *gb,
 
 /* The options of the SDK that change what the session does, which fyai lacks. */
 static const char *const sdk_refused[] = {
-	"max_budget_usd", "continue", "resume_session_at", "resume_drops_turn",
-	"fork_session", "session_mirror", "plugin_dir", "json_schema",
+	"resume_session_at", "resume_drops_turn", "session_mirror", "plugin_dir",
 };
 
 static bool sdk_mode_valid(const char *mode)
@@ -559,7 +569,10 @@ int fyai_cmd_claude_sdk_early(struct fyai_cfg *cfg, fy_generic args)
 {
 	fy_generic v, stored;
 	const char *resume, *sid, *mode;
-	const char *prompt, *path, *encoded, *tool, *config, *why;
+	const char *prompt, *path, *encoded, *tool, *config, *why, *text;
+	char cwd[PATH_MAX], from[sizeof(SDK_BRANCH_PREFIX) + SDK_ID_MAX + 1];
+	char *last;
+	bool fork;
 	char id[SDK_ID_MAX + 1], name[sizeof(SDK_BRANCH_PREFIX) + SDK_ID_MAX];
 	char *file = NULL;
 	char opt[64];
@@ -590,11 +603,47 @@ int fyai_cmd_claude_sdk_early(struct fyai_cfg *cfg, fy_generic args)
 				     "claude-sdk: --mcp-config: %s", why);
 	}
 
+	text = fy_get(args, "json_schema", (const char *)NULL);
+	if (text) {
+		v = parse_json_string(cfg->gb, text);
+		fyai_cfg_error_check(cfg, fy_is_mapping(v), err,
+				     "claude-sdk: --json-schema is not a JSON "
+				     "object");
+	}
+	fyai_cfg_error_check(cfg, fy_get(args, "max_budget_usd", 1.0) > 0, err,
+			     "claude-sdk: --max-budget-usd must be positive");
+
 	resume = fy_get(args, "resume", (const char *)NULL);
 	sid = fy_get(args, "session_id", (const char *)NULL);
-	fyai_cfg_error_check(cfg, !(resume && sid), err,
+	fork = fy_get(args, "fork_session", false);
+	/* --continue takes the last session of this directory, if there is one. */
+	if (!resume && fy_get(args, "continue", false) &&
+	    getcwd(cwd, sizeof(cwd))) {
+		last = fyai_peek_branch_pick(cfg->arena_dir, cfg->root_spec, cwd,
+					     false, SDK_BRANCH_PREFIX);
+		if (last) {
+			snprintf(from, sizeof(from), "%s", last);
+			free(last);
+			resume = from + strlen(SDK_BRANCH_PREFIX);
+		}
+	}
+	fyai_cfg_error_check(cfg, !(resume && sid) || fork, err,
 			     "claude-sdk: --resume and --session-id exclude "
 			     "each other");
+	fyai_cfg_error_check(cfg, !fork || resume, err,
+			     "claude-sdk: --fork-session needs a session to "
+			     "fork");
+	if (fork) {
+		/* The fork is a new session that starts from the resumed one. */
+		valid = sdk_id_valid(resume);
+		fyai_cfg_error_check(cfg, valid, err,
+				     "claude-sdk: invalid session ID '%s'", resume);
+		cfg->fresh_session_from = strdup(fy_sprintfa("%s%s",
+						 SDK_BRANCH_PREFIX, resume));
+		fyai_cfg_error_check(cfg, cfg->fresh_session_from, err,
+				     "claude-sdk: cannot keep the session name");
+		resume = NULL;
+	}
 	if (resume || sid) {
 		valid = sdk_id_valid(resume ? resume : sid);
 		fyai_cfg_error_check(cfg, valid, err,
@@ -692,13 +741,6 @@ static void sdk_respond(struct sdk_server *srv, fy_generic request_id,
 					response : fy_map_empty)));
 }
 
-static bool sdk_mapping_empty(fy_generic v)
-{
-	return fy_is_invalid(v) || fy_is_null(v) ||
-	       (fy_is_mapping(v) && fy_empty(v)) ||
-	       (fy_is_sequence(v) && fy_empty(v));
-}
-
 
 /* ---- the names of tools that the SDK sees ------------------------------- */
 
@@ -741,6 +783,18 @@ static const char *sdk_tool_view(struct fy_generic_builder *gb,
 			"content", fy_get(args, "content", ""));
 		return "Write";
 	}
+	if (!strcmp(name, "agent")) {
+		v = fy_mapping(gb,
+			"description", fy_get(args, "description", ""),
+			"prompt", fy_get(args, "task", ""));
+		if (fy_is_string(fy_get(args, "persona", fy_invalid)))
+			v = fy_assoc(gb, v, "subagent_type",
+				     fy_get(args, "persona", fy_invalid));
+		*inputp = v;
+		return "Task";
+	}
+	if (!strcmp(name, "structured_output"))
+		return "StructuredOutput";
 	return name;
 }
 
@@ -762,6 +816,9 @@ static fy_generic sdk_tool_unview(struct fy_generic_builder *gb,
 		{ "read_file",		"limit",	"limit" },
 		{ "write_file",		"file_path",	"path" },
 		{ "write_file",		"content",	"content" },
+		{ "agent",		"description",	"description" },
+		{ "agent",		"prompt",	"task" },
+		{ "agent",		"subagent_type", "persona" },
 	};
 	fy_generic v;
 	bool mapped = false;
@@ -1771,6 +1828,82 @@ static const char *sdk_set_model(struct sdk_server *srv, const char *model)
 			fy_sprintfa("the model '%s' cannot be used", model));
 }
 
+/*
+ * Make the agents of the SDK personas of the session: the description, the
+ * prompt, the tools and the model of each. Returns an error text.
+ */
+static const char *sdk_agents(struct sdk_server *srv, fy_generic agents)
+{
+	struct fyai_ctx *ctx = srv->ctx;
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	fy_generic name, agent, persona, tools, tool, allow;
+	const char *nm, *model, *word;
+	int rc;
+
+	fy_foreach_key_value(name, agent, agents) {
+		nm = fy_castp(&name, "");
+		persona = fy_mapping(gb,
+			"description", fy_get(agent, "description", ""),
+			"system_prompt", fy_get(agent, "prompt", ""));
+		/* The tools of the agent, by the names of fyai. */
+		tools = fy_get(agent, "tools", fy_invalid);
+		if (fy_is_sequence(tools)) {
+			allow = fy_seq_empty;
+			fy_foreach(tool, tools) {
+				word = fy_castp(&tool, "");
+				allow = sdk_tools_add(gb, allow, word,
+						      strlen(word));
+			}
+			persona = fy_assoc(gb, persona, "tools", allow);
+		} else if (fy_is_valid(tools) && !fy_is_null(tools)) {
+			return fy_gb_intern_string(gb,
+				fy_sprintfa("agent '%s' gives tools that are "
+					    "not a list", nm));
+		}
+		/* A model alias of Claude Code names no model of fyai. */
+		model = fy_get(agent, "model", "");
+		if (*model && strcmp(model, "inherit") && strcmp(model, "sonnet") &&
+		    strcmp(model, "opus") && strcmp(model, "haiku"))
+			persona = fy_assoc(gb, persona, "model", model);
+		rc = fyai_config_invocation_set(ctx,
+			fy_sprintfa("agent/personas/%s", nm), persona);
+		if (rc)
+			return fy_gb_intern_string(gb,
+				fy_sprintfa("agent '%s' is not a valid "
+					    "persona", nm));
+		srv->agents = fy_append(ctx->cfg->gb, srv->agents,
+					fy_value(ctx->cfg->gb, nm));
+	}
+	/* The agent tool lists the personas of the request. */
+	rc = fyai_request_state_apply(ctx);
+	return rc ? "the agents cannot be offered" : NULL;
+}
+
+/* The context window as the SDK reports it. */
+static fy_generic sdk_context_usage(struct sdk_server *srv,
+				    struct fy_generic_builder *gb)
+{
+	struct fyai_ctx *ctx = srv->ctx;
+	long long used, window;
+
+	used = ctx->last_call_input + ctx->last_call_output;
+	window = fyai_context_window(ctx);
+	return fy_mapping(gb,
+		"categories", fy_sequence(gb, fy_mapping(gb,
+			"name", "Messages", "tokens", used,
+			"color", "#808080")),
+		"totalTokens", used,
+		"maxTokens", window,
+		"rawMaxTokens", window,
+		"percentage", window > 0 ? 100.0 * (double)used /
+				(double)window : 0.0,
+		"model", ctx->cfg->model ? ctx->cfg->model : "",
+		"isAutoCompactEnabled", false,
+		"memoryFiles", fy_seq_empty,
+		"mcpTools", fy_seq_empty,
+		"agents", fy_seq_empty);
+}
+
 static void sdk_respond_init(struct sdk_server *srv, fy_generic id)
 {
 	struct fy_generic_builder *gb = fyai_ctx_transient_gb(srv->ctx);
@@ -1809,11 +1942,14 @@ static void sdk_control(struct sdk_server *srv, fy_generic frame)
 				return;
 			}
 		}
-		if (!sdk_mapping_empty(fy_get(req, "agents", fy_invalid))) {
-			sdk_respond(srv, id, fy_invalid,
-				    "fyai does not support SDK agents yet");
-			return;
+		if (fy_is_mapping(fy_get(req, "agents", fy_invalid))) {
+			why = sdk_agents(srv, fy_get(req, "agents", fy_invalid));
+			if (why) {
+				sdk_respond(srv, id, fy_invalid, why);
+				return;
+			}
 		}
+		srv->forward_text = fy_get(req, "forwardSubagentText", false);
 		srv->initialized = true;
 		/* As Claude Code, answer once the MCP servers have connected. */
 		if (srv->mcp_starting) {
@@ -1850,6 +1986,10 @@ static void sdk_control(struct sdk_server *srv, fy_generic frame)
 		why = sdk_set_model(srv, fy_is_string(model) ?
 				    fy_castp(&model, "") : NULL);
 		sdk_respond(srv, id, fy_invalid, why);
+		return;
+	}
+	if (!strcmp(subtype, "get_context_usage")) {
+		sdk_respond(srv, id, sdk_context_usage(srv, gb), NULL);
 		return;
 	}
 	if (!strcmp(subtype, "mcp_status")) {
@@ -1892,9 +2032,91 @@ static char *sdk_user_text(struct sdk_server *srv, fy_generic content)
 	return out.data ? out.data : strdup("");
 }
 
+/*
+ * The regular file that the mention @PATH at @start names, owned by the
+ * caller, or NULL. A mention can end with punctuation of the sentence.
+ */
+static char *sdk_mention_path(const char *start, size_t len)
+{
+	const char *home = getenv("HOME");
+	struct stat st;
+	char *path;
+
+	for (; len; len--) {
+		if (len > 1 && start[0] == '~' && start[1] == '/' && home)
+			path = strdup(fy_sprintfa("%s%.*s", home,
+						  (int)len - 1, start + 1));
+		else
+			path = strndup(start, len);
+		if (!path)
+			return NULL;
+		if (!stat(path, &st) && S_ISREG(st.st_mode))
+			return path;
+		free(path);
+		if (!strchr(".,;:!?)'\"", start[len - 1]))
+			break;
+	}
+	return NULL;
+}
+
+/*
+ * As Claude Code, add the content of each file that the prompt names as
+ * @PATH, as a call of Read and its result. The result is in the transient
+ * builder, or @prompt when it names no file.
+ */
+static const char *sdk_mentions(struct sdk_server *srv, const char *prompt)
+{
+	struct fyai_ctx *ctx = srv->ctx;
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	const struct fyai_tool_def *read = fyai_tool_find("read_file");
+	struct response_buffer out = { 0 };
+	const char *p, *json, *head, *res = prompt;
+	char *path, *content;
+	size_t len;
+	bool ok;
+	int rc;
+
+	if (!read || !read->run_text)
+		return prompt;
+	rc = response_buffer_append_data(&out, prompt, strlen(prompt));
+	for (p = prompt; !rc && (p = strchr(p, '@')); p++) {
+		if (p != prompt && !strchr(" \t\r\n", p[-1]))
+			continue;
+		len = strcspn(p + 1, " \t\r\n");
+		path = len ? sdk_mention_path(p + 1, len) : NULL;
+		if (!path)
+			continue;
+		content = read->run_text(ctx, fy_mapping(gb, "path", path), &ok);
+		json = emit_json_string(gb, fy_mapping(gb, "file_path", path));
+		head = json ? fy_gb_intern_string(gb, fy_sprintfa(
+			"\n\nCalled the Read tool with the following input: "
+			"%s\n\nResult of calling the Read tool:\n", json)) :
+			NULL;
+		if (content && ok && head)
+			rc = response_buffer_append_data(&out, head,
+							 strlen(head)) ||
+			     response_buffer_append_data(&out, content,
+							 strlen(content));
+		else
+			fyai_warning(ctx, "claude-sdk: cannot read %s, which "
+				     "the prompt names", path);
+		free(content);
+		free(path);
+	}
+	if (rc)
+		fyai_error(ctx, "claude-sdk: cannot add the files that the "
+			   "prompt names");
+	else if (out.len != strlen(prompt))
+		res = fy_gb_intern_string(gb, out.data);
+	free(out.data);
+	return res ? res : prompt;
+}
+
 static void sdk_user(struct sdk_server *srv, fy_generic frame)
 {
 	struct sdk_input *in;
+	fy_generic origin;
+	const char *json;
 	char *text;
 
 	text = sdk_user_text(srv,
@@ -1912,6 +2134,12 @@ static void sdk_user(struct sdk_server *srv, fy_generic frame)
 		return;
 	}
 	in->text = text;
+	in->composed = fy_get(frame, "client_composed", false);
+	origin = fy_get(frame, "origin", fy_invalid);
+	if (fy_is_mapping(origin)) {
+		json = emit_json_string(fyai_ctx_transient_gb(srv->ctx), origin);
+		in->origin_json = json ? strdup(json) : NULL;
+	}
 	*srv->tail = in;
 	srv->tail = &in->next;
 }
@@ -1981,27 +2209,138 @@ static void sdk_keep_text(struct sdk_server *srv, fy_generic content)
 	srv->result_text = out.data;
 }
 
-static void sdk_observe(struct fyai_ctx *ctx, fy_generic turn, void *data)
+static void sdk_stream_event(struct sdk_server *srv, fy_generic event)
+{
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(srv->ctx);
+
+	sdk_send(srv, fy_mapping(gb,
+		"type", "stream_event",
+		"uuid", sdk_new_uuid(srv),
+		"session_id", srv->session_id,
+		"event", event,
+		"parent_tool_use_id", fy_null));
+}
+
+/*
+ * Stream a chunk of answer text as the events of an Anthropic message: the
+ * first chunk of a response opens the message and its text block.
+ */
+static void sdk_text(struct fyai_ctx *ctx, const char *text, size_t len,
+		     void *data)
 {
 	struct sdk_server *srv = data;
 	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
-	fy_generic blocks, m, content, usage;
+	char msgid[48];
+
+	if (!srv->stream_open) {
+		snprintf(msgid, sizeof(msgid), "msg_%s", sdk_new_uuid(srv));
+		sdk_stream_event(srv, fy_mapping(gb,
+			"type", "message_start",
+			"message", fy_mapping(gb,
+				"id", msgid,
+				"type", "message",
+				"role", "assistant",
+				"model", ctx->cfg->model ? ctx->cfg->model : "",
+				"content", fy_seq_empty,
+				"stop_reason", fy_null,
+				"stop_sequence", fy_null,
+				"usage", sdk_usage(gb, 0, 0, 0, 0))));
+		sdk_stream_event(srv, fy_mapping(gb,
+			"type", "content_block_start",
+			"index", 0LL,
+			"content_block", fy_mapping(gb, "type", "text",
+						    "text", "")));
+		srv->stream_open = true;
+	}
+	sdk_stream_event(srv, fy_mapping(gb,
+		"type", "content_block_delta",
+		"index", 0LL,
+		"delta", fy_mapping(gb, "type", "text_delta",
+				    "text", fy_sprintfa("%.*s", (int)len, text))));
+}
+
+/* Close the streamed message of a response that has ended. */
+static void sdk_stream_close(struct sdk_server *srv, bool tools,
+			     long long output)
+{
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(srv->ctx);
+
+	if (!srv->stream_open)
+		return;
+	srv->stream_open = false;
+	sdk_stream_event(srv, fy_mapping(gb,
+		"type", "content_block_stop", "index", 0LL));
+	sdk_stream_event(srv, fy_mapping(gb,
+		"type", "message_delta",
+		"delta", fy_mapping(gb,
+			"stop_reason", tools ? "tool_use" : "end_turn",
+			"stop_sequence", fy_null),
+		"usage", fy_mapping(gb, "output_tokens", output)));
+	sdk_stream_event(srv, fy_mapping(gb, "type", "message_stop"));
+}
+
+static bool sdk_has_tool_use(fy_generic content)
+{
+	fy_generic block;
+
+	fy_foreach(block, content)
+		if (fy_equal(fy_get(block, "type", fy_invalid), "tool_use"))
+			return true;
+	return false;
+}
+
+/* Only the tool_use and tool_result blocks of @content. */
+static fy_generic sdk_blocks_tools(struct fy_generic_builder *gb,
+				   fy_generic content)
+{
+	fy_generic out, block;
+
+	out = fy_seq_empty;
+	fy_foreach(block, content)
+		if (fy_any_equal(fy_get(block, "type", fy_invalid),
+				 "tool_use", "tool_result"))
+			out = fy_append(gb, out, block);
+	return out;
+}
+
+/*
+ * Send the messages of one step: of the turn, or, with @parent, of the
+ * sub-agent that the tool use @parent started. A sub-agent shows its text
+ * only when the SDK asked for it.
+ */
+static void sdk_send_step(struct sdk_server *srv, fy_generic messages,
+			  fy_generic usage, const char *model,
+			  const char *parent)
+{
+	struct fyai_ctx *ctx = srv->ctx;
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	fy_generic blocks, m, content, parent_id;
 	char msgid[48];
 	const char *role;
 
-	blocks = fyai_messages_blocks(ctx, fy_get(turn, "messages", fy_seq_empty));
+	blocks = fyai_messages_blocks(ctx, messages);
 	if (fy_is_invalid(blocks)) {
 		fyai_error(ctx, "claude-sdk: cannot convert a step of the turn");
-		srv->failed = true;
+		if (!parent)
+			srv->failed = true;
 		return;
 	}
-	usage = fy_get(fyai_turn_meta(turn), "usage", fy_invalid);
+	parent_id = parent ? fy_value(gb, parent) : fy_null;
 	fy_foreach(m, blocks) {
 		role = fy_get(m, "role", "");
 		content = sdk_blocks_view(gb, fy_get(m, "content", fy_seq_empty));
+		if (parent && !srv->forward_text) {
+			content = sdk_blocks_tools(gb, content);
+			if (fy_empty(content))
+				continue;
+		}
 		if (!strcmp(role, "assistant")) {
-			srv->num_turns++;
-			sdk_keep_text(srv, content);
+			if (!parent) {
+				srv->num_turns++;
+				sdk_stream_close(srv, sdk_has_tool_use(content),
+						 fy_get(usage, "output", 0LL));
+				sdk_keep_text(srv, content);
+			}
 			snprintf(msgid, sizeof(msgid), "msg_%s",
 				 sdk_new_uuid(srv));
 			sdk_send(srv, fy_mapping(gb,
@@ -2010,8 +2349,7 @@ static void sdk_observe(struct fyai_ctx *ctx, fy_generic turn, void *data)
 					"id", msgid,
 					"type", "message",
 					"role", "assistant",
-					"model", ctx->cfg->model ?
-						ctx->cfg->model : "",
+					"model", model,
 					"content", content,
 					"stop_reason", fy_null,
 					"stop_sequence", fy_null,
@@ -2020,7 +2358,7 @@ static void sdk_observe(struct fyai_ctx *ctx, fy_generic turn, void *data)
 						fy_get(usage, "output", 0LL),
 						fy_get(usage, "cached", 0LL),
 						fy_get(usage, "cache_write", 0LL))),
-				"parent_tool_use_id", fy_null,
+				"parent_tool_use_id", parent_id,
 				"session_id", srv->session_id,
 				"uuid", sdk_new_uuid(srv)));
 		} else {
@@ -2029,11 +2367,34 @@ static void sdk_observe(struct fyai_ctx *ctx, fy_generic turn, void *data)
 				"message", fy_mapping(gb,
 					"role", "user",
 					"content", content),
-				"parent_tool_use_id", fy_null,
+				"parent_tool_use_id", parent_id,
 				"session_id", srv->session_id,
 				"uuid", sdk_new_uuid(srv)));
 		}
 	}
+}
+
+static void sdk_observe(struct fyai_ctx *ctx, fy_generic turn, void *data)
+{
+	sdk_send_step(data, fy_get(turn, "messages", fy_seq_empty),
+		      fy_get(fyai_turn_meta(turn), "usage", fy_invalid),
+		      ctx->cfg->model ? ctx->cfg->model : "", NULL);
+}
+
+/* A step of a sub-agent belongs to the tool use that started it. */
+static void sdk_agent_observe(struct fyai_ctx *ctx, fy_generic call,
+			      fy_generic step, void *data)
+{
+	fy_generic model;
+	const char *id;
+
+	id = fyai_tool_call_id(ctx, call);
+	if (!id || !*id)
+		return;
+	model = fy_get(step, "model", fy_invalid);
+	sdk_send_step(data, fy_get(step, "messages", fy_seq_empty),
+		      fy_get(step, "usage", fy_invalid), fy_castp(&model, ""),
+		      id);
 }
 
 static void sdk_send_init(struct sdk_server *srv)
@@ -2068,7 +2429,7 @@ static void sdk_send_init(struct sdk_server *srv)
 		"apiKeySource", "none",
 		"claude_code_version", FYAI_CLAUDE_SDK_VERSION,
 		"output_style", "default",
-		"agents", fy_seq_empty,
+		"agents", srv->agents,
 		"skills", fy_seq_empty,
 		"plugins", fy_seq_empty,
 		"uuid", sdk_new_uuid(srv)));
@@ -2119,6 +2480,7 @@ static char *sdk_run(struct sdk_server *srv, bool *okp)
 	int rc;
 
 	*okp = false;
+	ctx->turn_stop = FYAI_TURN_STOP_NONE;
 	ctx->tool_gate = sdk_gate_needed(srv) ? &sdk_gate_ops : NULL;
 	ctx->tool_gate_data = srv;
 	srv->busy = true;
@@ -2126,6 +2488,8 @@ static char *sdk_run(struct sdk_server *srv, bool *okp)
 	srv->busy = false;
 	ctx->tool_gate = NULL;
 	ctx->tool_gate_data = NULL;
+	/* A response that streamed and failed still ends its message. */
+	sdk_stream_close(srv, false, 0);
 	diag = fy_generic_get_diag(turn);
 	if (fy_is_valid(diag) && !fy_is_null(diag)) {
 		cause = strdup(fy_castp(&diag, ""));
@@ -2145,9 +2509,13 @@ out:
 	return cause;
 }
 
-/* Run one turn for @text and send its result. */
-static void sdk_turn(struct sdk_server *srv, const char *text)
+/* A model that answers in prose is reminded of the structured output. */
+#define SDK_OUTPUT_RETRIES	3
+
+/* Run one turn for the user message @in and send its result. */
+static void sdk_turn(struct sdk_server *srv, const struct sdk_input *in)
 {
+	const char *text = in->text;
 	struct fyai_ctx *ctx = srv->ctx;
 	struct fyai_cfg *cfg = ctx->cfg;
 	struct fy_generic_builder *gb;
@@ -2155,11 +2523,12 @@ static void sdk_turn(struct sdk_server *srv, const char *text)
 	struct sdk_wait w;
 	fy_generic input, frame;
 	long long in0, out0, cached0, write0, ms;
-	const char *prompt;
+	const char *prompt, *subtype = NULL, *reason;
 	double cost0;
 	char *cause = NULL;
-	bool ok, again;
-	int rc;
+	bool ok, again, api_error;
+	long status;
+	int rc, retries;
 
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	in0 = ctx->usage_input;
@@ -2171,6 +2540,7 @@ static void sdk_turn(struct sdk_server *srv, const char *text)
 	free(srv->result_text);
 	srv->result_text = NULL;
 	srv->denials = fy_seq_empty;
+	ctx->structured_output = fy_invalid;
 	memset(&w, 0, sizeof(w));
 
 	ok = false;
@@ -2198,13 +2568,30 @@ static void sdk_turn(struct sdk_server *srv, const char *text)
 			prompt = fy_sprintfa("%s\n\n%s", text, w.context);
 		sdk_wait_free(&w);
 	}
+	if (!in->composed)
+		prompt = sdk_mentions(srv, prompt);
 	rc = sdk_add_user(srv, prompt);
 	if (rc)		/* sdk_add_user() says why */
 		goto done;
 
-	for (again = false; ; again = true) {
+	for (again = false, retries = 0; ; ) {
 		cause = sdk_run(srv, &ok);
-		if (!ok || !sdk_has_hooks(srv, "Stop"))
+		if (!ok)
+			break;
+		if (fy_is_mapping(ctx->output_schema) &&
+		    !fy_is_valid(ctx->structured_output) &&
+		    retries < SDK_OUTPUT_RETRIES) {
+			retries++;
+			rc = sdk_add_user(srv, "Give the answer now: call the "
+					  "structured_output tool with the "
+					  "answer as its arguments.");
+			if (rc) {	/* sdk_add_user() says why */
+				ok = false;
+				break;
+			}
+			continue;
+		}
+		if (!sdk_has_hooks(srv, "Stop"))
 			break;
 		input = fy_assoc(gb, sdk_hook_input(srv, "Stop"),
 				 "stop_hook_active", (_Bool)again,
@@ -2222,17 +2609,44 @@ static void sdk_turn(struct sdk_server *srv, const char *text)
 			ok = false;
 			break;
 		}
+		again = true;
 	}
 
 done:
 	sdk_wait_free(&w);
+	/* A turn that asked for structured output ends with it. */
+	if (ok && fy_is_mapping(ctx->output_schema) &&
+	    !fy_is_valid(ctx->structured_output)) {
+		ok = false;
+		cause = strdup("the model gave no structured output");
+		subtype = "error_max_structured_output_retries";
+	}
+	/*
+	 * A failed provider request ends a loop that itself completed: the
+	 * result has subtype success, the reason in its text, and no errors.
+	 */
+	api_error = !ok && !subtype &&
+		    ctx->turn_stop == FYAI_TURN_STOP_REQUEST;
+	if (api_error) {
+		free(cause);
+		cause = fyai_diag_string(&cfg->diag);
+		subtype = "success";
+	}
 	if (!ok && !cause)
 		cause = fyai_diag_string(&cfg->diag);
+	if (!ok && !subtype)
+		subtype = ctx->turn_stop == FYAI_TURN_STOP_LIMIT ?
+				"error_max_turns" :
+			  ctx->turn_stop == FYAI_TURN_STOP_COST ?
+				"error_max_budget_usd" :
+				"error_during_execution";
+	reason = ok ? "completed" : api_error ? "api_error" :
+		 ctx->turn_stop == FYAI_TURN_STOP_LIMIT ? "max_turns" : NULL;
 	ms = sdk_elapsed_ms(&start);
 	gb = fyai_ctx_transient_gb(ctx);
 	frame = fy_mapping(gb,
 		"type", "result",
-		"subtype", ok ? "success" : "error_during_execution",
+		"subtype", ok ? "success" : subtype,
 		"is_error", (_Bool)!ok,
 		"duration_ms", ms,
 		"duration_api_ms", ms,
@@ -2249,9 +2663,23 @@ done:
 		"permission_denials", fy_is_valid(srv->denials) ?
 			srv->denials : fy_seq_empty,
 		"uuid", sdk_new_uuid(srv));
-	if (!ok)
+	if (reason)
+		frame = fy_assoc(gb, frame, "terminal_reason", reason);
+	status = fyai_xfer_last_status(ctx);
+	if (api_error && status >= 400)
+		frame = fy_assoc(gb, frame, "api_error_status", status);
+	if (api_error)
+		frame = fy_assoc(gb, frame, "errors", fy_seq_empty);
+	else if (!ok)
 		frame = fy_assoc(gb, frame, "errors", fy_sequence(gb,
 			cause && *cause ? cause : "the turn did not complete"));
+	if (ok && fy_is_valid(ctx->structured_output))
+		frame = fy_assoc(gb, frame, "structured_output",
+				 ctx->structured_output);
+	/* The origin of the prompt marks the result that answers it. */
+	if (in->origin_json)
+		frame = fy_assoc(gb, frame, "origin",
+				 parse_json_string(gb, in->origin_json));
 	sdk_send(srv, frame);
 	srv->last_error = !ok;
 	free(cause);
@@ -2260,39 +2688,127 @@ done:
 }
 
 /*
- * Append @append to the system prompt of a session that has no exchange. The
- * setup made that prompt, from the configuration, before this runs.
+ * Start the conversation of a session that has no exchange with the system
+ * prompt of the configuration and the text of --append-system-prompt.
  */
-static int sdk_system_append(struct sdk_server *srv, const char *append)
+static int sdk_system_seed(struct sdk_server *srv)
 {
 	struct fyai_ctx *ctx = srv->ctx;
-	struct fy_generic_builder *gb;
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	const char *text = ctx->cfg->system_prompt;
 	fy_generic turn;
-	const char *text;
+
+	if (srv->append && *srv->append)
+		text = fy_sprintfa("%s\n\n%s", text, srv->append);
+	turn = fyai_turn_append(ctx, fy_invalid,
+		fy_sequence(gb, fyai_make_system_message(ctx, text)));
+	turn = fyai_output_record(ctx, turn, FYAI_OUTPUT_SYSTEM, text);
+	ctx->last_message = fy_gb_internalize(ctx->gb, turn);
+	fyai_error_check(ctx, fy_is_valid(ctx->last_message), err,
+			 "claude-sdk: cannot keep the system prompt");
+	return 0;
+err:
+	return -1;
+}
+
+/*
+ * Append --append-system-prompt to the system prompt of a session that has
+ * no exchange. The setup made that prompt, from the configuration, before
+ * this runs.
+ */
+static int sdk_system_append(struct sdk_server *srv)
+{
+	struct fyai_ctx *ctx = srv->ctx;
 	int rc;
 
-	if (!append || !*append)
+	if (!srv->append || !*srv->append)
 		return 0;
 	if (!ctx->session_unstored) {
 		fyai_warning(ctx, "claude-sdk: a resumed session keeps its "
 			     "system prompt");
 		return 0;
 	}
-	text = fy_sprintfa("%s\n\n%s", ctx->cfg->system_prompt, append);
 	rc = fyai_setup_transient_builder(ctx);
 	fyai_error_check(ctx, !rc, err,
 			 "claude-sdk: cannot prepare the system prompt");
-	gb = fyai_ctx_transient_gb(ctx);
-	turn = fyai_turn_append(ctx, fy_invalid,
-		fy_sequence(gb, fyai_make_system_message(ctx, text)));
-	turn = fyai_output_record(ctx, turn, FYAI_OUTPUT_SYSTEM, text);
-	ctx->last_message = fy_gb_internalize(ctx->gb, turn);
+	rc = sdk_system_seed(srv);
 	fyai_cleanup_transient_builder(ctx);
-	fyai_error_check(ctx, fy_is_valid(ctx->last_message), err,
-			 "claude-sdk: cannot keep the system prompt");
-	return 0;
+	return rc;
 err:
 	return -1;
+}
+
+/*
+ * /clear starts a new session, as in Claude Code: the conversation_reset
+ * frame names the session that ends, and the result the one that starts.
+ */
+static void sdk_clear(struct sdk_server *srv)
+{
+	struct fyai_ctx *ctx = srv->ctx;
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	const char *name;
+	char *old, *sid;
+	int rc;
+
+	sid = strdup(sdk_new_uuid(srv));
+	fyai_error_check(ctx, sid && *sid, err,
+			 "claude-sdk: cannot name a new session");
+	name = fy_sprintfa("%s%s", SDK_BRANCH_PREFIX, sid);
+	rc = fyai_ctx_set_branch(ctx, name);
+	fyai_error_check(ctx, !rc, err,
+			 "claude-sdk: cannot select the new session");
+	/* The configuration goes with it; the conversation does not. */
+	free(ctx->session_unstored);
+	ctx->session_unstored = strdup(name);
+	fyai_error_check(ctx, ctx->session_unstored, err,
+			 "claude-sdk: cannot keep the new session name");
+	ctx->branch_desc = fy_invalid;
+	ctx->branch_agent = fy_invalid;
+	ctx->branch_prev = fy_invalid;
+	old = srv->session_id;
+	srv->session_id = sid;
+	sid = NULL;
+	rc = sdk_system_seed(srv);
+	sdk_send(srv, fy_mapping(gb,
+		"type", "conversation_reset",
+		"new_conversation_id", srv->session_id,
+		"uuid", sdk_new_uuid(srv),
+		"session_id", old));
+	free(old);
+	sdk_send(srv, fy_mapping(gb,
+		"type", "result",
+		"subtype", rc ? "error_during_execution" : "success",
+		"is_error", (_Bool)!!rc,
+		"duration_ms", 0LL,
+		"duration_api_ms", 0LL,
+		"num_turns", 0LL,
+		"result", "",
+		"stop_reason", fy_null,
+		"session_id", srv->session_id,
+		"total_cost_usd", 0.0,
+		"usage", sdk_usage(gb, 0, 0, 0, 0),
+		"permission_denials", fy_seq_empty,
+		"uuid", sdk_new_uuid(srv)));
+	srv->last_error = !!rc;
+	fyai_diag_drain(&ctx->cfg->diag);
+	fyai_cleanup_transient_builder(ctx);
+	return;
+err:
+	free(sid);
+	srv->failed = true;
+	fyai_cleanup_transient_builder(ctx);
+}
+
+/* True for a prompt that is the command /clear. */
+static bool sdk_is_clear(const char *text)
+{
+	while (*text == ' ' || *text == '\t' || *text == '\n')
+		text++;
+	if (strncmp(text, "/clear", 6))
+		return false;
+	for (text += 6; *text == ' ' || *text == '\t' || *text == '\n'; )
+		text++;
+	return !*text;
 }
 
 int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
@@ -2306,6 +2822,7 @@ int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
 	struct sdk_tunnel *t;
 	const char *branch, *mode, *text;
 	fy_generic allowed, names, tool;
+	double budget;
 	bool found;
 	int rc = -1;
 
@@ -2314,13 +2831,16 @@ int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
 	srv.ctx = ctx;
 	srv.tail = &srv.head;
 	srv.denials = fy_seq_empty;
+	srv.agents = fy_seq_empty;
 	fyai_error_check(ctx, el, out, "claude-sdk: no event loop");
 
 	branch = fyai_ctx_branch(ctx);
 	found = !strncmp(branch, SDK_BRANCH_PREFIX, strlen(SDK_BRANCH_PREFIX));
 	fyai_error_check(ctx, found, out,
 			 "claude-sdk: branch '%s' is not a session", branch);
-	srv.session_id = branch + strlen(SDK_BRANCH_PREFIX);
+	srv.session_id = strdup(branch + strlen(SDK_BRANCH_PREFIX));
+	fyai_error_check(ctx, srv.session_id, out,
+			 "claude-sdk: cannot keep the session ID");
 	mode = fyai_cmd_arg_str(call, "permission_mode");
 	srv.permission_mode = mode ? mode : "default";
 	/* A change of the configuration during the session keeps them. */
@@ -2343,8 +2863,8 @@ int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
 	rc = text ? sdk_rules_parse(text, &srv.deny) : 0;
 	fyai_error_check(ctx, !rc, out, "claude-sdk: cannot keep the rules");
 
-	rc = sdk_system_append(&srv,
-			       fyai_cmd_arg_str(call, "append_system_prompt"));
+	srv.append = fyai_cmd_arg_str(call, "append_system_prompt");
+	rc = sdk_system_append(&srv);
 	if (rc)		/* sdk_system_append() says why */
 		goto out;
 
@@ -2358,6 +2878,8 @@ int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
 			 "claude-sdk: cannot read standard input");
 	ctx->turn_observe = sdk_observe;
 	ctx->turn_observe_data = &srv;
+	ctx->agent_observe = sdk_agent_observe;
+	ctx->agent_observe_data = &srv;
 
 	/* The servers of the SDK answer through the connection, which reads. */
 	text = fyai_cmd_arg_str(call, "mcp_config");
@@ -2391,14 +2913,42 @@ int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
 				 "claude-sdk: cannot limit the tools");
 	}
 
+	/* The structured_output tool takes the schema of the answer. */
+	text = fyai_cmd_arg_str(call, "json_schema");
+	if (text) {
+		ctx->output_schema = parse_json_string(ctx->cfg->gb, text);
+		rc = fyai_setup_transient_builder(ctx);
+		if (!rc) {
+			ctx->tools_spec = fy_invalid;
+			rc = fyai_request_state_apply(ctx);
+		}
+		fyai_cleanup_transient_builder(ctx);
+		fyai_error_check(ctx, !rc && fy_is_mapping(ctx->output_schema),
+				 out, "claude-sdk: cannot ask for the structured "
+				 "output");
+	}
+	/* The budget is of the whole invocation, as of a query of the SDK. */
+	budget = fy_get(call->args, "max_budget_usd", 0.0);
+	if (budget > 0)
+		ctx->turn_cost_limit = ctx->usage_cost + budget;
+	if (fyai_cmd_arg_bool(call, "include_partial_messages")) {
+		srv.partial = true;
+		ctx->text_observe = sdk_text;
+		ctx->text_observe_data = &srv;
+	}
+
 	while (!srv.failed) {
 		if (srv.head) {
 			in = srv.head;
 			srv.head = in->next;
 			if (!srv.head)
 				srv.tail = &srv.head;
-			sdk_turn(&srv, in->text);
+			if (sdk_is_clear(in->text))
+				sdk_clear(&srv);
+			else
+				sdk_turn(&srv, in);
 			free(in->text);
+			free(in->origin_json);
 			free(in);
 			continue;
 		}
@@ -2419,6 +2969,11 @@ out:
 done:
 	ctx->turn_observe = NULL;
 	ctx->turn_observe_data = NULL;
+	ctx->agent_observe = NULL;
+	ctx->agent_observe_data = NULL;
+	ctx->text_observe = NULL;
+	ctx->text_observe_data = NULL;
+	ctx->turn_cost_limit = 0;
 	ctx->tool_gate = NULL;
 	ctx->tool_gate_data = NULL;
 	/* The servers of the SDK reach it through this frame: stop them first. */
@@ -2429,12 +2984,14 @@ done:
 	while ((in = srv.head)) {
 		srv.head = in->next;
 		free(in->text);
+		free(in->origin_json);
 		free(in);
 	}
 	while ((p = srv.pending)) {
 		srv.pending = p->next;
 		sdk_pending_free(p);
 	}
+	free(srv.session_id);
 	while ((d = srv.decisions)) {
 		srv.decisions = d->next;
 		sdk_decision_free(d);
