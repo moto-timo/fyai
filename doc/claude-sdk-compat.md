@@ -263,6 +263,29 @@ fyai answers these control requests of the SDK:
 
 It answers each other control request with an error.
 
+## Compatibility suite
+
+The target `claude-agent-sdk-testsuite` runs the end-to-end suite of the
+SDK for Python, at a pinned revision, with fyai as its CLI:
+
+```sh
+export ANTHROPIC_API_KEY=...
+ninja -C build claude-agent-sdk-testsuite
+```
+
+The suite calls a real model and costs money. Each session runs on
+`FYAI_SDK_MODEL`, by default `anthropic/claude-haiku-5.5`, with the key in
+the variable that `FYAI_SDK_KEY_ENV` names, by default `ANTHROPIC_API_KEY`:
+the suite names Anthropic models, and a wrapper replaces them. A name that
+is not a Claude model goes through, so a test of a bad model fails. Give more
+pytest arguments in `FYAI_SDK_PYTEST`, for example `-k hooks`. It needs git
+and uv, and writes a JUnit report to `claude-sdk-e2e.xml` in the build
+directory.
+
+A test of a feature that fyai does not support fails: plugins, session
+stores, the files of Claude Code (transcripts, settings and agents), and
+extended thinking.
+
 ## Standard input and output
 
 Standard output carries only the JSON lines of the protocol. Diagnostics go
