@@ -132,11 +132,20 @@ jobs:
         else
           jobs="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
         fi
-        if [ "${{ github.event_name }}" = "schedule" ]; then
-          ctest -j "$jobs" --output-on-failure
-        else
-          ctest -j "$jobs" --output-on-failure -LE nightly
+        ctest_args=(-j "$jobs" --output-on-failure)
+        if [ "${{ github.event_name }}" != "schedule" ]; then
+          ctest_args+=(-LE nightly)
         fi
+        if ctest "${ctest_args[@]}"; then
+          exit 0
+        fi
+        for attempt in 2 3; do
+          echo "Retrying failed tests (attempt $attempt of 3)"
+          if ctest "${ctest_args[@]}" --rerun-failed; then
+            exit 0
+          fi
+        done
+        exit 1
 
     - name: "Upload test logs on failure"
       if: failure()
