@@ -61,8 +61,21 @@ pass its environment variable through the `env` option of the SDK.
 Each SDK session is a branch `sdk/ID`, where ID is the `session_id` that the
 SDK reports. The session is stored when its first exchange is stored. The
 `resume` option continues the session, and `session_id` names a new
-session. Use `fyai branch list` and `fyai -b sdk/ID history` to examine a
-session.
+session. `continue_conversation` continues the session of the working
+directory that changed last, else starts a new one. `fork_session` with
+`resume` starts a new session from the conversation and configuration of
+the resumed one, which does not change. Use `fyai branch list` and
+`fyai -b sdk/ID history` to examine a session.
+
+A prompt that names a file as `@PATH` carries the content of the file, as
+in Claude Code: fyai adds the call of `Read` and its result to the text of
+the prompt, after the `UserPromptSubmit` hooks. PATH is absolute, relative
+to the working directory, or starts with `~/`. A message that the SDK
+marks `client_composed`, as `verbatim_prompts` does, goes as written.
+
+A prompt that is `/clear` starts a new session with the configuration of
+the session and no conversation, as in Claude Code. A `conversation_reset`
+message names the session that ends, and a `result` gives the new one.
 
 ## Messages
 
@@ -74,20 +87,36 @@ fyai sends the messages that the SDK parses:
   `tool_use`;
 - `user` with the `tool_result` blocks of each tool call; and
 - `result` at the end of each turn, with the text of the last answer, the
-  number of model responses, the token usage, and the cost.
+  number of model responses, the token usage, the cost, and the `origin`
+  that the SDK stamped on the user message; and
+- with `include_partial_messages`, `stream_event` with the text of each
+  response as it arrives: `message_start`, `content_block_start`,
+  `content_block_delta` with a `text_delta` for each chunk,
+  `content_block_stop`, `message_delta` and `message_stop`. The text of a
+  response streams; its tool calls come in its `assistant` message.
 
 The SDK sees three tools under the names and inputs of Claude Code: the
 shell tool as `Bash` with `command` and `timeout`, `read_file` as `Read` with
 `file_path`, `offset` and `limit`, and `write_file` as `Write` with
-`file_path` and `content`. These names appear in `tool_use` blocks, in the
-tools of `init`, in permission requests and in hook inputs. An input that
-the SDK changes goes back to the fyai arguments of the call. Each other
-tool keeps its fyai name and arguments.
+`file_path` and `content`. The sub-agent tool is `Task`, with
+`description`, `prompt` and `subagent_type`, and the tool of structured
+output is `StructuredOutput`. These names appear in `tool_use` blocks, in
+the tools of `init`, in permission requests and in hook inputs. An input
+that the SDK changes goes back to the fyai arguments of the call. Each
+other tool keeps its fyai name and arguments.
 
 A turn that fails or is interrupted ends with a `result` that has `is_error`
-set and the subtype `error_during_execution`. The process exits with status 1
-after such a result, when the SDK closes standard input. The `result` lists
-the tool calls that were denied in `permission_denials`.
+set. Its subtype says why: `error_max_turns` for the limit of `max_turns`,
+`error_max_budget_usd` for the limit of `max_budget_usd`,
+`error_max_structured_output_retries` for a turn that ended without the
+structured output that it was asked for, and `error_during_execution` for
+each other cause. A failed provider request is the exception, as in Claude
+Code: the subtype is `success`, `terminal_reason` is `api_error`,
+`api_error_status` gives the HTTP status, and the text gives the reason. The
+process exits with status 1 after such a result, when the SDK closes
+standard input. The `result` lists the tool calls that were denied in
+`permission_denials`. A turn that succeeds has the `terminal_reason`
+`completed`, and a turn at the limit of `max_turns` has `max_turns`.
 
 ## Options
 
@@ -97,6 +126,11 @@ the tool calls that were denied in `permission_denials`.
 | `system_prompt` (preset with `append`) | Appends the text to the system prompt of a new session. |
 | `model` | Selects the model of the session. |
 | `max_turns` | Sets `max_tool_iterations` for the session. |
+| `max_budget_usd` | Stops a turn before its next model request once the cost of the process reaches the budget. The cost is the cost that the provider reports, else the estimate from the prices of the catalogue; a model with no price costs nothing. |
+| `output_format` | Asks for structured output. See [Structured output](#structured-output). |
+| `include_partial_messages` | Sends `stream_event` messages. |
+| `agents` | Personas of the `agent` tool, with their description, prompt and model. See [Agents](#agents). |
+| `continue_conversation`, `fork_session` | See [Sessions](#sessions). |
 | `tools` | Limits the built-in tools. Claude Code names map to fyai tools: `Bash` to the shell tools, `Read` to `read_file`, `Write` to `write_file`, `Edit` to `apply_patch`, `Task` to `agent`, `TodoWrite` to `todo_write`. A fyai tool name names the tool itself. An empty list turns tools off. MCP tools stay. |
 | `disallowed_tools` | Removes the tools that it names, MCP tools included. A rule with parentheses denies the calls that it covers. |
 | `allowed_tools` | Rules of the calls that run without a permission request. |
@@ -108,13 +142,40 @@ the tool calls that were denied in `permission_denials`.
 | `cwd`, `env` | Apply to the fyai process, as to any CLI. |
 
 These options stop the session with an error, because they change what the
-session does and fyai does not support them yet: `agents`,
-`continue_conversation`, `fork_session`, `max_budget_usd`, `output_format`,
-`plugins`, and the permission mode `plan`.
+session does and fyai does not support them yet: `plugins`, `session_store`,
+`resume_session_at`, an agent that limits its `tools`, and the permission
+mode `plan`.
 
 fyai ignores the options that change only what the SDK receives or that have
-no meaning in fyai: `include_partial_messages`, `thinking`, `effort`,
-`setting_sources`, `settings`, `add_dirs`, and `betas`.
+no meaning in fyai: `thinking`, `effort`, `setting_sources`, `settings`,
+`add_dirs`, and `betas`.
+
+## Structured output
+
+With `output_format` of type `json_schema`, the model gets the tool
+`StructuredOutput`, whose parameters are the schema. A call whose arguments
+match the schema is the answer: the `result` gives it as
+`structured_output`, and the turn ends without a further model request. A
+call that does not match gets the problems as its result, and the model
+can correct it. A model that answers in prose instead is reminded to call
+the tool, up to three times.
+
+## Agents
+
+Each agent of `agents` is a persona of the `agent` tool for the session: its
+`description` is what the model chooses by, its `prompt` is its system
+prompt, `tools` limits the tools that it is offered and can call, and its
+`model` selects its model. The model aliases of Claude Code, `inherit`,
+`sonnet`, `opus` and `haiku`, name no model of fyai: the agent then takes the
+model of the session. The personas are not stored.
+
+A sub-agent asks the session about each of its tool calls: the rules, the
+permission mode, the hooks and `can_use_tool` decide on them as on a call of
+the session, and a denial is in `permission_denials` of the result. Its
+`tool_use` and `tool_result` blocks come in `assistant` and `user` messages
+whose `parent_tool_use_id` is the `Task` call that started it. Its text
+comes too when `initialize` gives `forwardSubagentText`. A sub-agent of a
+sub-agent asks the session too, but its messages do not come.
 
 ## Permissions
 
@@ -137,8 +198,8 @@ It stops at the first step that decides:
 9. Without `can_use_tool`, the call is denied, as in Claude Code.
 
 Thus a call of `Bash`, of `Task`, or of an MCP tool runs only when a rule,
-the permission mode, a hook, or `can_use_tool` allows it. A sub-agent of an
-allowed `Task` call runs its own calls without a question.
+the permission mode, a hook, or `can_use_tool` allows it. The calls of a
+sub-agent go through the same steps.
 
 The provider runs web search, and no one can be asked about a search. Thus
 web search is on only when the session starts with the mode
@@ -195,8 +256,10 @@ fyai answers these control requests of the SDK:
 - `set_model`, which changes the model for the process, as in Claude Code,
   from the next turn: nothing stores it. A model that fyai cannot use leaves
   the session as it was, and no model returns to the model that the session
-  started with; and
-- `mcp_status`.
+  started with;
+- `mcp_status`; and
+- `get_context_usage`, with the tokens of the last model request and the
+  context window of the model from the catalogue.
 
 It answers each other control request with an error.
 
