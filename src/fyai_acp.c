@@ -1069,7 +1069,7 @@ out:
 int fyai_cmd_acp_prepare(struct fyai_cfg *cfg, fy_generic args)
 {
 	cfg->interactive = false;
-	cfg->acp_mode = true;
+	cfg->protocol_stdout = true;
 	cfg->acp_worker = fy_get(args, "worker", false);
 	return 0;
 }

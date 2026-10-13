@@ -445,7 +445,8 @@ struct fyai_cfg {
 	/* Serve the agent protocol on standard input and output. */
 	bool agent_rpc;
 	bool acp_worker;
-	bool acp_mode;
+	/* Standard output carries protocol frames only. */
+	bool protocol_stdout;
 	/* An executed tool child: serve the tool channel on fds 3 and 4. */
 	bool tool_exec;
 	/* MCP (Model Context Protocol) server settings. */
