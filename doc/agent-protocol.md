@@ -69,6 +69,18 @@ also receives the already-reserved `branch` name. The result contains:
 `tool/progress` is a notification with a `text` chunk emitted while the tool
 runs.
 
+A parent that has a tool gate, such as the Claude Agent SDK front end, sets
+`gate: true` in the `tool/run` of a delegated agent. The agent then sends a
+`tool/gate` request for each of its tool calls: `{phase: before, call}`
+before the call runs, and `{phase: after, call, result, ok}` after it. The
+parent puts the call before its own gate and responds with `{allow, args,
+message, stop}` or `{context, stop}`. An agent that cannot ask its parent
+does not run the call. A grandchild asks its parent, which asks its own.
+
+A parent that observes the steps of its agents sets `steps: true`. The agent
+then sends a `turn/step` notification with `{messages, usage, model}` for
+each step that it appends to its turn.
+
 The child services `tool/run` after the current JSON-RPC dispatch. This rule
 prevents a nested event-loop dispatch.
 

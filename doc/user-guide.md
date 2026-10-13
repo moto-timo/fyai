@@ -889,7 +889,8 @@ create an agent branch. It also has an `--rpc` mode for the transient standalone
 agent control protocol.
 
 For model-delegated calls, configured personas may select a system prompt,
-model, reasoning policy, or context behaviour subject to the fork rule above.
+model, reasoning policy, tools, or context behaviour subject to the fork rule
+above. A persona that gives `tools` offers its agent only those tools.
 Independent sub-agent calls in one assistant message may execute concurrently.
 A model-delegated sub-agent can delegate again. `agent/max_live_agents`
 limits the complete invocation to 16 live agents by default. The existing

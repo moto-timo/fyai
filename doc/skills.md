@@ -70,7 +70,7 @@ effect.
 | `context` | `fork` runs the skill as a sub-agent. `inline` is the default. |
 | `agent` | The persona (`agent/personas`) of a forked skill. |
 | `model` | The model of a forked skill, resolved through the catalogue. |
-| `allowed-tools` | The tools of a forked skill. |
+| `allowed-tools` | The tools of a forked skill. They replace the `tools` of its persona. |
 | `isolated` | fyai: a forked skill runs on a private project view. |
 | `background` | fyai: a forked skill starts without holding the turn. |
 | `timeout` | fyai: the time limit of a forked skill, in milliseconds. |
