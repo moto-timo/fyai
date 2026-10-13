@@ -3446,11 +3446,11 @@ commands:
           description: the available tools, as Claude Code names separated by commas; empty for none, default for all
         allowed_tools:
           type: string
-          description: tools that run without a permission request; fyai asks for none
+          description: rules of the tool calls that run without a permission request
           x-fyai-long: allowedTools
         disallowed_tools:
           type: string
-          description: tools to remove, as Claude Code names separated by commas
+          description: tools to remove and rules of the tool calls to deny
           x-fyai-long: disallowedTools
         max_turns:
           type: integer
@@ -3467,10 +3467,10 @@ commands:
           description: not supported; ignored
         permission_mode:
           type: string
-          description: the permission mode; fyai runs tools in its sandbox and asks for no permission
+          description: the permission mode, as the SDK names it
         permission_prompt_tool:
           type: string
-          description: not supported
+          description: stdio asks the SDK before a tool call that no rule allows
         continue:
           type: boolean
           description: not supported
@@ -3510,10 +3510,10 @@ commands:
           x-fyai-repeat: true
         mcp_config:
           type: string
-          description: not supported
+          description: MCP servers of the session, as JSON or the path of a JSON file
         strict_mcp_config:
           type: boolean
-          description: accepted; fyai uses only the MCP servers of its configuration
+          description: use only the MCP servers of --mcp-config
         include_partial_messages:
           type: boolean
           description: not supported; ignored
