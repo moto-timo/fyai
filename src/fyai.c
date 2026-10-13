@@ -1394,6 +1394,14 @@ fyai_turn_run_transition_valid(enum fyai_turn_run_state from,
 	return false;
 }
 
+static void fyai_turn_run_observe(struct fyai_turn_run *run)
+{
+	struct fyai_ctx *ctx = run->ctx;
+
+	if (ctx->turn_observe)
+		ctx->turn_observe(ctx, run->turn, ctx->turn_observe_data);
+}
+
 static int
 fyai_turn_run_transition(struct fyai_turn_run *run,
 			 enum fyai_turn_run_state state)
@@ -1757,6 +1765,7 @@ static int fyai_turn_run_collect_tools(struct fyai_turn_run *run)
 						 result, ok, false);
 		fyai_error_check(ctx, fy_is_valid(run->turn), err,
 				 "could not append tool job result");
+		fyai_turn_run_observe(run);
 		/* Present the completed exchange before opening the next band. */
 		fyai_ui_drain_output(ctx);
 	}
@@ -1827,6 +1836,7 @@ fyai_turn_run_append_response(struct fyai_turn_run *run, fy_generic response)
 		fyai_error_check(ctx, fy_is_valid(run->turn), err,
 				 "could not retain response id");
 	}
+	fyai_turn_run_observe(run);
 	return 0;
 
 err:

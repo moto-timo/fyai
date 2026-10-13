@@ -5308,6 +5308,8 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	ctx->config_edit = NULL;
 	ctx->mcp = NULL;			/* its connections to the servers */
 	ctx->mcp_tools = fy_invalid;
+	ctx->turn_observe = NULL;		/* a stream to the parent's peer */
+	ctx->turn_observe_data = NULL;
 	/*
 	 * What the parent spent is the accounting of its run, and the extents
 	 * of its last call point into storage this child does not use.

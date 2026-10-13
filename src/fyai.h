@@ -795,6 +795,13 @@ struct fyai_ctx {
 	/* ACP worker notifications share the active turn's event loop. */
 	struct jsonrpc_conn *acp_rpc;
 	const char *acp_agent_message_id;
+	/*
+	 * Called with each turn that a running turn appends: a model response
+	 * and each tool result. The turn is valid during the call. A protocol
+	 * front end streams the conversation from it.
+	 */
+	void (*turn_observe)(struct fyai_ctx *ctx, fy_generic turn, void *data);
+	void *turn_observe_data;
 	/* Set inside a forked tool sub-execution once the environment has been
 	 * sanitized and the sandbox applied, so inner steps (the shell tool's
 	 * own fork) do not re-derive and re-apply the confinement. */
