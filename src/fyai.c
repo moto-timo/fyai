@@ -2138,6 +2138,7 @@ fyai_turn_run_append_response(struct fyai_turn_run *run, fy_generic response)
 		text = fy_castp(&out_text, "");
 		(void)fyai_output_append_string(ctx, text);
 		fyai_acp_worker_text(ctx, text, strlen(text));
+		fyai_text_observe(ctx, text, strlen(text));
 		fyai_tool_progress_emit(ctx, text, strlen(text));
 	}
 	run->turn = fyai_append_assistant_response(ctx, run->turn, response);

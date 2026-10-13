@@ -265,6 +265,7 @@ static void stream_write_content(struct stream_response *stream,
 	if (fyai_output_append(ctx, text, len))
 		stream->failed = true;
 	fyai_acp_worker_text(ctx, text, len);
+	fyai_text_observe(ctx, text, len);
 	/* Send sub-agent prose to the parent tool band through JSON-RPC. */
 	fyai_tool_progress_emit(ctx, text, len);
 	stream->content_bytes += len;

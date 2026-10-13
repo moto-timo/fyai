@@ -825,6 +825,10 @@ struct fyai_ctx {
 	 */
 	void (*turn_observe)(struct fyai_ctx *ctx, fy_generic turn, void *data);
 	void *turn_observe_data;
+	/* Called with each chunk of answer text as it arrives. */
+	void (*text_observe)(struct fyai_ctx *ctx, const char *text, size_t len,
+			     void *data);
+	void *text_observe_data;
 	/*
 	 * Why the last turn stopped short. A turn sets it; a caller that reports
 	 * it clears it before the turn.
@@ -899,6 +903,14 @@ struct fyai_ctx {
 	bool response_chain_linked;
 	bool response_chain_miss;
 };
+
+/* Give a chunk of answer text to the observer of the context. */
+static inline void fyai_text_observe(struct fyai_ctx *ctx, const char *text,
+				     size_t len)
+{
+	if (ctx->text_observe && len)
+		ctx->text_observe(ctx, text, len, ctx->text_observe_data);
+}
 
 static inline bool fyai_interrupt_pending(const struct fyai_ctx *ctx)
 {

@@ -5340,6 +5340,8 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	ctx->mcp_tools = fy_invalid;
 	ctx->turn_observe = NULL;		/* a stream to the parent's peer */
 	ctx->turn_observe_data = NULL;
+	ctx->text_observe = NULL;
+	ctx->text_observe_data = NULL;
 	ctx->tool_gate = NULL;			/* and the policy of its calls */
 	ctx->tool_gate_data = NULL;
 	ctx->tool_gate_run = NULL;
