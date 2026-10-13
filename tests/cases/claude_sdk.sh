@@ -92,11 +92,11 @@ frames = until_result(proc)
 init = frames[0]
 assert init["type"] == "system" and init["subtype"] == "init", init
 sid = init["session_id"]
-assert "read_file" in init["tools"] and "ask_user" not in init["tools"], init
+assert "Read" in init["tools"] and "ask_user" not in init["tools"], init
 uses = [b for f in frames if f["type"] == "assistant"
         for b in f["message"]["content"] if b["type"] == "tool_use"]
 assert uses == [{"type": "tool_use", "id": "call_sdk_read",
-                 "name": "read_file", "input": {"path": "notes.txt"}}], uses
+                 "name": "Read", "input": {"file_path": "notes.txt"}}], uses
 results = [b for f in frames if f["type"] == "user"
            for b in f["message"]["content"]]
 assert len(results) == 1 and results[0]["type"] == "tool_result", results
@@ -125,20 +125,24 @@ finish(proc, 0)
 proc = start()
 send(proc, {"type": "control_request", "request_id": "req_h",
             "request": {"subtype": "initialize", "hooks": {
-                "PreToolUse": [{"matcher": None,
+                "PreToolUse": [{"matcher": "(",
                                 "hookCallbackIds": ["hook_0"]}]}}})
 reply = recv(proc)
 assert reply["response"]["subtype"] == "error", reply
-assert "hooks" in reply["response"]["error"], reply
-send(proc, {"type": "control_request", "request_id": "req_m",
-            "request": {"subtype": "set_model", "model": "other"}})
+assert "regular expression" in reply["response"]["error"], reply
+send(proc, {"type": "control_request", "request_id": "req_x",
+            "request": {"subtype": "rewind_files"}})
 reply = recv(proc)
 assert reply["response"]["subtype"] == "error", reply
 finish(proc, 0)
 
-proc = start(["--permission-prompt-tool", "stdio"])
+proc = start(["--permission-prompt-tool", "mcp__perm__ask"])
 err = finish(proc, 1)
-assert "--permission-prompt-tool is not supported" in err, err
+assert "the permission prompt tool 'mcp__perm__ask' is not supported" in err, err
+
+proc = start(["--fork-session"])
+err = finish(proc, 1)
+assert "--fork-session is not supported" in err, err
 
 proc = start(["--resume=no-such-session"])
 err = finish(proc, 1)

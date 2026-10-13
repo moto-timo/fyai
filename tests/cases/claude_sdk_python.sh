@@ -38,8 +38,8 @@ async def main():
         if isinstance(message, AssistantMessage):
             for block in message.content:
                 if isinstance(block, ToolUseBlock):
-                    assert block.name == "read_file", block
-                    assert block.input == {"path": "notes.txt"}, block
+                    assert block.name == "Read", block
+                    assert block.input == {"file_path": "notes.txt"}, block
         if isinstance(message, ResultMessage):
             result = message
     assert kinds == ["SystemMessage", "AssistantMessage", "UserMessage",
@@ -60,4 +60,74 @@ PYEOF
 
 mock_stop 3
 assert_request 0 'r["body"]["messages"][0]["content"].startswith("Answer briefly.")'
+
+mock_start claude_sdk_control.json
+"$FYAI_BIN" --set "api_url=$MOCK_URL/v1/chat/completions" >/dev/null 2>&1 ||
+	fail "point the project at the second mock"
+
+"$PYTHON" - "$FYAI_BIN" "$TEST_DIR" <<'PYEOF' || fail "Python SDK control"
+import os
+import sys
+from typing import Any
+
+import anyio
+from claude_agent_sdk import (ClaudeAgentOptions, ClaudeSDKClient, HookMatcher,
+                              PermissionResultAllow, ResultMessage,
+                              create_sdk_mcp_server, tool)
+
+binary, cwd = sys.argv[1], sys.argv[2]
+log = []
+
+@tool("add", "Add two numbers", {"a": int, "b": int})
+async def add(args: dict[str, Any]) -> dict[str, Any]:
+    log.append("add")
+    return {"content": [{"type": "text", "text": str(args["a"] + args["b"])}]}
+
+async def can_use_tool(name, tool_input, context):
+    log.append(("ask", name, tool_input["command"]))
+    return PermissionResultAllow(updated_input={"command": "echo changed > b.txt"})
+
+async def prompt_hook(hook_input, tool_use_id, context):
+    return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                   "additionalContext": "prompt-ctx"}}
+
+async def post_hook(hook_input, tool_use_id, context):
+    log.append(("post", hook_input["tool_name"]))
+    return {"hookSpecificOutput": {"hookEventName": "PostToolUse",
+                                   "additionalContext": "after-bash"}}
+
+async def stop_hook(hook_input, tool_use_id, context):
+    if hook_input["stop_hook_active"]:
+        return {}
+    return {"decision": "block", "reason": "keep going"}
+
+async def main():
+    server = create_sdk_mcp_server(name="calc", version="1.0", tools=[add])
+    options = ClaudeAgentOptions(
+        cli_path=binary, cwd=cwd, can_use_tool=can_use_tool,
+        mcp_servers={"calc": server},
+        allowed_tools=["mcp__calc__add"],
+        disallowed_tools=["Bash(echo one:*)"],
+        hooks={"UserPromptSubmit": [HookMatcher(hooks=[prompt_hook])],
+               "PostToolUse": [HookMatcher(matcher="Bash", hooks=[post_hook])],
+               "Stop": [HookMatcher(hooks=[stop_hook])]})
+    async with ClaudeSDKClient(options=options) as client:
+        await client.query("go")
+        async for message in client.receive_response():
+            if isinstance(message, ResultMessage):
+                result = message
+        status = await client.get_mcp_status()
+    assert result.result == "second done" and not result.is_error, result
+    assert [d["tool_name"] for d in result.permission_denials] == ["Bash"], result
+    assert log == [("ask", "Bash", "echo two > b.txt"), ("post", "Bash"),
+                   "add"], log
+    assert status["mcpServers"][0]["status"] == "connected", status
+    assert not os.path.exists(os.path.join(cwd, "a.txt"))
+    assert open(os.path.join(cwd, "b.txt")).read() == "changed\n"
+
+anyio.run(main)
+PYEOF
+
+mock_stop 5
+assert_request 4 'r["body"]["messages"][-1]["content"] == "keep going"'
 pass

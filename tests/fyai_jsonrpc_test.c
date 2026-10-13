@@ -41,6 +41,10 @@ FYAI_TEST_ENTRY(jsonrpc, read_yields, jsonrpc_read_yields)
 FYAI_TEST_ENTRY(jsonrpc, malformed_frame_fails_pending, jsonrpc_malformed_frame_fails_pending)
 FYAI_TEST_ENTRY(jsonrpc, destroy_settles_pending, jsonrpc_destroy_settles_pending)
 FYAI_TEST_ENTRY(jsonrpc, closed_peer_is_no_error, jsonrpc_closed_peer_is_no_error)
+FYAI_TEST_ENTRY(jsonrpc, frames, jsonrpc_frames)
+FYAI_TEST_ENTRY(jsonrpc, tunnel_request, jsonrpc_tunnel_request)
+FYAI_TEST_ENTRY(jsonrpc, tunnel_notification, jsonrpc_tunnel_notification)
+FYAI_TEST_ENTRY(jsonrpc, tunnel_close_settles, jsonrpc_tunnel_close_settles)
 
 #define TEST_BOUND_MS 5000
 
@@ -539,6 +543,146 @@ static void test_closed_peer_is_no_error(void)
 	printf("ok - a write to a closed peer is no error\n");
 }
 
+struct frame_log {
+	int count;
+	char last[256];
+};
+
+static void on_frame(struct jsonrpc_conn *conn, fy_generic frame, void *data)
+{
+	struct frame_log *log = data;
+
+	(void)conn;
+	/* A frame with an ID and a method is not taken as a request. */
+	FYAI_TCHECK(fy_get(frame, "id", 0LL) == 1);
+	snprintf(log->last, sizeof(log->last), "%s",
+		 fy_get(frame, "type", ""));
+	log->count++;
+}
+
+static void test_frames(void)
+{
+	struct frame_log log = {};
+	struct peer p;
+	char buf[256];
+	ssize_t n;
+	int rc;
+
+	/* Each object is a frame; none is answered or read as JSON-RPC. */
+	peer_open(&p);
+	rc = jsonrpc_conn_frames(p.conn, on_frame, &log);
+	FYAI_TCHECK(!rc);
+	peer_send(&p, "{\"type\":\"user\",\"id\":1,\"method\":\"x\"}");
+	while (!log.count) {
+		rc = fyai_event_loop_step(loop(), TEST_BOUND_MS);
+		FYAI_TCHECK(rc > 0);
+	}
+	FYAI_TCHECK(!strcmp(log.last, "user"));
+	rc = jsonrpc_conn_send_frame(p.conn, fy_mapping(test_ctx.transient_gb,
+						"type", "result"));
+	FYAI_TCHECK(!rc);
+	while (jsonrpc_conn_has_output(p.conn)) {
+		rc = fyai_event_loop_step(loop(), TEST_BOUND_MS);
+		FYAI_TCHECK(rc > 0);
+	}
+	n = read(p.from_client, buf, sizeof(buf) - 1);
+	FYAI_TCHECK(n > 0);
+	buf[n] = '\0';
+	FYAI_TCHECK(strstr(buf, "result") && buf[n - 1] == '\n');
+	peer_close(&p);
+	printf("ok - a frame connection passes objects both ways\n");
+}
+
+struct tunnel_log {
+	int count;
+	long long id;
+	char method[32];
+};
+
+static int tunnel_send(void *userdata, fy_generic frame)
+{
+	struct tunnel_log *log = userdata;
+
+	log->count++;
+	log->id = fy_get(frame, "id", -1LL);
+	snprintf(log->method, sizeof(log->method), "%s",
+		 fy_get(frame, "method", ""));
+	return 0;
+}
+
+static void test_tunnel_request(void)
+{
+	struct tunnel_log log = {};
+	struct call_result cr = {};
+	struct jsonrpc_request *req;
+	struct jsonrpc_conn *conn;
+
+	/* The owner carries the request and hands back the response. */
+	conn = jsonrpc_conn_tunnel(&test_ctx, 1, "tunnel", NULL, tunnel_send,
+				   &log);
+	FYAI_TCHECK(conn);
+	req = jsonrpc_request_submit(conn, "tools/list", fy_map_empty, 5, false,
+				     on_complete, &cr);
+	FYAI_TCHECK(req);
+	FYAI_TCHECK(log.count == 1 && log.id == 5);
+	FYAI_TCHECK(!strcmp(log.method, "tools/list"));
+	FYAI_TCHECK(!cr.done);
+	jsonrpc_conn_tunnel_receive(conn, fy_mapping(test_ctx.transient_gb,
+		"jsonrpc", "2.0", "id", 5LL,
+		"result", fy_mapping(test_ctx.transient_gb, "value", 7LL)));
+	FYAI_TCHECK(cr.done && cr.ok);
+	FYAI_TCHECK(fy_get(cr.result, "value", 0LL) == 7);
+	jsonrpc_request_destroy(req);
+	jsonrpc_conn_destroy(conn);
+	printf("ok - a tunnel completes a request with its response\n");
+}
+
+static void test_tunnel_notification(void)
+{
+	struct tunnel_log log = {};
+	struct call_result cr = {};
+	struct jsonrpc_request *req;
+	struct jsonrpc_conn *conn;
+
+	/* A notification completes after its submit returns. */
+	conn = jsonrpc_conn_tunnel(&test_ctx, 1, "tunnel", NULL, tunnel_send,
+				   &log);
+	FYAI_TCHECK(conn);
+	req = jsonrpc_request_submit(conn, "notifications/initialized",
+				     fy_map_empty, 0, true, on_complete, &cr);
+	FYAI_TCHECK(req);
+	FYAI_TCHECK(log.count == 1 && log.id == -1);
+	FYAI_TCHECK(!cr.done);
+	FYAI_TCHECK(!fyai_event_loop_run_until(loop(), &cr.done, TEST_BOUND_MS));
+	FYAI_TCHECK(cr.ok);
+	jsonrpc_request_destroy(req);
+	jsonrpc_conn_destroy(conn);
+	printf("ok - a tunnel notification completes after its submit\n");
+}
+
+static void test_tunnel_close_settles(void)
+{
+	struct tunnel_log log = {};
+	struct call_result cr = {};
+	struct jsonrpc_request *req;
+	struct jsonrpc_conn *conn;
+
+	/* A tunnel whose peer is gone fails what waits for it. */
+	conn = jsonrpc_conn_tunnel(&test_ctx, 0, "tunnel", NULL, tunnel_send,
+				   &log);
+	FYAI_TCHECK(conn);
+	req = jsonrpc_request_submit(conn, "tools/call", fy_map_empty, 2, false,
+				     on_complete, &cr);
+	FYAI_TCHECK(req);
+	jsonrpc_conn_tunnel_close(conn, "is gone");
+	FYAI_TCHECK(cr.done && !cr.ok);
+	FYAI_TCHECK(!jsonrpc_request_submit(conn, "x", fy_map_empty, 3, false,
+					    on_complete, &cr));
+	jsonrpc_request_destroy(req);
+	jsonrpc_conn_destroy(conn);
+	printf("ok - closing a tunnel settles its requests\n");
+}
+
 /* Run one test with an isolated diagnostic context. */
 static int jsonrpc_run(void (*testfn)(void))
 {
@@ -629,4 +773,24 @@ int jsonrpc_destroy_settles_pending(void)
 int jsonrpc_closed_peer_is_no_error(void)
 {
 	return jsonrpc_run(test_closed_peer_is_no_error);
+}
+
+int jsonrpc_frames(void)
+{
+	return jsonrpc_run(test_frames);
+}
+
+int jsonrpc_tunnel_request(void)
+{
+	return jsonrpc_run(test_tunnel_request);
+}
+
+int jsonrpc_tunnel_notification(void)
+{
+	return jsonrpc_run(test_tunnel_notification);
+}
+
+int jsonrpc_tunnel_close_settles(void)
+{
+	return jsonrpc_run(test_tunnel_close_settles);
 }
