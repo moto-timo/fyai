@@ -506,7 +506,7 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	fy_generic name, description;
 	fy_generic task_v, context_v;
 	fy_generic persona_v, persona, persona_model;
-	fy_generic skill_v, skill_model, skill_tools, skill_name, skill_args;
+	fy_generic skill_v, skill_model, allow_tools, skill_name, skill_args;
 	fy_generic turn;
 	fy_generic report, spawn;
 	struct fyai_event_input input = {};
@@ -620,12 +620,15 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 		fyai_error_check(ctx, fy_is_mapping(persona), err,
 				 "could not apply the model of the skill");
 	}
-	skill_tools = fy_get(skill_v, "tools", fy_invalid);
-	if (fy_is_sequence(skill_tools)) {
+	allow_tools = fy_get(skill_v, "tools", fy_invalid);
+	/* A persona can limit the tools; the tools of a skill replace them. */
+	if (!fy_is_sequence(allow_tools))
+		allow_tools = fy_get(persona, "tools", fy_invalid);
+	if (fy_is_sequence(allow_tools)) {
 		/* The configuration builder lives as long as the process. */
-		ctx->tools_allow = fy_gb_internalize(cfg->gb, skill_tools);
+		ctx->tools_allow = fy_gb_internalize(cfg->gb, allow_tools);
 		fyai_error_check(ctx, fy_is_sequence(ctx->tools_allow), err,
-				 "could not keep the tools of the skill");
+				 "could not keep the tools of the sub-agent");
 	}
 
 	/* The call overrides the persona's conversation mode. */

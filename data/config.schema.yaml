@@ -497,6 +497,14 @@ properties:
               description: >-
                 Select the starting context for this persona. The `context`
                 parameter of the call overrides it.
+            tools:
+              type: array
+              items:
+                type: string
+              description: >-
+                Limit the tools of this persona to these names. The agent is
+                offered only these tools and cannot call another. A skill
+                that gives its own tools replaces the list.
             reasoning:
               type: object
               additionalProperties: false
