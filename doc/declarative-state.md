@@ -227,9 +227,8 @@ answer a question that fyai puts to the user.
 
 Approval must come from the user:
 
-- not from a parent model: a sub-agent sends its review to the parent
-  process, and the parent process forwards it toward the user; it never
-  gives the review to its own model, as it gives an `ask_parent` question;
+- not from a parent model: a sub-agent has no settings tool, so no review
+  passes through a model on its way to the user;
 - not from `--answer`, which answers `ask_user` before the question exists;
 - not from a tool, a skill, or an MCP server.
 
@@ -352,6 +351,17 @@ key with `search`, and reads the one key it needs with `describe`.
 | `revert` | `id` | Take back one change of the model of `write` keys, as a change of its own that the same rules apply or review. A key changed since is a conflict, and nothing is taken back. |
 | `proposals` | none | The proposals of this branch: id, status, paths and changes. |
 
+The title row of a call names what it reads or changes: the query and
+the path of a search, the key of a read, the first key of a change (with
+the count of the others, and `trial`), or the id of a revert. Every text
+in it that the model wrote is a code span that the text cannot close. The
+result for the user (`settings_format()`) is short: a row for each key of
+a search or a list, one row for a read, and for a change or a revert the
+outcome - applied as `cN`, waiting as `pN`, or rejected with the reply of
+the user - and the whole diff that fyai made. The entry has
+`FYAI_TOOL_WHOLE_RESULT`, so the preview of the tool body does not cut that
+diff. The model gets the result as JSON text.
+
 Each result has `arena_protected: true|false`: true when a view holds the
 arena as a descriptor, or when the sandbox is on and the arena is inside
 `<project>/.fyai`, which the sandbox denies. An arena elsewhere is not known
@@ -468,22 +478,15 @@ presented it.
 
 ### Sub-agents
 
-A delegated agent reads by the same policy. It applies no change to its
-parent. A change of a `write` key changes only its own run.
+The settings tool belongs to the session of the user. Its entry has
+`FYAI_TOOL_ROOT_ONLY`, so a delegated agent is not offered it, and a call
+that a delegated agent makes anyway is refused. The configuration of a run
+is the user's to change; a sub-agent that needs another setting says so to
+the agent that delegated it, whose model can present the change.
 
-A sub-agent never communicates with the user. It sends a `review` change
-to its parent process on its control channel, as it sends `user/ask` for
-`ask_user` (`src/fyai_agents.c`). Each parent process forwards the review
-up the same way, and the user-owned root shows the review panel. The
-answer goes back down the same chain. No process on the chain gives the
-review to its model, so no model answers it: this is the difference from
-`ask_parent`, whose question the parent model answers.
-
-Each process forwards the change set and makes no diff of its own: the
-root makes the diff against the configuration of the branch of the
-sub-agent, and the heading of the panel names that branch. When the root
-has no person to answer, the change is stored as a proposal on the branch
-of the sub-agent, named with that branch.
+A sub-agent never communicates with the user directly: it reaches the user
+only through its parent. Without the tool there is no review to forward,
+and no proposal stored on the branch of a sub-agent.
 
 ### The change log
 
@@ -604,9 +607,7 @@ Each phase is three patches: implementation, tests, documentation.
    proposals.
 4. **Revert and trial.** `revert`, `config revert/keep`, `trial` and the
    approval events: built, with `tests/cases/settings_revert.sh` and
-   `tests/cases/settings_approve.sh`. *Remains:* the forward of a
-   sub-agent review; until then a sub-agent keeps its review as a
-   proposal on its own branch.
+   `tests/cases/settings_approve.sh`. A sub-agent has no settings tool.
 5. **Catalogue read.**
 6. **Skill proposals.**
 7. **Display documents:** theme, keys, and stored page documents.
