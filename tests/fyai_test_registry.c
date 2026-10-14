@@ -5,12 +5,14 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "fyai_test_registry.h"
 
 /* Maximum number of registered tests. */
-#define FYAI_TEST_MAX 512
+#define FYAI_TEST_MAX 1024
 
 static struct fyai_test_case fyai_tests[FYAI_TEST_MAX];
 static int fyai_tests_count;
@@ -19,8 +21,12 @@ void fyai_test_register(const char *suite, const char *name, int (*run)(void))
 {
 	struct fyai_test_case *tc;
 
-	if (fyai_tests_count >= FYAI_TEST_MAX)
-		return;
+	/* A test left out of the registry would not run and not fail. */
+	if (fyai_tests_count >= FYAI_TEST_MAX) {
+		fprintf(stderr, "the test registry is full: %s/%s is not "
+			"registered; raise FYAI_TEST_MAX\n", suite, name);
+		abort();
+	}
 
 	tc = &fyai_tests[fyai_tests_count++];
 	tc->suite = suite;
