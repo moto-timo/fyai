@@ -21,6 +21,17 @@ run_fyai tool settings '{"document":"catalog","action":"list","path":"agents"}'
 assert_status 0
 assert_stdout_contains '"codex"'
 
+# The cheapest model of a provider, in one call.
+run_fyai tool settings '{"document":"catalog","action":"select","from":"providers/anthropic/models","fields":["canonical_id","pricing/blended"],"sort":"pricing/blended","limit":1}'
+assert_status 0
+assert_stdout_contains '"matched"'
+assert_stdout_contains '"pricing/blended"'
+
+# An export is a file that a program reads while the invocation runs.
+run_fyai tool settings '{"document":"catalog","action":"export"}'
+assert_status 0
+assert_stdout_contains 'catalog.json'
+
 run_fyai tool settings '{"document":"catalog","action":"change","changes":[{"path":"models","value":[]}]}'
 assert_stdout_contains 'the catalogue is read only'
 

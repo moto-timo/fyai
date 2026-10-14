@@ -11,9 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "fyai.h"
 #include "fyai_config.h"
+#include "fyai_settings.h"
 #include "fyai_tool_spec.h"
 #include "fyai_tool_registry.h"
 #include "fyai_tools.h"
@@ -27,6 +30,8 @@ FYAI_TEST_ENTRY(settings, search, settings_search)
 FYAI_TEST_ENTRY(settings, offered, settings_offered)
 FYAI_TEST_ENTRY(settings, format, settings_format)
 FYAI_TEST_ENTRY(settings, catalog, settings_catalog)
+FYAI_TEST_ENTRY(settings, select, settings_select)
+FYAI_TEST_ENTRY(settings, export, settings_export)
 
 static struct fyai_cfg test_cfg;
 static struct fyai_ctx test_ctx;
@@ -380,6 +385,128 @@ int settings_catalog(void)
 	FYAI_TCHECK(text && strstr(text, "`models/m`") &&
 		    strstr(text, "9 tokens") && strstr(text, "**in use**"));
 	free(text);
+
+	settings_teardown();
+	return 0;
+}
+
+
+/* select filters, sorts and projects rows of both documents. */
+int settings_select(void)
+{
+	fy_generic r, rows, row;
+	double prev, cur;
+	bool ok;
+
+	if (settings_setup())
+		return 1;
+
+	/* The keys a layer changed from their default. */
+	r = run("{action: select, where: [{field: changed, op: eq, "
+		"value: true}], fields: [key, layer], limit: 100}", &ok);
+	FYAI_TCHECK(ok);
+	rows = fy_get(r, "rows", fy_invalid);
+	FYAI_TCHECK(rows_have(rows, "key", "temperature"));
+	FYAI_TCHECK(rows_have(rows, "key", "shell/timeout_ms"));
+	FYAI_TCHECK(!rows_have(rows, "key", "reasoning/effort"));
+	/* A hidden key is no row. */
+	FYAI_TCHECK(!rows_have(rows, "key", "api_key/value"));
+	row = fy_get_at(rows, 0, fy_invalid);
+	FYAI_TCHECK(fy_len(row) == 2);
+
+	r = run("{action: select, path: shell, where: [{field: access, "
+		"op: eq, value: read}], fields: [key]}", &ok);
+	FYAI_TCHECK(ok && rows_have(fy_get(r, "rows", fy_invalid), "key",
+				    "shell/shell"));
+	FYAI_TCHECK(!rows_have(fy_get(r, "rows", fy_invalid), "key",
+			       "shell/timeout_ms"));
+
+	/* Every offering, cheapest first; each names its provider. */
+	r = run("{document: catalog, action: select, from: 'providers/*/models', "
+		"where: [{field: pricing/input, op: exists}, "
+		"{field: pricing/output, op: exists}], "
+		"fields: [provider, canonical_id, pricing/blended], "
+		"sort: pricing/blended, limit: 100}", &ok);
+	FYAI_TCHECK(ok && fy_get(r, "matched", 0LL) > 1);
+	prev = -1.0;
+	fy_foreach(row, fy_get(r, "rows", fy_invalid)) {
+		FYAI_TCHECK(fy_is_string(fy_get(row, "provider", fy_invalid)));
+		cur = fy_number(fy_get(row, "pricing/blended", fy_invalid),
+				-1.0);
+		FYAI_TCHECK(cur >= prev);
+		prev = cur;
+	}
+
+	/* Descending, and the cheapest of one provider with a limit. */
+	r = run("{document: catalog, action: select, "
+		"from: providers/anthropic/models, sort: pricing/input, "
+		"order: desc, fields: [canonical_id, pricing/input]}", &ok);
+	FYAI_TCHECK(ok);
+	rows = fy_get(r, "rows", fy_invalid);
+	FYAI_TCHECK(fy_len(rows) >= 2);
+	FYAI_TCHECK(fy_number(fy_get(fy_get_at(rows, 0, fy_invalid),
+				     "pricing/input", fy_invalid), 0.0) >=
+		    fy_number(fy_get(fy_get_at(rows, 1, fy_invalid),
+				     "pricing/input", fy_invalid), 0.0));
+
+	r = run("{document: catalog, action: select, from: models, "
+		"where: [{field: capabilities, op: has, value: reasoning}, "
+		"{field: name, op: contains, value: OPUS}], limit: 1}", &ok);
+	FYAI_TCHECK(ok && fy_len(fy_get(r, "rows", fy_seq_empty)) == 1);
+
+	check_refused("{action: select, where: [{field: key, op: like, "
+		      "value: x}]}", "op must be");
+	check_refused("{action: select, where: [{field: key, op: eq}]}",
+		      "needs a value");
+	check_refused("{document: catalog, action: select}",
+		      "select needs from");
+
+	settings_teardown();
+	return 0;
+}
+
+/* export writes what the model may read, and cleanup removes it. */
+int settings_export(void)
+{
+	char dir[4096], *text;
+	fy_generic r;
+	struct stat st;
+	FILE *fp;
+	size_t n;
+	bool ok;
+
+	if (settings_setup())
+		return 1;
+	snprintf(dir, sizeof(dir), "%s", "/tmp");
+	setenv("TMPDIR", dir, 1);
+
+	r = run("{action: export}", &ok);
+	FYAI_TCHECK(ok && fy_equal(fy_get(r, "format", fy_invalid), "json"));
+	FYAI_TCHECK(seq_has(fy_get(r, "hidden", fy_invalid), "api_key"));
+	fp = fopen(fy_get(r, "path", ""), "r");
+	FYAI_TCHECK(fp);
+	text = calloc(1, 1 << 20);
+	FYAI_TCHECK(text);
+	n = fread(text, 1, (1 << 20) - 1, fp);
+	fclose(fp);
+	FYAI_TCHECK(n > 0 && strstr(text, "\"temperature\""));
+	FYAI_TCHECK(!strstr(text, "KEY") && !strstr(text, "TOK"));
+	free(text);
+	FYAI_TCHECK(!stat(test_ctx.settings_export_dir, &st) &&
+		    (st.st_mode & 077) == 0);
+
+	r = run("{action: export, shape: rows, format: yaml}", &ok);
+	FYAI_TCHECK(ok && strstr(fy_get(r, "path", ""), "config-rows.yaml"));
+	r = run("{document: catalog, action: export}", &ok);
+	FYAI_TCHECK(ok && strstr(fy_get(r, "path", ""), "catalog.json"));
+	check_refused("{document: catalog, action: export, shape: rows}",
+		      "select gives rows");
+
+	/* Cleanup removes the files and their directory. */
+	snprintf(dir, sizeof(dir), "%s", test_ctx.settings_export_dir);
+	fyai_settings_release(&test_ctx);
+	FYAI_TCHECK(!test_ctx.settings_export_dir);
+	FYAI_TCHECK(stat(dir, &st) && access(dir, F_OK));
 
 	settings_teardown();
 	return 0;
