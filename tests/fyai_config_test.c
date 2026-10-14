@@ -25,6 +25,7 @@ FYAI_TEST_ENTRY(config, branch_names, config_branch_names)
 FYAI_TEST_ENTRY(config, branch_refs, config_branch_refs)
 FYAI_TEST_ENTRY(config, merge_base, config_merge_base)
 FYAI_TEST_ENTRY(config, sample_defaults, config_sample_defaults)
+FYAI_TEST_ENTRY(config, model_access, config_model_access)
 FYAI_TEST_ENTRY(session, compact_chatgpt_auth, session_compact_chatgpt_auth)
 
 static int failures;
@@ -535,5 +536,143 @@ int config_branch_refs(void)
 	test_ref_grammar(gb);
 
 	fy_generic_builder_destroy(gb);
+	return failures ? 1 : 0;
+}
+
+/* Every x-fyai-model of the schema names an access. */
+static void model_access_values(fy_generic node, const char *path, int depth)
+{
+	static const char *const subs[] = { "additionalProperties", "items" };
+	static const char *const alts[] = { "oneOf", "anyOf", "allOf" };
+	fy_generic v, key, child;
+	char full[256];
+	size_t i;
+
+	if (!fy_is_mapping(node) || depth > 64)
+		return;
+	v = fy_get(node, "x-fyai-model", fy_invalid);
+	if (fy_is_valid(v) && fyai_model_access_parse(v) < 0) {
+		fprintf(stderr, "FAIL: %s: x-fyai-model '%s' is not an access\n",
+			path, fy_str(v) ? fy_str(v) : "?");
+		failures++;
+	}
+	fy_foreach_key_value(key, child, fy_get(node, "properties", fy_invalid)) {
+		snprintf(full, sizeof(full), "%s%s%s", path, *path ? "/" : "",
+			 fy_castp(&key, ""));
+		model_access_values(child, full, depth + 1);
+	}
+	for (i = 0; i < sizeof(subs) / sizeof(subs[0]); i++)
+		model_access_values(fy_get(node, subs[i], fy_invalid), path,
+				    depth + 1);
+	for (i = 0; i < sizeof(alts) / sizeof(alts[0]); i++)
+		fy_foreach(child, fy_get(node, alts[i], fy_invalid))
+			model_access_values(child, path, depth + 1);
+}
+
+/*
+ * The schema states the access of each key; the classes of
+ * doc/declarative-state.md that open no change stay closed.
+ */
+int config_model_access(void)
+{
+	/* Keys that weaken confinement, run a program, send data out, or
+	 * lift a limit on the model: never changed by the model. */
+	static const char *const closed[] = {
+		"sandbox", "sandbox/enabled", "sandbox/allow", "sandbox/deny",
+		"sandbox/network/tcp/ports", "sandbox_profile",
+		"sandbox_lockdown", "sandbox_lockdown/allow",
+		"agent/isolation", "agent/transport_isolation", "agent/spawn",
+		"view/isolate_session", "view/scratch_dir",
+		"shell/shell", "shell/login", "catalog_update",
+		"catalog_update/command", "mcp/servers",
+		"mcp/servers/github/endpoint", "mcp/endpoint", "display/page",
+		"api_url", "api_key", "api_key/value", "auth", "no_auth",
+		"mcp/auth_token", "mcp/servers/github/auth/client/secret",
+		"catalog_update/credentials", "whitewash_api_keys",
+		"logging", "logging/wire", "arena_dir",
+		"shell/max_timeout_ms", "shell/hard_max_output_tokens",
+		"read/hard_max_bytes", "agent/max_timeout_ms",
+		"agent/hang_timeout_ms", "agent/timeout_kill",
+		"agent/max_live_agents", "agent/max_branch_depth",
+		"max_tool_iterations", "model_access",
+	};
+	/* Keys that hide the work of the model or draw chrome it chose:
+	 * changed only after the user approves. */
+	static const char *const reviewed[] = {
+		"display/tool_detail", "display/tool_preview_lines",
+		"display/notice_output", "display/thinking", "view/ignore",
+		"view/gitignore", "display/prompt", "display/prompt_top",
+		"display/prompt_bottom", "display/session_margin",
+		"display/keys", "display/keys/prompt", "system_prompt",
+		"parallel_tool_calls_prompt", "agent/personas",
+		"agent/personas/coder/tools", "model", "max_tokens", "retry",
+		"web_search", "tools", "builtin_shell", "mcp/enabled",
+	};
+	/* Credential references: not even read. */
+	static const char *const hidden[] = {
+		"api_key", "api_key/type", "mcp/auth_token",
+		"mcp/auth_token/value", "catalog_update/credentials",
+		"mcp/servers/github/auth/client/secret",
+		"mcp/servers/github/auth/client/secret/value",
+		"", "no/such/key",
+	};
+	fy_generic schema, key, spec;
+	enum fyai_model_access a;
+	char msg[256];
+	size_t i;
+
+	failures = 0;
+	schema = fyai_config_schema(NULL);
+	check(fy_is_mapping(schema), "the schema parses to a mapping");
+	model_access_values(schema, "", 0);
+
+	/* A key of the root with no access would fall to hidden unseen. */
+	fy_foreach_key_value(key, spec, fy_get(schema, "properties",
+					       fy_invalid)) {
+		snprintf(msg, sizeof(msg), "%s states x-fyai-model",
+			 fy_castp(&key, ""));
+		check(fy_is_valid(fy_get(spec, "x-fyai-model", fy_invalid)), msg);
+	}
+
+	for (i = 0; i < sizeof(closed) / sizeof(closed[0]); i++) {
+		a = fyai_config_model_access_tree(closed[i]);
+		snprintf(msg, sizeof(msg), "%s is not changed by the model (%s)",
+			 closed[i], fyai_model_access_name(a));
+		check(a <= FYAI_MODEL_READ, msg);
+	}
+	for (i = 0; i < sizeof(reviewed) / sizeof(reviewed[0]); i++) {
+		a = fyai_config_model_access_tree(reviewed[i]);
+		snprintf(msg, sizeof(msg), "%s needs a review (%s)",
+			 reviewed[i], fyai_model_access_name(a));
+		check(a == FYAI_MODEL_REVIEW, msg);
+	}
+	for (i = 0; i < sizeof(hidden) / sizeof(hidden[0]); i++) {
+		a = fyai_config_model_access(hidden[i]);
+		snprintf(msg, sizeof(msg), "'%s' is hidden (%s)", hidden[i],
+			 fyai_model_access_name(a));
+		check(a == FYAI_MODEL_HIDDEN, msg);
+	}
+
+	/* A key is its own access; its subtree takes the strictest. */
+	check(fyai_config_model_access("temperature") == FYAI_MODEL_WRITE,
+	      "temperature is written");
+	check(fyai_config_model_access("reasoning/effort") == FYAI_MODEL_WRITE,
+	      "reasoning/effort inherits write");
+	check(fyai_config_model_access("display/theme") == FYAI_MODEL_WRITE,
+	      "display/theme inherits write");
+	check(fyai_config_model_access("display") == FYAI_MODEL_WRITE,
+	      "display is written");
+	check(fyai_config_model_access_tree("display") == FYAI_MODEL_READ,
+	      "a change of display touches display/page");
+	check(fyai_config_model_access("shell/timeout_ms") == FYAI_MODEL_WRITE,
+	      "shell/timeout_ms is written");
+	check(fyai_config_model_access_tree("shell") == FYAI_MODEL_READ,
+	      "a change of shell touches shell/shell");
+	check(fyai_config_model_access("mcp/servers/github/auth/client/id") ==
+	      FYAI_MODEL_READ, "an MCP client id is read");
+	check(fyai_config_model_access_tree("mcp") == FYAI_MODEL_HIDDEN,
+	      "a change of mcp touches a credential reference");
+	check(fyai_config_model_access("mcp/timeout") == FYAI_MODEL_WRITE,
+	      "mcp/timeout is written");
 	return failures ? 1 : 0;
 }
