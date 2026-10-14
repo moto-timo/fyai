@@ -1,7 +1,7 @@
 # Declarative state and model access
 
 Status: proposal. Part 1 describes the current state. Part 2 is a design
-and a phased plan. Nothing in part 2 is built yet.
+and a phased plan. Phase 1, the policy keyword, is built.
 
 ## Goal
 
@@ -79,6 +79,7 @@ Configuration (`data/config.schema.yaml`):
 |---|---|
 | `x-fyai-scope` | `session`: a session change goes to the session layer. `stored`: it is committed to the branch. The nearest keyword on the path decides (`fyai_config_session_scoped()`). |
 | `x-fyai-complete` | The completion kind of the value. |
+| `x-fyai-model` | What the model can do with the key: `hidden`, `read`, `review` or `write`. The nearest keyword on the path decides (`fyai_config_model_access()`); see [the policy keyword](#the-policy-keyword). |
 
 ## Configuration layers
 

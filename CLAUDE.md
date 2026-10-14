@@ -398,6 +398,15 @@ commits the output between turns.
 Keep the informational `model_info` block synchronized on every configuration
 commit. Remove it when the selected model is not in the catalogue.
 
+Give each new key of `data/config.schema.yaml`, or the group above it, an
+`x-fyai-model` access: `hidden`, `read`, `review` or `write`. A key with none
+is hidden from the model. A key that weakens confinement, runs a program,
+sends data out or lifts a limit on the model is `read` or `hidden`; a key
+that hides the work of the model from the user is `review`.
+`fyai_config_model_access_tree()` gives the strictest access below a path,
+and `config/model_access` names the keys that must stay closed. See
+`doc/declarative-state.md`.
+
 Validate at every ingestion point. `--set` and an explicit `--config` file are
 both checked against the schema before the value reaches the merged document.
 Put the schema problems in the diagnostic that reports the failure; do not
