@@ -1,7 +1,8 @@
 # Declarative state and model access
 
 Status: proposal. Part 1 describes the current state. Part 2 is a design
-and a phased plan. Phase 1, the policy keyword, is built.
+and a phased plan. Phase 1, the policy keyword, and the reads of phase 2
+are built.
 
 ## Goal
 
@@ -325,27 +326,35 @@ change a `read` key.
 
 ## The tool `settings`
 
-One tool, defined in `data/tools.yaml`. Its entry is in a new
-`src/fyai_tool_settings.c`, with `FYAI_TOOL_PARENT` (it reads and changes
-the state of the parent) and `FYAI_TOOL_EFFECT_NONE`. Its `describe`
-function removes the actions that `model_access` does not allow from the
+One tool, defined in `data/tools.yaml`. Its entry is in
+`src/fyai_settings.c`, with `FYAI_TOOL_PARENT` (it reads and changes the
+state of the parent) and `FYAI_TOOL_EFFECT_NONE`. Its `describe` function
+leaves the tool out when `model_access` is `none`; a later phase also
+removes the actions that `model_access` does not allow from the
 specification, so the model learns what this run permits.
 
-Parameters: `action`, `document` (default `config`), and the arguments of
-the action.
+Parameters: `action`, `path`, a later `document` (default `config`), and
+the arguments of the action. A path is a slash path; a segment `*` stands
+for any name of a mapping of names, such as an MCP server or a persona.
+
+The schema is large, so no answer gives the whole of it. The model finds a
+key with `search`, and reads the one key it needs with `describe`.
 
 | Action | Arguments | Result |
 |---|---|---|
-| `describe` | `path` | The schema node (type, values, default, description), the class, the scope, the effective value, and the layer that gave it. |
-| `get` | `path` | The effective value. Hidden members are left out and listed in `hidden`. |
-| `list` | `prefix`, `changed` | The paths under the prefix with class and value; `changed: true` lists only values that differ from the default. |
+| `search` | `query`, `path`, `limit` | The keys under `path` whose path or description holds each word of `query`: those that hold every word in their path first. Each key has its access and the first sentence of its description. At most `limit` keys (20, up to 50), and the count found. |
+| `describe` | `path` | The schema node without its members and without the `x-fyai-*` keywords, the access, the scope, the value in force, the layer that gave it (`default`, `branch`, `invocation`, `session`), and the members with their access and first sentence. |
+| `get` | `path` | The value in force and its layer. Hidden members are left out and listed in `hidden`. |
+| `list` | `path`, `changed` | The leaf keys under the path with access, layer and value, at most 100; `changed: true` gives only values that differ from the default. |
 | `change` | `changes: [{path, value} or {path, delete: true}]`, `explanation`, `trial` | The presented change set and a Markdown explanation of it. fyai answers `applied`, `pending` or `refused`, with an id, the diff and the cause. |
 | `revert` | `id` | The reverted paths, or the paths in conflict. |
 | `proposals` | none | The proposals of the model on this branch and their state. |
 
-Each result has `arena_protected: true|false`: true only when the sandbox
-is on and its policy denies the arena to the shell. When it is false, every
-change is handled as `review` (see [the invariant](#the-invariant)).
+Each result has `arena_protected: true|false`: true when a view holds the
+arena as a descriptor, or when the sandbox is on and the arena is inside
+`<project>/.fyai`, which the sandbox denies. An arena elsewhere is not known
+to be denied, so it is false. When it is false, every change is handled as
+`review` (see [the invariant](#the-invariant)).
 
 ### A change
 
@@ -544,9 +553,9 @@ Each phase is three patches: implementation, tests, documentation.
    no key of the escalation, execution, exfiltration or ceiling classes is
    `write` or `review`; no key of the concealment or spoofing classes is
    `write`; a change set takes the strictest class of its subtree.
-2. **Read.** The tool with `describe`, `get` and `list`, and redaction.
-   `config describe` shows the class; `config effective --origin` and
-   `--changed`.
+2. **Read.** The tool with `search`, `describe`, `get` and `list`, and
+   redaction. `config describe` shows the access in its `model` column.
+   Built. `config effective --origin` and `--changed` remain.
 3. **Change.** `change` with the `write`, `review` and proposal paths,
    the change log, and `config changes/proposals/approve/reject`.
    Functional cases with the mock provider: a refused change, an applied

@@ -564,6 +564,16 @@ schema. The validator deliberately accepts unknown keys, and some transport
 extensions are not enumerated there, so consult `config.yaml.sample` for the
 annotated supported-key catalogue as well.
 
+### Model access to the configuration
+
+The `model` column of `config describe` gives what the model can do with
+each key: `hidden`, `read`, `review` (the user approves each change) or
+`write`. The model reads the configuration with the `settings` tool: it
+searches for a key, describes it, and reads its value. A hidden key, such
+as a credential reference, is left out of every answer. The tool writes
+nothing. `model_access: none` removes the tool. See
+`doc/declarative-state.md`.
+
 ## 6. Tools and sub-agents
 
 The built-in agent tool surface includes file reading, structured file writing and patching, shell execution, user questions, and delegated sub-agents where enabled.

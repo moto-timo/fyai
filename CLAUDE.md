@@ -155,6 +155,8 @@ initialize each generic field explicitly.
 - `src/fyai_merge.c`: branch merge and rebase.
 - `src/fyai_catalog.c`: provider and model catalogue.
 - `src/fyai_skill.c`: branch-stored skills and the `skill` tool.
+- `src/fyai_settings.c`: the `settings` tool, which reads the configuration
+  by the `x-fyai-model` access of each key.
 - `src/*.h`: shared structures and internal interfaces.
 - `data/`: embedded configuration schemas and catalogue data.
 - `tests/`: unit tests, functional cases, mock providers, and scenarios.
