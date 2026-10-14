@@ -112,6 +112,7 @@ const char *fyai_branch_cwd(const struct fyai_branch *b);
 #define FYAI_BRANCH_OP_TODO	"todo"
 #define FYAI_BRANCH_OP_SKILL	"skill"
 #define FYAI_BRANCH_OP_COMMAND	"command"
+#define FYAI_BRANCH_OP_SETTINGS	"settings"
 
 /* Set the operation and previous name for the next publish. */
 void fyai_branch_op_set(struct fyai_ctx *ctx, const char *op, const char *from);

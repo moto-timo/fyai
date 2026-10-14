@@ -733,16 +733,20 @@
       (`default`, `branch`, `invocation` or `session`), and a summary of the keys under it. `get`
       gives the value in force. `list` gives each key under a path with its access and value.
       Each key has an access: `read`, `review` and `write` keys can be read, and `hidden` keys are
-      left out of every answer and named under `hidden`. You cannot change the configuration with
-      this tool.
+      left out of every answer and named under `hidden`. `change` presents a change of `review`
+      and `write` keys: give the `changes` and an `explanation` for the user. fyai checks the
+      change and makes its diff. It applies a change of `write` keys at once when the
+      configuration allows it; otherwise the user reviews your explanation and the diff and
+      accepts or rejects it, or types a reply. When nobody can review it now, it is kept as a
+      proposal. You never write the configuration yourself, and you cannot change a `read` key.
     parameters:
       type: object
       properties:
         action:
           type: string
-          enum: [search, describe, get, list]
+          enum: [search, describe, get, list, change]
           description: |-
-            What to read.
+            What to do.
         path:
           type: string
           description: |-
@@ -755,6 +759,35 @@
           type: integer
           description: |-
             For `search`: the most keys to give, up to 50. Omit for 20.
+        changes:
+          type: array
+          description: |-
+            For `change`: up to 32 changes, each `{path, value}` to set a key or `{path, delete: true}` to remove it, so that it takes its default.
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+                description: |-
+                  The slash path of the key.
+              value:
+                description: |-
+                  The new value, of the type that the schema gives.
+              delete:
+                type: boolean
+                description: |-
+                  Remove the key.
+            required:
+              - path
+            additionalProperties: false
+        explanation:
+          type: string
+          description: |-
+            For `change`: why the change is wanted and what it does, in Markdown, for the user who reviews it. It can hold lists, tables and mermaid diagrams.
+        trial:
+          type: boolean
+          description: |-
+            For `change`: apply the change to this session only. Nothing is stored, and it ends with the session.
         changed:
           type: boolean
           description: |-

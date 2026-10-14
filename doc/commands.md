@@ -1070,7 +1070,7 @@ summary.
 
 inspect or change the configuration of the branch
 
-**Usage:** `fyai config {delete|describe|edit|effective|export|get|import|reset|schema|set|show|undo|validate} ...`
+**Usage:** `fyai config {approve|changes|delete|describe|edit|effective|export|get|import|proposals|reject|reset|review|schema|set|show|undo|validate} ...`
 
 The configuration is a document stored with each branch. Paths are
 slash-separated keys, and values are YAML flow documents; see
@@ -1081,6 +1081,8 @@ slash-separated keys, and values are YAML flow documents; see
 
 | Command | Description |
 | --- | --- |
+| `approve` | apply a proposal of the model |
+| `changes` | list the changes of the model |
 | `delete` | remove a key |
 | `describe` | describe the keys of the configuration |
 | `edit` | edit the configuration in an editor |
@@ -1088,7 +1090,10 @@ slash-separated keys, and values are YAML flow documents; see
 | `export` | write the configuration to a file |
 | `get` | write the value of a key |
 | `import` | store a configuration file |
+| `proposals` | list the changes that wait for you |
+| `reject` | drop a proposal of the model |
 | `reset` | return to the built-in configuration |
+| `review` | show a proposal of the model with its diff |
 | `schema` | write the configuration schema |
 | `set` | set the value of a key |
 | `show` | write the stored configuration |
@@ -1264,6 +1269,114 @@ returns to where the first started.
 | Argument | Description |
 | --- | --- |
 | `N` | the configuration changes to go back; default 1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai config changes
+
+list the changes of the model
+
+**Usage:** `fyai config changes`
+
+List the changes of the configuration that the model presented
+with the settings tool and that fyai applied: each with its id,
+its status, its access, and the keys it changed. The branch keeps
+the newest 64.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai config proposals
+
+list the changes that wait for you
+
+**Usage:** `fyai config proposals`
+
+List the changes that the model presented when nobody could review
+them, with their status. `config review ID` shows one with its
+diff; `config approve ID` applies it, and `config reject ID` drops
+it.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai config review
+
+show a proposal of the model with its diff
+
+**Usage:** `fyai config review ID`
+
+Show the pending proposal ID: the diff that fyai makes of it over
+the configuration in force, and the explanation that the model
+wrote, quoted.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the proposal, such as p1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai config approve
+
+apply a proposal of the model
+
+**Usage:** `fyai config approve ID`
+
+Apply the pending proposal ID. In a session the review panel shows
+its diff over the configuration in force first; a proposal that is
+no longer valid is refused.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the proposal, such as p1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai config reject
+
+drop a proposal of the model
+
+**Usage:** `fyai config reject ID`
+
+Mark the pending proposal ID rejected. It stays in the list.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the proposal, such as p1 |
 
 ### Options
 
@@ -3674,7 +3787,7 @@ summary.
 
 inspect or change the configuration of the branch
 
-**Usage:** `/config {delete|describe|edit|effective|export|get|import|reset|schema|set|show|undo|validate} ...`
+**Usage:** `/config {approve|changes|delete|describe|edit|effective|export|get|import|proposals|reject|reset|review|schema|set|show|undo|validate} ...`
 
 The configuration is a document stored with each branch. Paths are
 slash-separated keys, and values are YAML flow documents; see
@@ -3685,6 +3798,8 @@ slash-separated keys, and values are YAML flow documents; see
 
 | Command | Description |
 | --- | --- |
+| `approve` | apply a proposal of the model |
+| `changes` | list the changes of the model |
 | `delete` | remove a key |
 | `describe` | describe the keys of the configuration |
 | `edit` | edit the configuration in an editor |
@@ -3692,7 +3807,10 @@ slash-separated keys, and values are YAML flow documents; see
 | `export` | write the configuration to a file |
 | `get` | write the value of a key |
 | `import` | store a configuration file |
+| `proposals` | list the changes that wait for you |
+| `reject` | drop a proposal of the model |
 | `reset` | return to the built-in configuration |
+| `review` | show a proposal of the model with its diff |
 | `schema` | write the configuration schema |
 | `set` | set the value of a key |
 | `show` | write the stored configuration |
@@ -3861,6 +3979,109 @@ returns to where the first started.
 | Argument | Description |
 | --- | --- |
 | `N` | the configuration changes to go back; default 1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /config changes
+
+list the changes of the model
+
+**Usage:** `/config changes`
+
+List the changes of the configuration that the model presented
+with the settings tool and that fyai applied: each with its id,
+its status, its access, and the keys it changed. The branch keeps
+the newest 64.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /config proposals
+
+list the changes that wait for you
+
+**Usage:** `/config proposals`
+
+List the changes that the model presented when nobody could review
+them, with their status. `config review ID` shows one with its
+diff; `config approve ID` applies it, and `config reject ID` drops
+it.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /config review
+
+show a proposal of the model with its diff
+
+**Usage:** `/config review ID`
+
+Show the pending proposal ID: the diff that fyai makes of it over
+the configuration in force, and the explanation that the model
+wrote, quoted.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the proposal, such as p1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /config approve
+
+apply a proposal of the model
+
+**Usage:** `/config approve ID`
+
+Apply the pending proposal ID. In a session the review panel shows
+its diff over the configuration in force first; a proposal that is
+no longer valid is refused.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the proposal, such as p1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /config reject
+
+drop a proposal of the model
+
+**Usage:** `/config reject ID`
+
+Mark the pending proposal ID rejected. It stays in the list.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the proposal, such as p1 |
 
 ### Options
 

@@ -248,6 +248,24 @@ int fyai_config_invocation_set(struct fyai_ctx *ctx, const char *key,
 bool fyai_config_session_scoped(const char *path);
 
 /*
+ * Check @doc as the configuration of a branch: the schema and the semantic
+ * rules. On success *@docp becomes the form that a commit stores, with the
+ * derived model_info, and the result is an empty sequence; otherwise the
+ * result is the sequence of problems. Nothing is reported.
+ */
+fy_generic fyai_config_check(struct fyai_cfg *cfg, fy_generic *docp);
+
+/*
+ * Make @layer the session layer, after a check of it over the configuration
+ * in force, and derive the run from the result. A layer that fails the
+ * check is reported and changes nothing.
+ */
+int fyai_config_session_layer_adopt(struct fyai_ctx *ctx, fy_generic layer);
+
+/* Whether @layer passes the check of fyai_config_session_layer_adopt(). */
+bool fyai_config_session_layer_valid(struct fyai_ctx *ctx, fy_generic layer);
+
+/*
  * What the model can do with a configuration key, from `x-fyai-model` of the
  * schema. A lower value is stricter, so the strictest of several is the least.
  */

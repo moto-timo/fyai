@@ -1415,6 +1415,120 @@ commands:
         render:
           message: "config: returned {count} change(s) back"
 
+      - command: changes
+        title: list the changes of the model
+        description: |
+          List the changes of the configuration that the model presented
+          with the settings tool and that fyai applied: each with its id,
+          its status, its access, and the keys it changed. The branch keeps
+          the newest 64.
+        handler: config_changes
+        render:
+          table:
+            title: Changes of the model
+            empty: no changes of the model
+            keys: [id, status, access, keys, origin, time]
+            columns:
+              id: {name: Id, align: left}
+              status: {name: Status, align: left}
+              access: {name: Access, align: left}
+              keys: {name: Keys, align: left}
+              origin: {name: Branch, align: left}
+              time: {name: Time, align: left, format: time}
+
+      - command: proposals
+        title: list the changes that wait for you
+        description: |
+          List the changes that the model presented when nobody could review
+          them, with their status. `config review ID` shows one with its
+          diff; `config approve ID` applies it, and `config reject ID` drops
+          it.
+        handler: config_proposals
+        render:
+          table:
+            title: Proposals of the model
+            empty: no proposals of the model
+            keys: [id, status, access, keys, origin, time]
+            columns:
+              id: {name: Id, align: left}
+              status: {name: Status, align: left}
+              access: {name: Access, align: left}
+              keys: {name: Keys, align: left}
+              origin: {name: Branch, align: left}
+              time: {name: Time, align: left, format: time}
+
+      - command: review
+        title: show a proposal of the model with its diff
+        description: |
+          Show the pending proposal ID: the diff that fyai makes of it over
+          the configuration in force, and the explanation that the model
+          wrote, quoted.
+        handler: config_review
+        view: true
+        arguments:
+          type: object
+          required: [id]
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              description: the id of the proposal, such as p1
+              x-fyai-positional: 0
+              x-fyai-meta: ID
+        render:
+          markdown:
+            - "### Diff of {id} \u00b7 made by fyai"
+            - ""
+            - "{diff}"
+            - ""
+            - "### Explanation \u00b7 written by the model"
+            - ""
+            - "{explanation}"
+
+      - command: approve
+        title: apply a proposal of the model
+        description: |
+          Apply the pending proposal ID. In a session the review panel shows
+          its diff over the configuration in force first; a proposal that is
+          no longer valid is refused.
+        handler: config_approve
+        mode: async
+        arguments:
+          type: object
+          required: [id]
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              description: the id of the proposal, such as p1
+              x-fyai-positional: 0
+              x-fyai-meta: ID
+        render:
+          markdown:
+            - "config: proposal {id} is {status}"
+            - "{?change}"
+            - "{?change}It is change {change}."
+            - "{?diff}"
+            - "{?diff}{diff}"
+
+      - command: reject
+        title: drop a proposal of the model
+        description: |
+          Mark the pending proposal ID rejected. It stays in the list.
+        handler: config_reject
+        arguments:
+          type: object
+          required: [id]
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              description: the id of the proposal, such as p1
+              x-fyai-positional: 0
+              x-fyai-meta: ID
+        render:
+          message: "config: proposal {id} is {status}"
+
       - command: export
         title: write the configuration to a file
         description: |

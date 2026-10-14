@@ -20,6 +20,7 @@
 #include "fyai_cmd.h"
 #include "fyai_cmd_int.h"
 #include "fyai_config.h"
+#include "fyai_settings.h"
 #include "fyai_agents.h"
 #include "fyai_event.h"
 #include "fyai_transport_ctl.h"
@@ -154,6 +155,172 @@ int fyai_cmd_config_undo(struct fyai_cmd_call *call, fy_generic *result)
 		return -1;
 	*result = fy_mapping(call->gb, "count", n);
 	return 0;
+}
+
+/* The rows of a log of the settings tool, newest first. */
+static int config_settings_rows(struct fyai_cmd_call *call, const char *member,
+				fy_generic *result)
+{
+	fy_generic log, item, rows, p;
+	struct response_buffer keys = { 0 };
+	size_t i, n;
+	int rc;
+
+	if (config_need_arena(call))
+		return -1;
+	log = fyai_settings_log(call->ctx, member);
+	rows = fy_sequence(call->gb);
+	n = fy_len(log);
+	for (i = n; i > 0; i--) {
+		item = fy_get_at(log, i - 1, fy_invalid);
+		keys.len = 0;
+		rc = 0;
+		fy_foreach(p, fy_get(item, "paths", fy_invalid))
+			rc |= response_buffer_append(&keys, keys.len ?
+						     ", " : "") |
+			      response_buffer_append(&keys, fy_castp(&p, ""));
+		fyai_error_check(call->ctx, !rc, err,
+				 "config: cannot list the keys of a change");
+		rows = fy_append(call->gb, rows, fy_mapping(call->gb,
+			"id", fy_get(item, "name", ""),
+			"status", fy_get(item, "status", ""),
+			"access", fy_get(item, "access", ""),
+			"keys", fy_value(call->gb, keys.data ? keys.data : ""),
+			"origin", fy_get(item, "origin", ""),
+			"time", fy_get(item, "time", 0LL)));
+	}
+	free(keys.data);
+	*result = rows;
+	return 0;
+err:
+	free(keys.data);
+	return -1;
+}
+
+int fyai_cmd_config_changes(struct fyai_cmd_call *call, fy_generic *result)
+{
+	return config_settings_rows(call, "config_changes", result);
+}
+
+int fyai_cmd_config_proposals(struct fyai_cmd_call *call, fy_generic *result)
+{
+	return config_settings_rows(call, "config_proposals", result);
+}
+
+/*
+ * The text the model wrote, as a block quote: a heading or a fence in it
+ * stays inside the quote, so it cannot pass for the diff above it.
+ */
+static const char *config_quote(struct fy_generic_builder *gb,
+				const char *text)
+{
+	struct response_buffer out = { 0 };
+	const char *line, *nl, *quoted;
+	int rc = 0;
+
+	for (line = text; *line && !rc; line = nl ? nl + 1 : line +
+							   strlen(line)) {
+		nl = strchr(line, '\n');
+		rc = response_buffer_append(&out, "> ") ||
+		     response_buffer_append_data(&out, line, nl ?
+				(size_t)(nl - line) : strlen(line)) ||
+		     response_buffer_append(&out, "\n");
+	}
+	quoted = rc ? NULL : fy_gb_intern_string(gb, out.data ? out.data :
+						 "> _no explanation_\n");
+	free(out.data);
+	return quoted;
+}
+
+int fyai_cmd_config_review(struct fyai_cmd_call *call, fy_generic *result)
+{
+	const char *id = fyai_cmd_arg_str(call, "id");
+	const char *quoted;
+	fy_generic shown;
+
+	if (config_need_arena(call))
+		return -1;
+	shown = fyai_settings_proposal_show(call->ctx, call->gb, id);
+	if (!fy_is_mapping(shown))
+		return -1;
+	quoted = config_quote(call->gb, fy_get(shown, "explanation", ""));
+	fyai_error_check(call->ctx, quoted, err,
+			 "config: cannot quote the explanation of '%s'", id);
+	*result = fy_assoc(call->gb, shown, "explanation", quoted);
+	return 0;
+err:
+	return -1;
+}
+
+/* The panel answered the review of the proposal of an approve. */
+static void config_approve_answered(void *user,
+				    const struct fyai_ask_reply *replies,
+				    size_t n)
+{
+	struct fyai_cmd_call *call = user;
+	fy_generic result = fy_invalid;
+	static const struct fyai_ask_reply none = { 0 };
+	int rc;
+
+	/* No answer at all, as from Escape, leaves the proposal pending. */
+	rc = fyai_settings_review_apply(call->priv, replies ? replies : &none,
+					replies ? n : 1, &result);
+	fyai_cmd_done(call, rc, result);
+}
+
+static void config_approve_cancel(struct fyai_cmd_call *call)
+{
+	fyai_ui_ask_withdraw(call->ctx, call);
+	fyai_cmd_done(call, 0, fy_mapping(call->gb, "id",
+		fyai_cmd_arg_str(call, "id"), "status", "pending"));
+}
+
+static void config_approve_cleanup(struct fyai_cmd_call *call)
+{
+	fyai_settings_review_free(call->priv);
+	call->priv = NULL;
+}
+
+/*
+ * A session puts the proposal to the user in the review panel and waits in
+ * the loop of the session; a verb applies it, because the user named it.
+ */
+int fyai_cmd_config_approve(struct fyai_cmd_call *call, fy_generic *result)
+{
+	struct fyai_settings_review *r;
+	int rc;
+
+	if (config_need_arena(call))
+		return -1;
+	r = fyai_settings_review_open(call->ctx, call->gb,
+				      fyai_cmd_arg_str(call, "id"));
+	if (!r)
+		return -1;
+	if (call->surface != FYAI_CMD_SESSION ||
+	    !fyai_ui_ask_available(call->ctx)) {
+		rc = fyai_settings_review_apply(r, NULL, 0, result);
+		fyai_settings_review_free(r);
+		return rc;
+	}
+	call->priv = r;
+	call->cleanup = config_approve_cleanup;
+	call->cancel = config_approve_cancel;
+	rc = fyai_ui_ask(call->ctx, fyai_settings_review_questions(r), NULL,
+			 config_approve_answered, call);
+	fyai_error_check(call->ctx, !rc, err,
+			 "config approve: cannot show the review panel");
+	return FYAI_CMD_PENDING;
+err:
+	return -1;
+}
+
+int fyai_cmd_config_reject(struct fyai_cmd_call *call, fy_generic *result)
+{
+	if (config_need_arena(call))
+		return -1;
+	return fyai_settings_proposal_decide(call->ctx, call->gb,
+					     fyai_cmd_arg_str(call, "id"),
+					     false, result);
 }
 
 int fyai_cmd_config_export(struct fyai_cmd_call *call, fy_generic *result)

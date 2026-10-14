@@ -2765,6 +2765,8 @@ enum fyai_model_access fyai_config_model_access_tree(const char *path)
 
 static int config_session_layer_set(struct fyai_ctx *ctx, const char *key,
 				    fy_generic value);
+static int config_session_layer_check(struct fyai_ctx *ctx, fy_generic layer,
+				      const char *origin, bool adopt);
 
 int fyai_config_session_set(struct fyai_ctx *ctx, const char *key,
 			    fy_generic value)
@@ -2787,25 +2789,63 @@ static int config_session_layer_set(struct fyai_ctx *ctx, const char *key,
 				    fy_generic value)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
-	fy_generic layer, base, doc, report;
+	fy_generic layer;
 
 	layer = fy_is_valid(cfg->config_session) ? cfg->config_session :
 		fy_map_empty;
 	layer = fy_set_at_pathstr(cfg->gb, layer, key, value);
 	fyai_error_check(ctx, fy_is_valid(layer), err,
 			 "%s: cannot set the value", key);
+	return config_session_layer_check(ctx, layer, key, true);
+err:
+	return -1;
+}
+
+/*
+ * Check the session layer @layer over the configuration in force and, when
+ * @adopt, make it the session layer and derive the run from it. @origin
+ * names what is checked in a problem.
+ */
+static int config_session_layer_check(struct fyai_ctx *ctx, fy_generic layer,
+				      const char *origin, bool adopt)
+{
+	struct fyai_cfg *cfg = ctx->cfg;
+	fy_generic base, doc, report;
+
 	base = fy_is_valid(ctx->arena_config) ? ctx->arena_config :
 	       cfg->config_doc;
 	doc = config_merge(cfg->gb, base, layer);
-	report = fyai_config_validate_report(cfg, doc, key);
+	report = fyai_config_validate_report(cfg, doc, origin);
 	if (!fyai_schema_valid(report)) {
-		fyai_config_report_problems(cfg, report);
+		if (adopt)
+			fyai_config_report_problems(cfg, report);
 		return -1;
 	}
+	if (!adopt)
+		return 0;
 	cfg->config_session = layer;
 	return config_rederive_doc(ctx, doc);
-err:
-	return -1;
+}
+
+int fyai_config_session_layer_adopt(struct fyai_ctx *ctx, fy_generic layer)
+{
+	return config_session_layer_check(ctx, layer, "session", true);
+}
+
+bool fyai_config_session_layer_valid(struct fyai_ctx *ctx, fy_generic layer)
+{
+	return !config_session_layer_check(ctx, layer, "session", false);
+}
+
+fy_generic fyai_config_check(struct fyai_cfg *cfg, fy_generic *docp)
+{
+	fy_generic report;
+
+	report = fyai_config_validate_report(cfg, *docp, "config");
+	if (!fy_equal(fy_get(report, "result", fy_invalid), "ok"))
+		return fy_get(report, "problems", fy_seq_empty);
+	*docp = fy_get(report, "config", *docp);
+	return fy_seq_empty;
 }
 
 int fyai_config_adopt_catalog(struct fyai_ctx *ctx)
