@@ -1241,7 +1241,7 @@ static fy_generic settings_present(struct settings_walk *w,
 		rc = settings_apply(ctx, w->gb, c, explanation, &id, NULL,
 				    fy_invalid);
 		status = "applied";
-	} else if (fyai_agent_delegated(ctx) || !fyai_ui_ask_available(ctx)) {
+	} else if (!fyai_ui_ask_available(ctx)) {
 		rc = settings_propose(ctx, w->gb, c, explanation, &id);
 		status = "pending";
 	} else {
@@ -1646,6 +1646,9 @@ static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 
 	if (ctx->cfg->model_access < 0)
 		return fy_value(w.gb, "settings: model_access is none");
+	if (fyai_agent_delegated(ctx))
+		return fy_value(w.gb, "settings: only the session of the user "
+				"has the settings tool");
 	action = fy_get(args, "action", fy_invalid);
 	path = fy_gb_intern_string(w.gb, fy_get(args, "path", ""));
 	if (!path)
@@ -1953,6 +1956,7 @@ const struct fyai_tool_def fyai_settings_defs[] = {
 	{ .name = "settings", .run = settings_run, .head = settings_head,
 	  .format_result = settings_format,
 	  .describe = settings_describe_tool,
-	  .flags = FYAI_TOOL_PARENT | FYAI_TOOL_WHOLE_RESULT },
+	  .flags = FYAI_TOOL_PARENT | FYAI_TOOL_ROOT_ONLY |
+		   FYAI_TOOL_WHOLE_RESULT },
 };
 const size_t fyai_settings_defs_count = ARRAY_SIZE(fyai_settings_defs);
