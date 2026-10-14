@@ -717,6 +717,8 @@ struct fyai_ctx {
 	 * cleanup removes the tree, and a forked child forgets it.
 	 */
 	char *skill_root;
+	/* The directory that the settings tool exports to, or NULL. */
+	char *settings_export_dir;
 	struct fyai_skill_dir *skill_dirs;
 	/* Active branch state and its next ref-log predecessor. */
 	char *branch;

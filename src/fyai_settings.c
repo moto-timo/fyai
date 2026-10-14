@@ -16,10 +16,13 @@
 #include "config.h"
 #endif
 
+#include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "fyai.h"
 #include "fyai_agent.h"
@@ -41,7 +44,7 @@
 #define SETTINGS_DEPTH_MAX	64
 /* The bound on the keys that one list gives. */
 #define SETTINGS_LIST_MAX	100
-/* The bound on the rows that a select walks. */
+/* The bound on the rows that a select or an export walks. */
 #define SETTINGS_WALK_MAX	5000
 /* The bounds on the rows that a select gives, and on its conditions. */
 #define SETTINGS_SELECT_LIMIT	20
@@ -1663,6 +1666,8 @@ static fy_generic settings_change_run(struct settings_walk *w, fy_generic args,
 
 static fy_generic settings_catalog_select(struct settings_walk *w,
 					  fy_generic cat, fy_generic args);
+static fy_generic settings_export(struct settings_walk *w, bool catalog,
+				  fy_generic args);
 
 /* The providers that offer each model: {canonical id: [provider, ...]}. */
 static fy_generic catalog_offered_by(struct fy_generic_builder *gb,
@@ -1820,9 +1825,12 @@ static fy_generic settings_catalog_run(struct settings_walk *w,
 				      fy_get(args, "limit", 0LL));
 	if (fy_equal(action, "select"))
 		return settings_catalog_select(w, cat, args);
+	if (fy_equal(action, "export"))
+		return settings_export(w, true, args);
 	if (!fy_any_equal(action, "get", "list"))
 		return fy_value(w->gb, "settings: the catalogue is read only; "
-				"its actions are search, get, list and select");
+				"its actions are search, get, list, select "
+				"and export");
 	v = *path ? fyai_catalog_at(w->ctx, path) : cat;
 	if (!fy_is_valid(v))
 		return fy_value(w->gb, fy_sprintfa("settings: the catalogue "
@@ -2208,6 +2216,145 @@ static fy_generic settings_catalog_select(struct settings_walk *w,
 			"from", from);
 }
 
+/*
+ * export: write the document, as the model may read it, to a file that a
+ * program can search. fyai names the file, in a directory of its own under
+ * $TMPDIR that it removes at cleanup; the model names no path. The
+ * configuration leaves its hidden keys out.
+ */
+
+/* The names of the files that an export writes. */
+static const char *const settings_export_files[] = {
+	"config.json", "config.yaml", "config-rows.json", "config-rows.yaml",
+	"catalog.json", "catalog.yaml",
+};
+
+static const char *settings_export_dir(struct fyai_ctx *ctx)
+{
+	const char *tmp;
+	char tmpl[PATH_MAX];
+	int rc;
+
+	if (ctx->settings_export_dir)
+		return ctx->settings_export_dir;
+	tmp = getenv("TMPDIR");
+	if (fy_str_empty(tmp))
+		tmp = "/tmp";
+	rc = snprintf(tmpl, sizeof(tmpl), "%s/fyai-settings-XXXXXX", tmp);
+	fyai_error_check(ctx, rc > 0 && rc < (int)sizeof(tmpl), err_out,
+			 "settings: the temporary directory %s is too long",
+			 tmp);
+	/* mkdtemp makes the directory 0700: only this user reads the files. */
+	fyai_error_check(ctx, mkdtemp(tmpl), err_out,
+			 "settings: cannot make a directory in %s: %s", tmp,
+			 strerror(errno));
+	ctx->settings_export_dir = strdup(tmpl);
+	fyai_error_check(ctx, ctx->settings_export_dir, err_out,
+			 "settings: cannot keep the name of %s", tmpl);
+	return ctx->settings_export_dir;
+err_out:
+	return NULL;
+}
+
+void fyai_settings_release(struct fyai_ctx *ctx)
+{
+	size_t i;
+
+	if (!ctx || !ctx->settings_export_dir)
+		return;
+	/* Cleanup cannot act on a failure: the files are temporary. */
+	for (i = 0; i < ARRAY_SIZE(settings_export_files); i++)
+		(void)unlinkat(AT_FDCWD, fy_sprintfa("%s/%s",
+				ctx->settings_export_dir,
+				settings_export_files[i]), 0);
+	(void)rmdir(ctx->settings_export_dir);
+	fyai_settings_abandon(ctx);
+}
+
+void fyai_settings_abandon(struct fyai_ctx *ctx)
+{
+	if (!ctx)
+		return;
+	free(ctx->settings_export_dir);
+	ctx->settings_export_dir = NULL;
+}
+
+static int settings_write_file(const char *path, const char *text)
+{
+	size_t len = strlen(text), done;
+	ssize_t n;
+	int fd, rc;
+
+	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW,
+		  0600);
+	if (fd < 0)
+		return -1;
+	for (done = 0; done < len; done += (size_t)n) {
+		n = write(fd, text + done, len - done);
+		if (n < 0 && errno == EINTR) {
+			n = 0;
+			continue;
+		}
+		if (n <= 0)
+			break;
+	}
+	rc = close(fd);
+	return done == len && !rc ? 0 : -1;
+}
+
+static fy_generic settings_export(struct settings_walk *w, bool catalog,
+				  fy_generic args)
+{
+	const char *format = fy_get(args, "format", "json");
+	const char *shape = fy_get(args, "shape", "tree");
+	const char *dir, *text, *path;
+	fy_generic doc, emitted, result;
+
+	if (strcmp(format, "json") && strcmp(format, "yaml"))
+		return fy_value(w->gb, "settings: format must be json or "
+				"yaml");
+	if (strcmp(shape, "tree") && strcmp(shape, "rows"))
+		return fy_value(w->gb, "settings: shape must be tree or rows");
+	if (catalog && !strcmp(shape, "rows"))
+		return fy_value(w->gb, "settings: the catalogue is a tree; "
+				"select gives rows of it");
+	if (catalog)
+		doc = fyai_catalog_effective(w->ctx->arena_catalog, NULL);
+	else if (!strcmp(shape, "rows"))
+		doc = settings_config_rows(w, "", fyai_config_schema(NULL));
+	else
+		doc = settings_redact(w, "", w->ctx->cfg->config_doc, 0);
+	if (!fy_is_valid(doc))
+		return fy_value(w->gb, "settings: the document cannot be read");
+	if (!strcmp(format, "json")) {
+		text = emit_json_string(w->gb, doc);
+	} else {
+		emitted = fy_emit(w->gb, doc, FYAI_YAML_EMIT_FLAGS, NULL);
+		text = fy_is_string(emitted) ?
+		       fy_gb_intern_string(w->gb, fy_castp(&emitted, "")) :
+		       NULL;
+	}
+	if (!text)
+		return fy_value(w->gb, "settings: the document could not be "
+				"written");
+	dir = settings_export_dir(w->ctx);
+	if (!dir)
+		return fy_value(w->gb, "settings: there is no directory to "
+				"write to");
+	path = fy_gb_intern_string(w->gb, fy_sprintfa("%s/%s%s.%s", dir,
+		catalog ? "catalog" : "config",
+		!strcmp(shape, "rows") ? "-rows" : "", format));
+	if (!path || settings_write_file(path, text))
+		return fy_value(w->gb, fy_sprintfa("settings: cannot write %s: "
+				"%s", path ? path : dir, strerror(errno)));
+	result = fy_mapping(w->gb, "document", catalog ? "catalog" : "config",
+			    "path", path, "format", format, "shape", shape,
+			    "bytes", (long long)strlen(text));
+	if (!fy_empty(w->hidden))
+		result = fy_assoc(w->gb, result, "hidden", w->hidden);
+	return result;
+}
+
 static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 				       bool *okp)
 {
@@ -2272,6 +2419,10 @@ static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 		if (!fy_is_mapping(result))
 			return result;
 		result = fy_assoc(w.gb, result, "path", path);
+	} else if (fy_equal(action, "export")) {
+		result = settings_export(&w, false, args);
+		if (!fy_is_mapping(result))
+			return result;
 	} else if (fy_equal(action, "proposals")) {
 		result = settings_proposals_run(&w);
 	} else if (fy_equal(action, "search")) {
@@ -2304,8 +2455,8 @@ static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 			result = fy_assoc(w.gb, result, "truncated", true);
 	} else {
 		return fy_value(w.gb, "settings: action must be search, "
-				"describe, get, list, select, change, revert "
-				"or proposals");
+				"describe, get, list, select, export, change, "
+				"revert or proposals");
 	}
 	if (!fy_empty(w.hidden))
 		result = fy_assoc(w.gb, result, "hidden", w.hidden);
@@ -2425,13 +2576,15 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 		path = "?";
 	if (fy_equal(fy_get(args, "document", fy_invalid), "catalog")) {
 		fprintf(mf, "**catalog** %s ", fy_any_equal(action, "search",
-			"get", "list", "select") ?
+			"get", "list", "select", "export") ?
 			fy_castp(&action, "") : "?");
 		if (fy_equal(action, "search"))
 			fprintf(mf, "%s", settings_span(gb, query));
 		else if (fy_equal(action, "select"))
 			fprintf(mf, "%s", settings_span(gb,
 				fy_get(args, "from", "")));
+		else if (fy_equal(action, "export"))
+			fprintf(mf, "%s", fy_get(args, "format", "json"));
 		else
 			fprintf(mf, "`%s`", *path ? path : "catalog");
 	} else if (fy_equal(action, "search")) {
@@ -2450,6 +2603,10 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 		fprintf(mf, "**settings** revert %s", settings_span(gb, id));
 	} else if (fy_equal(action, "proposals")) {
 		fprintf(mf, "**settings** proposals");
+	} else if (fy_equal(action, "export")) {
+		fprintf(mf, "**settings** export %s",
+			fy_equal(fy_get(args, "format", fy_invalid), "yaml") ?
+			"yaml" : "json");
 	} else if (fy_equal(action, "select")) {
 		fprintf(mf, "**settings** select `%s`",
 			*path ? path : "config");
@@ -2515,6 +2672,14 @@ static void settings_format_select(FILE *mf, struct fy_generic_builder *gb,
 			SETTINGS_ROWS_MAX);
 }
 
+/* The file an export wrote. */
+static void settings_format_export(FILE *mf, struct fy_generic_builder *gb,
+				   fy_generic data)
+{
+	fprintf(mf, "Wrote %s, %lld bytes\n", settings_span(gb,
+		fy_get(data, "path", "")), fy_get(data, "bytes", 0LL));
+}
+
 /* The rows of a catalogue call for the user. */
 static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
 				    fy_generic action, fy_generic data)
@@ -2524,6 +2689,10 @@ static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
 
 	if (fy_equal(action, "select")) {
 		settings_format_select(mf, gb, data);
+		return;
+	}
+	if (fy_equal(action, "export")) {
+		settings_format_export(mf, gb, data);
 		return;
 	}
 	if (fy_equal(action, "search")) {
@@ -2587,6 +2756,8 @@ static char *settings_format(struct fyai_ctx *ctx,
 		settings_format_catalog(mf, gb, action, data);
 	} else if (fy_equal(action, "select")) {
 		settings_format_select(mf, gb, data);
+	} else if (fy_equal(action, "export")) {
+		settings_format_export(mf, gb, data);
 	} else if (fy_equal(action, "search")) {
 		fprintf(mf, "%lld found\n\n", fy_get(data, "found", 0LL));
 		settings_format_keys(mf, gb, fy_get(data, "keys", fy_invalid),

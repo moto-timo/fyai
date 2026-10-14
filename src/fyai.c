@@ -61,6 +61,7 @@
 #include "fyai_turn.h"
 #include "fyai_branch.h"
 #include "fyai_skill.h"
+#include "fyai_settings.h"
 
 static enum fyai_event_action fyai_signal_cb(const struct fyai_event *ev)
 {
@@ -2609,6 +2610,7 @@ void fyai_cleanup(struct fyai_ctx *ctx)
 	/* After the output document: its discard still talks to the sink. */
 	fyai_agents_cleanup(ctx);
 	fyai_skill_dirs_release(ctx);
+	fyai_settings_release(ctx);
 	fyai_cleanup_transient_builder(ctx);
 	fyai_sink_destroy(ctx->sink);
 	ctx->sink = NULL;

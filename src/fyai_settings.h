@@ -72,4 +72,10 @@ int fyai_settings_review_apply(struct fyai_settings_review *r,
 			       bool notify, fy_generic *resultp);
 void fyai_settings_review_free(struct fyai_settings_review *r);
 
+/* Remove the files that this invocation exported, and their directory. */
+void fyai_settings_release(struct fyai_ctx *ctx);
+
+/* Forget that directory without removing it: a forked child does not own it. */
+void fyai_settings_abandon(struct fyai_ctx *ctx);
+
 #endif

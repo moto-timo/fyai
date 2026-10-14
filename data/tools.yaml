@@ -749,13 +749,15 @@
       gives each offering with a `provider` column, and `pricing/input`, `pricing/output` and
       `pricing/blended` (three input tokens to one output token) are its prices. For example,
       the cheapest model of a provider is `from: providers/anthropic/models`, `sort:
-      pricing/blended`, `limit: 1`.
+      pricing/blended`, `limit: 1`. `export` writes the document to a file that fyai names and
+      removes when the session ends, so a program, such as jq, can search it: the
+      configuration without its hidden keys, as a tree or as rows, or the catalogue.
     parameters:
       type: object
       properties:
         action:
           type: string
-          enum: [search, describe, get, list, select, change, revert, proposals]
+          enum: [search, describe, get, list, select, export, change, revert, proposals]
           description: |-
             What to do.
         document:
@@ -809,6 +811,16 @@
           enum: [asc, desc]
           description: |-
             For `select`: the order of the sort; `asc` by default.
+        format:
+          type: string
+          enum: [json, yaml]
+          description: |-
+            For `export`: the format of the file; `json` by default.
+        shape:
+          type: string
+          enum: [tree, rows]
+          description: |-
+            For `export` of the configuration: the document as a `tree`, the default, or as the `rows` that `select` reads.
         query:
           type: string
           description: |-

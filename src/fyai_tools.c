@@ -55,6 +55,7 @@
 #include "fyai_output.h"
 #include "fyai_ask.h"
 #include "fyai_skill.h"
+#include "fyai_settings.h"
 #include "fyai_todo.h"
 #include "fyai_tools.h"
 #include "fyai_view.h"
@@ -5342,6 +5343,7 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	ctx->patch_display = NULL;
 	fyai_output_cleanup(ctx);		/* the document it has open */
 	fyai_skill_dirs_abandon(ctx);		/* the skills it wrote out */
+	fyai_settings_abandon(ctx);		/* and the exports */
 	ctx->ui = NULL;				/* its display */
 	ctx->browser = NULL;
 	ctx->agents = NULL;
