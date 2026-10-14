@@ -2334,7 +2334,8 @@ int fyai_tool_preview_lines(const struct fyai_cfg *cfg, const char *name)
 	if (!strcmp(name, "agent"))
 		return 0;
 	/* A diff is read as a whole, as a patch is. */
-	if (!strcmp(name, "apply_patch") || !strcmp(name, "diff"))
+	if (!strcmp(name, "apply_patch") || !strcmp(name, "diff") ||
+	    fyai_tool_has(name, FYAI_TOOL_WHOLE_RESULT))
 		return -1;
 	return cfg->tool_preview_lines;
 }

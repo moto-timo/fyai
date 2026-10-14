@@ -85,6 +85,11 @@ enum {
 	FYAI_TOOL_CHILD_ONLY	= 1 << 6,
 	/* A delegated agent cannot call a tool reserved for the user-owned root. */
 	FYAI_TOOL_ROOT_ONLY	= 1 << 7,
+	/*
+	 * The result for the user is read as a whole, as a patch is: the
+	 * formatter keeps it short, and the preview does not cut it.
+	 */
+	FYAI_TOOL_WHOLE_RESULT	= 1 << 8,
 };
 
 /*

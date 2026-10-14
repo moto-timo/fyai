@@ -124,6 +124,31 @@ static bool settings_arena_protected(struct fyai_ctx *ctx)
 	return inside;
 }
 
+/*
+ * The default of the schema node @node: its own, else the mapping of the
+ * defaults of its members, so a group such as `retry` shows what applies.
+ * fy_invalid when nothing below it has a default.
+ */
+static fy_generic settings_schema_default(struct fy_generic_builder *gb,
+					  fy_generic node, int depth)
+{
+	fy_generic v, out, key, child;
+
+	v = fy_get(node, "default", fy_invalid);
+	if (fy_is_valid(v) || depth > SETTINGS_DEPTH_MAX)
+		return v;
+	out = fy_invalid;
+	fy_foreach_key_value(key, child, fy_get(node, "properties",
+						fy_invalid)) {
+		v = settings_schema_default(gb, child, depth + 1);
+		if (!fy_is_valid(v))
+			continue;
+		out = fy_assoc(gb, fy_is_valid(out) ? out : fy_mapping(gb),
+			       key, v);
+	}
+	return out;
+}
+
 /* The value in force at @path, or the default of the schema. */
 static fy_generic settings_value(struct settings_walk *w, const char *path,
 				 const char **layerp)
@@ -135,8 +160,9 @@ static fy_generic settings_value(struct settings_walk *w, const char *path,
 		cfg->config_doc;
 	if (!fy_is_valid(v)) {
 		*layerp = "default";
-		return fy_get(fyai_config_schema_node(path), "default",
-			      fy_invalid);
+		return settings_schema_default(w->gb,
+					       fyai_config_schema_node(path),
+					       0);
 	}
 	if (fy_is_mapping(cfg->config_session) && *path &&
 	    fy_is_valid(fy_get_at_pathstr(w->gb, cfg->config_session, path))) {
@@ -581,6 +607,47 @@ static const char *settings_diff_body(struct fy_generic_builder *gb,
 }
 
 /*
+ * The fence of a block that holds @text: more backticks than any run in
+ * it, so that no text can close the block and write Markdown of its own.
+ * NULL for a run too long to outdo.
+ */
+static const char *settings_fence(struct fy_generic_builder *gb,
+				  const char *text)
+{
+	char fence[64];
+	size_t run, longest = 0;
+	const char *p;
+
+	for (p = text; *p; p++) {
+		for (run = 0; p[run] == '`'; run++)
+			;
+		if (run > longest)
+			longest = run;
+		if (run)
+			p += run - 1;
+	}
+	if (longest >= sizeof(fence) - 1)
+		return NULL;
+	memset(fence, '`', longest < 3 ? 3 : longest + 1);
+	fence[longest < 3 ? 3 : longest + 1] = '\0';
+	return fy_gb_intern_string(gb, fence);
+}
+
+/* @unified as a fenced diff block, without the header rows of each file. */
+static const char *settings_diff_block(struct fy_generic_builder *gb,
+				       const char *unified)
+{
+	const char *body, *fence;
+
+	body = settings_diff_body(gb, unified);
+	fence = body ? settings_fence(gb, body) : NULL;
+	if (!fence)
+		return NULL;
+	return fy_gb_intern_string(gb, fy_sprintfa("%sdiff\n%s%s\n", fence,
+						   body, fence));
+}
+
+/*
  * Make the diff of @c: the unified diff of the emitted documents of each
  * layer that it writes, under a summary row. The diff holds values that the
  * model wrote, so its fence is longer than every run of backticks in it, and
@@ -592,8 +659,8 @@ static int settings_change_diff(struct settings_walk *w,
 {
 	struct response_buffer all = { 0 };
 	const char *a, *b, *p, *scope, *body;
-	char *part, fence[64];
-	size_t added = 0, removed = 0, run, longest = 0;
+	char *part;
+	size_t added = 0, removed = 0;
 	int rc = -1;
 
 	if (fy_is_valid(c->stored)) {
@@ -631,31 +698,18 @@ static int settings_change_diff(struct settings_walk *w,
 		else if (*p == '-' && strncmp(p, "---", 3))
 			removed++;
 	}
-	for (p = c->unified; *p; p++) {
-		for (run = 0; p[run] == '`'; run++)
-			;
-		if (run > longest)
-			longest = run;
-		if (run)
-			p += run - 1;
-	}
-	if (longest >= sizeof(fence) - 1)
-		goto out;
-	memset(fence, '`', longest < 3 ? 3 : longest + 1);
-	fence[longest < 3 ? 3 : longest + 1] = '\0';
 	scope = c->trial ? "this session only, as a trial" :
 		fy_is_valid(c->stored) && fy_is_valid(c->session) ?
 			"the branch configuration and this session" :
 		fy_is_valid(c->stored) ? "the branch configuration" :
 			"this session";
-	body = settings_diff_body(w->gb, c->unified);
+	body = settings_diff_block(w->gb, c->unified);
 	if (!body)
 		goto out;
 	c->diff = fy_gb_intern_string(w->gb, fy_sprintfa(
-		"**%zu key%s \u00b7 +%zu \u2212%zu lines \u00b7 %s**\n\n"
-		"%sdiff\n%s%s\n",
+		"**%zu key%s \u00b7 +%zu \u2212%zu lines \u00b7 %s**\n\n%s",
 		fy_len(c->paths), fy_len(c->paths) == 1 ? "" : "s",
-		added, removed, scope, fence, body, fence));
+		added, removed, scope, body));
 	rc = c->diff ? 0 : -1;
 out:
 	free(all.data);
@@ -1576,8 +1630,8 @@ static fy_generic settings_change_run(struct settings_walk *w, fy_generic args,
 	return settings_present(w, &c, explanation, okp);
 }
 
-static fy_generic settings_run(struct fyai_ctx *ctx, fy_generic args,
-			       bool *okp)
+static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
+				       bool *okp)
 {
 	struct settings_walk w;
 	fy_generic action, result, node, value;
@@ -1660,6 +1714,30 @@ static fy_generic settings_run(struct fyai_ctx *ctx, fy_generic args,
 	return result;
 }
 
+/*
+ * The result of the tool is text, as every function result is: a structure
+ * goes to the model as its compact JSON, which the formatter reads back for
+ * the user.
+ */
+static fy_generic settings_run(struct fyai_ctx *ctx, fy_generic args,
+			       bool *okp)
+{
+	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
+	fy_generic result;
+	const char *text;
+
+	result = settings_run_generic(ctx, args, okp);
+	if (!fy_is_mapping(result))
+		return result;
+	text = emit_json_string(gb, result);
+	if (!text) {
+		*okp = false;
+		return fy_value(gb, "settings: the answer could not be "
+				"written");
+	}
+	return fy_value(gb, text);
+}
+
 /* The tool is not offered when model_access is none. */
 static fy_generic settings_describe_tool(struct fyai_ctx *ctx,
 					 struct fy_generic_builder *gb,
@@ -1669,29 +1747,212 @@ static fy_generic settings_describe_tool(struct fyai_ctx *ctx,
 	return ctx->cfg->model_access < 0 ? fy_invalid : tool;
 }
 
+/* The bound on the characters of a value or a query in a row. */
+#define SETTINGS_SPAN_MAX	60
+/* The bound on the keys that a result shows the user. */
+#define SETTINGS_ROWS_MAX	8
+
+/*
+ * @text as a code span of one row: control bytes and line breaks become
+ * blanks, a long text ends in an ellipsis, and the span is fenced with more
+ * backticks than any run in it. The model or a configuration wrote it.
+ */
+static const char *settings_span(struct fy_generic_builder *gb,
+				 const char *text)
+{
+	char buf[SETTINGS_SPAN_MAX * 4 + 8];
+	const char *fence;
+	size_t i, n, chars;
+
+	for (i = n = chars = 0; text[i] && n < sizeof(buf) - 8; i++) {
+		if (((unsigned char)text[i] & 0xc0) != 0x80 &&
+		    ++chars > SETTINGS_SPAN_MAX)
+			break;
+		buf[n++] = (unsigned char)text[i] < 0x20 ||
+			   (unsigned char)text[i] == 0x7f ? ' ' : text[i];
+	}
+	if (text[i]) {
+		memcpy(buf + n, "\u2026", strlen("\u2026"));
+		n += strlen("\u2026");
+	}
+	buf[n] = '\0';
+	fence = settings_fence(gb, buf);
+	if (!fence)
+		return "`?`";
+	/* A one-backtick span suffices unless the text holds a backtick. */
+	if (!strchr(buf, '`'))
+		fence = "`";
+	return fy_gb_intern_string(gb, fy_sprintfa("%s%s%s%s%s", fence,
+		buf[0] == '`' ? " " : "", buf,
+		n && buf[n - 1] == '`' ? " " : "", fence));
+}
+
+/* A value as a span: a string as it is, any other value as flow YAML. */
+static const char *settings_value_span(struct fy_generic_builder *gb,
+				       fy_generic v)
+{
+	fy_generic text;
+
+	if (fy_is_string(v))
+		return settings_span(gb, fy_castp(&v, ""));
+	text = fy_emit(gb, v, FYOPEF_DISABLE_DIRECTORY | FYOPEF_MODE_YAML_1_2 |
+		       FYOPEF_STYLE_ONELINE | FYOPEF_WIDTH_INF |
+		       FYOPEF_NO_ENDING_NEWLINE, NULL);
+	return settings_span(gb, fy_is_string(text) ? fy_castp(&text, "") :
+			     "?");
+}
+
 static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 			  struct fy_generic_builder *gb, fy_generic args,
 			  int preview_lines, struct fyai_md_blocks *blocks)
 {
 	fy_generic action = fy_get(args, "action", fy_invalid);
+	fy_generic changes = fy_get(args, "changes", fy_invalid);
 	const char *path = fy_get(args, "path", "");
+	const char *query = fy_get(args, "query", "");
+	const char *id = fy_get(args, "id", "");
+	const char *first;
 
 	(void)ctx;
-	(void)gb;
 	(void)preview_lines;
 	(void)blocks;
 	/* The model wrote the path: one that is not valid is not shown. */
 	if (!settings_path_valid(path))
 		path = "?";
-	fprintf(mf, "**settings** %s `%s`\n\n",
-		fy_any_equal(action, "search", "describe", "get", "list",
-			     "change", "revert", "proposals") ?
-			fy_castp(&action, "") : "?",
-		*path ? path : "config");
+	if (fy_equal(action, "search")) {
+		fprintf(mf, "**settings** search %s", settings_span(gb, query));
+		if (*path)
+			fprintf(mf, " in `%s`", path);
+	} else if (fy_equal(action, "change")) {
+		first = fy_get(fy_get_at(changes, 0, fy_invalid), "path", "");
+		fprintf(mf, "**settings** change `%s`",
+			settings_path_valid(first) && *first ? first : "?");
+		if (fy_len(changes) > 1)
+			fprintf(mf, " (+%zu more)", fy_len(changes) - 1);
+		if (fy_get(args, "trial", false))
+			fprintf(mf, " \u00b7 trial");
+	} else if (fy_equal(action, "revert")) {
+		fprintf(mf, "**settings** revert %s", settings_span(gb, id));
+	} else if (fy_equal(action, "proposals")) {
+		fprintf(mf, "**settings** proposals");
+	} else {
+		fprintf(mf, "**settings** %s `%s`",
+			fy_any_equal(action, "describe", "get", "list") ?
+				fy_castp(&action, "") : "?",
+			*path ? path : "config");
+	}
+	fprintf(mf, "\n\n");
+}
+
+/* A row for each key of @rows, at most a bound, with what follows. */
+static void settings_format_keys(FILE *mf, struct fy_generic_builder *gb,
+				 fy_generic rows, bool values)
+{
+	fy_generic row;
+	size_t n = 0;
+
+	fy_foreach(row, rows) {
+		if (n++ == SETTINGS_ROWS_MAX)
+			break;
+		fprintf(mf, "- %s \u00b7 %s", settings_span(gb,
+			fy_get(row, "key", "")), fy_get(row, "access", ""));
+		if (values)
+			fprintf(mf, " \u00b7 %s", settings_value_span(gb,
+				fy_get(row, "value", fy_null)));
+		else
+			fprintf(mf, " \u2014 %s", settings_span(gb,
+				fy_get(row, "summary", "")));
+		fprintf(mf, "\n");
+	}
+	if (fy_len(rows) > SETTINGS_ROWS_MAX)
+		fprintf(mf, "- _%zu more_\n", fy_len(rows) - SETTINGS_ROWS_MAX);
+	if (!n)
+		fprintf(mf, "_No key._\n");
+}
+
+/*
+ * The result of a call for the user: short rows for the reads, and for a
+ * change the outcome and the whole diff that fyai made, so no change is
+ * silent. The model gets the result as it is.
+ */
+static char *settings_format(struct fyai_ctx *ctx,
+			     struct fy_generic_builder *gb, fy_generic args,
+			     const char *result)
+{
+	fy_generic data, action, v;
+	const char *status, *diff, *block;
+	char *out = NULL;
+	size_t len = 0;
+	FILE *mf;
+
+	(void)ctx;
+	data = parse_json_string(gb, result);
+	if (!fy_is_mapping(data))
+		return NULL;
+	action = fy_get(args, "action", fy_invalid);
+	mf = open_memstream(&out, &len);
+	if (!mf)
+		return NULL;
+	if (fy_equal(action, "search")) {
+		fprintf(mf, "%lld found\n\n", fy_get(data, "found", 0LL));
+		settings_format_keys(mf, gb, fy_get(data, "keys", fy_invalid),
+				     false);
+	} else if (fy_equal(action, "list")) {
+		settings_format_keys(mf, gb, fy_get(data, "keys", fy_invalid),
+				     true);
+	} else if (fy_any_equal(action, "describe", "get")) {
+		fprintf(mf, "%s \u00b7 %s", settings_span(gb,
+			fy_get(data, "path", "")), fy_get(data, "access", ""));
+		if (fy_is_string(fy_get(data, "scope", fy_invalid)))
+			fprintf(mf, " \u00b7 %s", fy_get(data, "scope", ""));
+		v = fy_get(data, "value", fy_invalid);
+		if (fy_is_valid(v))
+			fprintf(mf, " \u00b7 %s (%s)",
+				settings_value_span(gb, v),
+				fy_get(data, "layer", "?"));
+		fprintf(mf, "\n");
+	} else if (fy_any_equal(action, "change", "revert")) {
+		status = fy_get(data, "status", "");
+		if (!strcmp(status, "applied"))
+			fprintf(mf, "**%s** as change %s\n",
+				fy_equal(action, "revert") ? "Taken back" :
+				"Applied",
+				settings_span(gb, fy_get(data, "id", "")));
+		else if (!strcmp(status, "pending"))
+			fprintf(mf, "**Waits** as proposal %s for `config "
+				"approve`\n", settings_span(gb,
+						fy_get(data, "id", "")));
+		else
+			fprintf(mf, "**Rejected**\n");
+		if (fy_is_string(fy_get(data, "reply", fy_invalid)))
+			fprintf(mf, "\nThe user replied %s\n", settings_span(gb,
+				fy_get(data, "reply", "")));
+		diff = fy_get(data, "diff", "");
+		block = *diff ? settings_diff_block(gb, diff) : NULL;
+		if (block)
+			fprintf(mf, "\n%s", block);
+	} else if (fy_equal(action, "proposals")) {
+		fy_foreach(v, fy_get(data, "proposals", fy_invalid))
+			fprintf(mf, "- %s \u00b7 %s\n", settings_span(gb,
+				fy_get(v, "id", "")), fy_get(v, "status", ""));
+		if (fy_empty(fy_get(data, "proposals", fy_seq_empty)))
+			fprintf(mf, "_No proposal._\n");
+	} else {
+		fclose(mf);
+		free(out);
+		return NULL;
+	}
+	if (fclose(mf)) {
+		free(out);
+		return NULL;
+	}
+	return out;
 }
 
 const struct fyai_tool_def fyai_settings_defs[] = {
 	{ .name = "settings", .run = settings_run, .head = settings_head,
-	  .describe = settings_describe_tool, .flags = FYAI_TOOL_PARENT },
+	  .format_result = settings_format,
+	  .describe = settings_describe_tool,
+	  .flags = FYAI_TOOL_PARENT | FYAI_TOOL_WHOLE_RESULT },
 };
 const size_t fyai_settings_defs_count = ARRAY_SIZE(fyai_settings_defs);
