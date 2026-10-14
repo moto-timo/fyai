@@ -48,9 +48,20 @@
 
 struct ui_line { struct ui_line *next; char *text; };
 
+/* The rows of a Markdown text of a question, rendered, and their source. */
+struct ui_rendered {
+	char **rows;
+	int n;
+	char *src;
+	int cols, cap;
+};
+
 /* The text of one question, copied: it outlives the call that queued it. */
 struct ui_qtext {
 	char *header, *question;
+	/* A reviewed change: the proposal that the model wrote and the diff
+	 * that fyai made, or empty. */
+	char *proposal, *diff;
 	bool multi;
 	size_t nopts;
 	struct {
@@ -175,12 +186,10 @@ struct fyai_ui {
 	bool todo_shown;
 	/* The entry the todo panel was built from, to see it change. */
 	fy_generic_value todo_entry;
-	/* The rendered preview of the option under the cursor of a question. */
-	char **preview;
-	int preview_nlines;
-	const struct ui_question *preview_q;
-	size_t preview_cur, preview_opt;
-	int preview_cols, preview_cap;
+	/* The rendered preview of the option under the cursor of a question,
+	 * or the proposal of a reviewed change, and the diff of that change. */
+	struct ui_rendered preview;
+	struct ui_rendered diff;
 	int note_nlines;
 	char *note_input;
 	fyai_event_ms_t next_frame_ms;
@@ -1190,6 +1199,8 @@ static void ui_question_free(struct ui_question *q)
 	for (i = 0; i < q->nq; i++) {
 		free(q->text[i].header);
 		free(q->text[i].question);
+		free(q->text[i].proposal);
+		free(q->text[i].diff);
 		for (o = 0; o < q->text[i].nopts; o++) {
 			free(q->text[i].opt[o].label);
 			free(q->text[i].opt[o].description);
@@ -1220,8 +1231,10 @@ static bool ui_question_copy(struct ui_question *q, fy_generic questions)
 		t = &q->text[q->nq++];
 		t->header = ui_ask_copy(question, "header");
 		t->question = ui_ask_copy(question, "question");
+		t->proposal = ui_ask_copy(question, "proposal");
+		t->diff = ui_ask_copy(question, "diff");
 		t->multi = fy_get(question, "multi_select", false);
-		if (!t->header || !t->question)
+		if (!t->header || !t->question || !t->proposal || !t->diff)
 			return false;
 		o = 0;
 		fy_foreach(option, fy_get(question, "options", fy_invalid)) {
@@ -1695,32 +1708,33 @@ static bool ui_typed_changed(struct fyai_ui *ui, const char *typed)
 
 /* The rows of the preview of an option, at most. */
 #define UI_PREVIEW_ROWS_MAX 14
+/* The rows of the diff of a reviewed change, at most. */
+#define UI_DIFF_ROWS_MAX 24
 /* The blanks before each row of a preview. */
 #define UI_PREVIEW_INDENT 4
 
-static void ui_preview_clear(struct fyai_ui *ui)
+static void ui_rendered_clear(struct ui_rendered *r)
 {
 	int i;
 
-	for (i = 0; i < ui->preview_nlines; i++)
-		free(ui->preview[i]);
-	free(ui->preview);
-	ui->preview = NULL;
-	ui->preview_nlines = 0;
-	ui->preview_q = NULL;
+	for (i = 0; i < r->n; i++)
+		free(r->rows[i]);
+	free(r->rows);
+	free(r->src);
+	memset(r, 0, sizeof(*r));
 }
 
 /* Keep the rows of @rendered, at most @cap, each under the indent. A longer
- * preview ends in a row that says so. */
-static void ui_preview_rows(struct fyai_ui *ui, const char *rendered,
-			    size_t len, int cap)
+ * text ends in a row that says so. */
+static int ui_rendered_rows(struct fyai_ui *ui, struct ui_rendered *r,
+			    const char *rendered, size_t len, int cap)
 {
 	const char *line = rendered, *end = rendered + len, *nl;
 	int n = 0;
 
-	ui->preview = calloc((size_t)cap, sizeof(*ui->preview));
-	fyai_error_check(ui->ctx, ui->preview, err_out,
-			 "cannot keep the preview of an option");
+	r->rows = calloc((size_t)cap, sizeof(*r->rows));
+	fyai_error_check(ui->ctx, r->rows, err_out,
+			 "cannot keep the rows of a question");
 	while (line < end && n < cap) {
 		nl = memchr(line, '\n', (size_t)(end - line));
 		if (!nl)
@@ -1728,78 +1742,114 @@ static void ui_preview_rows(struct fyai_ui *ui, const char *rendered,
 		if (n == cap - 1 && nl < end)
 			nl = line;
 		if (nl == line && n == cap - 1 && line < end)
-			ui->preview[n] = strdup("    \xe2\x80\xa6");
-		else if (asprintf(&ui->preview[n], "%*s%.*s",
+			r->rows[n] = strdup("    \xe2\x80\xa6");
+		else if (asprintf(&r->rows[n], "%*s%.*s",
 				  UI_PREVIEW_INDENT, "", (int)(nl - line),
 				  line) < 0)
-			ui->preview[n] = NULL;
-		fyai_error_check(ui->ctx, ui->preview[n], err_out,
-				 "cannot keep the preview of an option");
-		ui->preview_nlines = ++n;
+			r->rows[n] = NULL;
+		fyai_error_check(ui->ctx, r->rows[n], err_out,
+				 "cannot keep the rows of a question");
+		r->n = ++n;
 		line = nl < end ? nl + 1 : end;
 	}
-	return;
+	return 0;
 
 err_out:
-	ui_preview_clear(ui);
+	ui_rendered_clear(r);
+	return -1;
 }
 
 /*
- * Render the preview of the option under the cursor of @q, when the question
- * has one and the user chooses once. The rows are kept until the option, the
- * question or the size changes. Returns the number of rows.
+ * Render the Markdown @text into @r, at most @cap rows at the width @cols.
+ * The rows are kept until the text, the width or the cap changes. Returns
+ * the number of rows; an empty text, or a cap under three rows, has none.
  */
-static int ui_preview_update(struct fyai_ui *ui, const struct ui_question *q,
-			     int cols, int rows)
+static int ui_rendered_update(struct fyai_ui *ui, struct ui_rendered *r,
+			      const char *text, int cols, int cap)
 {
-	const struct ui_qtext *t;
 	struct response_buffer out = { 0 };
 	struct fyai_cfg *cfg = ui->ctx->cfg;
-	const char *text;
-	size_t opt;
-	int cap, saved, rc;
+	int saved, rc;
 
-	if (!q || q->cur >= q->nq)
-		goto none;
-	t = &q->text[q->cur];
-	opt = q->cursor[q->cur];
-	text = opt < t->nopts ? t->opt[opt].preview : NULL;
-	if (t->multi || !text || !*text)
-		goto none;
-	/* A third of the screen at most, so the options stay in view. */
-	cap = rows / 3 < UI_PREVIEW_ROWS_MAX ? rows / 3 : UI_PREVIEW_ROWS_MAX;
-	if (cap < 3)
-		goto none;
-	if (ui->preview_q == q && ui->preview_cur == q->cur &&
-	    ui->preview_opt == opt && ui->preview_cols == cols &&
-	    ui->preview_cap == cap)
-		return ui->preview_nlines;
-	ui_preview_clear(ui);
+	if (fy_str_empty(text) || cap < 3) {
+		ui_rendered_clear(r);
+		return 0;
+	}
+	if (r->src && !strcmp(r->src, text) && r->cols == cols &&
+	    r->cap == cap)
+		return r->n;
+	ui_rendered_clear(r);
 	saved = fyai_width_reserve_begin(cfg, UI_PREVIEW_INDENT + 2);
 	rc = markdown_render(cfg, text, strlen(text), &out,
 			     markdown_color_enabled(cfg->color),
 			     cfg->theme_variant);
 	fyai_width_reserve_end(cfg, saved);
 	if (rc) {
-		fyai_warning(ui->ctx, "cannot render the preview of an option");
+		fyai_warning(ui->ctx, "cannot render the text of a question");
 		free(out.data);
-		goto none;
+		return 0;
 	}
 	while (out.len && (out.data[out.len - 1] == '\n' ||
 			   out.data[out.len - 1] == '\r'))
 		out.len--;
-	ui_preview_rows(ui, out.data ? out.data : "", out.len, cap);
+	rc = ui_rendered_rows(ui, r, out.data ? out.data : "", out.len, cap);
 	free(out.data);
-	ui->preview_q = q;
-	ui->preview_cur = q->cur;
-	ui->preview_opt = opt;
-	ui->preview_cols = cols;
-	ui->preview_cap = cap;
-	return ui->preview_nlines;
+	if (rc)
+		return 0;
+	r->src = strdup(text);
+	if (!r->src) {
+		fyai_warning(ui->ctx, "cannot keep the text of a question");
+		ui_rendered_clear(r);
+		return 0;
+	}
+	r->cols = cols;
+	r->cap = cap;
+	return r->n;
+}
 
-none:
-	ui_preview_clear(ui);
-	return 0;
+static void ui_preview_clear(struct fyai_ui *ui)
+{
+	ui_rendered_clear(&ui->preview);
+	ui_rendered_clear(&ui->diff);
+}
+
+/*
+ * Render the rows of question @q: the diff that fyai made for a reviewed
+ * change, then the proposal of the model, or the preview of the option under
+ * the cursor. The diff takes its rows first, so a short screen drops the
+ * proposal before it drops the diff. *@ndiffp is the rows of the diff;
+ * returns the rows of the preview.
+ */
+static int ui_preview_update(struct fyai_ui *ui, const struct ui_question *q,
+			     int cols, int rows, int *ndiffp)
+{
+	const struct ui_qtext *t;
+	const char *text;
+	size_t opt;
+	int cap, ndiff;
+
+	*ndiffp = 0;
+	if (!q || q->cur >= q->nq) {
+		ui_preview_clear(ui);
+		return 0;
+	}
+	t = &q->text[q->cur];
+	opt = q->cursor[q->cur];
+	/* A third of the screen at most, so the options stay in view. A
+	 * reviewed change takes two thirds: the diff half of the screen
+	 * first, and the proposal what is left. */
+	cap = rows / 2 < UI_DIFF_ROWS_MAX ? rows / 2 : UI_DIFF_ROWS_MAX;
+	ndiff = ui_rendered_update(ui, &ui->diff, t->diff, cols, cap);
+	*ndiffp = ndiff;
+	cap = rows / 3 < UI_PREVIEW_ROWS_MAX ? rows / 3 : UI_PREVIEW_ROWS_MAX;
+	if (ndiff) {
+		cap = rows * 2 / 3 - ndiff - 2;
+		if (cap > UI_PREVIEW_ROWS_MAX)
+			cap = UI_PREVIEW_ROWS_MAX;
+	}
+	text = !fy_str_empty(t->proposal) ? t->proposal :
+	       opt < t->nopts && !t->multi ? t->opt[opt].preview : NULL;
+	return ui_rendered_update(ui, &ui->preview, text, cols, cap);
 }
 
 /* Write the answer given to question @i of @q as one line. */
@@ -1944,9 +1994,12 @@ static void ui_page_update(struct fyai_ui *ui)
 		ui_question_state(q, &ask, ask_options, ask_lines, ask_answers);
 		ask.bar = markdown_glyph(ctx->cfg, "select.bar",
 			markdown_glyph(ctx->cfg, "pane.edge", "\xe2\x96\x8c"));
-		ask.npreview = ui_preview_update(ui, q, cols, rows);
-		ask.preview = (const char *const *)ui->preview;
-		if (ask.npreview) {
+		ask.npreview = ui_preview_update(ui, q, cols, rows, &ask.ndiff);
+		ask.preview = (const char *const *)ui->preview.rows;
+		ask.diff = (const char *const *)ui->diff.rows;
+		ask.proposal = q->cur < q->nq &&
+			       !fy_str_empty(q->text[q->cur].proposal);
+		if (ask.npreview && !ask.proposal) {
 			ask.preview_title = q->text[q->cur].opt[q->cursor[q->cur]].label;
 		}
 		for (w = q->next; w; w = w->next)

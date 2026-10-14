@@ -258,15 +258,33 @@ pages:
                 name: chrome
                 items:
                   - text: "{description}"
-    - if: ask.preview_shown
+    - if: ask.preview_option
       row:
         - space: 4
         - role:
             name: chrome
             items:
               - text: "Preview \u00b7 {ask.preview_title}"
+    # A reviewed change: what the model wrote, then what fyai made. The
+    # headings are fixed, so the proposal cannot pass for the diff.
+    - if: ask.proposal_shown
+      row:
+        - space: 4
+        - role:
+            name: chrome
+            items:
+              - text: "Proposal \u00b7 written by the model"
     - if: ask.preview_shown
       slot: { id: preview, rows: "{ask.preview_rows}" }
+    - if: ask.diff_shown
+      row:
+        - space: 4
+        - role:
+            name: chrome
+            items:
+              - text: "Diff \u00b7 made by fyai"
+    - if: ask.diff_shown
+      slot: { id: diff, rows: "{ask.diff_rows}" }
     - each: ask.lines
       body:
         - row:

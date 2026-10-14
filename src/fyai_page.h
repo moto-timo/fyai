@@ -68,6 +68,14 @@ struct fyai_page_ask {
 	const char *const *preview;
 	int npreview;
 	const char *preview_title;	/* the label of that option */
+	/*
+	 * A change that the user reviews: the preview holds the proposal that
+	 * the model wrote, and the diff holds the rendered rows of the diff
+	 * that fyai made. The two stand under headings of their own.
+	 */
+	bool proposal;
+	const char *const *diff;
+	int ndiff;
 };
 
 struct fyai_page_state {

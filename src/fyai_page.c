@@ -197,7 +197,8 @@ static int page_ask_rows(const struct fyai_page_ask *ask)
 	rows = 2 + !fy_str_empty(ask->from);
 	for (i = 0; i < ask->noptions; i++)
 		rows += 1 + !fy_str_empty(ask->options[i].description);
-	return rows + (ask->npreview ? ask->npreview + 1 : 0);
+	return rows + (ask->npreview ? ask->npreview + 1 : 0) +
+	       (ask->ndiff ? ask->ndiff + 1 : 0);
 }
 
 int fyai_page_chrome_rows(const struct fyai_page_state *st)
@@ -647,7 +648,9 @@ static fy_generic page_ask_generic(struct fy_generic_builder *gb,
 			"lines", lines, "hint", "", "progress", "",
 			"progress_shown", false, "review", false,
 			"preview_shown", false, "preview_rows", 0,
-			"preview_title", "", "bar", "",
+			"preview_title", "", "preview_option", false,
+			"proposal_shown", false, "diff_shown", false,
+			"diff_rows", 0, "bar", "",
 			"question_shown", false, "waiting", 0,
 			"waiting_shown", false);
 	for (i = 0; i < ask->noptions; i++) {
@@ -686,6 +689,10 @@ static fy_generic page_ask_generic(struct fy_generic_builder *gb,
 		"preview_shown", (_Bool)(ask->npreview > 0),
 		"preview_rows", ask->npreview,
 		"preview_title", page_str(ask->preview_title),
+		"preview_option", (_Bool)(ask->npreview > 0 && !ask->proposal),
+		"proposal_shown", (_Bool)(ask->npreview > 0 && ask->proposal),
+		"diff_shown", (_Bool)(ask->ndiff > 0),
+		"diff_rows", ask->ndiff,
 		"bar", ask->bar ? ask->bar : "\xe2\x96\x8c",
 		"question_shown", (_Bool)!ask->review,
 		"waiting", ask->waiting,
@@ -2491,6 +2498,12 @@ static int page_canvas(struct fyai_page *pg, struct fytim *ft,
 					     st->ask->npreview, &fr[i]);
 			fyai_error_check(ctx, !rc, err_out,
 					 "cannot draw the preview into cells");
+		}
+		if (!strcmp(fr[i].id, "diff") && st->ask && st->ask->diff) {
+			rc = page_lines_draw(pg, st->ask->diff, st->ask->ndiff,
+					     &fr[i]);
+			fyai_error_check(ctx, !rc, err_out,
+					 "cannot draw the diff into cells");
 		}
 		if (!strcmp(fr[i].id, "note") && st->note_lines) {
 			rc = page_lines_draw(pg, st->note_lines,
