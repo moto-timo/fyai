@@ -2607,6 +2607,40 @@ fy_generic fyai_config_schema_node(const char *path)
 	return node;
 }
 
+int fyai_path_segment_decode(const char *s, size_t len, char *out,
+			     size_t size)
+{
+	size_t i, n = 0;
+
+	for (i = 0; i < len; i++) {
+		if (n + 1 >= size)
+			return -1;
+		if (s[i] != '~') {
+			out[n++] = s[i];
+			continue;
+		}
+		if (i + 1 >= len || (s[i + 1] != '0' && s[i + 1] != '1'))
+			return -1;
+		out[n++] = s[i + 1] == '1' ? '/' : '~';
+		i++;
+	}
+	out[n] = '\0';
+	return (int)n;
+}
+
+const char *fyai_path_join(struct fy_generic_builder *gb, const char *path,
+			   const char *key)
+{
+	fy_generic seg;
+
+	seg = fy_gb_path_segment_escape(gb, key);
+	if (!fy_is_string(seg))
+		return NULL;
+	return fy_gb_intern_string(gb, fy_sprintfa("%s%s%s", path,
+						   *path ? "/" : "",
+						   fy_castp(&seg, "")));
+}
+
 /*
  * The schema of member @key of the instance that @node describes: a named
  * property, else the schema of additional properties, else the first oneOf
@@ -2655,12 +2689,11 @@ static fy_generic config_schema_nearest(const char *path, const char *kw,
 	for (p = path; p && *p && fy_is_valid(node); p = slash ? slash + 1 : "") {
 		slash = strchr(p, '/');
 		len = slash ? (size_t)(slash - p) : strlen(p);
-		if (!len || len >= sizeof(key)) {
+		if (!len ||
+		    fyai_path_segment_decode(p, len, key, sizeof(key)) < 0) {
 			node = fy_invalid;
 			break;
 		}
-		memcpy(key, p, len);
-		key[len] = '\0';
 		node = config_schema_child(node, key);
 		v = kw ? fy_get(node, kw, fy_invalid) : fy_invalid;
 		if (fy_is_valid(v))

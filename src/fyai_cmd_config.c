@@ -658,10 +658,9 @@ int fyai_cmd_config_describe(struct fyai_cmd_call *call, fy_generic *result)
 		while (*p) {
 			slash = strchr(p, '/');
 			seglen = slash ? (size_t)(slash - p) : strlen(p);
-			if (seglen >= sizeof(seg))
-				seglen = sizeof(seg) - 1;
-			memcpy(seg, p, seglen);
-			seg[seglen] = '\0';
+			if (fyai_path_segment_decode(p, seglen, seg,
+						     sizeof(seg)) < 0)
+				seg[0] = '\0';
 			node = schema_child(node, seg);
 			fyai_error_check(ctx, fy_is_valid(node), err,
 					 "config describe: unknown property "

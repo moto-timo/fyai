@@ -71,18 +71,23 @@ struct settings_walk {
 };
 
 /*
- * A path names keys of the schema and of user mappings (server and persona
- * names); a segment `*` stands for any such name. Its characters are those,
- * so the title row can show it as it is.
+ * A path names keys of the schema and of user mappings, such as server,
+ * persona and key names; a segment `*` stands for any such name, and "~1"
+ * and "~0" write a '/' and a '~' in a name. It holds no control byte and no
+ * backtick, so the title row can show it as it is in a code span.
  */
 static bool settings_path_valid(const char *path)
 {
 	const char *p;
 
 	for (p = path; *p; p++)
-		if (!(*p >= 'a' && *p <= 'z') && !(*p >= 'A' && *p <= 'Z') &&
-		    !(*p >= '0' && *p <= '9') && !strchr("_-./:*", *p))
+		if ((unsigned char)*p < 0x20 || *p == 0x7f || *p == '`')
 			return false;
+	/* A '~' starts an escape: "~1" is '/' and "~0" is '~'. */
+	for (p = path; (p = strchr(p, '~')); p++)
+		if (p[1] != '0' && p[1] != '1')
+			return false;
+	p = path + strlen(path);
 	/* No empty segment, and none that starts with a dot. */
 	return *path != '/' && *path != '.' && (!*path || p[-1] != '/') &&
 	       !strstr(path, "//") && !strstr(path, "/.");
@@ -101,8 +106,7 @@ static bool seq_has(fy_generic seq, const char *s)
 static const char *settings_join(struct fy_generic_builder *gb,
 				 const char *path, const char *key)
 {
-	return fy_gb_intern_string(gb, fy_sprintfa("%s%s%s", path,
-						   *path ? "/" : "", key));
+	return fyai_path_join(gb, path, key);
 }
 
 /*
@@ -1748,7 +1752,7 @@ static fy_generic catalog_search(struct settings_walk *w, fy_generic cat,
 			continue;
 		found++;
 		row = fy_mapping(w->gb,
-			"path", fy_sprintfa("models/%s", name),
+			"path", fyai_path_join(w->gb, "models", name),
 			"display_name", fy_get(model, "display_name", ""),
 			"context_window", fy_get(model, "context_window", 0LL),
 			"providers", providers,
@@ -2096,6 +2100,11 @@ static fy_generic catalog_child(fy_generic node, const char *seg)
 		if (fy_equal(fy_get(item, "name", fy_invalid), seg) ||
 		    fy_equal(fy_get(item, "canonical_id", fy_invalid), seg))
 			return item;
+	/* An offering is also named by the id its provider gives it. */
+	fy_foreach(item, node)
+		if (fy_equal(fy_get(item, "provider_model_id", fy_invalid),
+			     seg))
+			return item;
 	return fy_invalid;
 }
 
@@ -2203,8 +2212,17 @@ static fy_generic settings_catalog_select(struct settings_walk *w,
 	if (!copy)
 		return fy_value(w->gb, "settings: the path could not be kept");
 	for (seg = strtok_r(copy, "/", &save); seg && n < 32;
-	     seg = strtok_r(NULL, "/", &save))
+	     seg = strtok_r(NULL, "/", &save)) {
+		/* "*" is the fan-out; any other segment is decoded. */
+		if (strcmp(seg, "*") &&
+		    fyai_path_segment_decode(seg, strlen(seg), seg,
+					     strlen(seg) + 1) < 0) {
+			free(copy);
+			return fy_value(w->gb, "settings: a '~' in from must be "
+					"~0 or ~1");
+		}
 		segs[n++] = seg;
+	}
 	rows = catalog_rows(w, cat, segs, n, 0, fy_mapping(w->gb),
 			    fy_sequence(w->gb));
 	result = settings_select(w, rows, args,

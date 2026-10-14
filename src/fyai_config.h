@@ -248,6 +248,22 @@ int fyai_config_invocation_set(struct fyai_ctx *ctx, const char *key,
 bool fyai_config_session_scoped(const char *path);
 
 /*
+ * Decode the segment of @len bytes at @s of a slash path into @out, as
+ * fy_gb_path_split() reads it: "~1" is '/' and "~0" is '~', the escapes of
+ * JSON Pointer. Returns the length, or -1 for any other '~' or a segment
+ * that does not fit @size.
+ */
+int fyai_path_segment_decode(const char *s, size_t len, char *out,
+			     size_t size);
+
+/*
+ * @path with @key appended as one segment, escaped so that a '/' or a '~'
+ * in the key splits back to it; built in @gb, NULL when it cannot be.
+ */
+const char *fyai_path_join(struct fy_generic_builder *gb, const char *path,
+			   const char *key);
+
+/*
  * Check @doc as the configuration of a branch: the schema and the semantic
  * rules. On success *@docp becomes the form that a commit stores, with the
  * derived model_info, and the result is an empty sequence; otherwise the

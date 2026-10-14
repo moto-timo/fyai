@@ -365,18 +365,34 @@ static long catalog_seq_find(fy_generic seq, const char *seg)
 			return i;
 		i++;
 	}
+	/* An offering is also named by the id its provider gives it. */
+	i = 0;
+	fy_foreach(item, seq) {
+		if (!strcmp(fy_get(item, "provider_model_id", ""), seg))
+			return i;
+		i++;
+	}
 	return -1;
 }
 
+/*
+ * Split @path in place into @segs, each segment decoded as
+ * fy_gb_path_split() reads it: "~1" is '/' and "~0" is '~'. A decoded
+ * segment is never longer than its text, so it is written over it.
+ */
 static int catalog_path_split(char *path, char **segs)
 {
 	char *seg, *save;
-	int n;
+	int n, len;
 
 	n = 0;
 	for (seg = strtok_r(path, "/", &save); seg;
 	     seg = strtok_r(NULL, "/", &save)) {
 		if (n == CATALOG_PATH_MAX_DEPTH)
+			return -1;
+		len = fyai_path_segment_decode(seg, strlen(seg), seg,
+					       strlen(seg) + 1);
+		if (len < 0)
 			return -1;
 		segs[n++] = seg;
 	}
