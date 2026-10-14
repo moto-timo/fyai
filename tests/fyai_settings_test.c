@@ -15,7 +15,9 @@
 #include "fyai.h"
 #include "fyai_config.h"
 #include "fyai_tool_spec.h"
+#include "fyai_tool_registry.h"
 #include "fyai_tools.h"
+#include "utils.h"
 
 #include "fyai_test.h"
 #include "fyai_test_registry.h"
@@ -23,6 +25,7 @@
 FYAI_TEST_ENTRY(settings, read, settings_read)
 FYAI_TEST_ENTRY(settings, search, settings_search)
 FYAI_TEST_ENTRY(settings, offered, settings_offered)
+FYAI_TEST_ENTRY(settings, format, settings_format)
 
 static struct fyai_cfg test_cfg;
 static struct fyai_ctx test_ctx;
@@ -72,9 +75,15 @@ static void settings_teardown(void)
 	fy_generic_builder_destroy(test_ctx.transient_gb);
 }
 
+/* The result is the JSON text the model gets; a refusal is plain text. */
 static fy_generic run(const char *args, bool *okp)
 {
-	return fyai_tool_run_one(&test_ctx, "settings", doc(args), okp);
+	fy_generic r;
+
+	r = fyai_tool_run_one(&test_ctx, "settings", doc(args), okp);
+	if (fy_is_string(r) && *fy_castp(&r, "") == '{')
+		r = parse_json_string(test_ctx.transient_gb, fy_castp(&r, ""));
+	return r;
 }
 
 static bool seq_has(fy_generic seq, const char *s)
@@ -238,7 +247,7 @@ static bool offers_settings(void)
 	return false;
 }
 
-/* model_access none offers no settings tool. */
+/* model_access none offers no settings tool, nor does a sub-agent. */
 int settings_offered(void)
 {
 	if (settings_setup())
@@ -246,6 +255,62 @@ int settings_offered(void)
 	FYAI_TCHECK(offers_settings());
 	test_cfg.model_access = -1;
 	FYAI_TCHECK(!offers_settings());
+	test_cfg.model_access = FYAI_MODEL_REVIEW;
+	test_cfg.agent_child = true;
+	test_cfg.agent_rpc = true;
+	FYAI_TCHECK(!offers_settings());
+	check_refused("{action: get, path: temperature}",
+		      "only the session of the user");
+	settings_teardown();
+	return 0;
+}
+
+/* The user reads a short result; text the model wrote stays in a span. */
+int settings_format(void)
+{
+	const struct fyai_tool_def *def = fyai_tool_find("settings");
+	fy_generic r;
+	char *text;
+	bool ok;
+
+	if (settings_setup())
+		return 1;
+	FYAI_TCHECK(def && def->format_result);
+	FYAI_TCHECK(fyai_tool_has("settings", FYAI_TOOL_WHOLE_RESULT));
+	FYAI_TCHECK(fyai_tool_has("settings", FYAI_TOOL_ROOT_ONLY));
+
+	r = fyai_tool_run_one(&test_ctx, "settings",
+			      doc("{action: describe, path: temperature}"),
+			      &ok);
+	FYAI_TCHECK(ok && fy_is_string(r));
+	text = def->format_result(&test_ctx, test_ctx.transient_gb,
+				  doc("{action: describe}"), fy_castp(&r, ""));
+	FYAI_TCHECK(text && strstr(text, "`temperature`") &&
+		    strstr(text, "write") && strstr(text, "(branch)"));
+	free(text);
+
+	/* A group shows the defaults of its members. */
+	r = fyai_tool_run_one(&test_ctx, "settings",
+			      doc("{action: get, path: retry}"), &ok);
+	FYAI_TCHECK(ok && strstr(fy_castp(&r, ""), "max_attempts"));
+
+	/* A value with backticks cannot close its span. */
+	text = def->format_result(&test_ctx, test_ctx.transient_gb,
+		doc("{action: get}"),
+		"{\"path\": \"system_prompt\", \"access\": \"review\", "
+		"\"layer\": \"branch\", \"value\": \"a ` b `` c\"}");
+	FYAI_TCHECK(text && strstr(text, "```a ` b `` c```"));
+	free(text);
+
+	/* A change shows its outcome and the diff that fyai made. */
+	text = def->format_result(&test_ctx, test_ctx.transient_gb,
+		doc("{action: change}"),
+		"{\"status\": \"pending\", \"id\": \"p1\", \"diff\": "
+		"\"@@ -1 +1 @@\\n-a: 1\\n+a: 2\\n\"}");
+	FYAI_TCHECK(text && strstr(text, "**Waits** as proposal `p1`") &&
+		    strstr(text, "```diff\n@@ -1 +1 @@\n-a: 1\n+a: 2\n```"));
+	free(text);
+
 	settings_teardown();
 	return 0;
 }
