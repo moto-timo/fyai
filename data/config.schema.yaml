@@ -6,12 +6,17 @@
 # properties. `x-fyai-scope: session` marks settings stored in the session
 # layer; other settings are stored in the branch. Validation applies to each
 # configuration commit and to `fyai config validate`.
+# `x-fyai-model` states what the model can do with a key and each key below
+# it: hidden, read, review (fyai applies a change after the user approves it)
+# or write (fyai applies a change at once). The nearest value on the path
+# decides; a key with none is hidden. See doc/declarative-state.md.
 type: object
 description: >-
   Configuration settings for fyai. The document resides in an arena; see
   config.yaml.sample for the key list and defaults.
 properties:
   view:
+    x-fyai-model: write
     type: object
     description: Configure project filesystem views.
     properties:
@@ -24,6 +29,7 @@ properties:
           filesystem flushes and may lose snapshots after power loss; durable
           flushes the backing filesystem before publishing snapshot references.
       scratch_dir:
+        x-fyai-model: read
         type: string
         default: ""
         description: >-
@@ -66,6 +72,7 @@ properties:
           depth limits the storage that a session keeps. The oldest group is
           dropped first.
       ignore:
+        x-fyai-model: review
         type: array
         items:
           type: string
@@ -80,6 +87,7 @@ properties:
           the pattern anchors it to the project root, ! negates, and ** matches
           any number of directories. These rules outrank the .gitignore files.
       gitignore:
+        x-fyai-model: review
         type: boolean
         default: true
         description: >-
@@ -89,6 +97,7 @@ properties:
           project when a diff or an apply needs them. The global Git ignore file
           is not read. The .git directory is never ignored.
       isolate_session:
+        x-fyai-model: read
         type: boolean
         default: false
         description: >-
@@ -98,6 +107,7 @@ properties:
           `view apply` writes them to the project. Linux only. It needs a
           writable arena and no credential isolation.
   auth:
+    x-fyai-model: read
     type: string
     enum: [auto, api-key, chatgpt]
     default: auto
@@ -106,6 +116,7 @@ properties:
       a saved ChatGPT login for OpenAI Responses if no key is available; api-key
       and chatgpt force the selected method.
   model:
+    x-fyai-model: review
     x-fyai-complete: model
     type: string
     description: >-
@@ -114,6 +125,7 @@ properties:
       offering it (e.g. openrouter/glm-5.2). No default; falls back to a
       built-in model when unset.
   api:
+    x-fyai-model: review
     type: string
     enum: [responses, chat-completions, chat, messages]
     default: responses
@@ -123,12 +135,14 @@ properties:
       re-derived alongside api_url when `model` changes to a
       known catalogue entry.
   api_url:
+    x-fyai-model: read
     type: string
     description: >-
       Set the provider endpoint URL. It comes from the catalogue by default;
       set it only to override the endpoint resolved for the current
       model/api (e.g. a self-hosted mirror).
   api_key:
+    x-fyai-model: hidden
     type: object
     required: [type]
     description: >-
@@ -145,10 +159,12 @@ properties:
         type: string
         description: Name an environment variable or fyai secret. Omit for auto.
   system_prompt:
+    x-fyai-model: review
     type: string
     default: You are a concise assistant.
     description: Set the system prompt for each conversation.
   parallel_tool_calls_prompt:
+    x-fyai-model: review
     type: string
     default: >-
       Independent tool calls may be issued together in one response and will
@@ -159,24 +175,28 @@ properties:
       conversation's system prompt while parallel calls are enabled. An empty
       string suppresses the guidance without disabling parallel execution.
   parallel_tool_calls:
+    x-fyai-model: write
     type: boolean
     default: true
     description: >-
       Run independent built-in tool calls concurrently. Calls returned in
       one model response can run together.
   web_search:
+    x-fyai-model: review
     type: boolean
     default: true
     description: >-
       Enable the provider's hosted web-search tool. This is only
       available when the catalogue endpoint declares hosted web search.
   temperature:
+    x-fyai-model: write
     type: number
     minimum: 0
     maximum: 2
     default: 0
     description: Sampling temperature.
   max_tool_iterations:
+    x-fyai-model: read
     type: integer
     exclusiveMinimum: 0
     default: 1000
@@ -184,6 +204,7 @@ properties:
       Limit tool-call iterations per turn. On reaching the limit, the
       turn keeps the steps that completed and reports the limit as its cause.
   max_tokens:
+    x-fyai-model: review
     type: integer
     exclusiveMinimum: 0
     default: 8192
@@ -191,6 +212,7 @@ properties:
       Limit output tokens per model call. The Anthropic Messages API requires
       this value on every request; other APIs can use the catalogue limit.
   branch:
+    x-fyai-model: review
     type: object
     description: >-
       Configure branch conflict handling. Each branch has its own
@@ -208,6 +230,7 @@ properties:
           Invocations on *different* branches never conflict.
 
   reasoning:
+    x-fyai-model: write
     type: object
     description: >-
       Configure reasoning for supported models. The setting maps to the
@@ -225,10 +248,22 @@ properties:
         enum: [auto, concise, detailed]
         description: Set the reasoning summary detail for Responses requests.
   tools:
+    x-fyai-model: review
     type: boolean
     default: true
     description: Enable tool calling.
+  model_access:
+    x-fyai-model: read
+    type: string
+    enum: [none, read, review, write]
+    default: review
+    description: >-
+      Limit what the model can do with the configuration through the settings
+      tool. none offers no tool; read allows reads only; review makes the user
+      approve each change; write applies the classes that the schema states.
+      It can only make the schema stricter.
   builtin_shell:
+    x-fyai-model: review
     type: boolean
     default: false
     description: >-
@@ -236,6 +271,7 @@ properties:
       function tool. Native calls use pipes and cannot request a terminal or
       keep a named session. The Messages API does not support native shell.
   retry:
+    x-fyai-model: review
     type: object
     additionalProperties: false
     description: >-
@@ -265,6 +301,7 @@ properties:
           Limit the delay between retry attempts. This also caps a
           `Retry-After` value. 0 removes the bound.
   catalog_update:
+    x-fyai-model: read
     type: object
     additionalProperties: false
     description: >-
@@ -279,6 +316,7 @@ properties:
           runs it under /bin/sh with only the credentials named by
           `credentials`, and reads the catalogue from standard output.
       credentials:
+        x-fyai-model: hidden
         type: array
         maxItems: 32
         items:
@@ -301,6 +339,7 @@ properties:
         default: 600000
         description: Limit one catalogue update run. 0 disables the limit.
   shell:
+    x-fyai-model: write
     type: object
     additionalProperties: false
     description: Configure shell-tool execution limits and defaults.
@@ -313,6 +352,7 @@ properties:
           Set the default shell-tool time limit. It applies when the model
           requests no limit. The command stops when it expires; 0 disables it.
       max_timeout_ms:
+        x-fyai-model: read
         type: integer
         minimum: 0
         default: 600000
@@ -328,6 +368,7 @@ properties:
           model asks for none. Truncated output retains its end.
           0 disables the default limit.
       hard_max_output_tokens:
+        x-fyai-model: read
         type: integer
         minimum: 0
         default: 200000
@@ -355,12 +396,14 @@ properties:
           stopped in a read of its input needs the model,
           and the model is told so in a turn of its own. 0 does not ask.
       shell:
+        x-fyai-model: read
         type: string
         default: ""
         description: >-
           Set the default shell for a call. An empty value
           runs `/bin/sh`, as each other command of this program does.
       login:
+        x-fyai-model: read
         type: boolean
         default: false
         description: >-
@@ -389,6 +432,7 @@ properties:
           Set pseudo-terminal columns for a `tty` shell call. 0
           follows the real terminal, and gives 80 when there is none.
   read:
+    x-fyai-model: write
     type: object
     additionalProperties: false
     description: Configure read_file result limits.
@@ -402,6 +446,7 @@ properties:
           truncated and the result reports the full size. 0 disables the
           default limit.
       hard_max_bytes:
+        x-fyai-model: read
         type: integer
         minimum: 0
         default: 4194304
@@ -409,11 +454,13 @@ properties:
           Limit read_file bytes requested by the model. 0 removes the
           bound.
   agent:
+    x-fyai-model: read
     type: object
     additionalProperties: false
     description: Configure sub-agent execution.
     properties:
       timeout_ms:
+        x-fyai-model: write
         type: integer
         minimum: 0
         default: 0
@@ -452,6 +499,7 @@ properties:
           changes stay in the view until the user applies them. The call can
           override this with the `isolated` parameter.
       personas:
+        x-fyai-model: review
         type: object
         description: >-
           Define named sub-agent personas. The `persona` parameter of the agent tool
@@ -559,6 +607,7 @@ properties:
           descendant tree. The root grants admission before provider work
           starts. Excess calls fail so the caller can wait or change its task.
   sandbox:
+    x-fyai-model: read
     x-fyai-scope: session
     default: false
     description: >-
@@ -645,6 +694,7 @@ properties:
                       minimum: 1
                       maximum: 65535
   sandbox_profile:
+    x-fyai-model: read
     type: string
     enum: [normal, lockdown]
     default: normal
@@ -654,6 +704,7 @@ properties:
       whatever `sandbox` says. `/session lockdown` selects `lockdown` and
       `/session yolo` selects `normal`.
   sandbox_lockdown:
+    x-fyai-model: read
     type: object
     description: >-
       Set the sandbox policy of the `lockdown` profile, apart from `sandbox`.
@@ -739,28 +790,34 @@ properties:
                   minimum: 1
                   maximum: 65535
   logprobs:
+    x-fyai-model: write
     type: boolean
     default: false
     description: Request token log-probabilities from the provider.
   top_logprobs:
+    x-fyai-model: write
     type: integer
     minimum: -1
     default: -1
     description: Set the number of top log-probability candidates per token. -1 leaves it unset.
   token_extents:
+    x-fyai-model: write
     x-fyai-scope: session
     type: boolean
     default: false
     description: Record streamed token extents in turn metadata.
   no_obfuscation:
+    x-fyai-model: review
     type: boolean
     default: false
     description: Disable provider-side response obfuscation where supported.
   whitewash_api_keys:
+    x-fyai-model: read
     type: boolean
     default: true
     description: Redact API keys from wire logs.
   response_chain:
+    x-fyai-model: write
     type: boolean
     default: false
     description: >-
@@ -768,6 +825,7 @@ properties:
       a stale or evicted stored response automatically falls back to replaying
       the canonical local turn chain.
   no_auth:
+    x-fyai-model: read
     type: boolean
     default: false
     description: >-
@@ -775,11 +833,13 @@ properties:
       Authorization and x-api-key headers for servers that use the Chat
       Completions wire format.
   arena_dir:
+    x-fyai-model: read
     type: string
     description: >-
       Set the .fyai arena location. By default, fyai finds it by walking up
       from the current working directory.
   logging:
+    x-fyai-model: read
     type: object
     description: Configure trace logs under .fyai/logs.
     properties:
@@ -807,6 +867,7 @@ properties:
           and response events, and its wire traffic. Credentials are always
           whited out; `whitewash_api_keys` does not apply to this log.
   display:
+    x-fyai-model: write
     x-fyai-scope: session
     type: object
     description: >-
@@ -830,6 +891,7 @@ properties:
           session starts. -1 replays as many recent exchanges as the screen
           holds, 0 replays none.
       tool_preview_lines:
+        x-fyai-model: review
         type: integer
         minimum: 0
         default: 5
@@ -853,6 +915,7 @@ properties:
           Set the minimum interval between progressive tool-output redraws. Zero
           repaints every update.
       session_margin:
+        x-fyai-model: review
         type: string
         default: "  "
         description: >-
@@ -919,6 +982,7 @@ properties:
           opens it when the current input has candidates. A candidate still
           requires an explicit selection.
       keys:
+        x-fyai-model: review
         type: object
         description: >-
           Bind keys of the prompt. Each member names a mode of the terminal
@@ -954,6 +1018,7 @@ properties:
           tile, and the transcript keeps nothing of it. transcript draws the
           command and its output in the transcript, and stores both there.
       notice_output:
+        x-fyai-model: review
         type: string
         enum: [pane, transcript]
         default: transcript
@@ -1121,6 +1186,7 @@ properties:
           session_margin gutter runs down the inside of one. An empty
           string draws none.
       page:
+        x-fyai-model: read
         type: string
         default: ""
         description: >-
@@ -1155,6 +1221,7 @@ properties:
           tile gives it the keys and a click off the tiles gives them back to
           the prompt.
       tool_detail:
+        x-fyai-model: review
         x-fyai-scope: stored
         type: string
         enum: [none, brief, default, full]
@@ -1262,6 +1329,7 @@ properties:
           Set blank rows between a user card and its answer. The rows separate
           it. 0 puts the answer directly under the card.
       prompt:
+        x-fyai-model: review
         type: string
         default: "  > "
         description: >-
@@ -1319,6 +1387,7 @@ properties:
           below the graph; other diagram types shrink their spacing where supported.
           The branch tree has fixed spacing and clips long rows.
       prompt_top:
+        x-fyai-model: review
         type: string
         default: " {location}"
         description: >-
@@ -1330,6 +1399,7 @@ properties:
           {isolation} to show the credential isolation here; the default
           bottom row already ends with it.
       prompt_bottom:
+        x-fyai-model: review
         type: string
         default: " {model} · {provider} · {api}{effort}{summary}{temp}{tokens}{cache}{cost}{isolation}{view}"
         description: >-
@@ -1357,6 +1427,7 @@ properties:
         default: false
         description: Format debug dumps as YAML.
       thinking:
+        x-fyai-model: review
         type: boolean
         default: true
         description: >-
@@ -1371,6 +1442,7 @@ properties:
         default: false
         description: Show session token usage.
   model_info:
+    x-fyai-model: read
     type: object
     required: [name]
     description: >-
@@ -1426,6 +1498,7 @@ properties:
             description: Show the number of model ranking votes.
 
   mcp:
+    x-fyai-model: read
     type: object
     default: { enabled: false, startup_wait: true, endpoint: "", auth_token: { type: env, value: MCP_API_KEY }, protocol_version: "2024-11-05", servers: {}, timeout: 30 }
     description: >-
@@ -1433,10 +1506,12 @@ properties:
       set enabled: true and configure endpoint (or servers) to connect.
     properties:
       enabled:
+        x-fyai-model: review
         type: boolean
         default: false
         description: Enable MCP server connections.
       startup_wait:
+        x-fyai-model: write
         type: boolean
         default: true
         description: >-
@@ -1448,6 +1523,7 @@ properties:
         default: ""
         description: Set the default MCP server URL.
       auth_token:
+        x-fyai-model: hidden
         type: object
         required: [type]
         description: >-
@@ -1523,6 +1599,7 @@ properties:
                         - client_secret_basic
                       description: Select the OAuth token endpoint authentication method.
                     secret:
+                      x-fyai-model: hidden
                       type: object
                       required: [type, value]
                       description: Reference the OAuth client secret.
@@ -1536,6 +1613,7 @@ properties:
                           minLength: 1
                           description: Name the environment variable or secret.
       timeout:
+        x-fyai-model: write
         type: integer
         default: 30
         exclusiveMinimum: 0

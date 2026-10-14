@@ -2614,37 +2614,160 @@ fy_generic fyai_config_schema_node(const char *path)
 	return node;
 }
 
-bool fyai_config_session_scoped(const char *path)
+/*
+ * The schema of member @key of the instance that @node describes: a named
+ * property, else the schema of additional properties, else the first oneOf
+ * or anyOf member that names the property. fy_invalid when no schema names it.
+ */
+static fy_generic config_schema_child(fy_generic node, const char *key)
 {
-	fy_generic node, scope;
+	static const char *const alts[] = { "oneOf", "anyOf" };
+	fy_generic child, alt;
+	size_t i;
+
+	child = fy_get(fy_get(node, "properties", fy_invalid), key, fy_invalid);
+	if (fy_is_mapping(child))
+		return child;
+	child = fy_get(node, "additionalProperties", fy_invalid);
+	if (fy_is_mapping(child))
+		return child;
+	for (i = 0; i < ARRAY_SIZE(alts); i++) {
+		fy_foreach(alt, fy_get(node, alts[i], fy_invalid)) {
+			child = fy_get(fy_get(alt, "properties", fy_invalid),
+				       key, fy_invalid);
+			if (fy_is_mapping(child))
+				return child;
+		}
+	}
+	return fy_invalid;
+}
+
+/*
+ * The value of keyword @kw nearest to the end of the slash path @path, or
+ * fy_invalid when no node on the path has it. A key below the last node the
+ * schema names inherits from that node. *@nodep, when given, is the node at
+ * @path, or fy_invalid when the schema does not name it. The schema is
+ * cached for the process, so the values stay valid.
+ */
+static fy_generic config_schema_nearest(const char *path, const char *kw,
+					fy_generic *nodep)
+{
+	fy_generic node, v, found;
 	const char *p, *slash;
 	char key[128];
 	size_t len;
-	bool session;
 
-	/* The nearest scope on the path decides. */
-	session = false;
 	node = fyai_config_schema(NULL);
-	for (p = path; p && *p; p = slash + 1) {
+	found = fy_get(node, kw, fy_invalid);
+	for (p = path; p && *p && fy_is_valid(node); p = slash ? slash + 1 : "") {
 		slash = strchr(p, '/');
 		len = slash ? (size_t)(slash - p) : strlen(p);
-		if (!len || len >= sizeof(key))
-			return false;
+		if (!len || len >= sizeof(key)) {
+			node = fy_invalid;
+			break;
+		}
 		memcpy(key, p, len);
 		key[len] = '\0';
-		node = fy_get(fy_get(node, "properties", fy_invalid), key,
-			      fy_invalid);
-		/* A key below a scoped node inherits its scope, also where the
-		 * schema does not name it (a member of a oneOf branch). */
-		if (!fy_is_valid(node))
-			return session;
-		scope = fy_get(node, "x-fyai-scope", fy_invalid);
-		if (fy_is_string(scope))
-			session = fy_equal(scope, "session");
-		if (!slash)
-			break;
+		node = config_schema_child(node, key);
+		v = fy_get(node, kw, fy_invalid);
+		if (fy_is_valid(v))
+			found = v;
 	}
-	return session;
+	if (nodep)
+		*nodep = node;
+	return found;
+}
+
+bool fyai_config_session_scoped(const char *path)
+{
+	return fy_equal(config_schema_nearest(path, "x-fyai-scope", NULL),
+			"session");
+}
+
+static const char *const model_access_names[] = {
+	[FYAI_MODEL_HIDDEN]	= "hidden",
+	[FYAI_MODEL_READ]	= "read",
+	[FYAI_MODEL_REVIEW]	= "review",
+	[FYAI_MODEL_WRITE]	= "write",
+};
+
+const char *fyai_model_access_name(enum fyai_model_access access)
+{
+	if ((size_t)access >= ARRAY_SIZE(model_access_names))
+		return model_access_names[FYAI_MODEL_HIDDEN];
+	return model_access_names[access];
+}
+
+int fyai_model_access_parse(fy_generic v)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(model_access_names); i++)
+		if (fy_equal(v, model_access_names[i]))
+			return (int)i;
+	return -1;
+}
+
+/* An unknown value is hidden: a typing error must not open a key. */
+static enum fyai_model_access config_model_access_of(fy_generic v)
+{
+	int access;
+
+	access = fyai_model_access_parse(v);
+	return access < 0 ? FYAI_MODEL_HIDDEN : (enum fyai_model_access)access;
+}
+
+enum fyai_model_access fyai_config_model_access(const char *path)
+{
+	fy_generic v;
+
+	v = config_schema_nearest(path, "x-fyai-model", NULL);
+	return fy_is_valid(v) ? config_model_access_of(v) : FYAI_MODEL_HIDDEN;
+}
+
+/* The bound on the depth of a schema walk; the schema is not recursive. */
+#define FYAI_CONFIG_SCHEMA_DEPTH_MAX 64
+
+static enum fyai_model_access
+config_model_access_below(fy_generic node, enum fyai_model_access access,
+			  int depth)
+{
+	static const char *const subs[] = { "additionalProperties", "items" };
+	static const char *const alts[] = { "oneOf", "anyOf", "allOf" };
+	enum fyai_model_access sub;
+	fy_generic v, key, child;
+	size_t i;
+
+	if (!fy_is_mapping(node) || depth > FYAI_CONFIG_SCHEMA_DEPTH_MAX)
+		return access;
+	v = fy_get(node, "x-fyai-model", fy_invalid);
+	if (fy_is_valid(v)) {
+		sub = config_model_access_of(v);
+		if (sub < access)
+			access = sub;
+	}
+	fy_foreach_key_value(key, child, fy_get(node, "properties", fy_invalid))
+		access = config_model_access_below(child, access, depth + 1);
+	for (i = 0; i < ARRAY_SIZE(subs); i++)
+		access = config_model_access_below(fy_get(node, subs[i],
+							  fy_invalid),
+						   access, depth + 1);
+	for (i = 0; i < ARRAY_SIZE(alts); i++)
+		fy_foreach(child, fy_get(node, alts[i], fy_invalid))
+			access = config_model_access_below(child, access,
+							   depth + 1);
+	return access;
+}
+
+enum fyai_model_access fyai_config_model_access_tree(const char *path)
+{
+	enum fyai_model_access access;
+	fy_generic v, node;
+
+	v = config_schema_nearest(path, "x-fyai-model", &node);
+	access = fy_is_valid(v) ? config_model_access_of(v) :
+		 FYAI_MODEL_HIDDEN;
+	return config_model_access_below(node, access, 0);
 }
 
 static int config_session_layer_set(struct fyai_ctx *ctx, const char *key,

@@ -175,6 +175,9 @@ agent:
 #   summary: auto       # auto | concise | detailed
 
 tools: true
+# Limit what the model can do with the configuration: none, read, review
+# (the user approves each change) or write (the classes of the schema).
+model_access: review
 # Enable the native OpenAI shell tool instead of the exec_command function.
 # Native calls use pipes and cannot request a terminal or named session.
 builtin_shell: false

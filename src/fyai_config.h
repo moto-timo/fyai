@@ -247,6 +247,36 @@ int fyai_config_invocation_set(struct fyai_ctx *ctx, const char *key,
  */
 bool fyai_config_session_scoped(const char *path);
 
+/*
+ * What the model can do with a configuration key, from `x-fyai-model` of the
+ * schema. A lower value is stricter, so the strictest of several is the least.
+ */
+enum fyai_model_access {
+	FYAI_MODEL_HIDDEN,	/* no read and no change */
+	FYAI_MODEL_READ,	/* read only */
+	FYAI_MODEL_REVIEW,	/* a change waits for the user */
+	FYAI_MODEL_WRITE,	/* fyai applies a change at once */
+};
+
+/* The name of @access, as the schema writes it. */
+const char *fyai_model_access_name(enum fyai_model_access access);
+
+/* The access that the string @v names, or -1. */
+int fyai_model_access_parse(fy_generic v);
+
+/*
+ * The access of @path: the nearest `x-fyai-model` on the path. A key below
+ * the last node that the schema names inherits from that node. A path with
+ * no value on it is hidden.
+ */
+enum fyai_model_access fyai_config_model_access(const char *path);
+
+/*
+ * The strictest access of @path and of every node of the schema below it: a
+ * change that replaces the value at @path touches each of them.
+ */
+enum fyai_model_access fyai_config_model_access_tree(const char *path);
+
 /* The node of the configuration schema at the slash path @path. */
 fy_generic fyai_config_schema_node(const char *path);
 
