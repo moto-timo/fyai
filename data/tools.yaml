@@ -741,12 +741,21 @@
       proposal. You never write the configuration yourself, and you cannot change a `read` key.
       `revert` takes back one of your changes of `write` keys by its `id`, as a change of its own;
       a key changed since is a conflict. `proposals` lists your proposals and their status.
+      `select` answers a question over many entries in one call: it filters rows with `where`,
+      sorts them by `sort`, and gives the `fields` asked for, at most `limit`. The rows of the
+      configuration are its keys under `path`, with the columns `key`, `access`, `scope`,
+      `layer`, `value`, `default` and `changed`. The rows of the catalogue are the items at
+      `from`, where a segment `*` takes every item and names it in a column: `providers/*/models`
+      gives each offering with a `provider` column, and `pricing/input`, `pricing/output` and
+      `pricing/blended` (three input tokens to one output token) are its prices. For example,
+      the cheapest model of a provider is `from: providers/anthropic/models`, `sort:
+      pricing/blended`, `limit: 1`.
     parameters:
       type: object
       properties:
         action:
           type: string
-          enum: [search, describe, get, list, change, revert, proposals]
+          enum: [search, describe, get, list, select, change, revert, proposals]
           description: |-
             What to do.
         document:
@@ -758,6 +767,48 @@
           type: string
           description: |-
             The slash path of the key, such as `reasoning/effort`. Omit it for the whole configuration. For `search`, the keys under this path are searched.
+        from:
+          type: string
+          description: |-
+            For `select` in the catalogue: the path of the rows, such as `models` or `providers/*/models`.
+        where:
+          type: array
+          description: |-
+            For `select`: up to 8 conditions that each row must meet.
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: |-
+                  The slash path of a field of the row, such as `pricing/input` or `access`.
+              op:
+                type: string
+                enum: [eq, ne, lt, le, gt, ge, has, contains, exists]
+                description: |-
+                  `has` tests a member of a list, `contains` a part of a text, `exists` a value at all.
+              value:
+                description: |-
+                  The value to compare with; `exists` takes none.
+            required:
+              - field
+              - op
+            additionalProperties: false
+        fields:
+          type: array
+          description: |-
+            For `select`: the fields of each row to give. Omit for the usual ones.
+          items:
+            type: string
+        sort:
+          type: string
+          description: |-
+            For `select`: the field to sort the rows by. A row without it goes last.
+        order:
+          type: string
+          enum: [asc, desc]
+          description: |-
+            For `select`: the order of the sort; `asc` by default.
         query:
           type: string
           description: |-
@@ -765,7 +816,7 @@
         limit:
           type: integer
           description: |-
-            For `search`: the most keys to give, up to 50. Omit for 20.
+            For `search`: the most keys to give, up to 50. For `select`: the most rows, up to 100. Omit for 20.
         changes:
           type: array
           description: |-

@@ -41,6 +41,12 @@
 #define SETTINGS_DEPTH_MAX	64
 /* The bound on the keys that one list gives. */
 #define SETTINGS_LIST_MAX	100
+/* The bound on the rows that a select walks. */
+#define SETTINGS_WALK_MAX	5000
+/* The bounds on the rows that a select gives, and on its conditions. */
+#define SETTINGS_SELECT_LIMIT	20
+#define SETTINGS_SELECT_MAX	100
+#define SETTINGS_WHERE_MAX	8
 /* The bounds on one change set, on its explanation, and on each log. */
 #define SETTINGS_CHANGES_MAX	32
 #define SETTINGS_EXPLANATION_MAX 16384
@@ -56,7 +62,9 @@ struct settings_walk {
 	fy_generic hidden;	/* the hidden paths met, a sequence */
 	fy_generic keys;	/* the rows of a list, a sequence */
 	size_t count;
+	size_t max;		/* the bound on the keys that a walk gives */
 	bool changed;		/* only keys that are not the default */
+	bool full;		/* each key with its scope and its default */
 };
 
 /*
@@ -390,11 +398,12 @@ static fy_generic settings_describe(struct settings_walk *w, const char *path)
 static void settings_list_walk(struct settings_walk *w, const char *path,
 			       fy_generic node, int depth)
 {
-	fy_generic props, key, child, value, dflt;
+	fy_generic props, key, child, value, dflt, row;
 	enum fyai_model_access access;
 	const char *sub, *layer;
 
-	if (w->count >= SETTINGS_LIST_MAX || depth > SETTINGS_DEPTH_MAX)
+	if (w->count >= (w->max ? w->max : SETTINGS_LIST_MAX) ||
+	    depth > SETTINGS_DEPTH_MAX)
 		return;
 	props = fy_get(node, "properties", fy_invalid);
 	if (*path && !fy_is_mapping(props)) {
@@ -406,11 +415,26 @@ static void settings_list_walk(struct settings_walk *w, const char *path,
 				    !fy_compare(value, dflt))))
 			return;
 		value = settings_redact(w, path, value, 0);
-		w->keys = fy_append(w->gb, w->keys, fy_mapping(w->gb,
+		row = fy_mapping(w->gb,
 			"key", path,
 			"access", fyai_model_access_name(access),
 			"layer", layer,
-			"value", fy_is_valid(value) ? value : fy_null));
+			"value", fy_is_valid(value) ? value : fy_null);
+		if (w->full) {
+			dflt = settings_redact(w, path,
+				settings_schema_default(w->gb, node, 0), 0);
+			row = fy_assoc(w->gb, row, "scope",
+				fyai_config_session_scoped(path) ?
+				"session" : "stored");
+			row = fy_assoc(w->gb, row, "default",
+				fy_is_valid(dflt) ? dflt : fy_null);
+			/* What a layer set that the default does not have. */
+			row = fy_assoc(w->gb, row, "changed",
+				(_Bool)(fy_is_valid(value) &&
+					(!fy_is_valid(dflt) ||
+					 fy_compare(value, dflt))));
+		}
+		w->keys = fy_append(w->gb, w->keys, row);
 		w->count++;
 		return;
 	}
@@ -1637,6 +1661,9 @@ static fy_generic settings_change_run(struct settings_walk *w, fy_generic args,
  * list by its name, as `catalog get` does.
  */
 
+static fy_generic settings_catalog_select(struct settings_walk *w,
+					  fy_generic cat, fy_generic args);
+
 /* The providers that offer each model: {canonical id: [provider, ...]}. */
 static fy_generic catalog_offered_by(struct fy_generic_builder *gb,
 				     fy_generic cat)
@@ -1791,9 +1818,11 @@ static fy_generic settings_catalog_run(struct settings_walk *w,
 	if (fy_equal(action, "search"))
 		return catalog_search(w, cat, fy_get(args, "query", ""),
 				      fy_get(args, "limit", 0LL));
+	if (fy_equal(action, "select"))
+		return settings_catalog_select(w, cat, args);
 	if (!fy_any_equal(action, "get", "list"))
 		return fy_value(w->gb, "settings: the catalogue is read only; "
-				"its actions are search, get and list");
+				"its actions are search, get, list and select");
 	v = *path ? fyai_catalog_at(w->ctx, path) : cat;
 	if (!fy_is_valid(v))
 		return fy_value(w->gb, fy_sprintfa("settings: the catalogue "
@@ -1810,6 +1839,373 @@ static fy_generic settings_catalog_run(struct settings_walk *w,
 				"such as models/NAME or providers/NAME");
 	return fy_mapping(w->gb, "document", "catalog", "path", path,
 			  "value", catalog_short(w, path, v));
+}
+
+/*
+ * select: rows that match every condition of `where`, sorted, and cut to
+ * a limit; each row only with the fields asked for. The rows of the
+ * configuration are its keys; the rows of the catalogue are the items at a
+ * path, where a segment `*` takes every item and names it in a column.
+ */
+
+/* The value of @field of @row, or fy_invalid. `pricing/blended` is made. */
+static fy_generic select_field(struct fy_generic_builder *gb, fy_generic row,
+			       const char *field)
+{
+	fy_generic in, out;
+
+	if (!strcmp(field, "pricing/blended")) {
+		in = fy_get_at_pathstr(gb, row, "pricing/input");
+		out = fy_get_at_pathstr(gb, row, "pricing/output");
+		if (!fy_is_valid(in) || !fy_is_valid(out) ||
+		    fy_is_string(in) || fy_is_string(out))
+			return fy_invalid;
+		/* Three tokens read for each token written. */
+		return fy_value(gb, (3.0 * fy_cast(in, 0.0) +
+				     fy_cast(out, 0.0)) / 4.0);
+	}
+	return fy_is_mapping(row) ? fy_get_at_pathstr(gb, row, field) :
+	       fy_invalid;
+}
+
+static bool select_number(fy_generic v, double *dp)
+{
+	if (!fy_is_valid(v) || fy_is_string(v) || fy_is_mapping(v) ||
+	    fy_is_sequence(v) || fy_is_null(v) || fy_is_bool(v))
+		return false;
+	*dp = fy_cast(v, 0.0);
+	return true;
+}
+
+/* -1, 0 or 1; numbers by value, strings by text, a missing value last. */
+static int select_cmp(fy_generic a, fy_generic b)
+{
+	double da, db;
+
+	if (!fy_is_valid(a) || fy_is_null(a))
+		return fy_is_valid(b) && !fy_is_null(b) ? 1 : 0;
+	if (!fy_is_valid(b) || fy_is_null(b))
+		return -1;
+	if (select_number(a, &da) && select_number(b, &db))
+		return da < db ? -1 : da > db;
+	if (fy_is_string(a) && fy_is_string(b))
+		return strcmp(fy_castp(&a, ""), fy_castp(&b, ""));
+	return fy_compare(a, b) < 0 ? -1 : fy_compare(a, b) > 0;
+}
+
+/* Whether @row meets the condition @cond, checked before. */
+static bool select_meets(struct fy_generic_builder *gb, fy_generic row,
+			 fy_generic cond)
+{
+	fy_generic v, want, item;
+	const char *op = fy_get(cond, "op", "");
+	int c;
+
+	v = select_field(gb, row, fy_get(cond, "field", ""));
+	want = fy_get(cond, "value", fy_invalid);
+	if (!strcmp(op, "exists"))
+		return fy_is_valid(v) && !fy_is_null(v);
+	if (!strcmp(op, "has")) {
+		fy_foreach(item, v)
+			if (!fy_compare(item, want))
+				return true;
+		return false;
+	}
+	if (!strcmp(op, "contains"))
+		return fy_is_string(v) && fy_is_string(want) &&
+		       strcasestr(fy_castp(&v, ""), fy_castp(&want, ""));
+	if (!fy_is_valid(v))
+		return !strcmp(op, "ne");
+	c = select_cmp(v, want);
+	if (!strcmp(op, "eq"))
+		return !c && !fy_compare(v, want) ? true : !c;
+	if (!strcmp(op, "ne"))
+		return c != 0;
+	if (!strcmp(op, "lt"))
+		return c < 0;
+	if (!strcmp(op, "le"))
+		return c <= 0;
+	if (!strcmp(op, "gt"))
+		return c > 0;
+	return c >= 0;
+}
+
+/* Check the conditions and the fields of a select. */
+static int select_check(fy_generic where, fy_generic fields,
+			const char *sort, char *why, size_t why_size)
+{
+	static const char *const ops[] = {
+		"eq", "ne", "lt", "le", "gt", "ge", "has", "contains",
+		"exists",
+	};
+	fy_generic cond, f;
+	const char *op, *field;
+	size_t i;
+
+	if (fy_is_valid(where) && (!fy_is_sequence(where) ||
+				   fy_len(where) > SETTINGS_WHERE_MAX)) {
+		snprintf(why, why_size, "where is a list of up to %d "
+			 "conditions", SETTINGS_WHERE_MAX);
+		return -1;
+	}
+	fy_foreach(cond, where) {
+		field = fy_get(cond, "field", "");
+		op = fy_get(cond, "op", "");
+		if (!*field || !settings_path_valid(field)) {
+			snprintf(why, why_size, "a condition needs a field");
+			return -1;
+		}
+		for (i = 0; i < ARRAY_SIZE(ops); i++)
+			if (!strcmp(op, ops[i]))
+				break;
+		if (i == ARRAY_SIZE(ops)) {
+			snprintf(why, why_size, "%s: op must be eq, ne, lt, "
+				 "le, gt, ge, has, contains or exists", field);
+			return -1;
+		}
+		if (strcmp(op, "exists") &&
+		    !fy_is_valid(fy_get(cond, "value", fy_invalid))) {
+			snprintf(why, why_size, "%s: %s needs a value", field,
+				 op);
+			return -1;
+		}
+	}
+	fy_foreach(f, fields) {
+		if (!fy_is_string(f) ||
+		    !settings_path_valid(fy_castp(&f, ""))) {
+			snprintf(why, why_size, "fields are slash paths");
+			return -1;
+		}
+	}
+	if (!settings_path_valid(sort)) {
+		snprintf(why, why_size, "sort is a slash path");
+		return -1;
+	}
+	return 0;
+}
+
+struct select_sort {
+	fy_generic row;
+	fy_generic key;
+	bool descending;
+};
+
+static int select_sort_cmp(const void *a, const void *b)
+{
+	const struct select_sort *sa = a, *sb = b;
+	int c;
+
+	c = select_cmp(sa->key, sb->key);
+	/* A missing value stays last in either order. */
+	if (sa->descending && fy_is_valid(sa->key) && !fy_is_null(sa->key) &&
+	    fy_is_valid(sb->key) && !fy_is_null(sb->key))
+		c = -c;
+	return c;
+}
+
+/*
+ * Filter, sort and project @rows. @fields names the columns of each row
+ * given; without it, @dflt_fields does. Builds the answer in @w->gb.
+ */
+static fy_generic settings_select(struct settings_walk *w, fy_generic rows,
+				  fy_generic args, fy_generic dflt_fields)
+{
+	fy_generic where, fields, row, cond, out, f, proj;
+	struct select_sort *kept;
+	const char *sort, *field;
+	char why[256];
+	size_t n, i, max;
+	long long limit;
+
+	where = fy_get(args, "where", fy_invalid);
+	fields = fy_get(args, "fields", fy_invalid);
+	sort = fy_gb_intern_string(w->gb, fy_get(args, "sort", ""));
+	if (!sort ||
+	    select_check(where, fields, sort, why, sizeof(why)))
+		return fy_value(w->gb, fy_sprintfa("settings: %s",
+				sort ? why : "the sort could not be kept"));
+	if (!fy_is_sequence(fields) || fy_empty(fields))
+		fields = dflt_fields;
+	limit = fy_get(args, "limit", 0LL);
+	max = limit > 0 && limit <= SETTINGS_SELECT_MAX ? (size_t)limit :
+	      SETTINGS_SELECT_LIMIT;
+	kept = calloc(fy_len(rows) + 1, sizeof(*kept));
+	if (!kept)
+		return fy_value(w->gb, "settings: the rows could not be kept");
+	n = 0;
+	fy_foreach(row, rows) {
+		fy_foreach(cond, where)
+			if (!select_meets(w->gb, row, cond))
+				goto next;
+		kept[n++].row = row;
+next:
+		;
+	}
+	if (*sort) {
+		for (i = 0; i < n; i++) {
+			kept[i].key = select_field(w->gb, kept[i].row, sort);
+			kept[i].descending = fy_equal(fy_get(args, "order",
+						       fy_invalid), "desc");
+		}
+		qsort(kept, n, sizeof(*kept), select_sort_cmp);
+	}
+	out = fy_sequence(w->gb);
+	for (i = 0; i < n && i < max; i++) {
+		proj = fy_mapping(w->gb);
+		fy_foreach(f, fields) {
+			field = fy_castp(&f, "");
+			proj = fy_assoc(w->gb, proj, f, fyai_generic_or_null(
+				select_field(w->gb, kept[i].row, field)));
+		}
+		out = fy_append(w->gb, out, proj);
+	}
+	free(kept);
+	return fy_mapping(w->gb, "rows", out, "matched", (long long)n,
+			  "fields", fields);
+}
+
+/* The configuration as rows: each key under @path with every column. */
+static fy_generic settings_config_rows(struct settings_walk *w,
+				       const char *path, fy_generic node)
+{
+	w->keys = fy_sequence(w->gb);
+	w->count = 0;
+	w->max = SETTINGS_WALK_MAX;
+	w->full = true;
+	w->changed = false;
+	settings_list_walk(w, path, node, 0);
+	return w->keys;
+}
+
+/* The item @seg of a list by name or id, or of a mapping by key. */
+static fy_generic catalog_child(fy_generic node, const char *seg)
+{
+	fy_generic item;
+
+	if (fy_is_mapping(node))
+		return fy_get(node, seg, fy_invalid);
+	fy_foreach(item, node)
+		if (fy_equal(fy_get(item, "name", fy_invalid), seg) ||
+		    fy_equal(fy_get(item, "canonical_id", fy_invalid), seg))
+			return item;
+	return fy_invalid;
+}
+
+/* The column that a segment `*` after @seg names: `providers` names a
+ * `provider`. */
+static const char *catalog_column(struct fy_generic_builder *gb,
+				  const char *seg)
+{
+	size_t len = strlen(seg);
+
+	if (len > 1 && seg[len - 1] == 's')
+		return fy_gb_intern_string(gb, fy_sprintfa("%.*s",
+					   (int)(len - 1), seg));
+	return seg;
+}
+
+/*
+ * The rows of the catalogue at @segs from @i: the items of the list or the
+ * mapping that the path ends at, each with the columns that a `*` bound.
+ */
+static fy_generic catalog_rows(struct settings_walk *w, fy_generic node,
+			       char **segs, int n, int i, fy_generic bound,
+			       fy_generic out)
+{
+	fy_generic item, key, row, name;
+	const char *col;
+
+	if (fy_len(out) >= SETTINGS_WALK_MAX || !fy_is_valid(node))
+		return out;
+	if (i == n) {
+		if (fy_is_sequence(node)) {
+			fy_foreach(item, node) {
+				row = fy_is_mapping(item) ? item :
+				      fy_mapping(w->gb, "value", item);
+				fy_foreach_key_value(key, name, bound)
+					row = fy_assoc(w->gb, row, key, name);
+				out = fy_append(w->gb, out, row);
+			}
+		} else if (fy_is_mapping(node)) {
+			fy_foreach_key_value(key, item, node) {
+				row = fy_is_mapping(item) ? item :
+				      fy_mapping(w->gb, "value", item);
+				row = fy_assoc(w->gb, row, "key", key);
+				fy_foreach_key_value(name, key, bound)
+					row = fy_assoc(w->gb, row, name, key);
+				out = fy_append(w->gb, out, row);
+			}
+		}
+		return out;
+	}
+	if (strcmp(segs[i], "*"))
+		return catalog_rows(w, catalog_child(node, segs[i]), segs, n,
+				    i + 1, bound, out);
+	col = catalog_column(w->gb, i ? segs[i - 1] : "item");
+	if (fy_is_sequence(node)) {
+		fy_foreach(item, node) {
+			name = fy_get(item, "name", fy_invalid);
+			if (!fy_is_string(name))
+				name = fy_get(item, "canonical_id", fy_null);
+			out = catalog_rows(w, item, segs, n, i + 1,
+				fy_assoc(w->gb, bound, col, name), out);
+		}
+	} else if (fy_is_mapping(node)) {
+		fy_foreach_key_value(key, item, node)
+			out = catalog_rows(w, item, segs, n, i + 1,
+				fy_assoc(w->gb, bound, col, key), out);
+	}
+	return out;
+}
+
+/* The fields a row of the catalogue shows when none are asked for. */
+static fy_generic catalog_dflt_fields(struct settings_walk *w,
+				      fy_generic args, char **segs, int n)
+{
+	fy_generic out, cond;
+	const char *sort = fy_get(args, "sort", "");
+	int i;
+
+	out = fy_sequence(w->gb);
+	for (i = 0; i < n; i++)
+		if (!strcmp(segs[i], "*"))
+			out = fy_append(w->gb, out, catalog_column(w->gb,
+				i ? segs[i - 1] : "item"));
+	out = fy_append(w->gb, out, n && !strcmp(segs[n - 1], "models") ?
+			"canonical_id" : "name");
+	fy_foreach(cond, fy_get(args, "where", fy_invalid))
+		out = fy_append(w->gb, out, fy_get(cond, "field", fy_invalid));
+	if (*sort)
+		out = fy_append(w->gb, out, sort);
+	return out;
+}
+
+static fy_generic settings_catalog_select(struct settings_walk *w,
+					  fy_generic cat, fy_generic args)
+{
+	char *segs[32], *copy, *seg, *save;
+	const char *from = fy_get(args, "from", "");
+	fy_generic rows, result;
+	int n = 0;
+
+	if (!*from || !settings_path_valid(from))
+		return fy_value(w->gb, "settings: select needs from, a path "
+				"such as providers/*/models");
+	copy = strdup(from);
+	if (!copy)
+		return fy_value(w->gb, "settings: the path could not be kept");
+	for (seg = strtok_r(copy, "/", &save); seg && n < 32;
+	     seg = strtok_r(NULL, "/", &save))
+		segs[n++] = seg;
+	rows = catalog_rows(w, cat, segs, n, 0, fy_mapping(w->gb),
+			    fy_sequence(w->gb));
+	result = settings_select(w, rows, args,
+				 catalog_dflt_fields(w, args, segs, n));
+	free(copy);
+	if (!fy_is_mapping(result))
+		return result;
+	return fy_assoc(w->gb, fy_assoc(w->gb, result, "document", "catalog"),
+			"from", from);
 }
 
 static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
@@ -1866,6 +2262,16 @@ static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 		result = fy_assoc(w.gb, result, "arena_protected",
 				  settings_arena_protected(ctx));
 		return result;
+	} else if (fy_equal(action, "select")) {
+		if (!fy_is_mapping(node))
+			return fy_value(w.gb, fy_sprintfa("settings: %s is not "
+					"a key of the schema", path));
+		result = settings_select(&w, settings_config_rows(&w, path,
+					 node), args, fy_sequence(w.gb, "key",
+					 "access", "layer", "value"));
+		if (!fy_is_mapping(result))
+			return result;
+		result = fy_assoc(w.gb, result, "path", path);
 	} else if (fy_equal(action, "proposals")) {
 		result = settings_proposals_run(&w);
 	} else if (fy_equal(action, "search")) {
@@ -1898,8 +2304,8 @@ static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 			result = fy_assoc(w.gb, result, "truncated", true);
 	} else {
 		return fy_value(w.gb, "settings: action must be search, "
-				"describe, get, list, change, revert or "
-				"proposals");
+				"describe, get, list, select, change, revert "
+				"or proposals");
 	}
 	if (!fy_empty(w.hidden))
 		result = fy_assoc(w.gb, result, "hidden", w.hidden);
@@ -2019,9 +2425,13 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 		path = "?";
 	if (fy_equal(fy_get(args, "document", fy_invalid), "catalog")) {
 		fprintf(mf, "**catalog** %s ", fy_any_equal(action, "search",
-			"get", "list") ? fy_castp(&action, "") : "?");
+			"get", "list", "select") ?
+			fy_castp(&action, "") : "?");
 		if (fy_equal(action, "search"))
 			fprintf(mf, "%s", settings_span(gb, query));
+		else if (fy_equal(action, "select"))
+			fprintf(mf, "%s", settings_span(gb,
+				fy_get(args, "from", "")));
 		else
 			fprintf(mf, "`%s`", *path ? path : "catalog");
 	} else if (fy_equal(action, "search")) {
@@ -2040,6 +2450,9 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 		fprintf(mf, "**settings** revert %s", settings_span(gb, id));
 	} else if (fy_equal(action, "proposals")) {
 		fprintf(mf, "**settings** proposals");
+	} else if (fy_equal(action, "select")) {
+		fprintf(mf, "**settings** select `%s`",
+			*path ? path : "config");
 	} else {
 		fprintf(mf, "**settings** %s `%s`",
 			fy_any_equal(action, "describe", "get", "list") ?
@@ -2075,6 +2488,33 @@ static void settings_format_keys(FILE *mf, struct fy_generic_builder *gb,
 		fprintf(mf, "_No key._\n");
 }
 
+/* The rows of a select: each field of a row as a span. */
+static void settings_format_select(FILE *mf, struct fy_generic_builder *gb,
+				   fy_generic data)
+{
+	fy_generic row, key, v;
+	size_t n = 0;
+	bool first;
+
+	fprintf(mf, "%lld matched\n\n", fy_get(data, "matched", 0LL));
+	fy_foreach(row, fy_get(data, "rows", fy_invalid)) {
+		if (n++ == SETTINGS_ROWS_MAX)
+			break;
+		fprintf(mf, "-");
+		first = true;
+		fy_foreach_key_value(key, v, row) {
+			fprintf(mf, "%s %s", first ? "" : " \u00b7",
+				settings_value_span(gb, v));
+			first = false;
+		}
+		fprintf(mf, "\n");
+	}
+	if (fy_len(fy_get(data, "rows", fy_seq_empty)) > SETTINGS_ROWS_MAX)
+		fprintf(mf, "- _%zu more_\n",
+			fy_len(fy_get(data, "rows", fy_seq_empty)) -
+			SETTINGS_ROWS_MAX);
+}
+
 /* The rows of a catalogue call for the user. */
 static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
 				    fy_generic action, fy_generic data)
@@ -2082,6 +2522,10 @@ static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
 	fy_generic row, v;
 	size_t n = 0;
 
+	if (fy_equal(action, "select")) {
+		settings_format_select(mf, gb, data);
+		return;
+	}
 	if (fy_equal(action, "search")) {
 		fprintf(mf, "%lld found\n\n", fy_get(data, "found", 0LL));
 		fy_foreach(row, fy_get(data, "models", fy_invalid)) {
@@ -2141,6 +2585,8 @@ static char *settings_format(struct fyai_ctx *ctx,
 		return NULL;
 	if (fy_equal(fy_get(data, "document", fy_invalid), "catalog")) {
 		settings_format_catalog(mf, gb, action, data);
+	} else if (fy_equal(action, "select")) {
+		settings_format_select(mf, gb, data);
 	} else if (fy_equal(action, "search")) {
 		fprintf(mf, "%lld found\n\n", fy_get(data, "found", 0LL));
 		settings_format_keys(mf, gb, fy_get(data, "keys", fy_invalid),
