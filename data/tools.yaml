@@ -739,12 +739,14 @@
       configuration allows it; otherwise the user reviews your explanation and the diff and
       accepts or rejects it, or types a reply. When nobody can review it now, it is kept as a
       proposal. You never write the configuration yourself, and you cannot change a `read` key.
+      `revert` takes back one of your changes of `write` keys by its `id`, as a change of its own;
+      a key changed since is a conflict. `proposals` lists your proposals and their status.
     parameters:
       type: object
       properties:
         action:
           type: string
-          enum: [search, describe, get, list, change]
+          enum: [search, describe, get, list, change, revert, proposals]
           description: |-
             What to do.
         path:
@@ -784,6 +786,10 @@
           type: string
           description: |-
             For `change`: why the change is wanted and what it does, in Markdown, for the user who reviews it. It can hold lists, tables and mermaid diagrams.
+        id:
+          type: string
+          description: |-
+            For `revert`: the id of the change to take back, such as `c1`.
         trial:
           type: boolean
           description: |-

@@ -1529,6 +1529,58 @@ commands:
         render:
           message: "config: proposal {id} is {status}"
 
+      - command: revert
+        title: take back a change of the model
+        description: |
+          Take back change ID of the change log: each key to its value
+          before the change. A key whose value changed since is a conflict,
+          and then nothing is taken back; with --force the other keys are.
+          The revert is a change of its own, and keeps every later change,
+          as `config undo` does not.
+        handler: config_revert
+        arguments:
+          type: object
+          required: [id]
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              description: the id of the change, such as c1
+              x-fyai-positional: 0
+              x-fyai-meta: ID
+            force:
+              type: boolean
+              description: take back the keys that did not change since
+              x-fyai-short: f
+        render:
+          markdown:
+            - "config: change {id} is taken back by change {change}"
+            - "{?diff}"
+            - "{?diff}{diff}"
+
+      - command: keep
+        title: store a trial change of the model
+        description: |
+          Store the trial change ID: each key it changed for this session
+          goes to the configuration of the branch, with the value of the
+          trial, and leaves the session layer.
+        handler: config_keep
+        arguments:
+          type: object
+          required: [id]
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              description: the id of the trial change, such as c1
+              x-fyai-positional: 0
+              x-fyai-meta: ID
+        render:
+          markdown:
+            - "config: change {id} is kept by change {change}"
+            - "{?diff}"
+            - "{?diff}{diff}"
+
       - command: export
         title: write the configuration to a file
         description: |

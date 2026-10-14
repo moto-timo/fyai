@@ -66,6 +66,8 @@ static const struct {
 	{ "config_review",	fyai_cmd_config_review },
 	{ "config_approve",	fyai_cmd_config_approve },
 	{ "config_reject",	fyai_cmd_config_reject },
+	{ "config_revert",	fyai_cmd_config_revert },
+	{ "config_keep",	fyai_cmd_config_keep },
 	{ "config_export",	fyai_cmd_config_export },
 	{ "config_validate",	fyai_cmd_config_validate },
 	{ "config_schema",	fyai_cmd_config_schema },

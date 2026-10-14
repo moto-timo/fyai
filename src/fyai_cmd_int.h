@@ -128,6 +128,8 @@ int fyai_cmd_config_proposals(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_config_review(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_config_approve(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_config_reject(struct fyai_cmd_call *call, fy_generic *result);
+int fyai_cmd_config_revert(struct fyai_cmd_call *call, fy_generic *result);
+int fyai_cmd_config_keep(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_config_export(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_config_validate(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_config_schema(struct fyai_cmd_call *call, fy_generic *result);

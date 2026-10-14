@@ -1070,7 +1070,7 @@ summary.
 
 inspect or change the configuration of the branch
 
-**Usage:** `fyai config {approve|changes|delete|describe|edit|effective|export|get|import|proposals|reject|reset|review|schema|set|show|undo|validate} ...`
+**Usage:** `fyai config {approve|changes|delete|describe|edit|effective|export|get|import|keep|proposals|reject|reset|revert|review|schema|set|show|undo|validate} ...`
 
 The configuration is a document stored with each branch. Paths are
 slash-separated keys, and values are YAML flow documents; see
@@ -1090,9 +1090,11 @@ slash-separated keys, and values are YAML flow documents; see
 | `export` | write the configuration to a file |
 | `get` | write the value of a key |
 | `import` | store a configuration file |
+| `keep` | store a trial change of the model |
 | `proposals` | list the changes that wait for you |
 | `reject` | drop a proposal of the model |
 | `reset` | return to the built-in configuration |
+| `revert` | take back a change of the model |
 | `review` | show a proposal of the model with its diff |
 | `schema` | write the configuration schema |
 | `set` | set the value of a key |
@@ -1377,6 +1379,57 @@ Mark the pending proposal ID rejected. It stays in the list.
 | Argument | Description |
 | --- | --- |
 | `ID` | the id of the proposal, such as p1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai config revert
+
+take back a change of the model
+
+**Usage:** `fyai config revert [-f] ID`
+
+Take back change ID of the change log: each key to its value
+before the change. A key whose value changed since is a conflict,
+and then nothing is taken back; with --force the other keys are.
+The revert is a change of its own, and keeps every later change,
+as `config undo` does not.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the change, such as c1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-f`, `--force` | take back the keys that did not change since |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai config keep
+
+store a trial change of the model
+
+**Usage:** `fyai config keep ID`
+
+Store the trial change ID: each key it changed for this session
+goes to the configuration of the branch, with the value of the
+trial, and leaves the session layer.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the trial change, such as c1 |
 
 ### Options
 
@@ -3787,7 +3840,7 @@ summary.
 
 inspect or change the configuration of the branch
 
-**Usage:** `/config {approve|changes|delete|describe|edit|effective|export|get|import|proposals|reject|reset|review|schema|set|show|undo|validate} ...`
+**Usage:** `/config {approve|changes|delete|describe|edit|effective|export|get|import|keep|proposals|reject|reset|revert|review|schema|set|show|undo|validate} ...`
 
 The configuration is a document stored with each branch. Paths are
 slash-separated keys, and values are YAML flow documents; see
@@ -3807,9 +3860,11 @@ slash-separated keys, and values are YAML flow documents; see
 | `export` | write the configuration to a file |
 | `get` | write the value of a key |
 | `import` | store a configuration file |
+| `keep` | store a trial change of the model |
 | `proposals` | list the changes that wait for you |
 | `reject` | drop a proposal of the model |
 | `reset` | return to the built-in configuration |
+| `revert` | take back a change of the model |
 | `review` | show a proposal of the model with its diff |
 | `schema` | write the configuration schema |
 | `set` | set the value of a key |
@@ -4082,6 +4137,55 @@ Mark the pending proposal ID rejected. It stays in the list.
 | Argument | Description |
 | --- | --- |
 | `ID` | the id of the proposal, such as p1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /config revert
+
+take back a change of the model
+
+**Usage:** `/config revert [-f] ID`
+
+Take back change ID of the change log: each key to its value
+before the change. A key whose value changed since is a conflict,
+and then nothing is taken back; with --force the other keys are.
+The revert is a change of its own, and keeps every later change,
+as `config undo` does not.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the change, such as c1 |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-f`, `--force` | take back the keys that did not change since |
+| `-h`, `--help` | show this help |
+
+## /config keep
+
+store a trial change of the model
+
+**Usage:** `/config keep ID`
+
+Store the trial change ID: each key it changed for this session
+goes to the configuration of the branch, with the value of the
+trial, and leaves the session layer.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `ID` | the id of the trial change, such as c1 |
 
 ### Options
 

@@ -409,6 +409,10 @@ struct settings_change {
 	bool trial;		/* the session layer only, for every scope */
 	const char *diff;	/* Markdown that fyai made, in the builder */
 	const char *unified;	/* the unified diff alone */
+	/* The entry of the change log that this change reverts or keeps,
+	 * and the status the entry takes when the change applies, or NULL. */
+	const char *mark_id;
+	const char *mark_status;
 };
 
 /*
@@ -495,17 +499,40 @@ static int settings_change_normalize(struct settings_walk *w,
 	return 0;
 }
 
-/* @doc with @path set to @value, or removed for fy_invalid. */
+/*
+ * @doc with @path set to @value, or removed for fy_invalid. A removal also
+ * removes each parent that it leaves empty, when the schema makes the parent
+ * a plain mapping with no default: such an empty mapping means what its
+ * absence means. A parent of a union, such as `sandbox`, stays.
+ */
 static fy_generic settings_doc_set(struct fy_generic_builder *gb,
 				   fy_generic doc, const char *path,
 				   fy_generic value)
 {
+	fy_generic node, parent;
+	char *up, *slash;
+
 	if (fy_is_valid(value))
 		return fy_set_at_pathstr(gb, doc, path,
 					 fy_gb_internalize(gb, value));
 	if (!fy_is_valid(fy_get_at_pathstr(gb, doc, path)))
 		return doc;
-	return fy_delete_at_pathstr(gb, doc, path);
+	doc = fy_delete_at_pathstr(gb, doc, path);
+	up = strdup(path);
+	if (!up)
+		return fy_invalid;
+	while (fy_is_valid(doc) && (slash = strrchr(up, '/'))) {
+		*slash = '\0';
+		node = fyai_config_schema_node(up);
+		parent = fy_get_at_pathstr(gb, doc, up);
+		if (!fy_is_mapping(parent) || !fy_empty(parent) ||
+		    !fy_equal(fy_get(node, "type", fy_invalid), "object") ||
+		    fy_is_valid(fy_get(node, "default", fy_invalid)))
+			break;
+		doc = fy_delete_at_pathstr(gb, doc, up);
+	}
+	free(up);
+	return doc;
 }
 
 static fy_generic settings_doc_get(struct fy_generic_builder *gb,
@@ -804,7 +831,9 @@ static fy_generic settings_entry(struct fyai_ctx *ctx,
 				 const char *id, const char *explanation,
 				 const char *status)
 {
-	return fy_mapping(gb,
+	fy_generic entry;
+
+	entry = fy_mapping(gb,
 		"name", id,
 		"status", status,
 		"access", fyai_model_access_name(c->access),
@@ -817,6 +846,37 @@ static fy_generic settings_entry(struct fyai_ctx *ctx,
 		"explanation", explanation,
 		"origin", fyai_ctx_branch(ctx),
 		"time", (long long)fyai_branch_timestamp());
+	if (c->mark_id)
+		entry = fy_assoc(gb, entry, "of", fy_mapping(gb,
+			"id", c->mark_id, "status", c->mark_status));
+	return entry;
+}
+
+/* The entry @id of @log, or fy_invalid. */
+static fy_generic settings_log_find(fy_generic log, const char *id)
+{
+	fy_generic item;
+
+	fy_foreach(item, log)
+		if (fy_equal(fy_get(item, "name", fy_invalid), id))
+			return item;
+	return fy_invalid;
+}
+
+/* @log with the status of entry @id replaced by @status. */
+static fy_generic settings_log_status(struct fy_generic_builder *gb,
+				      fy_generic log, const char *id,
+				      const char *status)
+{
+	fy_generic out, item;
+
+	out = fy_sequence(gb);
+	fy_foreach(item, log) {
+		if (fy_equal(fy_get(item, "name", fy_invalid), id))
+			item = fy_assoc(gb, item, "status", status);
+		out = fy_append(gb, out, item);
+	}
+	return out;
 }
 
 /*
@@ -834,6 +894,8 @@ static int settings_apply(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 
 	log = fyai_settings_log(ctx, "config_changes");
 	id = settings_next_id(gb, log, 'c');
+	if (c->mark_id)
+		log = settings_log_status(gb, log, c->mark_id, c->mark_status);
 	if (fy_is_valid(c->session) &&
 	    fyai_config_session_layer_adopt(ctx, c->session))
 		return -1;
@@ -970,33 +1032,6 @@ err_out:
 	return -1;
 }
 
-/* The entry @id of @log, or fy_invalid. */
-static fy_generic settings_log_find(fy_generic log, const char *id)
-{
-	fy_generic item;
-
-	fy_foreach(item, log)
-		if (fy_equal(fy_get(item, "name", fy_invalid), id))
-			return item;
-	return fy_invalid;
-}
-
-/* @log with the status of entry @id replaced by @status. */
-static fy_generic settings_log_status(struct fy_generic_builder *gb,
-				      fy_generic log, const char *id,
-				      const char *status)
-{
-	fy_generic out, item;
-
-	out = fy_sequence(gb);
-	fy_foreach(item, log) {
-		if (fy_equal(fy_get(item, "name", fy_invalid), id))
-			item = fy_assoc(gb, item, "status", status);
-		out = fy_append(gb, out, item);
-	}
-	return out;
-}
-
 static void settings_walk_init(struct settings_walk *w, struct fyai_ctx *ctx,
 			       struct fy_generic_builder *gb)
 {
@@ -1016,7 +1051,7 @@ static int settings_proposal_prepare(struct settings_walk *w, const char *id,
 				     struct settings_change *c,
 				     const char **explanationp)
 {
-	fy_generic entry;
+	fy_generic entry, of;
 	char why[1024];
 
 	memset(c, 0, sizeof(*c));
@@ -1032,6 +1067,12 @@ static int settings_proposal_prepare(struct settings_walk *w, const char *id,
 	c->trial = fy_get(entry, "trial", false);
 	*explanationp = fy_gb_intern_string(w->gb,
 					    fy_get(entry, "explanation", ""));
+	of = fy_get(entry, "of", fy_invalid);
+	if (fy_is_mapping(of)) {
+		c->mark_id = fy_gb_intern_string(w->gb, fy_get(of, "id", ""));
+		c->mark_status = fy_gb_intern_string(w->gb,
+						     fy_get(of, "status", ""));
+	}
 	if (settings_change_normalize(w, fy_get(entry, "changes", fy_invalid),
 				      c, why, sizeof(why)) ||
 	    settings_change_build(w, c, why, sizeof(why))) {
@@ -1059,9 +1100,27 @@ fy_generic fyai_settings_proposal_show(struct fyai_ctx *ctx,
 			  "diff", c.diff);
 }
 
+/*
+ * Tell the model how the user decided proposal @id: an event that the next
+ * turn reads, as the answer of a background question is.
+ */
+static void settings_proposal_event(struct fyai_ctx *ctx,
+				    struct fy_generic_builder *gb,
+				    const char *id, fy_generic result)
+{
+	const char *json;
+
+	json = emit_json_string(gb, result);
+	if (!json || fyai_event_injectf(ctx, "[config '%s' %s]\n%s", id,
+					fy_get(result, "status", "decided"),
+					json))
+		fyai_warning(ctx, "the model is not told that proposal '%s' "
+			     "was decided", id);
+}
+
 int fyai_settings_proposal_decide(struct fyai_ctx *ctx,
 				  struct fy_generic_builder *gb,
-				  const char *id, bool approve,
+				  const char *id, bool approve, bool notify,
 				  fy_generic *resultp)
 {
 	struct settings_walk w;
@@ -1080,6 +1139,8 @@ int fyai_settings_proposal_decide(struct fyai_ctx *ctx,
 				     fy_invalid))
 			return -1;
 		*resultp = fy_mapping(gb, "id", id, "status", "rejected");
+		if (notify)
+			settings_proposal_event(ctx, gb, id, *resultp);
 		return 0;
 	}
 	proposals = settings_log_status(gb, proposals, id, "approved");
@@ -1088,9 +1149,310 @@ int fyai_settings_proposal_decide(struct fyai_ctx *ctx,
 		return -1;
 	*resultp = fy_mapping(gb, "id", id, "status", "approved",
 			      "change", cid, "diff", c.diff);
+	if (notify)
+		settings_proposal_event(ctx, gb, id, fy_mapping(gb,
+			"id", id, "status", "approved", "change", cid,
+			"diff", c.unified));
 	return 0;
 err_out:
 	return -1;
+}
+
+/*
+ * Apply, review or propose the checked change @c that the model presents:
+ * fyai applies a change of write keys unasked only when the setting and the
+ * shell both allow it; any other change goes to the review panel, or waits
+ * as a proposal when nobody can review it now.
+ */
+static fy_generic settings_present(struct settings_walk *w,
+				   struct settings_change *c,
+				   const char *explanation, bool *okp)
+{
+	struct fyai_ctx *ctx = w->ctx;
+	struct fyai_cfg *cfg = ctx->cfg;
+	enum fyai_model_access access;
+	const char *id = NULL, *status = "rejected";
+	char *reply = NULL;
+	fy_generic result;
+	int rc;
+
+	*okp = false;
+	access = c->access;
+	if (access == FYAI_MODEL_WRITE &&
+	    (cfg->model_access < FYAI_MODEL_WRITE ||
+	     !settings_arena_protected(ctx)))
+		access = FYAI_MODEL_REVIEW;
+
+	if (access == FYAI_MODEL_WRITE) {
+		rc = settings_apply(ctx, w->gb, c, explanation, &id, NULL,
+				    fy_invalid);
+		status = "applied";
+	} else if (fyai_agent_delegated(ctx) || !fyai_ui_ask_available(ctx)) {
+		rc = settings_propose(ctx, w->gb, c, explanation, &id);
+		status = "pending";
+	} else {
+		rc = settings_review(ctx, w->gb, c, explanation, &reply);
+		if (rc > 0) {
+			rc = settings_apply(ctx, w->gb, c, explanation, &id,
+					    NULL, fy_invalid);
+			status = "applied";
+		}
+	}
+	if (rc < 0) {
+		free(reply);
+		return fy_value(w->gb, "settings: the change was not applied");
+	}
+	result = fy_mapping(w->gb, "status", status, "access",
+			    fyai_model_access_name(access), "diff", c->unified);
+	if (id)
+		result = fy_assoc(w->gb, result, "id", id);
+	if (reply) {
+		result = fy_assoc(w->gb, result, "reply",
+				  fy_value(w->gb, reply));
+		free(reply);
+	}
+	if (!strcmp(status, "pending"))
+		result = fy_assoc(w->gb, result, "note", "Nobody can review "
+			"the change now. It is kept as a proposal; the user "
+			"applies it with `config approve`.");
+	*okp = strcmp(status, "rejected") != 0;
+	return result;
+}
+
+/*
+ * Build in @c the change that takes entry @entry of the change log back:
+ * each path to its value before the change. A path whose value is no
+ * longer the one the change left is a conflict; with @force the other paths
+ * are taken back, else nothing is. Returns 0, 1 for a conflict, or -1.
+ */
+static int settings_revert_build(struct settings_walk *w, fy_generic entry,
+				 bool force, struct settings_change *c,
+				 fy_generic *conflictsp, char *why,
+				 size_t why_size)
+{
+	struct fyai_ctx *ctx = w->ctx;
+	fy_generic before, after, item, cur, out, paths, conflicts, b;
+	const char *path;
+	bool in_session;
+	size_t len;
+	int access;
+
+	memset(c, 0, sizeof(*c));
+	c->trial = fy_get(entry, "trial", false);
+	before = fy_get(entry, "before", fy_invalid);
+	after = fy_get(entry, "after", fy_invalid);
+	out = fy_sequence(w->gb);
+	paths = fy_sequence(w->gb);
+	conflicts = fy_sequence(w->gb);
+	fy_foreach(item, fy_get(entry, "paths", fy_invalid)) {
+		path = fy_gb_intern_string(w->gb, fy_castp(&item, ""));
+		in_session = c->trial || fyai_config_session_scoped(path);
+		cur = settings_doc_get(w->gb, in_session ?
+				       ctx->cfg->config_session :
+				       ctx->arena_config, path);
+		if (fy_compare(cur, fy_get(after, path, fy_null))) {
+			conflicts = fy_append(w->gb, conflicts, path);
+			continue;
+		}
+		b = fy_get(before, path, fy_null);
+		out = fy_append(w->gb, out, fy_is_null(b) ?
+			fy_mapping(w->gb, "path", path, "delete", true) :
+			fy_mapping(w->gb, "path", path, "value", b));
+		paths = fy_append(w->gb, paths, path);
+	}
+	*conflictsp = conflicts;
+	if (!fy_empty(conflicts) && !force) {
+		len = (size_t)snprintf(why, why_size, "changed since the "
+				       "change, so nothing is taken back:");
+		fy_foreach(item, conflicts)
+			if (len < why_size)
+				len += (size_t)snprintf(why + len,
+					why_size - len, " %s",
+					fy_castp(&item, ""));
+		return 1;
+	}
+	if (fy_empty(out)) {
+		snprintf(why, why_size, "every path changed since the change");
+		return -1;
+	}
+	access = fyai_model_access_parse(fy_get(entry, "access", fy_invalid));
+	c->access = access < 0 ? FYAI_MODEL_HIDDEN :
+		    (enum fyai_model_access)access;
+	c->changes = out;
+	c->paths = paths;
+	c->mark_id = fy_gb_intern_string(w->gb, fy_get(entry, "name", ""));
+	c->mark_status = "reverted";
+	return settings_change_build(w, c, why, why_size) ? -1 : 0;
+}
+
+/* The entry @id of the change log that can be reverted or kept. */
+static fy_generic settings_change_entry(struct fyai_ctx *ctx, const char *id)
+{
+	fy_generic entry;
+
+	entry = settings_log_find(fyai_settings_log(ctx, "config_changes"),
+				  id);
+	fyai_error_check(ctx, fy_is_mapping(entry), err_out,
+			 "no change '%s' on branch '%s'", id,
+			 fyai_ctx_branch(ctx));
+	fyai_error_check(ctx, fy_any_equal(fy_get(entry, "status",
+						  fy_invalid),
+					   "applied", "session"), err_out,
+			 "change '%s' is %s", id,
+			 fy_get(entry, "status", "?"));
+	return entry;
+err_out:
+	return fy_invalid;
+}
+
+/* The model takes back one of its own changes of write keys. */
+static fy_generic settings_revert_run(struct settings_walk *w,
+				      fy_generic args, bool *okp)
+{
+	struct fyai_ctx *ctx = w->ctx;
+	struct settings_change c;
+	fy_generic entry, conflicts;
+	const char *id = fy_get(args, "id", "");
+	char why[1024];
+	int rc;
+
+	*okp = false;
+	if (ctx->cfg->model_access < FYAI_MODEL_REVIEW)
+		return fy_value(w->gb, "settings: model_access allows reads "
+				"only");
+	entry = settings_log_find(fyai_settings_log(ctx, "config_changes"),
+				  id);
+	if (!fy_is_mapping(entry) ||
+	    !fy_any_equal(fy_get(entry, "status", fy_invalid), "applied",
+			  "session"))
+		return fy_value(w->gb, fy_sprintfa("settings: no change '%s' "
+				"to take back", id));
+	if (!fy_equal(fy_get(entry, "access", fy_invalid), "write"))
+		return fy_value(w->gb, fy_sprintfa("settings: change %s has "
+				"review keys; only the user takes it back",
+				id));
+	rc = settings_revert_build(w, entry, false, &c, &conflicts, why,
+				   sizeof(why));
+	if (rc)
+		return fy_value(w->gb, fy_sprintfa("settings: %s", why));
+	return settings_present(w, &c, fy_sprintfa("Take back change %s.", id),
+				okp);
+}
+
+int fyai_settings_revert(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
+			 const char *id, bool force, fy_generic *resultp)
+{
+	struct settings_walk w;
+	struct settings_change c;
+	fy_generic entry, conflicts;
+	const char *cid;
+	char why[1024];
+
+	settings_walk_init(&w, ctx, gb);
+	fyai_error_check(ctx, ctx->gb, err_out, "no arena; run fyai init");
+	entry = settings_change_entry(ctx, id);
+	if (!fy_is_mapping(entry))
+		return -1;
+	if (settings_revert_build(&w, entry, force, &c, &conflicts, why,
+				  sizeof(why))) {
+		fyai_error(ctx, "change '%s' is not taken back: %s", id, why);
+		return -1;
+	}
+	if (settings_apply(ctx, gb, &c, fy_sprintfa("Take back change %s.",
+						    id), &cid, NULL,
+			   fy_invalid))
+		return -1;
+	*resultp = fy_mapping(gb, "id", id, "status", "reverted",
+			      "change", cid, "conflicts", conflicts,
+			      "diff", c.diff);
+	return 0;
+err_out:
+	return -1;
+}
+
+int fyai_settings_keep(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
+		       const char *id, fy_generic *resultp)
+{
+	struct settings_walk w;
+	struct settings_change c;
+	fy_generic entry, after, item, v, out, paths, session, stored0;
+	fy_generic session0;
+	const char *path, *cid;
+	char why[1024];
+
+	settings_walk_init(&w, ctx, gb);
+	memset(&c, 0, sizeof(c));
+	fyai_error_check(ctx, ctx->gb, err_out, "no arena; run fyai init");
+	entry = settings_change_entry(ctx, id);
+	if (!fy_is_mapping(entry))
+		return -1;
+	fyai_error_check(ctx, fy_get(entry, "trial", false), err_out,
+			 "change '%s' is not a trial", id);
+	/* Each key of stored scope goes to the branch with the value of the
+	 * trial, and leaves the session layer. */
+	after = fy_get(entry, "after", fy_invalid);
+	out = fy_sequence(gb);
+	paths = fy_sequence(gb);
+	session = fy_is_mapping(ctx->cfg->config_session) ?
+		  ctx->cfg->config_session : fy_map_empty;
+	fy_foreach(item, fy_get(entry, "paths", fy_invalid)) {
+		path = fy_gb_intern_string(gb, fy_castp(&item, ""));
+		if (fyai_config_session_scoped(path))
+			continue;
+		v = fy_get(after, path, fy_null);
+		out = fy_append(gb, out, fy_is_null(v) ?
+			fy_mapping(gb, "path", path, "delete", true) :
+			fy_mapping(gb, "path", path, "value", v));
+		paths = fy_append(gb, paths, path);
+		session = settings_doc_set(ctx->cfg->gb, session, path,
+					   fy_invalid);
+	}
+	fyai_error_check(ctx, !fy_empty(out), err_out,
+			 "change '%s' has no key that a branch stores", id);
+	c.changes = out;
+	c.paths = paths;
+	c.access = FYAI_MODEL_REVIEW;
+	c.mark_id = id;
+	c.mark_status = "kept";
+	if (settings_change_build(&w, &c, why, sizeof(why))) {
+		fyai_error(ctx, "change '%s' is not kept: %s", id, why);
+		return -1;
+	}
+	stored0 = fy_is_mapping(ctx->arena_config) ? ctx->arena_config :
+		  fy_map_empty;
+	session0 = fy_is_mapping(ctx->cfg->config_session) ?
+		   ctx->cfg->config_session : fy_map_empty;
+	c.session = fy_compare(session, session0) ? session : fy_invalid;
+	if ((fy_is_valid(c.session) &&
+	     !fyai_config_session_layer_valid(ctx, session)) ||
+	    settings_change_diff(&w, &c, stored0, session0)) {
+		fyai_error(ctx, "change '%s' is not kept: the session layer "
+			   "cannot give up its keys", id);
+		return -1;
+	}
+	if (settings_apply(ctx, gb, &c, fy_sprintfa("Keep change %s.", id),
+			   &cid, NULL, fy_invalid))
+		return -1;
+	*resultp = fy_mapping(gb, "id", id, "status", "kept", "change", cid,
+			      "diff", c.diff);
+	return 0;
+err_out:
+	return -1;
+}
+
+/* The proposals of this branch, as the model reads them. */
+static fy_generic settings_proposals_run(struct settings_walk *w)
+{
+	fy_generic rows, item;
+
+	rows = fy_sequence(w->gb);
+	fy_foreach(item, fyai_settings_log(w->ctx, "config_proposals"))
+		rows = fy_append(w->gb, rows, fy_mapping(w->gb,
+			"id", fy_get(item, "name", ""),
+			"status", fy_get(item, "status", ""),
+			"paths", fy_get(item, "paths", fy_invalid),
+			"changes", fy_get(item, "changes", fy_invalid)));
+	return fy_mapping(w->gb, "proposals", rows);
 }
 
 /* A pending proposal that waits for the answer of the review panel. */
@@ -1141,11 +1503,11 @@ fy_generic fyai_settings_review_questions(struct fyai_settings_review *r)
 
 int fyai_settings_review_apply(struct fyai_settings_review *r,
 			       const struct fyai_ask_reply *replies, size_t n,
-			       fy_generic *resultp)
+			       bool notify, fy_generic *resultp)
 {
 	struct fyai_ctx *ctx = r->ctx;
 	struct fy_generic_builder *gb = r->gb;
-	fy_generic proposals;
+	fy_generic proposals, event;
 	const char *cid = NULL;
 	char *reply = NULL;
 
@@ -1165,6 +1527,11 @@ int fyai_settings_review_apply(struct fyai_settings_review *r,
 		return -1;
 	*resultp = fy_mapping(gb, "id", r->id, "status", "approved",
 			      "change", cid, "diff", r->c.diff);
+	if (notify) {
+		event = fy_mapping(gb, "id", r->id, "status", "approved",
+				   "change", cid, "diff", r->c.unified);
+		settings_proposal_event(ctx, gb, r->id, event);
+	}
 	return 0;
 }
 
@@ -1180,11 +1547,8 @@ static fy_generic settings_change_run(struct settings_walk *w, fy_generic args,
 	struct fyai_ctx *ctx = w->ctx;
 	struct fyai_cfg *cfg = ctx->cfg;
 	struct settings_change c;
-	enum fyai_model_access access;
-	const char *explanation, *id, *status;
-	char why[1024], *reply = NULL;
-	fy_generic result;
-	int rc;
+	const char *explanation;
+	char why[1024];
 
 	*okp = false;
 	memset(&c, 0, sizeof(c));
@@ -1209,51 +1573,7 @@ static fy_generic settings_change_run(struct settings_walk *w, fy_generic args,
 				explanation ? why : "the explanation could "
 				"not be kept"));
 
-	/* A change of a write key is reviewed unless both the setting and
-	 * the shell allow fyai to apply it unasked. */
-	access = c.access;
-	if (access == FYAI_MODEL_WRITE &&
-	    (cfg->model_access < FYAI_MODEL_WRITE ||
-	     !settings_arena_protected(ctx)))
-		access = FYAI_MODEL_REVIEW;
-
-	if (access == FYAI_MODEL_WRITE) {
-		rc = settings_apply(ctx, w->gb, &c, explanation, &id, NULL,
-				    fy_invalid);
-		status = "applied";
-	} else if (fyai_agent_delegated(ctx) || !fyai_ui_ask_available(ctx)) {
-		rc = settings_propose(ctx, w->gb, &c, explanation, &id);
-		status = "pending";
-	} else {
-		rc = settings_review(ctx, w->gb, &c, explanation, &reply);
-		if (rc > 0) {
-			rc = settings_apply(ctx, w->gb, &c, explanation, &id,
-					    NULL, fy_invalid);
-			status = "applied";
-		} else if (!rc) {
-			id = NULL;
-			status = "rejected";
-		}
-	}
-	if (rc < 0) {
-		free(reply);
-		return fy_value(w->gb, "settings: the change was not applied");
-	}
-	result = fy_mapping(w->gb, "status", status, "access",
-			    fyai_model_access_name(access), "diff", c.unified);
-	if (id)
-		result = fy_assoc(w->gb, result, "id", id);
-	if (reply) {
-		result = fy_assoc(w->gb, result, "reply",
-				  fy_value(w->gb, reply));
-		free(reply);
-	}
-	if (!strcmp(status, "pending"))
-		result = fy_assoc(w->gb, result, "note", "Nobody can review "
-			"the change now. It is kept as a proposal; the user "
-			"applies it with `config approve`.");
-	*okp = strcmp(status, "rejected") != 0;
-	return result;
+	return settings_present(w, &c, explanation, okp);
 }
 
 static fy_generic settings_run(struct fyai_ctx *ctx, fy_generic args,
@@ -1285,13 +1605,17 @@ static fy_generic settings_run(struct fyai_ctx *ctx, fy_generic args,
 	node = *path ? fyai_config_schema_node(path) :
 	       fyai_config_schema(NULL);
 
-	if (fy_equal(action, "change")) {
-		result = settings_change_run(&w, args, okp);
+	if (fy_any_equal(action, "change", "revert")) {
+		result = fy_equal(action, "change") ?
+			 settings_change_run(&w, args, okp) :
+			 settings_revert_run(&w, args, okp);
 		if (!fy_is_mapping(result))
 			return result;
 		result = fy_assoc(w.gb, result, "arena_protected",
 				  settings_arena_protected(ctx));
 		return result;
+	} else if (fy_equal(action, "proposals")) {
+		result = settings_proposals_run(&w);
 	} else if (fy_equal(action, "search")) {
 		if (!fy_is_mapping(node))
 			return fy_value(w.gb, fy_sprintfa("settings: %s is not "
@@ -1322,7 +1646,8 @@ static fy_generic settings_run(struct fyai_ctx *ctx, fy_generic args,
 			result = fy_assoc(w.gb, result, "truncated", true);
 	} else {
 		return fy_value(w.gb, "settings: action must be search, "
-				"describe, get or list");
+				"describe, get, list, change, revert or "
+				"proposals");
 	}
 	if (!fy_empty(w.hidden))
 		result = fy_assoc(w.gb, result, "hidden", w.hidden);
@@ -1360,7 +1685,7 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 		path = "?";
 	fprintf(mf, "**settings** %s `%s`\n\n",
 		fy_any_equal(action, "search", "describe", "get", "list",
-			     "change") ?
+			     "change", "revert", "proposals") ?
 			fy_castp(&action, "") : "?",
 		*path ? path : "config");
 }

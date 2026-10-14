@@ -264,7 +264,7 @@ static void config_approve_answered(void *user,
 
 	/* No answer at all, as from Escape, leaves the proposal pending. */
 	rc = fyai_settings_review_apply(call->priv, replies ? replies : &none,
-					replies ? n : 1, &result);
+					replies ? n : 1, true, &result);
 	fyai_cmd_done(call, rc, result);
 }
 
@@ -298,7 +298,8 @@ int fyai_cmd_config_approve(struct fyai_cmd_call *call, fy_generic *result)
 		return -1;
 	if (call->surface != FYAI_CMD_SESSION ||
 	    !fyai_ui_ask_available(call->ctx)) {
-		rc = fyai_settings_review_apply(r, NULL, 0, result);
+		rc = fyai_settings_review_apply(r, NULL, 0,
+				call->surface == FYAI_CMD_SESSION, result);
 		fyai_settings_review_free(r);
 		return rc;
 	}
@@ -320,7 +321,26 @@ int fyai_cmd_config_reject(struct fyai_cmd_call *call, fy_generic *result)
 		return -1;
 	return fyai_settings_proposal_decide(call->ctx, call->gb,
 					     fyai_cmd_arg_str(call, "id"),
-					     false, result);
+					     false,
+					     call->surface == FYAI_CMD_SESSION,
+					     result);
+}
+
+int fyai_cmd_config_revert(struct fyai_cmd_call *call, fy_generic *result)
+{
+	if (config_need_arena(call))
+		return -1;
+	return fyai_settings_revert(call->ctx, call->gb,
+				    fyai_cmd_arg_str(call, "id"),
+				    fyai_cmd_arg_bool(call, "force"), result);
+}
+
+int fyai_cmd_config_keep(struct fyai_cmd_call *call, fy_generic *result)
+{
+	if (config_need_arena(call))
+		return -1;
+	return fyai_settings_keep(call->ctx, call->gb,
+				  fyai_cmd_arg_str(call, "id"), result);
 }
 
 int fyai_cmd_config_export(struct fyai_cmd_call *call, fy_generic *result)
