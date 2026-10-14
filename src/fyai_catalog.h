@@ -133,6 +133,14 @@ int fyai_catalog_export(struct fyai_ctx *ctx, const char *path);
  * which. The value is held by the arena or by the process.
  */
 int fyai_catalog_document(struct fyai_ctx *ctx, fy_generic *catp);
+/*
+ * The value at the slash path @path of the catalogue of the branch, else of
+ * the embedded snapshot: an item of a list is named by its name, as in
+ * `providers/openai/models/gpt-5`. fy_invalid, with nothing reported, when
+ * the path leads nowhere. The value is held by the arena or by the process.
+ */
+fy_generic fyai_catalog_at(struct fyai_ctx *ctx, const char *path);
+
 /* The models, or with @what "providers" the providers, of the catalogue. */
 fy_generic fyai_catalog_list_data(struct fyai_ctx *ctx,
 				  struct fy_generic_builder *gb,

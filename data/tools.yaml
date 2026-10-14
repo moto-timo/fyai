@@ -749,6 +749,11 @@
           enum: [search, describe, get, list, change, revert, proposals]
           description: |-
             What to do.
+        document:
+          type: string
+          enum: [config, catalog]
+          description: |-
+            What to read: `config`, the default, or `catalog`, the providers and models fyai knows. The catalogue is read only: `search` finds models by name, capability, modality or provider; `get` reads `models/NAME`, `providers/NAME` or `providers/NAME/models/ID`; `list` names the items under a path.
         path:
           type: string
           description: |-

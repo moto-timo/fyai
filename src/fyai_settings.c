@@ -25,6 +25,7 @@
 #include "fyai_agent.h"
 #include "fyai_ask.h"
 #include "fyai_branch.h"
+#include "fyai_catalog.h"
 #include "fyai_config.h"
 #include "fyai_diff.h"
 #include "fyai_event.h"
@@ -1630,6 +1631,187 @@ static fy_generic settings_change_run(struct settings_walk *w, fy_generic args,
 	return settings_present(w, &c, explanation, okp);
 }
 
+/*
+ * The catalogue is read only: the model learns what models and providers
+ * exist and what they can do, and changes nothing. A path names an item of a
+ * list by its name, as `catalog get` does.
+ */
+
+/* The providers that offer each model: {canonical id: [provider, ...]}. */
+static fy_generic catalog_offered_by(struct fy_generic_builder *gb,
+				     fy_generic cat)
+{
+	fy_generic out, provider, offering, id, names;
+
+	out = fy_mapping(gb);
+	fy_foreach(provider, fy_get(cat, "providers", fy_invalid)) {
+		fy_foreach(offering, fy_get(provider, "models", fy_invalid)) {
+			id = fy_get(offering, "canonical_id", fy_invalid);
+			if (!fy_is_string(id))
+				continue;
+			names = fy_get(out, id, fy_seq_empty);
+			out = fy_assoc(gb, out, id, fy_append(gb, names,
+				fy_get(provider, "name", fy_invalid)));
+		}
+	}
+	return out;
+}
+
+/* Whether @word is in @text, or in a member of the sequence @seq. */
+static bool catalog_word_in(const char *word, const char *text,
+			    fy_generic seq)
+{
+	fy_generic v;
+
+	if (text && strcasestr(text, word))
+		return true;
+	fy_foreach(v, seq)
+		if (fy_is_string(v) && strcasestr(fy_castp(&v, ""), word))
+			return true;
+	return false;
+}
+
+static fy_generic catalog_search(struct settings_walk *w, fy_generic cat,
+				 const char *query, long long limit)
+{
+	const char *words[SETTINGS_SEARCH_WORDS], *name, *current;
+	fy_generic offered, model, by_name, by_text, row, providers, keys;
+	char *copy, *word, *save;
+	size_t nwords = 0, i, in_name, max, found = 0;
+
+	max = limit > 0 && limit <= SETTINGS_SEARCH_MAX ? (size_t)limit :
+	      SETTINGS_SEARCH_LIMIT;
+	copy = strdup(query);
+	if (!copy)
+		return fy_value(w->gb, "settings: the query could not be kept");
+	for (word = strtok_r(copy, " \t", &save);
+	     word && nwords < SETTINGS_SEARCH_WORDS;
+	     word = strtok_r(NULL, " \t", &save))
+		words[nwords++] = fy_gb_intern_string(w->gb, word);
+	free(copy);
+	if (!nwords)
+		return fy_value(w->gb, "settings: search needs a query");
+	offered = catalog_offered_by(w->gb, cat);
+	current = w->ctx->cfg->model ? w->ctx->cfg->model : "";
+	by_name = fy_sequence(w->gb);
+	by_text = fy_sequence(w->gb);
+	fy_foreach(model, fy_get(cat, "models", fy_invalid)) {
+		name = fy_get(model, "name", "");
+		providers = fy_get(offered, name, fy_seq_empty);
+		in_name = 0;
+		for (i = 0; i < nwords; i++) {
+			if (strcasestr(name, words[i]))
+				in_name++;
+			else if (!catalog_word_in(words[i],
+					fy_get(model, "display_name", ""),
+					fy_get(model, "capabilities",
+					       fy_invalid)) &&
+				 !catalog_word_in(words[i], NULL,
+					fy_get(model, "modalities",
+					       fy_invalid)) &&
+				 !catalog_word_in(words[i], NULL, providers))
+				break;
+		}
+		if (i < nwords)
+			continue;
+		found++;
+		row = fy_mapping(w->gb,
+			"path", fy_sprintfa("models/%s", name),
+			"display_name", fy_get(model, "display_name", ""),
+			"context_window", fy_get(model, "context_window", 0LL),
+			"providers", providers,
+			"capabilities", fy_get(model, "capabilities",
+					       fy_seq_empty),
+			"current", (_Bool)!strcmp(name, current));
+		if (in_name == nwords && fy_len(by_name) < max)
+			by_name = fy_append(w->gb, by_name, row);
+		else if (in_name < nwords && fy_len(by_text) < max)
+			by_text = fy_append(w->gb, by_text, row);
+	}
+	keys = by_name;
+	fy_foreach(row, by_text) {
+		if (fy_len(keys) >= max)
+			break;
+		keys = fy_append(w->gb, keys, row);
+	}
+	return fy_mapping(w->gb, "document", "catalog", "query", query,
+			  "models", keys, "found", (long long)found);
+}
+
+/*
+ * @v at @path, kept short: a provider gives the ids of its models, not each
+ * offering, which `providers/NAME/models/ID` reads one at a time.
+ */
+static fy_generic catalog_short(struct settings_walk *w, const char *path,
+				fy_generic v)
+{
+	fy_generic ids, offering;
+
+	if (strncmp(path, "providers/", 10) || strchr(path + 10, '/') ||
+	    !fy_is_mapping(v))
+		return v;
+	ids = fy_sequence(w->gb);
+	fy_foreach(offering, fy_get(v, "models", fy_invalid))
+		ids = fy_append(w->gb, ids, fy_get(offering, "canonical_id",
+						   fy_invalid));
+	return fy_assoc(w->gb, v, "models", ids);
+}
+
+/* The names of the items at @path: a list by name, a mapping by key. */
+static fy_generic catalog_names(struct settings_walk *w, fy_generic v)
+{
+	fy_generic out, item, key;
+
+	out = fy_sequence(w->gb);
+	if (fy_is_sequence(v)) {
+		fy_foreach(item, v) {
+			key = fy_get(item, "name", fy_invalid);
+			if (!fy_is_string(key))
+				key = fy_get(item, "canonical_id", fy_invalid);
+			if (fy_is_string(key))
+				out = fy_append(w->gb, out, key);
+		}
+	} else {
+		fy_foreach_key_value(key, item, v)
+			out = fy_append(w->gb, out, key);
+	}
+	return out;
+}
+
+static fy_generic settings_catalog_run(struct settings_walk *w,
+				       fy_generic action, const char *path,
+				       fy_generic args)
+{
+	fy_generic cat, v;
+
+	cat = fyai_catalog_effective(w->ctx->arena_catalog, NULL);
+	if (!fy_is_mapping(cat))
+		return fy_value(w->gb, "settings: the catalogue cannot be "
+				"read");
+	if (fy_equal(action, "search"))
+		return catalog_search(w, cat, fy_get(args, "query", ""),
+				      fy_get(args, "limit", 0LL));
+	if (!fy_any_equal(action, "get", "list"))
+		return fy_value(w->gb, "settings: the catalogue is read only; "
+				"its actions are search, get and list");
+	v = *path ? fyai_catalog_at(w->ctx, path) : cat;
+	if (!fy_is_valid(v))
+		return fy_value(w->gb, fy_sprintfa("settings: the catalogue "
+				"has nothing at %s", path));
+	if (fy_equal(action, "list")) {
+		if (!fy_is_sequence(v) && !fy_is_mapping(v))
+			return fy_value(w->gb, fy_sprintfa("settings: %s has "
+					"no items", path));
+		return fy_mapping(w->gb, "document", "catalog", "path", path,
+				  "names", catalog_names(w, v));
+	}
+	if (!*path)
+		return fy_value(w->gb, "settings: get a part of the catalogue, "
+				"such as models/NAME or providers/NAME");
+	return fy_mapping(w->gb, "document", "catalog", "path", path,
+			  "value", catalog_short(w, path, v));
+}
+
 static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 				       bool *okp)
 {
@@ -1656,9 +1838,22 @@ static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 	if (!settings_path_valid(path))
 		return fy_value(w.gb, fy_sprintfa("settings: '%s' is not a "
 				"slash path of the configuration", path));
-	if (*path && fyai_config_model_access(path) == FYAI_MODEL_HIDDEN)
+	if (*path && !fy_equal(fy_get(args, "document", fy_invalid),
+			       "catalog") &&
+	    fyai_config_model_access(path) == FYAI_MODEL_HIDDEN)
 		return fy_value(w.gb, fy_sprintfa("settings: %s is hidden "
 				"from the model", path));
+	if (fy_equal(fy_get(args, "document", fy_invalid), "catalog")) {
+		result = settings_catalog_run(&w, action, path, args);
+		if (!fy_is_mapping(result))
+			return result;
+		*okp = true;
+		return result;
+	}
+	if (!fy_any_equal(fy_get(args, "document", "config"), "config")) {
+		return fy_value(w.gb, "settings: document must be config or "
+				"catalog");
+	}
 	node = *path ? fyai_config_schema_node(path) :
 	       fyai_config_schema(NULL);
 
@@ -1822,7 +2017,14 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 	/* The model wrote the path: one that is not valid is not shown. */
 	if (!settings_path_valid(path))
 		path = "?";
-	if (fy_equal(action, "search")) {
+	if (fy_equal(fy_get(args, "document", fy_invalid), "catalog")) {
+		fprintf(mf, "**catalog** %s ", fy_any_equal(action, "search",
+			"get", "list") ? fy_castp(&action, "") : "?");
+		if (fy_equal(action, "search"))
+			fprintf(mf, "%s", settings_span(gb, query));
+		else
+			fprintf(mf, "`%s`", *path ? path : "catalog");
+	} else if (fy_equal(action, "search")) {
 		fprintf(mf, "**settings** search %s", settings_span(gb, query));
 		if (*path)
 			fprintf(mf, " in `%s`", path);
@@ -1873,6 +2075,47 @@ static void settings_format_keys(FILE *mf, struct fy_generic_builder *gb,
 		fprintf(mf, "_No key._\n");
 }
 
+/* The rows of a catalogue call for the user. */
+static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
+				    fy_generic action, fy_generic data)
+{
+	fy_generic row, v;
+	size_t n = 0;
+
+	if (fy_equal(action, "search")) {
+		fprintf(mf, "%lld found\n\n", fy_get(data, "found", 0LL));
+		fy_foreach(row, fy_get(data, "models", fy_invalid)) {
+			if (n++ == SETTINGS_ROWS_MAX)
+				break;
+			fprintf(mf, "- %s \u00b7 %s \u00b7 %lld tokens "
+				"\u00b7 %s%s\n",
+				settings_span(gb, fy_get(row, "path", "")),
+				settings_span(gb, fy_get(row, "display_name",
+							 "")),
+				fy_get(row, "context_window", 0LL),
+				settings_value_span(gb, fy_get(row, "providers",
+							       fy_seq_empty)),
+				fy_get(row, "current", false) ?
+					" \u00b7 **in use**" : "");
+		}
+		if (fy_len(fy_get(data, "models", fy_seq_empty)) >
+		    SETTINGS_ROWS_MAX)
+			fprintf(mf, "- _%zu more_\n",
+				fy_len(fy_get(data, "models", fy_seq_empty)) -
+				SETTINGS_ROWS_MAX);
+		return;
+	}
+	if (fy_equal(action, "list")) {
+		v = fy_get(data, "names", fy_seq_empty);
+		fprintf(mf, "%zu \u00b7 %s\n", fy_len(v),
+			settings_value_span(gb, v));
+		return;
+	}
+	fprintf(mf, "%s \u00b7 %s\n",
+		settings_span(gb, fy_get(data, "path", "")),
+		settings_value_span(gb, fy_get(data, "value", fy_null)));
+}
+
 /*
  * The result of a call for the user: short rows for the reads, and for a
  * change the outcome and the whole diff that fyai made, so no change is
@@ -1896,7 +2139,9 @@ static char *settings_format(struct fyai_ctx *ctx,
 	mf = open_memstream(&out, &len);
 	if (!mf)
 		return NULL;
-	if (fy_equal(action, "search")) {
+	if (fy_equal(fy_get(data, "document", fy_invalid), "catalog")) {
+		settings_format_catalog(mf, gb, action, data);
+	} else if (fy_equal(action, "search")) {
 		fprintf(mf, "%lld found\n\n", fy_get(data, "found", 0LL));
 		settings_format_keys(mf, gb, fy_get(data, "keys", fy_invalid),
 				     false);

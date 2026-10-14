@@ -474,6 +474,22 @@ static fy_generic catalog_current(struct fyai_ctx *ctx)
 	return fyai_catalog_effective(ctx->arena_catalog, ctx->cfg->gb);
 }
 
+fy_generic fyai_catalog_at(struct fyai_ctx *ctx, const char *path)
+{
+	char *segs[CATALOG_PATH_MAX_DEPTH];
+	fy_generic v;
+	char *copy;
+	int n;
+
+	copy = strdup(path);
+	if (!copy)
+		return fy_invalid;
+	n = catalog_path_split(copy, segs);
+	v = n < 0 ? fy_invalid : catalog_path_get(catalog_current(ctx), segs, n);
+	free(copy);
+	return v;
+}
+
 int fyai_catalog_value(struct fyai_ctx *ctx, const char *path,
 		       fy_generic *valuep)
 {
