@@ -26,6 +26,7 @@ FYAI_TEST_ENTRY(settings, read, settings_read)
 FYAI_TEST_ENTRY(settings, search, settings_search)
 FYAI_TEST_ENTRY(settings, offered, settings_offered)
 FYAI_TEST_ENTRY(settings, format, settings_format)
+FYAI_TEST_ENTRY(settings, catalog, settings_catalog)
 
 static struct fyai_cfg test_cfg;
 static struct fyai_ctx test_ctx;
@@ -57,6 +58,8 @@ static int settings_setup(void)
 	test_ctx.gb = test_ctx.transient_gb;
 	test_cfg.gb = test_ctx.transient_gb;
 	test_ctx.tools_spec = fy_invalid;
+	/* No catalogue in the branch: the embedded snapshot is read. */
+	test_ctx.arena_catalog = fy_invalid;
 	test_cfg.model_access = FYAI_MODEL_REVIEW;
 	test_ctx.arena_config = doc(
 		"{temperature: 0.5, "
@@ -309,6 +312,73 @@ int settings_format(void)
 		"\"@@ -1 +1 @@\\n-a: 1\\n+a: 2\\n\"}");
 	FYAI_TCHECK(text && strstr(text, "**Waits** as proposal `p1`") &&
 		    strstr(text, "```diff\n@@ -1 +1 @@\n-a: 1\n+a: 2\n```"));
+	free(text);
+
+	settings_teardown();
+	return 0;
+}
+
+static bool rows_have(fy_generic rows, const char *key, const char *value)
+{
+	fy_generic row;
+
+	fy_foreach(row, rows)
+		if (fy_equal(fy_get(row, key, fy_invalid), value))
+			return true;
+	return false;
+}
+
+/* The catalogue is read: search, get and list; nothing changes it. */
+int settings_catalog(void)
+{
+	const struct fyai_tool_def *def = fyai_tool_find("settings");
+	fy_generic r, row, v;
+	char *text;
+	bool ok;
+
+	if (settings_setup())
+		return 1;
+
+	r = run("{document: catalog, action: search, query: opus}", &ok);
+	FYAI_TCHECK(ok && fy_get(r, "found", 0LL) >= 1);
+	FYAI_TCHECK(rows_have(fy_get(r, "models", fy_invalid), "path",
+			      "models/claude-opus-5.5"));
+	row = fy_get_at(fy_get(r, "models", fy_invalid), 0, fy_invalid);
+	FYAI_TCHECK(fy_len(fy_get(row, "providers", fy_seq_empty)) >= 1);
+
+	/* A word may name a capability or a provider instead. */
+	r = run("{document: catalog, action: search, "
+		"query: 'deepseek reasoning', limit: 50}", &ok);
+	FYAI_TCHECK(ok && fy_get(r, "found", 0LL) >= 1);
+
+	r = run("{document: catalog, action: list, path: providers}", &ok);
+	FYAI_TCHECK(ok && fy_len(fy_get(r, "names", fy_seq_empty)) >= 2);
+	v = fy_get(r, "names", fy_seq_empty);
+	FYAI_TCHECK(fy_equal(fy_get_at(v, 0, fy_invalid), "anthropic"));
+
+	/* A provider gives the ids of its models, not each offering. */
+	r = run("{document: catalog, action: get, path: providers/openai}",
+		&ok);
+	FYAI_TCHECK(ok);
+	v = fy_get(fy_get(r, "value", fy_invalid), "models", fy_invalid);
+	FYAI_TCHECK(fy_is_sequence(v) &&
+		    fy_is_string(fy_get_at(v, 0, fy_invalid)));
+
+	check_refused("{document: catalog, action: get, path: providers/none}",
+		      "nothing at providers/none");
+	check_refused("{document: catalog, action: change, changes: []}",
+		      "read only");
+	check_refused("{document: skills, action: get}",
+		      "document must be config or catalog");
+
+	text = def->format_result(&test_ctx, test_ctx.transient_gb,
+		doc("{document: catalog, action: search}"),
+		"{\"document\": \"catalog\", \"found\": 1, \"models\": "
+		"[{\"path\": \"models/m\", \"display_name\": \"M\", "
+		"\"context_window\": 9, \"providers\": [\"p\"], "
+		"\"current\": true}]}");
+	FYAI_TCHECK(text && strstr(text, "`models/m`") &&
+		    strstr(text, "9 tokens") && strstr(text, "**in use**"));
 	free(text);
 
 	settings_teardown();
