@@ -1,9 +1,10 @@
 # Declarative state and model access
 
 Status: proposal. Part 1 describes the current state. Part 2 is a design
-and a phased plan. Phases 1 to 3 are built: the policy keyword, the
-reads, and the changes with the review panel and the proposals. The items
-that a section marks *Remains* are not.
+and a phased plan. Phases 1 to 4 are built: the policy keyword, the
+reads, the changes with the review panel and the proposals, and revert,
+keep and the approval events. The items that a section marks *Remains*
+are not.
 
 ## Goal
 
@@ -348,8 +349,8 @@ key with `search`, and reads the one key it needs with `describe`.
 | `get` | `path` | The value in force and its layer. Hidden members are left out and listed in `hidden`. |
 | `list` | `path`, `changed` | The leaf keys under the path with access, layer and value, at most 100; `changed: true` gives only values that differ from the default. |
 | `change` | `changes: [{path, value} or {path, delete: true}]`, `explanation`, `trial` | The presented change set and a Markdown explanation of it. fyai answers `applied`, `pending` or `refused`, with an id, the diff and the cause. |
-| `revert` | `id` | *Remains:* the reverted paths, or the paths in conflict. |
-| `proposals` | none | *Remains:* the proposals of the model on this branch and their state. |
+| `revert` | `id` | Take back one change of the model of `write` keys, as a change of its own that the same rules apply or review. A key changed since is a conflict, and nothing is taken back. |
+| `proposals` | none | The proposals of this branch: id, status, paths and changes. |
 
 Each result has `arena_protected: true|false`: true when a view holds the
 arena as a descriptor, or when the sandbox is on and the arena is inside
@@ -383,8 +384,8 @@ and the endpoint of that request.
 
 `trial: true` writes the change to the session layer only, also for a key
 of stored scope. Nothing is stored but the entry of the change log. The
-change ends with the invocation. *Remains:* `config keep ID`, which stores
-it. A trial is the natural way to try a setting and drop it.
+change ends with the invocation, unless the user stores it with
+`config keep ID`. A trial is the natural way to try a setting and drop it.
 
 ### The review panel
 
@@ -499,8 +500,9 @@ store/config_proposals: [{name: pN, ...the same members}]
   `diff` is the whole unified diff that fyai made.
 - `origin` is the branch of the agent that made the change.
 - `status` of a change is `applied`, or `session` for one that wrote only
-  the session layer; of a proposal `pending`, `approved` or `rejected`.
-  A later phase adds `reverted`.
+  the session layer, then `reverted` or `kept`; of a proposal `pending`,
+  `approved` or `rejected`. An entry that reverts or keeps another names it
+  in `of: {id, status}`.
 - Both are sequences of named items, so `fyai_branch_store_merge()` merges
   them by name after a lost CAS, and `fyai_branch_store_build()` keeps them
   as members it does not know.
@@ -513,16 +515,28 @@ store/config_proposals: [{name: pN, ...the same members}]
 
 ### Revert
 
-`revert ID` restores the `before` value of each path of the change, three
-ways: a path whose current value is not the `after` value of the change is
-a conflict. The revert then changes nothing and names each such path. The
-user can force a revert of the remaining paths.
+`config revert ID` restores the `before` value of each path of the
+change, three ways: a path whose current value is not the `after` value of
+the change is a conflict. The revert then changes nothing and names each
+such path. With `--force` it takes back the other paths.
+
+The revert is a change of its own, in the change log, and the entry it
+takes back becomes `reverted` in the same publish. A key that had no value
+before is removed; a parent that the removal leaves empty is removed too
+when the schema makes it a plain mapping with no default, so a change that
+made `reasoning: {effort: high}` leaves no `reasoning: {}` behind. A parent
+of a union, such as `sandbox`, stays.
 
 This is a revert of one change. Unlike `config undo`, it keeps each later
 change. `config undo` stays as it is.
 
-The model can revert only its own changes of class `write`. The user can
-revert any change.
+The model can revert only its own changes of `write` keys, through the
+same decision as a change: applied unasked when the setting and the shell
+allow it, else reviewed or proposed. The user can revert any change.
+
+`config keep ID` stores a trial: each key of stored scope goes to the
+branch configuration with the value of the trial, and leaves the session
+layer. The entry becomes `kept`.
 
 ### User commands
 
@@ -536,13 +550,19 @@ and `session`. No tool calls them.
 | `config review ID` | The diff that fyai makes of a pending proposal now, then the explanation of the model as a block quote, so a heading in it stays inside the quote. |
 | `config approve ID` | Apply a pending proposal. A session shows the review panel first; a verb applies it, because the user named it, and shows the diff it applied. A proposal that is no longer valid is refused. |
 | `config reject ID` | Mark a pending proposal rejected. |
-| `config revert ID [--force]` | *Remains:* revert a change. |
-| `config keep ID` | *Remains:* store a trial change. |
+| `config revert ID [--force]` | Take back a change, as the section above says. |
+| `config keep ID` | Store a trial change. |
 
-*Remains:* when a session approves or rejects a proposal, the registry
-queues the event `[config 'ID' approved]` or `[config 'ID' rejected]` for
-the model, as `src/fyai_asks.c` queues the answer of a background
-question.
+`config approve` is an asynchronous command. In a session it puts the
+proposal in the review panel and returns; the panel answers through its
+callback, which applies the proposal and ends the command. It never waits
+in a loop of its own inside the session. Reject and Escape leave the
+proposal pending.
+
+When a session approves or rejects a proposal, fyai queues the event
+`[config 'ID' approved]` or `[config 'ID' rejected]`, with the result as
+JSON, for the model, as `src/fyai_asks.c` queues the answer of a
+background question. A verb tells the model nothing: no model runs.
 
 `config describe` also shows the class of the node and the layer of the
 effective value. `config effective --origin` lists the layer of each value,
@@ -582,10 +602,11 @@ Each phase is three patches: implementation, tests, documentation.
    Built, with `config review`. Cases: `tests/cases/settings_review.sh`
    drives the panel in a terminal, `tests/cases/settings_proposals.sh` the
    proposals.
-4. **Revert and trial.** `revert`, `config revert/keep`, the approval
-   events, and the forward of a sub-agent review. The `trial` flag of a
-   change is built; a sub-agent keeps its review as a proposal on its own
-   branch until the forward is built.
+4. **Revert and trial.** `revert`, `config revert/keep`, `trial` and the
+   approval events: built, with `tests/cases/settings_revert.sh` and
+   `tests/cases/settings_approve.sh`. *Remains:* the forward of a
+   sub-agent review; until then a sub-agent keeps its review as a
+   proposal on its own branch.
 5. **Catalogue read.**
 6. **Skill proposals.**
 7. **Display documents:** theme, keys, and stored page documents.

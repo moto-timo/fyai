@@ -587,7 +587,14 @@ fyai config review p1
 fyai config approve p1
 fyai config reject p2
 fyai config changes
+fyai config revert c3
+fyai config keep c4
 ```
+
+`config revert` takes back one change of the model and keeps every later
+change; a key that changed since is a conflict, and `--force` takes back
+the others. `config keep` stores a change that the model made as a trial
+for one session. Approving or rejecting in a session tells the model.
 
 `model_access: read` allows reads only, and `none` removes the tool. See
 `doc/declarative-state.md`.
