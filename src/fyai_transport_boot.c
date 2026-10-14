@@ -485,6 +485,10 @@ int fyai_transport_bootstrap(struct fyai_cfg *cfg, int argc, char **argv)
 			     "level-a, or level-b", cfg->agent_transport_isolation);
 	if (level == FYAI_TL_NONE)
 		return 0;
+	/* An idle interactive run can wait for a provider key. */
+	if (cfg->interactive && !cfg->no_auth &&
+	    fy_str_empty(cfg->api_key) && !transport_wants_chatgpt(cfg))
+		return 0;
 	/* The host is asked for the best it has; a level that it lacks is an error. */
 	if (level == FYAI_TL_AUTO)
 		level = FYAI_TL_B;
@@ -535,7 +539,9 @@ int fyai_transport_bootstrap(struct fyai_cfg *cfg, int argc, char **argv)
 	if (!rc && login) {
 		rc = boot_send(&b, build_probe, (void *)FYAI_AUTH_CHATGPT_REF, -1, &why);
 		if (!rc && !b.found) {
-			why = "no API key and no ChatGPT login: set a key or run `fyai auth login`";
+			why = cfg->auth_mode == FYAI_AUTH_CHATGPT ?
+				"not logged in; run `fyai auth login`" :
+				"no API key and no ChatGPT login: set a key or run `fyai auth login`";
 			rc = -ENOENT;
 		}
 	}

@@ -96,6 +96,16 @@ assert_status 0
 assert_state_contains "latest turn" -b older dump state
 assert_state_absent "latest turn" -b newer dump state
 
+# A session opens for configuration even when its provider key is absent.
+unset MOCKPROV_API_KEY
+run_session resume --last </dev/null
+assert_status 0
+printf 'cannot send\n' | run_session resume --last
+assert_status 0
+assert_stderr_contains "no API key"
+assert_state_absent "cannot send" -b older dump state
+export MOCKPROV_API_KEY=mock-secret
+
 run_fyai root show
 assert_status 0
 assert_stdout_contains "main"

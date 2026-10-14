@@ -2395,6 +2395,10 @@ fyai_turn_run_submit(struct fyai_ctx *ctx, fy_generic turn)
 	struct fyai_turn_run *run;
 	int rc;
 
+	if (!fyai_credential_available(ctx)) {
+		fyai_error(ctx, "no API key or ChatGPT login is available");
+		return NULL;
+	}
 	run = calloc(1, sizeof(*run));
 	fyai_error_check(ctx, run, err, "out of memory");
 	run->ctx = ctx;
@@ -2735,7 +2739,8 @@ int fyai_request_state_apply(struct fyai_ctx *ctx)
 	/* Anthropic authenticates with x-api-key (no Bearer scheme) and
 	 * requires a protocol version header on every request.  Local no-auth
 	 * servers skip the API-key header entirely. */
-	if (!cfg->chatgpt_auth && !cfg->no_auth && !ctx->tclient) {
+	if (!cfg->chatgpt_auth && !cfg->no_auth && !ctx->tclient &&
+	    (!cfg->interactive || (cfg->api_key && *cfg->api_key))) {
 		ctx->auth_header = make_header(cfg->api_mode == FYAI_API_MESSAGES ?
 					       "x-api-key: " : "Authorization: Bearer ",
 					       cfg->api_key);
@@ -3674,6 +3679,11 @@ fyai_interactive_start_line(struct fyai_ctx *ctx, const char *histfile,
 	rc = fyai_interactive_handle_slash(ctx, histfile, line, true);
 	if (rc >= 0)
 		return rc;
+	if (!fyai_credential_available(ctx)) {
+		fyai_error(ctx, "no API key or ChatGPT login is available");
+		fyai_ui_diag_drain(ctx, "error");
+		return 0;
+	}
 	fyai_interactive_prepare_user_line(ctx, histfile, line);
 	rc = fyai_setup_transient_builder(ctx);
 	fyai_error_check(ctx, !rc, err,
@@ -4268,6 +4278,13 @@ int fyai_prompt_interactive(struct fyai_ctx *ctx)
 				break;
 			continue;
 		}
+		if (!fyai_credential_available(ctx)) {
+			fyai_error(ctx, "no API key or ChatGPT login is available");
+			fyai_ui_diag_drain(ctx, "error");
+			free(line);
+			line = NULL;
+			continue;
+		}
 		fyai_interactive_prepare_user_line(ctx, histfile, line);
 
 		rc = fyai_setup_transient_builder(ctx);
@@ -4329,7 +4346,7 @@ int fyai_prompt(struct fyai_ctx *ctx)
 	(void)args;
 	assert(ctx);
 
-	if (!fyai_credential_available(ctx)) {
+	if (!cfg->interactive && !fyai_credential_available(ctx)) {
 		fyai_error(ctx, "no API key or ChatGPT login is available");
 		return -1;
 	}
