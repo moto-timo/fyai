@@ -445,7 +445,7 @@ fyai catalog validate
 fyai catalog reset
 ```
 
-A path is slash-separated. An item of a sequence is named by its index or by its name; a model that a provider offers is named by its `canonical_id`. A `set` on an item that does not exist adds it. Every change is checked against the catalogue schema (`fyai catalog schema`), and a change that fails it writes nothing.
+A path is slash-separated. An item of a sequence is named by its index or by its name; a model that a provider offers is named by its `canonical_id`, or by the id the provider gives it. A name that holds a `/` or a `~` writes them as `~1` and `~0`, as in JSON Pointer: `providers/fireworks/models/accounts~1fireworks~1models~1glm-5p3`. Configuration paths read the same escapes: `fyai config get display/keys/prompt/Ctrl-~1`. A `set` on an item that does not exist adds it. Every change is checked against the catalogue schema (`fyai catalog schema`), and a change that fails it writes nothing.
 
 `fyai catalog update` runs `catalog_update/command`, `scrape-providers` by default, and takes the catalogue that it writes. `--provider NAME` replaces only that provider and the models that the scrape describes; `--curated` is passed to the command. The command gets only the provider keys that `catalog_update/credentials` names. In a session, `/catalog update` takes the same options and runs the command in a tile of the work pane. The session commits the catalogue when the command ends and no turn runs.
 

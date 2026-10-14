@@ -2082,7 +2082,9 @@ inspect or change the model catalogue of the branch
 The catalogue lists the providers, their endpoints, and the models
 they offer. Each branch owns its catalogue. A path is slash-separated;
 an item of a list is named by its name, such as
-`providers/openai/models/gpt-5`.
+`providers/openai/models/gpt-5`, and an offering also by the id its
+provider gives it. A '/' in a name is written `~1` and a '~' `~0`:
+`providers/fireworks/models/accounts~1fireworks~1models~1glm-5p3`.
 
 
 ### Commands
@@ -4727,7 +4729,9 @@ inspect or change the model catalogue of the branch
 The catalogue lists the providers, their endpoints, and the models
 they offer. Each branch owns its catalogue. A path is slash-separated;
 an item of a list is named by its name, such as
-`providers/openai/models/gpt-5`.
+`providers/openai/models/gpt-5`, and an offering also by the id its
+provider gives it. A '/' in a name is written `~1` and a '~' `~0`:
+`providers/fireworks/models/accounts~1fireworks~1models~1glm-5p3`.
 
 
 ### Commands

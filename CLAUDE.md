@@ -417,8 +417,11 @@ both checked against the schema before the value reaches the merged document.
 Put the schema problems in the diagnostic that reports the failure; do not
 write them separately.
 
-Configuration paths use slash-separated keys. Parse values as YAML flow
-documents. `--transient` places an in-memory builder above the durable arena
+Configuration paths use slash-separated keys. A name that holds a '/' or a
+'~' writes them as "~1" and "~0", the escapes of JSON Pointer, as libfyaml's
+`fy_gb_path_split()` reads them: write every name into a path with
+`fyai_path_join()`, and read a segment that fyai splits itself with
+`fyai_path_segment_decode()`. Parse values as YAML flow documents. `--transient` places an in-memory builder above the durable arena
 and skips reference publication.
 
 Never store a raw API key. The `api_key` setting must have this form:

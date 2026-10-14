@@ -337,7 +337,14 @@ specification, so the model learns what this run permits.
 Parameters: `action`, `path`, `document` (`config`, the default, or
 `catalog`), and
 the arguments of the action. A path is a slash path; a segment `*` stands
-for any name of a mapping of names, such as an MCP server or a persona.
+for any name of a mapping of names, such as an MCP server or a persona. A
+name that holds a '/' or a '~' writes them as `~1` and `~0`, the escapes
+of JSON Pointer (RFC 6901): the key binding `Ctrl-/` is
+`display/keys/prompt/Ctrl-~1`. libfyaml reads the same escapes
+(`fy_gb_path_split()`), so `config get` and `--set` agree with the tool,
+and every path that fyai writes escapes its names. A segment of digits
+that meets a mapping names its integer key, else the string key of those
+digits. A '~' followed by anything but `0` or `1` is not a path.
 
 The schema is large, so no answer gives the whole of it. The model finds a
 key with `search`, and reads the one key it needs with `describe`.
