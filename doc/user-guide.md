@@ -600,6 +600,13 @@ The same tool reads the catalogue (`document: catalog`): the model can
 search the models by name, capability or provider before it suggests one.
 It cannot change the catalogue. A sub-agent has no settings tool.
 
+For a question over many entries, such as "which model of Anthropic is the
+cheapest?", the model uses `select`: it filters, sorts and projects the
+keys of the configuration or the items of the catalogue in one call. For a
+deeper search it can `export` either document to a file that fyai names and
+removes at the end of the session, and read it with a program such as jq.
+An export of the configuration leaves the hidden keys out.
+
 `model_access: read` allows reads only, and `none` removes the tool. See
 `doc/declarative-state.md`.
 
