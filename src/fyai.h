@@ -377,6 +377,9 @@ struct fyai_cfg {
 	bool web_search;
 	bool parallel_tool_calls;
 	bool enable_builtin_shell;
+	/* The ceiling of model_access: an enum fyai_model_access, or -1 for
+	 * none, which offers no settings tool. */
+	int model_access;
 	bool enable_sandbox;	/* Landlock-confine shell tool sub-executions */
 	fy_generic sandbox;	/* policy in force: mapping (allow/deny/network), or invalid */
 	bool sandbox_lockdown;	/* the policy is the lockdown profile */

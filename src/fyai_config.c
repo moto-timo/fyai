@@ -561,6 +561,11 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 					     cfg->parallel_tool_calls);
 	cfg->enable_builtin_shell = apply_bool(root, "builtin_shell",
 					       cfg->enable_builtin_shell);
+	v = fy_get(root, "model_access", fy_invalid);
+	if (fy_equal(v, "none"))
+		cfg->model_access = -1;
+	else if (fyai_model_access_parse(v) >= 0)
+		cfg->model_access = fyai_model_access_parse(v);
 	/* sandbox is either a bool (enable with defaults) or a mapping
 	 * { enabled, allow, deny, network }. A mapping enables unless it says
 	 * otherwise and is retained for the tool path to read grants from. The
@@ -2591,26 +2596,14 @@ int fyai_config_rederive(struct fyai_ctx *ctx)
 	return config_rederive_doc(ctx, doc);
 }
 
+static fy_generic config_schema_nearest(const char *path, const char *kw,
+					fy_generic *nodep);
+
 fy_generic fyai_config_schema_node(const char *path)
 {
 	fy_generic node;
-	const char *p, *slash;
-	char key[128];
-	size_t len;
 
-	node = fyai_config_schema(NULL);
-	for (p = path; p && *p; p = slash ? slash + 1 : p + len) {
-		slash = strchr(p, '/');
-		len = slash ? (size_t)(slash - p) : strlen(p);
-		if (!len || len >= sizeof(key))
-			return fy_invalid;
-		memcpy(key, p, len);
-		key[len] = '\0';
-		node = fy_get(fy_get(node, "properties", fy_invalid), key,
-			      fy_invalid);
-		if (!slash)
-			break;
-	}
+	(void)config_schema_nearest(path, NULL, &node);
 	return node;
 }
 
@@ -2644,10 +2637,10 @@ static fy_generic config_schema_child(fy_generic node, const char *key)
 
 /*
  * The value of keyword @kw nearest to the end of the slash path @path, or
- * fy_invalid when no node on the path has it. A key below the last node the
- * schema names inherits from that node. *@nodep, when given, is the node at
- * @path, or fy_invalid when the schema does not name it. The schema is
- * cached for the process, so the values stay valid.
+ * fy_invalid when no node on the path has it or @kw is NULL. A key below the
+ * last node the schema names inherits from that node. *@nodep, when given, is
+ * the node at @path, or fy_invalid when the schema does not name it. The
+ * schema is cached for the process, so the values stay valid.
  */
 static fy_generic config_schema_nearest(const char *path, const char *kw,
 					fy_generic *nodep)
@@ -2658,7 +2651,7 @@ static fy_generic config_schema_nearest(const char *path, const char *kw,
 	size_t len;
 
 	node = fyai_config_schema(NULL);
-	found = fy_get(node, kw, fy_invalid);
+	found = kw ? fy_get(node, kw, fy_invalid) : fy_invalid;
 	for (p = path; p && *p && fy_is_valid(node); p = slash ? slash + 1 : "") {
 		slash = strchr(p, '/');
 		len = slash ? (size_t)(slash - p) : strlen(p);
@@ -2669,7 +2662,7 @@ static fy_generic config_schema_nearest(const char *path, const char *kw,
 		memcpy(key, p, len);
 		key[len] = '\0';
 		node = config_schema_child(node, key);
-		v = fy_get(node, kw, fy_invalid);
+		v = kw ? fy_get(node, kw, fy_invalid) : fy_invalid;
 		if (fy_is_valid(v))
 			found = v;
 	}
@@ -2955,6 +2948,7 @@ void fyai_config_set_defaults(struct fyai_cfg *cfg)
 	cfg->web_search = true;
 	cfg->web_search_notice_emitted = false;
 	cfg->enable_builtin_shell = false;
+	cfg->model_access = FYAI_MODEL_REVIEW;
 	cfg->markdown = true;
 	cfg->parallel_tool_calls = true;
 	cfg->stream = true;

@@ -8,7 +8,8 @@
 #
 # Tool order is fixed: tool_search, mcp_resource, read_file, write_file,
 # apply_patch, shell, shell_input,
-# shell_output, shell_close, ask_user, ask_parent, agent, todo_write, time, wait,
+# shell_output, shell_close, ask_user, ask_parent, agent, list, settings,
+# todo_write, time, wait,
 # skill, structured_output.
 - type: function
   function:
@@ -718,6 +719,48 @@
           enum: [agents, views, shells, waits, monitors, questions, messages]
           description: |-
             What to list. Omit it to list every kind.
+      additionalProperties: false
+- type: function
+  function:
+    name: settings
+    description: >-
+      Read the configuration of fyai: its keys, their schema, and the values in force. A key is a
+      slash path such as `display/theme`; an empty path names the whole configuration, and a
+      segment `*` stands for any name of a mapping of names, such as an MCP server. Start with
+      `search` to find a key: it matches each word of `query` against the paths and descriptions
+      of the keys under `path` and gives the first sentence of each description. `describe` gives
+      the schema of one key, its access, its scope, the value in force and the layer that set it
+      (`default`, `branch`, `invocation` or `session`), and a summary of the keys under it. `get`
+      gives the value in force. `list` gives each key under a path with its access and value.
+      Each key has an access: `read`, `review` and `write` keys can be read, and `hidden` keys are
+      left out of every answer and named under `hidden`. You cannot change the configuration with
+      this tool.
+    parameters:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [search, describe, get, list]
+          description: |-
+            What to read.
+        path:
+          type: string
+          description: |-
+            The slash path of the key, such as `reasoning/effort`. Omit it for the whole configuration. For `search`, the keys under this path are searched.
+        query:
+          type: string
+          description: |-
+            For `search`: words that each key must hold in its path or its description, such as `tool output lines`.
+        limit:
+          type: integer
+          description: |-
+            For `search`: the most keys to give, up to 50. Omit for 20.
+        changed:
+          type: boolean
+          description: |-
+            For `list`: give only the keys whose value in force differs from the default.
+      required:
+        - action
       additionalProperties: false
 - type: function
   function:

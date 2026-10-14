@@ -425,7 +425,8 @@ static bool schema_key_required(fy_generic node, const char *key)
 
 /* One row of the describe table. */
 static fy_generic describe_row(struct fy_generic_builder *gb, const char *name,
-			       fy_generic node, bool required, fy_generic desc)
+			       const char *path, fy_generic node, bool required,
+			       fy_generic desc)
 {
 	char type_buf[128], cons_buf[384];
 	char def_buf[DESCRIBE_CELL_MAX + 8];
@@ -438,6 +439,7 @@ static fy_generic describe_row(struct fy_generic_builder *gb, const char *name,
 		"type", type_buf,
 		"constraint", *cons_buf ? cons_buf : "-",
 		"default", *def_buf ? def_buf : "-",
+		"model", fyai_model_access_name(fyai_config_model_access(path)),
 		"description", fy_is_string(desc) ?
 			fy_castp(&desc, "") : "");
 }
@@ -492,11 +494,16 @@ int fyai_cmd_config_describe(struct fyai_cmd_call *call, fy_generic *result)
 		fy_get(object_node, "properties") : fy_invalid;
 	if (!fy_is_mapping(props)) {
 		rows = fy_append(gb, rows,
-				 describe_row(gb, last, node, false, desc));
+				 describe_row(gb, last, path ? path : "", node,
+					      false, desc));
 	} else {
 		fy_foreach_key_value(key, sub, props) {
 			rows = fy_append(gb, rows,
-				describe_row(gb, fy_castp(&key, ""), sub,
+				describe_row(gb, fy_castp(&key, ""),
+					     fy_sprintfa("%s%s%s",
+						(path && *path) ? path : "",
+						(path && *path) ? "/" : "",
+						fy_castp(&key, "")), sub,
 					     schema_key_required(object_node,
 						fy_castp(&key, "")),
 					     fy_get(sub, "description")));
@@ -511,7 +518,7 @@ int fyai_cmd_config_describe(struct fyai_cmd_call *call, fy_generic *result)
 			fy_is_string(desc) ? "\n\n" : "",
 			fy_is_string(desc) ? fy_castp(&desc, "") : ""),
 		"keys", fy_sequence(gb, "name", "type", "constraint",
-				    "default", "description"));
+				    "default", "model", "description"));
 	*result = rows;
 	return 0;
 err:
