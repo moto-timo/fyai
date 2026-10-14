@@ -1801,7 +1801,14 @@ int fyai_auth_resolve(struct fyai_ctx *ctx)
 		return -1;
 	}
 
-	if (auth_load(ctx, &ctx->auth)) {
+	/*
+	 * A record without an access token is the client registration that a
+	 * logout keeps: the user is signed out, as `auth status` says, and
+	 * auto mode goes on without a login. A record with a token that lacks
+	 * the plan scope is a login that must be made again.
+	 */
+	if (auth_load(ctx, &ctx->auth) ||
+	    fy_str_empty(ctx->auth.access_token)) {
 		if (cfg->auth_mode == FYAI_AUTH_CHATGPT)
 			fyai_error(ctx, "not logged in; run `fyai auth login`");
 		return cfg->auth_mode == FYAI_AUTH_CHATGPT ? -1 : 0;
