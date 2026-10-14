@@ -1,10 +1,10 @@
 # Declarative state and model access
 
 Status: proposal. Part 1 describes the current state. Part 2 is a design
-and a phased plan. Phases 1 to 4 are built: the policy keyword, the
-reads, the changes with the review panel and the proposals, and revert,
-keep and the approval events. The items that a section marks *Remains*
-are not.
+and a phased plan. Phases 1 to 5 are built: the policy keyword, the
+reads, the changes with the review panel and the proposals, revert, keep
+and the approval events, and the reads of the catalogue. The items that a
+section marks *Remains* are not.
 
 ## Goal
 
@@ -334,7 +334,8 @@ leaves the tool out when `model_access` is `none`; a later phase also
 removes the actions that `model_access` does not allow from the
 specification, so the model learns what this run permits.
 
-Parameters: `action`, `path`, a later `document` (default `config`), and
+Parameters: `action`, `path`, `document` (`config`, the default, or
+`catalog`), and
 the arguments of the action. A path is a slash path; a segment `*` stands
 for any name of a mapping of names, such as an MCP server or a persona.
 
@@ -579,7 +580,7 @@ table of documents of the tool, not in that schema.
 
 | Document | Class | Notes |
 |---|---|---|
-| Catalogue | read | `get` takes `models/NAME` and `providers/NAME`; `list` filters by capability, modality and provider. The schema is the output of scrape-providers, so it is not annotated. |
+| Catalogue | read | Built. `document: catalog` selects it. `search` matches each word against the name, display name, capabilities and modalities of a model and the providers that offer it, models that hold every word in their name first, and marks the model in use. `get` reads a path as `catalog get` does (`fyai_catalog_at()`): `models/NAME`, `providers/NAME` - whose offerings shrink to their ids - or `providers/NAME/models/ID`. `list` names the items under a path. Any other action is refused. The schema is the output of scrape-providers, so it is not annotated. |
 | Skills | review | `change` makes a proposal of a new or an edited skill. The front matter is checked against `data/skill.schema.yaml`. The review shows the whole `SKILL.md`, each file, `context: fork` and each tool that `allowed-tools` adds. A model never sets the executable bit; the review can grant it. |
 | Theme | write | `display/theme`, from `markdown_theme_selectors()`. |
 | Key bindings | review | `display/keys`. The reserved keys stay refused. |
@@ -608,7 +609,7 @@ Each phase is three patches: implementation, tests, documentation.
 4. **Revert and trial.** `revert`, `config revert/keep`, `trial` and the
    approval events: built, with `tests/cases/settings_revert.sh` and
    `tests/cases/settings_approve.sh`. A sub-agent has no settings tool.
-5. **Catalogue read.**
+5. **Catalogue read.** Built, with `tests/cases/settings_catalog.sh`.
 6. **Skill proposals.**
 7. **Display documents:** theme, keys, and stored page documents.
 

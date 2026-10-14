@@ -596,6 +596,10 @@ change; a key that changed since is a conflict, and `--force` takes back
 the others. `config keep` stores a change that the model made as a trial
 for one session. Approving or rejecting in a session tells the model.
 
+The same tool reads the catalogue (`document: catalog`): the model can
+search the models by name, capability or provider before it suggests one.
+It cannot change the catalogue. A sub-agent has no settings tool.
+
 `model_access: read` allows reads only, and `none` removes the tool. See
 `doc/declarative-state.md`.
 
