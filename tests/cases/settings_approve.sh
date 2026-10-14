@@ -1,0 +1,42 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+# A proposal that nobody could review is approved in a session: the review
+# panel shows the diff of now, and the model is told the decision by an
+# event that its next turn reads.
+set -eu
+. "$(dirname "$0")/../harness.sh"
+
+fyai_test_setup
+run_fyai tool settings '{"action":"change","changes":[{"path":"temperature","value":0.5}],"explanation":"Warmer."}'
+assert_status 0
+assert_stdout_contains '"id": "p1"'
+
+mock_start settings_approve.json
+driver=0
+FYAI_PTY_COLS=100 FYAI_PTY_ROWS=40 FYAI_PTY_INPUT="/config approve p1" \
+FYAI_PTY_NEEDLE="Diff · made by fyai" FYAI_PTY_TIMEOUT=20 \
+FYAI_PTY_AFTER="wait-screen:+temperature: 0.5|wait-screen:1. Reject|raw:32|wait-screen:Noted the approval." \
+FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
+"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    "$FYAI_BIN" -k test-key --theme dark --branch main \
+    --set display/markdown=true --set display/stream=false \
+    --set tools=true \
+    --set api=chat-completions \
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    driver=$?
+if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out"; then
+	skip "this build has no page support"
+fi
+if [ "$driver" -ne 0 ]; then
+	tail -c 2000 "$TEST_DIR/pty.out" >&2
+	fail "the approval did not reach the model"
+fi
+assert_request 0 'any("[config \x27p1\x27 approved]" in str(m.get("content")) for m in r["body"]["messages"])'
+mock_stop 1
+
+run_fyai config get temperature
+assert_stdout_contains '0.5'
+run_fyai config proposals --output json
+assert_stdout_contains '"approved"'
+
+pass
