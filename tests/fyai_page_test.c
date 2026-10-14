@@ -197,6 +197,12 @@ static void page_golden_state(unsigned i, struct fyai_page_state *st)
 			ask.preview = lines;
 			ask.npreview = 2;
 			ask.preview_title = "No <b>";
+			/* A reviewed change: the proposal and the diff. */
+			if (page_golden_pick(i, 30, 2)) {
+				ask.proposal = true;
+				ask.diff = lines;
+				ask.ndiff = 2;
+			}
 		}
 		st->ask = &ask;
 	}

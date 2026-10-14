@@ -426,9 +426,13 @@ STATUS line
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">means <i>yes</i></fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -536,9 +540,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -3535,9 +3543,13 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -4330,9 +4342,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -4629,9 +4645,13 @@ HINT <b>x</b>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -4840,9 +4860,13 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -5484,9 +5508,13 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -6295,9 +6323,13 @@ STATUS line
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -6433,9 +6465,13 @@ STATUS line
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -6967,9 +7003,13 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -7207,9 +7247,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 3)</fy-role>  (2 more)
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -7434,9 +7478,13 @@ HINT <b>x</b>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -8060,9 +8108,13 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -8184,9 +8236,13 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -8498,9 +8554,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (1 more)
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -9567,9 +9627,13 @@ HINT <b>x</b>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -9613,9 +9677,13 @@ HINT <b>x</b>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -10242,9 +10310,13 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -10301,9 +10373,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -10939,9 +11015,13 @@ HINT <b>x</b>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -11232,9 +11312,13 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -11544,9 +11628,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -12240,9 +12328,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -12438,9 +12530,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -12553,9 +12649,13 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -15453,9 +15553,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -16441,9 +16545,13 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -16891,9 +16999,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -17411,9 +17523,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -19019,9 +19135,13 @@ HINT <b>x</b>
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -19831,9 +19951,13 @@ HINT <b>x</b>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -21099,9 +21223,13 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -21434,9 +21562,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">means <i>yes</i></fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -22386,9 +22518,13 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -22757,9 +22893,13 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -22793,9 +22933,13 @@ STATUS line
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -22835,9 +22979,13 @@ STATUS line
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -22961,9 +23109,13 @@ STATUS line
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
@@ -23992,9 +24144,13 @@ HINT <b>x</b>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (2 more)
 
-<fy-space n="4"/><fy-role name="chrome">Preview · No <b></fy-role>
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
 <fy-slot id="preview" height="2"/>
+
+<fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
+
+<fy-slot id="diff" height="2"/>
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
