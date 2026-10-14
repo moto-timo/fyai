@@ -1389,6 +1389,8 @@ Repository references:
 
 - `config.yaml.sample` — annotated configuration examples;
 - `data/config.schema.yaml` — accepted configuration structure;
+- `doc/declarative-state.md` — the declarative documents, their schemas,
+  layers and rollback, and the plan for model access to them;
 - `doc/branching.md` — detailed branch and root semantics;
 - `doc/srd/fyai-srd.md` — storage and provider contract;
 - unit and functional tests — executable behaviour and edge cases.
