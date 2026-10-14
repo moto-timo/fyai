@@ -570,8 +570,26 @@ The `model` column of `config describe` gives what the model can do with
 each key: `hidden`, `read`, `review` (the user approves each change) or
 `write`. The model reads the configuration with the `settings` tool: it
 searches for a key, describes it, and reads its value. A hidden key, such
-as a credential reference, is left out of every answer. The tool writes
-nothing. `model_access: none` removes the tool. See
+as a credential reference, is left out of every answer.
+
+The model never writes the configuration. It presents a change and an
+explanation; fyai checks it and makes the diff. fyai applies a change of
+`write` keys at once only when `model_access` is `write` and the sandbox
+denies the arena to the shell. Every other change appears in a review
+panel: the explanation of the model, then the diff that fyai made. Reject
+is the first option; Down and Enter accept; a typed reply rejects the
+change and goes back to the model. When nobody can review a change, as in
+a one-shot prompt, it is kept as a proposal:
+
+```sh
+fyai config proposals
+fyai config review p1
+fyai config approve p1
+fyai config reject p2
+fyai config changes
+```
+
+`model_access: read` allows reads only, and `none` removes the tool. See
 `doc/declarative-state.md`.
 
 ## 6. Tools and sub-agents

@@ -1,8 +1,9 @@
 # Declarative state and model access
 
 Status: proposal. Part 1 describes the current state. Part 2 is a design
-and a phased plan. Phase 1, the policy keyword, and the reads of phase 2
-are built.
+and a phased plan. Phases 1 to 3 are built: the policy keyword, the
+reads, and the changes with the review panel and the proposals. The items
+that a section marks *Remains* are not.
 
 ## Goal
 
@@ -347,8 +348,8 @@ key with `search`, and reads the one key it needs with `describe`.
 | `get` | `path` | The value in force and its layer. Hidden members are left out and listed in `hidden`. |
 | `list` | `path`, `changed` | The leaf keys under the path with access, layer and value, at most 100; `changed: true` gives only values that differ from the default. |
 | `change` | `changes: [{path, value} or {path, delete: true}]`, `explanation`, `trial` | The presented change set and a Markdown explanation of it. fyai answers `applied`, `pending` or `refused`, with an id, the diff and the cause. |
-| `revert` | `id` | The reverted paths, or the paths in conflict. |
-| `proposals` | none | The proposals of the model on this branch and their state. |
+| `revert` | `id` | *Remains:* the reverted paths, or the paths in conflict. |
+| `proposals` | none | *Remains:* the proposals of the model on this branch and their state. |
 
 Each result has `arena_protected: true|false`: true when a view holds the
 arena as a descriptor, or when the sandbox is on and the arena is inside
@@ -381,9 +382,9 @@ change of `model`, `tools` or `builtin_shell` therefore changes the tools
 and the endpoint of that request.
 
 `trial: true` writes the change to the session layer only, also for a key
-of stored scope. Nothing is stored. The change ends with the invocation,
-unless the user keeps it with `config keep ID`. A trial is the natural way
-to try a setting and drop it.
+of stored scope. Nothing is stored but the entry of the change log. The
+change ends with the invocation. *Remains:* `config keep ID`, which stores
+it. A trial is the natural way to try a setting and drop it.
 
 ### The review panel
 
@@ -395,9 +396,14 @@ The panel has three answers:
 
 | Answer | Effect | Result for the model |
 |---|---|---|
-| *Accept* | fyai applies the change. | `applied`, with the id |
 | *Reject* | Nothing changes. Escape and `^C` also reject. | `rejected` |
+| *Accept* | fyai applies the change. | `applied`, with the id |
 | Typed text | Nothing changes. | `rejected`, with the text as the user's reply, so the model can present a revised change |
+
+*Reject* is the first option and stands under the cursor. Enter alone
+rejects, and so does an Enter that arrives in one chunk with a pasted
+reply, which the panel reads before it takes the typed text. To accept
+takes Down and Enter, or the key `2`.
 
 The panel has two parts, with two authors:
 
@@ -417,41 +423,46 @@ the first pass for the second:
   fyai. The proposal is rendered at the width of its slot and cannot draw
   outside it, so it cannot draw a heading, a rule or a row of the diff
   slot.
-- **The proposal has no raw terminal control.** It is rendered by a
-  renderer of `markdown_renderer_new()`, which makes all its escapes; the
-  escape sequences of the source are removed before the render, so the
-  proposal cannot set a colour, move the cursor or write an OSC sequence.
-  A fenced `diff` block in the proposal is drawn as code of the proposal,
-  in its slot, never as the diff.
-- **The diff is made by fyai.** For each touched path, fyai emits the
-  original value and the validated new value as YAML and shows a unified
-  diff, in the preview slot, at the width of the panel. The original is the
-  value of the layer that the change writes: the branch configuration, or
-  the session layer for a session-scoped key or a trial.
-- **The diff is complete.** It shows each path under a replaced subtree,
-  and each value that the commit derives with it, such as `api` and
-  `api_url` after a change of `model`. A summary line counts the paths and
-  the lines added and removed, so a long diff that scrolls cannot hide its
-  size.
-- **The effect is stated.** When a higher layer (`--config`, `--set`, the
-  session layer) holds the same key, the panel says that the change has no
-  effect in this invocation.
-- **The heading is fixed.** It names the document, the class of the change
-  and its scope (stored, session, trial). The model cannot write it.
-- **The diff is always visible.** The answers stand under the diff. When
-  the panel is short, the proposal gives up its rows first; the diff keeps
-  at least its summary line. The user can scroll each part alone.
-- **What was shown is what is applied.** The panel keeps the validated
-  document that it diffed. Accept applies that document. If the stored
-  value changed before the user answers, as after a commit of another
-  process, fyai makes the diff again and shows the panel again. fyai never
-  applies a diff the user did not see.
+- **The proposal has no raw terminal control.** Every control byte of the
+  explanation but a line break and a tab becomes `?` before the render, so
+  the proposal cannot set a colour, move the cursor or write an OSC
+  sequence. A fenced `diff` block in the proposal is drawn as code of the
+  proposal, in its slot, never as the diff.
+- **The diff is made by fyai.** fyai emits each layer that the change
+  writes - the branch configuration, and the session layer for a
+  session-scoped key or a trial - before and after the change, and shows
+  the unified diff of the two documents in the `diff` slot. The rows of
+  the panel leave out the file header rows; the model and the change log
+  get the whole diff.
+- **The diff cannot be forged by a value.** A value that the model gave can
+  hold a fence. The diff is fenced with more backticks than any run in it,
+  and its control bytes become `?`, so a value cannot close the fence and
+  write Markdown of its own into the diff slot.
+- **The diff is complete.** It is a diff of the whole document, so it shows
+  each path under a replaced subtree, and each value that the commit
+  derives with it, such as `model_info` after a change of `model`. A
+  summary row counts the keys and the lines added and removed and names
+  the layer, so a diff cut at the bottom of its slot cannot hide its size.
+- **The heading is fixed.** The headings of both slots and the question are
+  written by fyai; the question names the number of keys and the access.
+  The model cannot write them.
+- **The diff keeps its rows.** The options stand above both slots. The diff
+  takes up to half the screen first; the proposal takes what is left of
+  two thirds, and on a short screen it is the one that goes.
+- **What was shown is what is applied.** Accept applies the document that
+  the panel diffed. A pending proposal is checked and diffed again when the
+  user reviews it.
+
+*Remains:* a note when a higher layer (`--config`, `--set`) holds the same
+key, so that the change has no effect in this invocation; a scroll of each
+slot alone; and a new diff when another process commits the configuration
+while the panel waits, which the publish now merges three ways instead.
 
 The same panel reviews every document of part 2: the diff of a skill
 covers its `SKILL.md` and each supporting file, and the diff of a page
-document or of `display/keys` covers that document. A pending proposal
-(`config proposals`, `config approve`) shows the same panel, diffed
-against the current value when the user reviews it, not when the model
+document or of `display/keys` covers that document. `config approve` in a
+session shows the same panel for a pending proposal, diffed against the
+configuration in force when the user reviews it, not when the model
 presented it.
 
 ### Sub-agents
@@ -478,19 +489,27 @@ of the sub-agent, named with that branch.
 Two new members of the branch store:
 
 ```text
-store/config_changes: [{name: ID, paths, before, after, explanation, time, origin, status}]
-store/config_proposals: [{name: ID, changes, explanation, time, origin, status}]
+store/config_changes:   [{name: cN, status, access, paths, changes, trial,
+                          before, after, diff, explanation, origin, time}]
+store/config_proposals: [{name: pN, ...the same members}]
 ```
 
+- `changes` is the change set as the model presented it; `before` and
+  `after` map each path to its value in the layer it writes, or null;
+  `diff` is the whole unified diff that fyai made.
 - `origin` is the branch of the agent that made the change.
-- `status` is `applied`, `session`, `pending`, `rejected` or `reverted`.
+- `status` of a change is `applied`, or `session` for one that wrote only
+  the session layer; of a proposal `pending`, `approved` or `rejected`.
+  A later phase adds `reverted`.
 - Both are sequences of named items, so `fyai_branch_store_merge()` merges
   them by name after a lost CAS, and `fyai_branch_store_build()` keeps them
   as members it does not know.
-- Both have a bounded length. Garbage collection drops the oldest entry
-  that is not `pending`.
+- Each keeps its newest 64 entries.
 - An ID is symbolic and per branch (`c1`, `c2`, ...). It is not an arena
   address.
+- A change is published with the operation `settings`, the configuration
+  and the entry in one ref-log entry. An approval publishes the change and
+  the new status of the proposal in one entry too.
 
 ### Revert
 
@@ -512,16 +531,18 @@ and `session`. No tool calls them.
 
 | Command | Effect |
 |---|---|
-| `config changes` | The change log: id, origin, paths, status. |
-| `config proposals` | The pending proposals, with their diff. |
-| `config approve ID` | Show the review panel of a proposal. |
-| `config reject ID` | Reject a proposal. |
-| `config revert ID [--force]` | Revert a change. |
-| `config keep ID` | Store a trial change. |
+| `config changes` | The change log, newest first: id, status, access, keys, branch, time. |
+| `config proposals` | The proposals, newest first, with the same columns. |
+| `config review ID` | The diff that fyai makes of a pending proposal now, then the explanation of the model as a block quote, so a heading in it stays inside the quote. |
+| `config approve ID` | Apply a pending proposal. A session shows the review panel first; a verb applies it, because the user named it, and shows the diff it applied. A proposal that is no longer valid is refused. |
+| `config reject ID` | Mark a pending proposal rejected. |
+| `config revert ID [--force]` | *Remains:* revert a change. |
+| `config keep ID` | *Remains:* store a trial change. |
 
-When a session approves or rejects a proposal, the registry queues the
-event `[config 'ID' approved]` or `[config 'ID' rejected]` for the model,
-as `src/fyai_asks.c` queues the answer of a background question.
+*Remains:* when a session approves or rejects a proposal, the registry
+queues the event `[config 'ID' approved]` or `[config 'ID' rejected]` for
+the model, as `src/fyai_asks.c` queues the answer of a background
+question.
 
 `config describe` also shows the class of the node and the layer of the
 effective value. `config effective --origin` lists the layer of each value,
@@ -558,10 +579,13 @@ Each phase is three patches: implementation, tests, documentation.
    Built. `config effective --origin` and `--changed` remain.
 3. **Change.** `change` with the `write`, `review` and proposal paths,
    the change log, and `config changes/proposals/approve/reject`.
-   Functional cases with the mock provider: a refused change, an applied
-   change, an approval in a PTY, a proposal in a one-shot run.
-4. **Revert and trial.** `revert`, `trial`, `config revert/keep`, the
-   approval events, and the forward of a sub-agent review.
+   Built, with `config review`. Cases: `tests/cases/settings_review.sh`
+   drives the panel in a terminal, `tests/cases/settings_proposals.sh` the
+   proposals.
+4. **Revert and trial.** `revert`, `config revert/keep`, the approval
+   events, and the forward of a sub-agent review. The `trial` flag of a
+   change is built; a sub-agent keeps its review as a proposal on its own
+   branch until the forward is built.
 5. **Catalogue read.**
 6. **Skill proposals.**
 7. **Display documents:** theme, keys, and stored page documents.
