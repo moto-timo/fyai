@@ -32,6 +32,7 @@ FYAI_TEST_ENTRY(settings, format, settings_format)
 FYAI_TEST_ENTRY(settings, catalog, settings_catalog)
 FYAI_TEST_ENTRY(settings, select, settings_select)
 FYAI_TEST_ENTRY(settings, export, settings_export)
+FYAI_TEST_ENTRY(settings, escape, settings_escape)
 
 static struct fyai_cfg test_cfg;
 static struct fyai_ctx test_ctx;
@@ -507,6 +508,47 @@ int settings_export(void)
 	fyai_settings_release(&test_ctx);
 	FYAI_TCHECK(!test_ctx.settings_export_dir);
 	FYAI_TCHECK(stat(dir, &st) && access(dir, F_OK));
+
+	settings_teardown();
+	return 0;
+}
+
+/* A '/' or a '~' in a name is written "~1" and "~0", as libfyaml reads it. */
+int settings_escape(void)
+{
+	char out[64];
+	fy_generic r;
+	bool ok;
+
+	if (settings_setup())
+		return 1;
+
+	FYAI_TCHECK(fyai_path_segment_decode("a~1b~0c", 7, out,
+					     sizeof(out)) == 5);
+	FYAI_TCHECK(!strcmp(out, "a/b~c"));
+	FYAI_TCHECK(fyai_path_segment_decode("a~2", 3, out, sizeof(out)) < 0);
+	FYAI_TCHECK(fyai_path_segment_decode("a~", 2, out, sizeof(out)) < 0);
+	FYAI_TCHECK(!strcmp(fyai_path_join(test_ctx.transient_gb, "keys",
+					   "Ctrl-/"), "keys/Ctrl-~1"));
+
+	/* A key with a '/' is read by its escaped path, and listed so. */
+	test_cfg.config_doc = doc("{display: {keys: {prompt: "
+				  "{'Ctrl-/': fytim.redraw}}}}");
+	r = run("{action: get, path: display/keys/prompt/Ctrl-~1}", &ok);
+	FYAI_TCHECK(ok && fy_equal(fy_get(r, "value", fy_invalid),
+				   "fytim.redraw"));
+	r = run("{action: describe, path: display/keys/prompt/Ctrl-~1}", &ok);
+	FYAI_TCHECK(ok && fy_equal(fy_get(r, "access", fy_invalid), "review"));
+	check_refused("{action: get, path: 'display/keys/a~2'}",
+		      "not a slash path");
+
+	/* An offering is named by the id its provider gives it. */
+	r = run("{document: catalog, action: get, path: "
+		"providers/fireworks/models/"
+		"accounts~1fireworks~1models~1glm-5p3}", &ok);
+	FYAI_TCHECK(ok && fy_equal(fy_get(fy_get(r, "value", fy_invalid),
+					  "canonical_id", fy_invalid),
+				   "glm-5.3"));
 
 	settings_teardown();
 	return 0;
