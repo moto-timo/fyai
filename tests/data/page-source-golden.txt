@@ -420,21 +420,36 @@ STATUS line
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (3 of 3)</fy-role>
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act><fy-fill/></fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">means <i>yes</i></fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="4"/>
 
@@ -534,21 +549,36 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="4"/>
 
@@ -3537,21 +3567,36 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="3"/>
 
@@ -4334,6 +4379,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -4342,15 +4398,19 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="1">
 
@@ -4637,6 +4697,17 @@ HINT <b>x</b>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act><fy-fill/></fy-role>
@@ -4645,15 +4716,19 @@ HINT <b>x</b>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="1"/>
 
@@ -4852,6 +4927,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -4860,15 +4946,19 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -5506,17 +5596,32 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 3)</fy-role>  (1 more)
 
-<fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
 
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="7"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="4"/>
 
@@ -6315,6 +6420,17 @@ STATUS line
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -6323,15 +6439,19 @@ STATUS line
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="1">
 
@@ -6457,6 +6577,17 @@ STATUS line
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -6465,15 +6596,19 @@ STATUS line
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -6993,6 +7128,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
@@ -7003,15 +7149,19 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="11"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="1"/>
 
@@ -7247,15 +7397,30 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 3)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="6"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="1"/>
 
@@ -7474,19 +7639,34 @@ HINT <b>x</b>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="8"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="2"/>
 
@@ -8102,21 +8282,36 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="1">
 
@@ -8230,21 +8425,36 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -8554,15 +8764,30 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="6"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="3"/>
 
@@ -9623,19 +9848,34 @@ HINT <b>x</b>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="8"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -9677,15 +9917,30 @@ HINT <b>x</b>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="6"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -10308,17 +10563,32 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (1 more)
 
-<fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
 
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="7"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="3"/>
 
@@ -10361,6 +10631,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -10373,15 +10654,19 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="12"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="4"/>
 
@@ -11007,6 +11292,17 @@ HINT <b>x</b>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -11015,15 +11311,19 @@ HINT <b>x</b>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 
 === case 270
@@ -11300,6 +11600,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -11312,15 +11623,19 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="12"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="1">
 
@@ -11618,6 +11933,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (2 of 3)</fy-role>  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
@@ -11628,15 +11954,19 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="11"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="4"/>
 
@@ -12318,6 +12648,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
@@ -12328,15 +12669,19 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="11"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -12522,6 +12867,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -12530,15 +12886,19 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="2"/>
 
@@ -12639,6 +12999,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act><fy-fill/></fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">means <i>yes</i></fy-role><fy-fill/></fy-role>
@@ -12649,15 +13020,19 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="11"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -15545,6 +15920,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -15553,15 +15939,19 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="2"/>
 
@@ -16533,6 +16923,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act><fy-fill/></fy-role>
@@ -16545,15 +16946,19 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="12"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="4"/>
 
@@ -16993,21 +17398,36 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="1"/>
 
@@ -17523,15 +17943,30 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="6"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="1"/>
 
@@ -19133,17 +19568,32 @@ HINT <b>x</b>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
-<fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
 
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="7"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="4"/>
 
@@ -19939,6 +20389,17 @@ HINT <b>x</b>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -19951,15 +20412,19 @@ HINT <b>x</b>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="12"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -21217,21 +21682,36 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="2"/>
 
@@ -21558,19 +22038,34 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act><fy-fill/></fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">means <i>yes</i></fy-role><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="8"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -22506,6 +23001,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act><fy-fill/></fy-role>
@@ -22518,15 +23024,19 @@ CAP <fy-fill/>
 
 <fy-space n="7"/><fy-role name="chrome">something else</fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="12"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -22885,6 +23395,17 @@ CAP <fy-fill/>
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 3)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
@@ -22893,15 +23414,19 @@ CAP <fy-fill/>
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:2" role="select.label">2. No</fy-act><fy-fill/></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="10"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="note" height="2"/>
 
@@ -22929,19 +23454,34 @@ STATUS line
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (1 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="8"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="1">
 
@@ -22973,21 +23513,36 @@ STATUS line
 
 <fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
+<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. Yes <b></fy-act>
 
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
-<fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
 
-<fy-slot id="preview" height="2"/>
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="9"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 
@@ -23109,15 +23664,30 @@ STATUS line
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="6"/>
 
-<fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-slot id="prompt" height="3"/>
 
@@ -24144,15 +24714,30 @@ HINT <b>x</b>
 
 <fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (2 more)
 
+<fy-grid rows="fit" cols="32,*" gap="1">
+<fy-cell row="0" col="0">
+
+<fy-space n="4"/>Decision
+
 <fy-space n="4"/><fy-role name="chrome">Proposal · written by the model</fy-role>
 
-<fy-slot id="preview" height="2"/>
+<fy-slot id="panel:permission-proposal" height="1"/>
+
+<fy-space n="4"/><fy-role name="chrome">PgUp/PgDn scroll the diff · ← back · or type an answer</fy-role>
+
+<fy-space n="4"/><fy-act id="page.focus:prompt" role="select.label">Other: type a reply below</fy-act>
+
+</fy-cell>
+<fy-cell row="0" col="1">
 
 <fy-space n="4"/><fy-role name="chrome">Diff · made by fyai</fy-role>
 
-<fy-slot id="diff" height="2"/>
+<fy-slot id="panel:permission-diff" height="6"/>
 
-<fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
+</fy-cell>
+</fy-grid>
+
+<fy-space n="2"/>Your reply (optional)
 
 <fy-drop order="3">
 

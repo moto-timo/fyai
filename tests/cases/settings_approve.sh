@@ -15,7 +15,7 @@ mock_start settings_approve.json
 driver=0
 FYAI_PTY_COLS=100 FYAI_PTY_ROWS=40 FYAI_PTY_INPUT="/config approve p1" \
 FYAI_PTY_NEEDLE="Diff · made by fyai" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:+temperature: 0.5|wait-screen:1. Reject|raw:32|wait-screen:Noted the approval." \
+FYAI_PTY_AFTER="wait-screen:+temperature: 0.5|wait-screen:1. Reject|raw:1b5b420d|wait-screen:Noted the approval." \
 FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
 "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark --branch main \
@@ -47,7 +47,7 @@ mock_start settings_approve.json
 driver=0
 FYAI_PTY_COLS=100 FYAI_PTY_ROWS=40 FYAI_PTY_INPUT="/config approve p2" \
 FYAI_PTY_NEEDLE="Diff · made by fyai" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:1. Reject|raw:32|wait-screen:config: proposal p2 is approved" \
+FYAI_PTY_AFTER="wait-screen:1. Reject|raw:1b5b420d|wait-screen:config: proposal p2 is approved" \
 FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
 "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark --branch main \

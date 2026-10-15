@@ -12,9 +12,10 @@ fyai_test_setup
 mock_start settings_review.json
 
 review_run() {
-	local input=$1 after=$2 driver=0
+	local input=$1 after=$2 rows=${3:-40} driver=0
 
-	FYAI_PTY_COLS=100 FYAI_PTY_ROWS=40 FYAI_PTY_INPUT="$input" \
+	FYAI_PTY_COLS=100 FYAI_PTY_ROWS=$rows FYAI_PTY_INPUT="$input" \
+	FYAI_PTY_SNAPSHOT="$TEST_DIR/reply-screen.out" \
 	FYAI_PTY_NEEDLE="Proposal · written by the model" FYAI_PTY_TIMEOUT=20 \
 	FYAI_PTY_AFTER="$after" \
 	FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
@@ -36,7 +37,21 @@ review_run() {
 
 # The panel shows both parts; Down and Enter accept.
 review_run "make it warmer" \
-	"wait-screen:Diff · made by fyai|wait-screen:+temperature: 0.5|wait-screen:warmer|wait-screen:1. Reject|raw:1b5b42|frame:2|raw:0d|wait-screen:Temperature changed."
+	"wait-screen:Diff · made by fyai|wait-screen:warmer|wait-screen:1. Reject|snapshot|raw:1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e|wait-screen:Review row 50|raw:1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e|wait-screen:system_prompt|raw:1b5b420d|wait-screen:Temperature changed."
+"$PYTHON" - "$TEST_DIR/reply-screen.out" "$TESTS_DIR" <<'PY' ||
+import sys
+
+sys.path.insert(0, sys.argv[2])
+from screen import Screen
+
+screen = Screen(40, 100)
+screen.feed(open(sys.argv[1], "rb").read())
+shown = "\n".join(screen.lines())
+for text in ("make it warmer", "Your reply (optional)", "Diff"):
+    if text not in shown:
+        raise SystemExit("review covered %r: %s" % (text, shown))
+PY
+	fail "the review covered the conversation or main input box"
 assert_request 1 'json.loads([m for m in r["body"]["messages"] if m.get("role") == "tool"][-1]["content"])["status"] == "applied"'
 
 run_fyai config get temperature
@@ -48,9 +63,24 @@ assert_stdout_contains '"c1"'
 
 # A typed reply rejects the change and reaches the model.
 review_run "warmer still" \
-	"wait-screen:+temperature: 1.5|raw:74|frame:2|raw:6f6f207761726d|frame:2|raw:0d|wait-screen:Left as it is."
+	"wait-screen:+temperature: 1.5|click:Much warmer still.|raw:1b5b43|frame:1|raw:1b5b44|frame:1|raw:1b5b421b5b42|frame:1|raw:1b5b41|frame:1|raw:1b5b43|frame:1|raw:09|frame:1|raw:1b5b5a|frame:1|raw:09|frame:1|raw:746f6f207761726d203132|wait-screen:too warm 12|raw:1b5b447f|wait-screen:too warm 2|snapshot|raw:0d|wait-screen:Left as it is." 24
+
+"$PYTHON" - "$TEST_DIR/reply-screen.out" "$TESTS_DIR" <<'PY' ||
+import sys
+
+sys.path.insert(0, sys.argv[2])
+from screen import Screen
+
+screen = Screen(24, 100)
+screen.feed(open(sys.argv[1], "rb").read())
+shown = "\n".join(screen.lines())
+for text in ("too warm 2", "Your reply (optional)", "Diff", "Reject", "Accept", "Other:"):
+    if text not in shown:
+        raise SystemExit("reply editor covered %r: %s" % (text, shown))
+PY
+	fail "the reply editor was covered by the review panel"
 assert_request 3 'json.loads([m for m in r["body"]["messages"] if m.get("role") == "tool"][-1]["content"])["status"] == "rejected"'
-assert_request 3 'json.loads([m for m in r["body"]["messages"] if m.get("role") == "tool"][-1]["content"])["reply"] == "too warm"'
+assert_request 3 'json.loads([m for m in r["body"]["messages"] if m.get("role") == "tool"][-1]["content"])["reply"] == "too warm 2"'
 
 run_fyai config get temperature
 assert_status 0

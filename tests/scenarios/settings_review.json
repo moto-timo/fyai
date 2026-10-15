@@ -18,7 +18,7 @@
          "type": "function",
          "function": {
           "name": "settings",
-          "arguments": "{\"action\": \"change\", \"changes\": [{\"path\": \"temperature\", \"value\": 0.5}], \"explanation\": \"Make the answers a little **warmer**.\"}"
+          "arguments": "{\"action\": \"change\", \"changes\": [{\"path\": \"temperature\", \"value\": 0.5}, {\"path\": \"system_prompt\", \"value\": \"Review row 01\\nReview row 02\\nReview row 03\\nReview row 04\\nReview row 05\\nReview row 06\\nReview row 07\\nReview row 08\\nReview row 09\\nReview row 10\\nReview row 11\\nReview row 12\\nReview row 13\\nReview row 14\\nReview row 15\\nReview row 16\\nReview row 17\\nReview row 18\\nReview row 19\\nReview row 20\\nReview row 21\\nReview row 22\\nReview row 23\\nReview row 24\\nReview row 25\\nReview row 26\\nReview row 27\\nReview row 28\\nReview row 29\\nReview row 30\\nReview row 31\\nReview row 32\\nReview row 33\\nReview row 34\\nReview row 35\\nReview row 36\\nReview row 37\\nReview row 38\\nReview row 39\\nReview row 40\\nReview row 41\\nReview row 42\\nReview row 43\\nReview row 44\\nReview row 45\\nReview row 46\\nReview row 47\\nReview row 48\\nReview row 49\\nReview row 50\"}], \"explanation\": \"Make the answers a little **warmer**.\"}"
          }
         }
        ]

@@ -64,6 +64,8 @@ FYAI_TEST_ENTRY(page, check_walks_every_case, page_check_walks_every_case)
 FYAI_TEST_ENTRY(page, load_takes_the_embedded_document, page_load_takes_the_embedded_document)
 FYAI_TEST_ENTRY(page, load_says_why, page_load_says_why)
 FYAI_TEST_ENTRY(page, fullscreen_takes_the_transcript, page_fullscreen_takes_the_transcript)
+FYAI_TEST_ENTRY(page, review_diff_on_right, page_review_diff_on_right)
+FYAI_TEST_ENTRY(page, panel_in_any_page, page_panel_in_any_page)
 
 /* The recorded page sources of the golden matrix. */
 #include "embedded_page_golden.inc"
@@ -105,10 +107,12 @@ static void page_golden_noop(struct fyai_ctx *ctx, const char *arg)
 
 /* The actions that the embedded document names. */
 static const struct fyai_page_action page_golden_actions[] = {
+	{ "page.focus", page_golden_noop },
 	{ "ask.prev", page_golden_noop },
 	{ "ask.next", page_golden_noop },
 	{ "ask.accept", page_golden_noop },
 	{ "ask.dismiss", page_golden_noop },
+	{ "panel.scroll", page_golden_noop },
 	{ "ask.choose", page_golden_noop },
 	{ "ask.toggle", page_golden_noop },
 	{ "ask.back", page_golden_noop },
@@ -200,8 +204,9 @@ static void page_golden_state(unsigned i, struct fyai_page_state *st)
 			/* A reviewed change: the proposal and the diff. */
 			if (page_golden_pick(i, 30, 2)) {
 				ask.proposal = true;
-				ask.diff = lines;
-				ask.ndiff = 2;
+				ask.diff_text = "--- a/config.yaml\n+++ b/config.yaml\n"
+					"@@ -1 +1 @@\n-a: 1\n+a: 2\n";
+				ask.proposal_text = "The model proposes a change.";
 			}
 		}
 		st->ask = &ask;
@@ -358,7 +363,8 @@ static char *page_render(const struct fyai_page_state *st, int height,
 	memset(&cfg, 0, sizeof(cfg));
 	cfg.flags = FYMD_RF_DEFAULT | FYMD_RF_UI | FYMD_RF_NO_COLOR;
 	cfg.sgr_input = FYMD_SGR_SAFE;
-	cfg.width = 40 + markdown_gutter_cols(st->ctx ? st->ctx->cfg : NULL);
+	cfg.width = (st->screen_cols > 0 ? st->screen_cols : 40) +
+		markdown_gutter_cols(st->ctx ? st->ctx->cfg : NULL);
 	r = fymd_renderer_create(&cfg);
 	FYAI_TCHECK(r != NULL);
 	if (st->ctx && st->ctx->cfg && st->ctx->cfg->palette) {
@@ -408,6 +414,131 @@ static const struct fymd_region *region(struct fymd_renderer *r,
 		if (!strcmp(rg[i].id, id))
 			return &rg[i];
 	return NULL;
+}
+
+static const char *page_key_action(const struct fyai_page_keys *keys,
+				   const char *name)
+{
+	size_t i;
+
+	for (i = 0; i < keys->count; i++)
+		if (!strcmp(keys->key[i].name, name))
+			return keys->key[i].action;
+	return "";
+}
+
+int page_review_diff_on_right(void)
+{
+	static const struct fyai_page_ask_option options[] = {
+		{ "Reject", "", false }, { "Accept", "", false },
+	};
+	struct fyai_page_ask ask = {
+		.header = "Review", .question = "Apply?", .count = 1,
+		.options = options, .noptions = 2, .proposal = true,
+		.proposal_text = "Model explanation",
+		.diff_text = "--- a/a.yaml\n+++ b/a.yaml\n"
+			"@@ -1 +1 @@\n-a: 1\n+a: 2\n",
+	};
+	struct fyai_page_state st = page_state();
+	struct fymd_renderer *r;
+	const struct fymd_region *preview, *diff, *input;
+	struct fyai_page_keys keys = {0};
+	char *out;
+	struct response_buffer source = {0};
+	size_t i;
+	bool up = false, down = false;
+
+	st.ask = &ask;
+	st.screen_cols = 100;
+	st.screen_rows = 24;
+	st.prompt_rows = 1;
+	st.prompt_card = true;
+	st.input_mode = "ask";
+	st.actions = page_golden_actions;
+	st.nactions = sizeof(page_golden_actions) / sizeof(page_golden_actions[0]);
+	st.keys = &keys;
+	out = page_render(&st, 24, &r);
+	preview = region(r, "panel:permission-proposal");
+	diff = region(r, "panel:permission-diff");
+	input = region(r, "prompt");
+	FYAI_TCHECK(preview && diff && input);
+	if (preview && diff) {
+		FYAI_TCHECK(diff->col >= preview->col + preview->width);
+		FYAI_TCHECK(diff->row < preview->row + preview->height);
+		/* The diff takes the height of the left cell, less its heading
+		 * row, and the proposal takes the rows of its text. */
+		FYAI_TCHECK(preview->height == 1);
+		FYAI_TCHECK(diff->height >= 3 && diff->height < 12);
+		if (input) {
+			/* The reply label is the only row between them. */
+			FYAI_TCHECK(input->row <= diff->row + diff->height + 2);
+			FYAI_TCHECK(input->row >= diff->row + diff->height);
+			FYAI_TCHECK(input->col < diff->col);
+			FYAI_TCHECK(input->width > diff->width);
+			FYAI_TCHECK(input->row + input->height <= 24);
+		}
+	}
+	for (i = 0; i < keys.count; i++) {
+		FYAI_TCHECK(strcmp(keys.key[i].name, "Space") &&
+			    strcmp(keys.key[i].name, "1"));
+		up |= !strcmp(keys.key[i].name, "PageUp") &&
+		      !strcmp(keys.key[i].action, "panel.scroll:permission-diff/page-up");
+		down |= !strcmp(keys.key[i].name, "PageDown") &&
+			!strcmp(keys.key[i].action, "panel.scroll:permission-diff/page-down");
+	}
+	FYAI_TCHECK(up && down);
+	free(out);
+	fymd_renderer_destroy(r);
+	FYAI_TCHECK(!strcmp(page_key_action(&keys, "Right"),
+			    "page.focus:permission-diff"));
+	FYAI_TCHECK(!strcmp(page_key_action(&keys, "Down"), "ask.next:prompt"));
+	st.input_focus = "permission-diff";
+	keys.count = 0;
+	FYAI_TCHECK(!fyai_page_source(&st, &source));
+	FYAI_TCHECK(!strcmp(page_key_action(&keys, "Left"), "page.focus:choices"));
+	FYAI_TCHECK(!strcmp(page_key_action(&keys, "Down"),
+			    "panel.scroll:permission-diff/down"));
+	free(source.data);
+	source = (struct response_buffer){0};
+	st.input_focus = "prompt";
+	keys.count = 0;
+	FYAI_TCHECK(!fyai_page_source(&st, &source));
+	FYAI_TCHECK(!strcmp(page_key_action(&keys, "Up"), "page.focus:choices"));
+	FYAI_TCHECK(!*page_key_action(&keys, "Left"));
+	FYAI_TCHECK(!*page_key_action(&keys, "Right"));
+	free(source.data);
+	return 0;
+}
+
+int page_panel_in_any_page(void)
+{
+	struct fy_generic_builder_cfg cfg = { .flags = FYGBCF_SCOPE_LEADER };
+	struct fy_generic_builder *gb = fy_generic_builder_create(&cfg);
+	struct response_buffer out = {0};
+	fy_generic doc, state;
+	int rc;
+
+	FYAI_TCHECK(!fyai_page_panel_scroll(NULL, NULL));
+	FYAI_TCHECK(gb != NULL);
+	if (!gb)
+		return 1;
+	doc = fy_parse(gb,
+		"{page: [{panel: {id: comparison, type: diff, "
+		"source: document.patch, rows: 4}}, "
+		"{row: [{text: 'After the diff'}]}]}",
+		FYAI_YAML_PARSE_FLAGS | FYOPPF_INPUT_TYPE_STRING, NULL);
+	state = fy_mapping(gb, "document", fy_mapping(gb,
+		"patch", "--- a/a\n+++ b/a\n@@ -1 +1 @@\n-a\n+b\n"));
+	rc = fyai_page_transcribe(NULL, doc, state, NULL, 0, &out, NULL, false);
+	FYAI_TCHECK(!rc && out.data);
+	if (out.data) {
+		FYAI_TCHECK(strstr(out.data,
+			"<fy-slot id=\"panel:comparison\" height=\"4\"/>") != NULL);
+		FYAI_TCHECK(strstr(out.data, "After the diff") != NULL);
+	}
+	free(out.data);
+	fy_generic_builder_destroy(gb);
+	return 0;
 }
 
 /* The chrome stands on adjacent rows: header, rule, prompt, rule, status. */
@@ -897,7 +1028,7 @@ static int page_review_marks_each_row_run(void)
 	FYAI_TCHECK(strstr(out.data,
 			   "<fy-mark id=\"review:ask.options/selected\"/>"));
 	FYAI_TCHECK(strstr(out.data, "<fy-mark id=\"review:pane/blank\"/>"));
-	FYAI_TCHECK(strstr(out.data, "<fy-mark id=\"review:question\"/>"));
+	FYAI_TCHECK(strstr(out.data, "<fy-mark id=\"review:question_details\"/>"));
 	free(out.data);
 
 	out = (struct response_buffer){0};
@@ -1321,6 +1452,7 @@ static void page_test_ask_noop(struct fyai_ctx *ctx, const char *arg)
 
 /* The actions the page document names for a question. */
 static const struct fyai_page_action page_test_ask_actions[] = {
+	{ "page.focus", page_test_ask_noop },
 	{ "ask.prev", page_test_ask_noop },
 	{ "ask.next", page_test_ask_noop },
 	{ "ask.choose", page_test_ask_noop },
@@ -1329,6 +1461,7 @@ static const struct fyai_page_action page_test_ask_actions[] = {
 	{ "ask.forward", page_test_ask_noop },
 	{ "ask.accept", page_test_ask_noop },
 	{ "ask.dismiss", page_test_ask_noop },
+	{ "panel.scroll", page_test_ask_noop },
 	{ "popup.close", page_test_ask_noop },
 	{ "popup.scroll", page_test_ask_noop },
 };

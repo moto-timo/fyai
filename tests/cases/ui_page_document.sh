@@ -21,12 +21,12 @@ if s.count(header) != 1:
 open(out + "/good.yaml", "w").write(
     s.replace(header, '\n        - row:\n            - text: "CUSTOM-PAGE"' +
               header))
-# The keys of ask_text end with Escape; those of ask go on to the numbers.
+# Both answer modes bind Escape before their body.
 keys = '            Escape: ask.dismiss\n          body:\n'
-if s.count(keys) != 1:
+if s.count(keys) != 2:
     raise SystemExit("the keys of the ask_text case moved")
 # The unknown action is in ask_text, a case that is not showing.
-at = s.index(keys)
+at = s.index(keys, s.index("        ask_text:"))
 open(out + "/bad.yaml", "w").write(
     s[:at] + '            Escape: ask.dismiss\n            x: no-such-action\n'
     '          body:\n' + s[at + len(keys):])

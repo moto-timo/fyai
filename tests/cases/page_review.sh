@@ -9,7 +9,7 @@ fyai_test_setup
 out=$("$FYAI_BIN" --color=off page review question --width 70 --height 30) ||
     fail "page review did not draw the question sample"
 for name in transcript "pane/blank" pane.cap "header.shown/blank" header \
-        question ask.question_shown ask.from_agent "ask.options/selected" \
+        question_details ask.question_shown ask.from_agent "ask.options/selected" \
         "ask.options/other" "ask.options/selected_description" \
         "ask.options/other_description" \
         prompt status.hint status.row; do
