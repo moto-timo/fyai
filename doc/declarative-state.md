@@ -80,7 +80,7 @@ Configuration (`data/config.schema.yaml`):
 
 | Keyword | Effect |
 |---|---|
-| `x-fyai-scope` | `session`: a session change goes to the session layer. `stored`: it is committed to the branch. The nearest keyword on the path decides (`fyai_config_session_scoped()`). |
+| `x-fyai-scope` | For session setting commands, `session` writes the session layer and `stored` commits to the branch. The nearest keyword on the path decides (`fyai_config_session_scoped()`). The `settings` tool stores normal changes regardless of this keyword. |
 | `x-fyai-complete` | The completion kind of the value. |
 | `x-fyai-model` | What the model can do with the key: `hidden`, `read`, `review` or `write`. The nearest keyword on the path decides (`fyai_config_model_access()`); see [the policy keyword](#the-policy-keyword). |
 
@@ -307,8 +307,9 @@ under it, except the rows below it that name a deeper key.
 | `mcp/endpoint`, `mcp/protocol_version`, `mcp/servers` | read | execution and exfiltration |
 | `mcp/auth_token`, `mcp/servers/*/auth/client/secret` | hidden | credential references |
 
-A key that a session-scoped node holds is written to the session layer, as
-a setting command writes it: such a change ends with the invocation.
+A session setting command writes a session-scoped key to the session layer:
+such a change ends with the invocation. A normal `settings change` tool call
+stores the key in the branch. Only `trial: true` uses the session layer.
 
 ## A master setting
 
@@ -357,7 +358,7 @@ key with `search`, and reads the one key it needs with `describe`.
 | `list` | `path`, `changed` | The leaf keys under the path with access, layer and value, at most 100; `changed: true` gives only values that differ from the default. |
 | `select` | `path` or `from`, `where`, `fields`, `sort`, `order`, `limit` | The rows that meet every condition of `where` (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `has`, `contains`, `exists`), sorted by one field - a row without it last - and cut to `limit` (20, up to 100), each with the `fields` asked for. A row of the configuration is a key under `path`, with `key`, `access`, `scope`, `layer`, `value`, `default` and `changed` (the value differs from the default); hidden keys are no rows. A row of the catalogue is an item at `from`, where a segment `*` takes every item and adds a column that names it: `providers/*/models` gives each offering with `provider`. `pricing/blended` is made as three input tokens to one output token. The answer gives the count matched. |
 | `export` | `document`, `format`, `shape` | Write the document to a file for a program, such as jq, to search: the configuration without its hidden keys, as a `tree` or as the `rows` that `select` reads, or the catalogue; `json` or `yaml`. fyai names the file, in a directory of its own made by `mkdtemp()` under `$TMPDIR` (`ctx->settings_export_dir`); the model names no path. Cleanup removes the directory; a forked child forgets it without removing it. |
-| `change` | `changes: [{path, value} or {path, delete: true}]`, `explanation`, `trial` | The presented change set and a Markdown explanation of it. fyai answers `applied`, `pending` or `refused`, with an id, the diff and the cause. |
+| `change` | `changes: [{path, value} or {path, delete: true}]`, `explanation`, `trial` | The presented change set and a Markdown explanation of it. A normal change is stored in the branch; a trial lasts for the invocation. fyai answers `applied`, `pending` or `refused`, with an id, the diff and the cause. |
 | `revert` | `id` | Take back one change of the model of `write` keys, as a change of its own that the same rules apply or review. A key changed since is a conflict, and nothing is taken back. |
 | `proposals` | none | The proposals of this branch: id, status, paths and changes. |
 
@@ -402,8 +403,8 @@ The new values take effect at the next model request of the turn. A
 change of `model`, `tools` or `builtin_shell` therefore changes the tools
 and the endpoint of that request.
 
-`trial: true` writes the change to the session layer only, also for a key
-of stored scope. Nothing is stored but the entry of the change log. The
+`trial: true` writes the change to the session layer only, for any key.
+Nothing is stored but the entry of the change log. The
 change ends with the invocation, unless the user stores it with
 `config keep ID`. A trial is the natural way to try a setting and drop it.
 
@@ -449,19 +450,16 @@ the first pass for the second:
   the proposal cannot set a colour, move the cursor or write an OSC
   sequence. A fenced `diff` block in the proposal is drawn as code of the
   proposal, in its slot, never as the diff.
-- **The diff is made by fyai.** fyai emits each layer that the change
-  writes - the branch configuration, and the session layer for a
-  session-scoped key or a trial - before and after the change, and shows
-  the unified diff of the two documents in the `diff` slot. The rows of
-  the panel leave out the file header rows; the model and the change log
-  get the whole diff.
+- **The diff is made by fyai.** fyai emits the changed paths from the
+  configuration before and after the change, and shows their unified diff
+  in the `diff` slot. A trial compares the session layer. YAML file headers
+  let the renderer highlight the configuration syntax.
 - **The diff cannot be forged by a value.** A value that the model gave can
   hold a fence. The diff is fenced with more backticks than any run in it,
   and its control bytes become `?`, so a value cannot close the fence and
   write Markdown of its own into the diff slot.
-- **The diff is complete.** It is a diff of the whole document, so it shows
-  each path under a replaced subtree, and each value that the commit
-  derives with it, such as `model_info` after a change of `model`. A
+- **The diff covers the changed paths.** It shows each value under a
+  replaced subtree that the model may read. A
   summary row counts the keys and the lines added and removed and names
   the layer, so a diff cut at the bottom of its slot cannot hide its size.
 - **The heading is fixed.** The headings of both slots and the question are
@@ -503,7 +501,7 @@ and no proposal stored on the branch of a sub-agent.
 Two new members of the branch store:
 
 ```text
-store/config_changes:   [{name: cN, status, access, paths, changes, trial,
+store/config_changes:   [{name: cN, status, access, paths, changes, trial, persistent,
                           before, after, diff, explanation, origin, time}]
 store/config_proposals: [{name: pN, ...the same members}]
 ```
@@ -511,6 +509,8 @@ store/config_proposals: [{name: pN, ...the same members}]
 - `changes` is the change set as the model presented it; `before` and
   `after` map each path to its value in the layer it writes, or null;
   `diff` is the whole unified diff that fyai made.
+- `persistent` marks changes that store all paths in the branch. Older
+  entries without it retain their schema-scoped revert behavior.
 - `origin` is the branch of the agent that made the change.
 - `status` of a change is `applied`, or `session` for one that wrote only
   the session layer, then `reverted` or `kept`; of a proposal `pending`,
@@ -547,9 +547,9 @@ The model can revert only its own changes of `write` keys, through the
 same decision as a change: applied unasked when the setting and the shell
 allow it, else reviewed or proposed. The user can revert any change.
 
-`config keep ID` stores a trial: each key of stored scope goes to the
-branch configuration with the value of the trial, and leaves the session
-layer. The entry becomes `kept`.
+`config keep ID` stores a trial or an older session-only change: each key
+goes to the branch configuration with the value of that change, and leaves
+the session layer. The entry becomes `kept`.
 
 ### User commands
 

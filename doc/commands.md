@@ -1090,7 +1090,7 @@ slash-separated keys, and values are YAML flow documents; see
 | `export` | write the configuration to a file |
 | `get` | write the value of a key |
 | `import` | store a configuration file |
-| `keep` | store a trial change of the model |
+| `keep` | store a temporary change of the model |
 | `proposals` | list the changes that wait for you |
 | `reject` | drop a proposal of the model |
 | `reset` | return to the built-in configuration |
@@ -1416,20 +1416,20 @@ as `config undo` does not.
 
 ## fyai config keep
 
-store a trial change of the model
+store a temporary change of the model
 
 **Usage:** `fyai config keep ID`
 
-Store the trial change ID: each key it changed for this session
-goes to the configuration of the branch, with the value of the
-trial, and leaves the session layer.
+Store a trial change or an older session-only change by ID: each
+key goes to the configuration of the branch with the value of
+that change, and leaves the session layer.
 
 
 ### Arguments
 
 | Argument | Description |
 | --- | --- |
-| `ID` | the id of the trial change, such as c1 |
+| `ID` | the id of the temporary change, such as c1 |
 
 ### Options
 
@@ -3862,7 +3862,7 @@ slash-separated keys, and values are YAML flow documents; see
 | `export` | write the configuration to a file |
 | `get` | write the value of a key |
 | `import` | store a configuration file |
-| `keep` | store a trial change of the model |
+| `keep` | store a temporary change of the model |
 | `proposals` | list the changes that wait for you |
 | `reject` | drop a proposal of the model |
 | `reset` | return to the built-in configuration |
@@ -4174,20 +4174,20 @@ as `config undo` does not.
 
 ## /config keep
 
-store a trial change of the model
+store a temporary change of the model
 
 **Usage:** `/config keep ID`
 
-Store the trial change ID: each key it changed for this session
-goes to the configuration of the branch, with the value of the
-trial, and leaves the session layer.
+Store a trial change or an older session-only change by ID: each
+key goes to the configuration of the branch with the value of
+that change, and leaves the session layer.
 
 
 ### Arguments
 
 | Argument | Description |
 | --- | --- |
-| `ID` | the id of the trial change, such as c1 |
+| `ID` | the id of the temporary change, such as c1 |
 
 ### Options
 
