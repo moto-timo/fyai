@@ -405,7 +405,7 @@ int settings_catalog(void)
 	check_refused("{document: catalog, action: get, path: providers/none}",
 		      "nothing at providers/none");
 	check_refused("{document: catalog, action: change, changes: []}",
-		      "read only");
+		      "give 1 to 32 catalogue changes");
 	check_refused("{document: skills, action: get}",
 		      "document must be config or catalog");
 

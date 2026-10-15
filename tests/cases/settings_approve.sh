@@ -39,4 +39,30 @@ assert_stdout_contains '0.5'
 run_fyai config proposals --output json
 assert_stdout_contains '"approved"'
 
+# A catalogue proposal uses the same session review and approval path.
+run_fyai tool settings '{"document":"catalog","action":"change","source":"https://example.test/model","changes":[{"path":"models/claude-opus-5.5/context_window","value":123456}],"explanation":"Correct the context window."}'
+assert_status 0
+assert_stdout_contains '"id": "p2"'
+mock_start settings_approve.json
+driver=0
+FYAI_PTY_COLS=100 FYAI_PTY_ROWS=40 FYAI_PTY_INPUT="/config approve p2" \
+FYAI_PTY_NEEDLE="Diff · made by fyai" FYAI_PTY_TIMEOUT=20 \
+FYAI_PTY_AFTER="wait-screen:1. Reject|raw:32|wait-screen:config: proposal p2 is approved" \
+FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
+"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    "$FYAI_BIN" -k test-key --theme dark --branch main \
+    --set display/markdown=true --set display/stream=false \
+    --set tools=true \
+    --set api=chat-completions \
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    driver=$?
+if [ "$driver" -ne 0 ]; then
+	tail -c 2000 "$TEST_DIR/pty.out" >&2
+	fail "the catalogue approval did not reach the model"
+fi
+assert_request 0 'any("[config \x27p2\x27 approved]" in str(m.get("content")) for m in r["body"]["messages"])'
+mock_stop 1
+run_fyai catalog get models/claude-opus-5.5/context_window
+assert_stdout_contains '123456'
+
 pass
