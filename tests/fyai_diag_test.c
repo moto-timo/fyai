@@ -21,6 +21,7 @@
 
 FYAI_TEST_ENTRY(diag, format, diag_format)
 FYAI_TEST_ENTRY(diag, order, diag_order)
+FYAI_TEST_ENTRY(diag, bare, diag_bare)
 FYAI_TEST_ENTRY(diag, demote, diag_demote)
 FYAI_TEST_ENTRY(diag, reset, diag_reset)
 FYAI_TEST_ENTRY(diag, mask, diag_mask)
@@ -481,6 +482,35 @@ static int diag_run(void (*testfn)(struct fyai_diag *diag))
 
 	fyai_diag_cleanup(&test_cfg.diag);
 	return failures ? 1 : 0;
+}
+
+/* A bare drain leaves out the module, and records the highest severity. */
+static void test_bare(struct fyai_diag *diag)
+{
+	char *out;
+
+	fyai_diag_set_bare(true);
+	(void)fyai_diag_take_drained_max();
+	fyai_notice(&test_ctx, "native web search is disabled");
+	fyai_warning(&test_ctx, "could not persist to config");
+	out = drain_to_string(diag);
+	expect_str("bare drain", out,
+		   "note: native web search is disabled\n"
+		   "warning: could not persist to config\n");
+	free(out);
+	fyai_diag_set_bare(false);
+	expect_eq("highest severity", fyai_diag_take_drained_max(),
+		  FYAIET_WARNING);
+
+	fyai_notice(&test_ctx, "again");
+	out = drain_to_string(diag);
+	expect_str("module returns", out, "config: note: again\n");
+	free(out);
+}
+
+int diag_bare(void)
+{
+	return diag_run(test_bare);
 }
 
 int diag_format(void)

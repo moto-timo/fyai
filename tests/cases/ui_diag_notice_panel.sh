@@ -37,6 +37,9 @@ text = "\n".join(rows)
 note = next((i for i, r in enumerate(rows) if "advisory" in r), None)
 if note is None:
     raise SystemExit("no notice on screen:\n" + text)
+# The panel shows the cause, without the module that raised it.
+if "tools: " in rows[note]:
+    raise SystemExit("the notice shows its module prefix:\n" + text)
 # The panel names what it shows: on the row of the notice, or above it.
 if not any("notice" in r for r in rows[max(0, note - 1):note + 1]):
     raise SystemExit("the notice has no heading, it is a row of the "

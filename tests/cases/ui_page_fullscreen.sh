@@ -111,8 +111,9 @@ PY
 # A drag over five rows of the popup holds text whatever rows of the table wrap.
 PDRAG=$(printf '\033[<0;4;4M\033[<32;40;9M\033[<0;40;9m' |
     od -An -tx1 | tr -d ' \n')
-# "── help " takes eight columns, so the label starts on column 9.
-ACLICK=$(printf '\033[<0;12;1M\033[<0;12;1m' | od -An -tx1 | tr -d ' \n')
+# "── log · all · N " takes seventeen columns, so the label starts on
+# column 18.
+ACLICK=$(printf '\033[<0;21;1M\033[<0;21;1m' | od -An -tx1 | tr -d ' \n')
 session fullscreen "wait-screen:Hello from the mock provider.|"\
 "send:/help|wait-screen:Esc closes|raw:$PDRAG|wait-copy:|"\
 "raw:1b5b367e|wait-gone:/branches|raw:1b|wait-gone:Esc closes|"\
@@ -152,9 +153,9 @@ while True:
         for r in rows:
             if "Hello from the mock provider." in r or "fyai: session/" in r:
                 raise SystemExit("the page shows beside the popup: %r" % r)
-        if "help" not in rows[0]:
-            raise SystemExit("the heading does not name the result: %r" %
-                             rows[0])
+        if "log" not in rows[0]:
+            raise SystemExit("the popup does not show the log: %r" %
+                             rows[:3])
         if not any("/branches" in r for r in rows[1:]):
             scrolled = True
     at = next((y for y, r in enumerate(rows)

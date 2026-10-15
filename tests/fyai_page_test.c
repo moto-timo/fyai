@@ -118,6 +118,8 @@ static const struct fyai_page_action page_golden_actions[] = {
 	{ "ask.back", page_golden_noop },
 	{ "ask.forward", page_golden_noop },
 	{ "popup.close", page_golden_noop },
+	{ "popup.clear", page_golden_noop },
+	{ "popup.level", page_golden_noop },
 	{ "popup.scroll", page_golden_noop },
 };
 
@@ -1463,6 +1465,8 @@ static const struct fyai_page_action page_test_ask_actions[] = {
 	{ "ask.dismiss", page_test_ask_noop },
 	{ "panel.scroll", page_test_ask_noop },
 	{ "popup.close", page_test_ask_noop },
+	{ "popup.clear", page_test_ask_noop },
+	{ "popup.level", page_test_ask_noop },
 	{ "popup.scroll", page_test_ask_noop },
 };
 
