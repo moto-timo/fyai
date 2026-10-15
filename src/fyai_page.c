@@ -330,6 +330,8 @@ int fyai_page_chrome_rows(const struct fyai_page_state *st)
 		rows += page_ask_rows(st->ask);
 	/* The todo panel stands above the prompt with the work pane. */
 	rows += st->note_nlines;
+	if (st->log_title && st->log_rows > 0)
+		rows += st->log_rows + 1;
 	return rows + (st->todo_shown ? st->todo_rows + 2 : 0);
 }
 
@@ -348,6 +350,13 @@ void fyai_page_fit(struct fyai_page_state *st, int height)
 		st->tail_rows = 0;
 		st->transcript_rows = 0;
 		return;
+	}
+	/* The compact log takes at most a third of the page, and never the
+	 * input. */
+	if (st->log_title && st->log_rows > 0) {
+		left = height / 3 - 1;
+		if (st->log_rows > left)
+			st->log_rows = left > 0 ? left : 0;
 	}
 	/* Keep the input visible when the branch list exceeds its space. */
 	if (st->todo_shown) {
@@ -853,6 +862,10 @@ fy_generic fyai_page_state_generic(struct fy_generic_builder *gb,
 		"note", fy_mapping(gb,
 			"shown", (bool)(st->note_nlines > 0),
 			"rows", st->note_nlines),
+		"log", fy_mapping(gb,
+			"shown", (_Bool)(st->log_title && st->log_rows > 0),
+			"title", page_str(st->log_title),
+			"rows", st->log_rows),
 		"layout", fy_mapping(gb,
 			"name", st->layout ? st->layout : "band"),
 		"pane", fy_mapping(gb,
@@ -2840,6 +2853,12 @@ static int page_canvas(struct fyai_page *pg, struct fytim *ft,
 			rc = page_panel_draw(pg, panel, st, &fr[i], truecolor);
 			fyai_error_check(ctx, !rc, err_out,
 					 "cannot draw panel '%s'", panel->id);
+		}
+		if (!strcmp(fr[i].id, "log") && st->log_lines) {
+			rc = page_lines_draw(pg, st->log_lines, st->log_nlines,
+					     &fr[i]);
+			fyai_error_check(ctx, !rc, err_out,
+					 "cannot draw the log into cells");
 		}
 		if (!strcmp(fr[i].id, "note") && st->note_lines) {
 			rc = page_lines_draw(pg, st->note_lines,

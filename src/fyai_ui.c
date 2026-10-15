@@ -178,7 +178,7 @@ struct fyai_ui {
 	char *popup_title;
 	/* The popup keeps the results of the session while it is hidden. The
 	 * header indicator counts them and shows or hides the popup. */
-	bool popup_shown;
+	int popup_state;		/* enum ui_popup_state */
 	struct ui_log_entry *log;
 	int nlog;
 	enum fyai_error_type log_min;	/* lowest level the popup shows */
@@ -590,10 +590,23 @@ static int ui_todo_rows(const char *text, int cols)
 	return rows;
 }
 
+/* The log of the session shows small above the status, over the whole page,
+ * or not at all. */
+enum ui_popup_state { UI_POPUP_HIDDEN, UI_POPUP_COMPACT, UI_POPUP_FULL };
+
+/* The rows of the compact log under its heading, at most. */
+#define UI_LOG_ROWS 8
+
 /* Whether the popup covers the page. */
 static bool ui_popup_open(const struct fyai_ui *ui)
 {
-	return ui->popup && ui->popup_shown;
+	return ui->popup && ui->popup_state == UI_POPUP_FULL;
+}
+
+/* Whether the compact log stands above the status. */
+static bool ui_popup_compact(const struct fyai_ui *ui)
+{
+	return ui->popup && ui->popup_state == UI_POPUP_COMPACT;
 }
 
 /* The results kept by the log of the session; the oldest go first. */
@@ -663,16 +676,22 @@ static void ui_popup_close(struct fyai_ui *ui)
 	}
 	free(ui->popup_title);
 	ui->popup_title = NULL;
-	ui->popup_shown = false;
+	ui->popup_state = UI_POPUP_HIDDEN;
 	ui->frame_pending = true;
 }
 
-/* Hide the popup; the log stays for the indicator to show again. */
-static void ui_popup_hide(struct fyai_ui *ui)
+static void ui_log_rebuild(struct fyai_ui *ui);
+
+/* Take the popup to @state; the log stays for the indicator to show again. */
+static void ui_popup_set(struct fyai_ui *ui, enum ui_popup_state state)
 {
-	if (!ui->popup_shown)
+	if (ui->popup_state == (int)state)
 		return;
-	ui->popup_shown = false;
+	ui->popup_state = state;
+	/* The newest entry shows from its heading at the new size. */
+	ui->popup_rows = 0;
+	if (ui->popup && state != UI_POPUP_HIDDEN)
+		ui_log_rebuild(ui);
 	ui->frame_pending = true;
 }
 
@@ -715,6 +734,7 @@ static void ui_log_rebuild(struct fyai_ui *ui)
 	free(ui->popup_title);
 	ui->popup_title = title;
 	height = ui->popup_rows > 0 ? ui->popup_rows :
+		 ui->popup_state == UI_POPUP_COMPACT ? UI_LOG_ROWS :
 		 ui->render_rows > 1 ? ui->render_rows - 1 : 23;
 	fyai_transcript_view_scroll(view, INT_MIN / 2, height);
 	if (after - before > (size_t)height)
@@ -804,12 +824,13 @@ static void ui_popup_append(struct fyai_ui *ui, enum fyai_error_type level,
 	}
 	ui->log = grown;
 	ui->log[ui->nlog++] = e;
-	if (!ui_popup_open(ui) && rows <= UI_NOTE_ROWS)
+	if (ui->popup_state == UI_POPUP_HIDDEN && rows <= UI_NOTE_ROWS)
 		ui_note_set(ui, heading, text, len, rows);
 	else
 		ui_note_clear(ui);
-	if (shown && rows > UI_NOTE_ROWS)
-		ui->popup_shown = true;
+	/* A long result opens the log small; the user expands it. */
+	if (shown && rows > UI_NOTE_ROWS && ui->popup_state == UI_POPUP_HIDDEN)
+		ui->popup_state = UI_POPUP_COMPACT;
 	ui_log_rebuild(ui);
 	fyai_ui_panel_update(ui->ctx);
 }
@@ -1687,10 +1708,26 @@ static void ui_ask_dismiss(struct fyai_ctx *ctx, const char *arg)
 	ui_question_finish(ctx->ui, false);
 }
 
+/* Collapse the popup to the compact log. */
 static void ui_popup_close_act(struct fyai_ctx *ctx, const char *arg)
 {
 	(void)arg;
-	ui_popup_hide(ctx->ui);
+	ui_popup_set(ctx->ui, UI_POPUP_COMPACT);
+}
+
+/* Hide the compact log; the log stays for the indicator. */
+static void ui_popup_hide_act(struct fyai_ctx *ctx, const char *arg)
+{
+	(void)arg;
+	ui_popup_set(ctx->ui, UI_POPUP_HIDDEN);
+}
+
+/* Expand the compact log over the page. */
+static void ui_popup_expand_act(struct fyai_ctx *ctx, const char *arg)
+{
+	(void)arg;
+	if (ctx->ui->popup)
+		ui_popup_set(ctx->ui, UI_POPUP_FULL);
 }
 
 static void ui_popup_clear_act(struct fyai_ctx *ctx, const char *arg)
@@ -1700,18 +1737,18 @@ static void ui_popup_clear_act(struct fyai_ctx *ctx, const char *arg)
 	fyai_ui_panel_update(ctx);
 }
 
-/* Show the popup of the results, or hide it when it shows. */
+/* Show the log small, then over the page, then hide it again. */
 static void ui_popup_toggle(struct fyai_ui *ui)
 {
-	if (ui->popup_shown) {
-		ui_popup_hide(ui);
+	if (ui->popup_state == UI_POPUP_FULL) {
+		ui_popup_set(ui, UI_POPUP_HIDDEN);
 		return;
 	}
 	if (!ui->popup || !ui->fullscreen)
 		return;
 	ui_note_clear(ui);
-	ui->popup_shown = true;
-	ui->frame_pending = true;
+	ui_popup_set(ui, ui->popup_state == UI_POPUP_COMPACT ?
+			 UI_POPUP_FULL : UI_POPUP_COMPACT);
 }
 
 /* Raise the lowest level the popup shows, from all back round to all. */
@@ -1770,6 +1807,8 @@ static const struct fyai_page_action ui_page_action_table[] = {
 	{ "ask.dismiss", ui_ask_dismiss },
 	{ "panel.scroll", ui_panel_scroll_act },
 	{ "popup.close", ui_popup_close_act },
+	{ "popup.hide", ui_popup_hide_act },
+	{ "popup.expand", ui_popup_expand_act },
 	{ "popup.clear", ui_popup_clear_act },
 	{ "popup.level", ui_popup_level_act },
 	{ "popup.scroll", ui_popup_scroll_act },
@@ -2321,10 +2360,23 @@ static void ui_page_update(struct fyai_ui *ui)
 			!fyai_agent_delegated(ctx) &&
 			!(st.fullscreen && st.popup_title);
 	st.popup_title = ui_popup_open(ui) ? ui->popup_title : NULL;
+	if (ui_popup_compact(ui)) {
+		st.log_title = ui->popup_title;
+		st.log_rows = fyai_transcript_view_rows(ui->popup);
+		if (st.log_rows > UI_LOG_ROWS)
+			st.log_rows = UI_LOG_ROWS;
+		if (st.log_rows < 1)
+			st.log_rows = 1;
+	}
 	st.fullscreen = ui->fullscreen;
 	fyai_page_fit(&st, rows);
 	rc = fyai_page_fit_document(ui->page, &st, cols, rows);
 	fyai_error_check(ctx, !rc, err_page, "cannot fit the page document");
+	if (ui_popup_compact(ui)) {
+		ui->popup_rows = st.log_rows;
+		st.log_lines = fyai_transcript_view_window(ui->popup,
+			st.log_rows, &st.log_nlines);
+	}
 	if (ui_popup_open(ui)) {
 		ui->popup_rows = st.popup_rows;
 		st.popup_lines = fyai_transcript_view_window(ui->popup,

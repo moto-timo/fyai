@@ -115,6 +115,14 @@ struct fyai_page_state {
 	int popup_rows;
 	const char *const *popup_lines;
 	int popup_nlines;
+	/* The compact log: a heading and @log_rows rows above the status, which
+	 * @log_lines hold, borrowed for the frame. @log_rows is the rows asked
+	 * for; the fit gives what the page can spare. It stands while
+	 * @log_title is set and no popup covers the page. */
+	const char *log_title;
+	int log_rows;
+	const char *const *log_lines;
+	int log_nlines;
 	/* The rows of a short result, which stand above the status. */
 	const char *const *note_lines;
 	int note_nlines;

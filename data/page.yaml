@@ -119,6 +119,10 @@ pages:
     - if: note.shown
       slot: { id: note, rows: "{note.rows}" }
 
+    # The log of the session, small: a click on it expands it.
+    - if: log.shown
+      page: log_panel
+
     # The hint or the completion ribbon, then the status.
     - if: status.shown
       drop: 1
@@ -418,6 +422,30 @@ pages:
               - text: "Todos"
     - markup: todo.source
 
+  # The compact log: its heading, then the newest results.
+  log_panel:
+    - keys:
+        Escape: popup.hide
+    - row:
+        - role:
+            name: chrome
+            items:
+              - text: "── "
+        - act: { action: popup.expand, text: "{log.title}" }
+        - role:
+            name: chrome
+            items:
+              - text: " "
+              - fill: { char: "─" }
+              - text: " "
+        - act: { action: popup.expand, text: "[expand]" }
+        - role:
+            name: chrome
+            items:
+              - text: " "
+        - act: { action: popup.hide, text: "[x]" }
+    - slot: { id: log, rows: "{log.rows}" }
+
   # The popup of a fullscreen session: its heading, then the result.
   popup:
     - tight: true
@@ -426,7 +454,7 @@ pages:
             name: chrome
             items:
               - text: "── {popup.title} "
-        - act: { action: popup.close, text: "[Esc closes \u00b7 l level \u00b7 x clears]" }
+        - act: { action: popup.close, text: "[Esc collapses \u00b7 l level \u00b7 x clears]" }
         - role:
             name: chrome
             items:
