@@ -302,6 +302,26 @@ static bool markdown_role_ground(const struct fyai_cfg *cfg, const char *role,
 	return true;
 }
 
+/*
+ * The rgb of the theme ground into *@rgb. The ground is a colour of the
+ * palette and not a role, so it is read as the page fill reads it.
+ */
+static bool markdown_theme_ground(const struct fyai_cfg *cfg, uint32_t *rgb)
+{
+	char sgr[64];
+	unsigned int r, g, b;
+	int n;
+
+	n = fypal_ctx_color_sgr(cfg->palette, "ground", FYPAL_LAYER_BG, sgr,
+				sizeof(sgr));
+	if (n < 0 || (size_t)n >= sizeof(sgr))
+		return false;
+	if (sscanf(sgr, "\x1b[48;2;%u;%u;%um", &r, &g, &b) != 3)
+		return false;
+	*rgb = (r & 0xff) << 16 | (g & 0xff) << 8 | (b & 0xff);
+	return true;
+}
+
 bool markdown_command_ground(const struct fyai_cfg *cfg, uint32_t *rgb)
 {
 	const struct fypal_caps *caps;
@@ -332,7 +352,7 @@ bool markdown_command_ground(const struct fyai_cfg *cfg, uint32_t *rgb)
 	 * fullscreen page with a theme ground, else it is the terminal's. */
 	if (cfg->screen && !strcmp(cfg->screen, "fullscreen") &&
 	    (cfg->theme_ground && !strcmp(cfg->theme_ground, "theme")) &&
-	    markdown_role_ground(cfg, "ground", &base)) {
+	    markdown_theme_ground(cfg, &base)) {
 		;
 	} else if (cfg->terminal.flags & FYPAL_TERM_BACKGROUND) {
 		base = cfg->terminal.background;
