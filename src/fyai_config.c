@@ -243,12 +243,11 @@ static const char *const fyai_env_direct[] = {
 	"MCP_API_KEY",
 };
 
-static int config_bad_value(const char *key, fy_generic value,
-			    fy_generic choices)
+static int config_bad_value(struct fyai_cfg *cfg, const char *key,
+			    fy_generic value, fy_generic choices)
 {
-	fprintf(stderr, "config: invalid %s '%s' (%s)\n",
-		key, fy_str(value),
-		fy_cast(choices, ""));
+	fyai_cfg_error(cfg, "invalid %s '%s' (%s)", key, fy_str(value),
+		       fy_castp(&choices, ""));
 	return -1;
 }
 
@@ -257,8 +256,9 @@ static bool config_contains(fy_generic values, fy_generic value)
 	return fy_cast(fy_contains(values, value), (_Bool)false);
 }
 
-static int config_validate_enum(fy_generic root, const char *key,
-				fy_generic values, fy_generic choices)
+static int config_validate_enum(struct fyai_cfg *cfg, fy_generic root,
+				const char *key, fy_generic values,
+				fy_generic choices)
 {
 	fy_generic v;
 
@@ -266,15 +266,15 @@ static int config_validate_enum(fy_generic root, const char *key,
 	if (fy_is_invalid(v))
 		return 0;
 	return config_contains(values, v) ? 0 :
-	       config_bad_value(key, v, choices);
+	       config_bad_value(cfg, key, v, choices);
 }
 
-#define CONFIG_VALIDATE_ENUM(_root, _key, ...) \
-	config_validate_enum((_root), (_key), \
+#define CONFIG_VALIDATE_ENUM(_cfg, _root, _key, ...) \
+	config_validate_enum((_cfg), (_root), (_key), \
 			     fy_sequence(__VA_ARGS__), \
 			     fy_join("|", __VA_ARGS__))
 
-static int config_validate_api(fy_generic root)
+static int config_validate_api(struct fyai_cfg *cfg, fy_generic root)
 {
 	fy_generic v;
 
@@ -284,13 +284,14 @@ static int config_validate_api(fy_generic root)
 	if (config_contains(fy_sequence("responses", "messages", "chat",
 					"chat-completions"), v))
 		return 0;
-	fprintf(stderr, "config: invalid api '%s' (responses|chat-completions|messages)\n",
-		fy_str(v));
+	fyai_cfg_error(cfg, "invalid api '%s' (responses|chat-completions|messages)",
+		       fy_str(v));
 	return -1;
 }
 
 static bool config_has_command_ops(struct fyai_cfg *cfg);
-static int config_report_commit(fy_generic report, fy_generic *docp);
+static int config_report_commit(struct fyai_cfg *cfg, fy_generic report,
+				fy_generic *docp);
 static fy_generic config_doc_mirror_key(struct fy_generic_builder *gb,
 					fy_generic config_doc, fy_generic root,
 					const char *key);
@@ -452,7 +453,7 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 		}
 	}
 
-	if (config_validate_api(root))
+	if (config_validate_api(cfg, root))
 		return -1;
 
 	v = fy_get(root, "model");
@@ -658,7 +659,7 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 			fyai_cfg_error(cfg, "branch must be a mapping");
 			return -1;
 		}
-		if (CONFIG_VALIDATE_ENUM(v, "on_conflict",
+		if (CONFIG_VALIDATE_ENUM(cfg, v, "on_conflict",
 					 "abort", "rebase", "merge"))
 			return -1;
 		cfg->branch_on_conflict = fy_get(v, "on_conflict",
@@ -671,9 +672,9 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 			fyai_cfg_error(cfg, "reasoning must be a mapping");
 			return -1;
 		}
-		if (CONFIG_VALIDATE_ENUM(v, "effort",
+		if (CONFIG_VALIDATE_ENUM(cfg, v, "effort",
 					 "minimal", "low", "medium", "high") ||
-		    CONFIG_VALIDATE_ENUM(v, "summary",
+		    CONFIG_VALIDATE_ENUM(cfg, v, "summary",
 					 "auto", "concise", "detailed"))
 			return -1;
 		cfg->reasoning_effort = fy_get(v, "effort",
@@ -697,11 +698,11 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 			fyai_cfg_error(cfg, "display must be a mapping");
 			return -1;
 		}
-		if (CONFIG_VALIDATE_ENUM(v, "markdown_mode",
+		if (CONFIG_VALIDATE_ENUM(cfg, v, "markdown_mode",
 					 "oneshot", "line", "stream") ||
-		    CONFIG_VALIDATE_ENUM(v, "color",
+		    CONFIG_VALIDATE_ENUM(cfg, v, "color",
 					 "auto", "off", "on") ||
-		    CONFIG_VALIDATE_ENUM(v, "tool_detail",
+		    CONFIG_VALIDATE_ENUM(cfg, v, "tool_detail",
 					 "none", "brief", "default", "full"))
 			return -1;
 		cfg->markdown_mode = fy_get(v, "markdown_mode",
@@ -862,7 +863,8 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
  * Parse a YAML config file into a generic. A missing file yields fy_invalid
  * (not an error); a malformed file is an error.
  */
-static int parse_config_file(struct fy_generic_builder *gb, const char *path,
+static int parse_config_file(struct fyai_cfg *cfg,
+			     struct fy_generic_builder *gb, const char *path,
 			     fy_generic *out)
 {
 	fy_generic root;
@@ -875,7 +877,7 @@ static int parse_config_file(struct fy_generic_builder *gb, const char *path,
 	root = fy_parse_file(gb,
 				FYAI_YAML_PARSE_FLAGS, path);
 	if (fy_is_invalid(root)) {
-		fprintf(stderr, "failed to parse config file: %s\n", path);
+		fyai_cfg_error(cfg, "failed to parse config file: %s", path);
 		return -1;
 	}
 
@@ -971,8 +973,8 @@ static char *strip(char *s)
  * @names (the in-use config-export set) are exported; others are silently
  * ignored.
  */
-static int env_apply_line(char *line, fy_generic names, const char *path,
-			  int lineno)
+static int env_apply_line(struct fyai_cfg *cfg, char *line, fy_generic names,
+			  const char *path, int lineno)
 {
 	char *p;
 	char *eq;
@@ -990,7 +992,7 @@ static int env_apply_line(char *line, fy_generic names, const char *path,
 
 	eq = strchr(p, '=');
 	if (!eq) {
-		fprintf(stderr, "%s:%d: expected KEY=VALUE\n", path, lineno);
+		fyai_cfg_error(cfg, "%s:%d: expected KEY=VALUE", path, lineno);
 		return -1;
 	}
 	*eq = '\0';
@@ -998,8 +1000,8 @@ static int env_apply_line(char *line, fy_generic names, const char *path,
 	val = strip(eq + 1);
 
 	if (!valid_env_key(key)) {
-		fprintf(stderr, "%s:%d: invalid variable name '%s'\n",
-			path, lineno, key);
+		fyai_cfg_error(cfg, "%s:%d: invalid variable name '%s'",
+			       path, lineno, key);
 		return -1;
 	}
 
@@ -1010,13 +1012,13 @@ static int env_apply_line(char *line, fy_generic names, const char *path,
 		val[vl - 1] = '\0';
 		val++;
 	} else if (val[0] == '"' || val[0] == '\'') {
-		fprintf(stderr, "%s:%d: unterminated quote\n", path, lineno);
+		fyai_cfg_error(cfg, "%s:%d: unterminated quote", path, lineno);
 		return -1;
 	}
 
 	if (has_substitution(val)) {
-		fprintf(stderr, "%s:%d: variable substitution is not supported\n",
-			path, lineno);
+		fyai_cfg_error(cfg, "%s:%d: variable substitution is not supported",
+			       path, lineno);
 		return -1;
 	}
 
@@ -1027,7 +1029,8 @@ static int env_apply_line(char *line, fy_generic names, const char *path,
 	return 0;
 }
 
-static int load_env_file(const char *path, fy_generic names)
+static int load_env_file(struct fyai_cfg *cfg, const char *path,
+			 fy_generic names)
 {
 	char *content;
 	char *p;
@@ -1040,7 +1043,7 @@ static int load_env_file(const char *path, fy_generic names)
 	lineno = 0;
 	content = read_text_file(path);
 	if (!content) {
-		fprintf(stderr, "--env: cannot read %s\n", path);
+		fyai_cfg_error(cfg, "--env: cannot read %s", path);
 		return -1;
 	}
 
@@ -1052,7 +1055,7 @@ static int load_env_file(const char *path, fy_generic names)
 		if (len && p[len - 1] == '\r')
 			p[len - 1] = '\0';
 
-		if (env_apply_line(p, names, path, ++lineno)) {
+		if (env_apply_line(cfg, p, names, path, ++lineno)) {
 			rc = -1;
 			break;
 		}
@@ -1338,7 +1341,7 @@ int fyai_config_load(struct fyai_cfg *cfg,
 	root_user = fy_invalid;
 	if (!fy_is_mapping(cfg->reload_state)) {
 		user_path = user_config_path();
-		rc = parse_config_file(gb, user_path, &root_user);
+		rc = parse_config_file(cfg, gb, user_path, &root_user);
 		free(user_path);
 		if (rc)
 			return -1;
@@ -1366,7 +1369,7 @@ int fyai_config_load(struct fyai_cfg *cfg,
 			fyai_cfg_error(cfg, "cannot read %s", cli_config);
 			return -1;
 		}
-		if (parse_config_file(gb, cli_config, &root_explicit))
+		if (parse_config_file(cfg, gb, cli_config, &root_explicit))
 			return -1;
 		/* Validate an explicit file before merging it into the configuration. */
 		if (fy_is_valid(root_explicit) &&
@@ -1388,7 +1391,7 @@ int fyai_config_load(struct fyai_cfg *cfg,
 		names = collect_env_refs(gb, root_repo, names);
 		names = collect_env_refs(gb, root_explicit, names);
 
-		if (load_env_file(cli_env, names))
+		if (load_env_file(cfg, cli_env, names))
 			return -1;
 	}
 
@@ -1485,7 +1488,7 @@ int fyai_config_set(struct fyai_ctx *ctx, const char *key, const char *value)
 		return -1;
 	}
 	report = fyai_config_validate_report(ctx->cfg, root, "config");
-	if (config_report_commit(report, &root)) {
+	if (config_report_commit(ctx->cfg, report, &root)) {
 		return -1;
 	}
 	/* The merged doc tracks the edit (validated form, including any
@@ -1605,7 +1608,7 @@ int fyai_apply_config_ops(struct fyai_ctx *ctx)
 	}
 	if (dirty) {
 		report = fyai_config_validate_report(cfg, root, "config");
-		if (config_report_commit(report, &root))
+		if (config_report_commit(ctx->cfg, report, &root))
 			return -1;
 		if (fyai_publish_root(ctx, root, fy_invalid, fy_invalid))
 			return -1;
@@ -2103,7 +2106,8 @@ int fyai_config_validate_schema(struct fyai_cfg *cfg, fy_generic doc,
 	return -1;
 }
 
-static int config_report_commit(fy_generic report, fy_generic *docp)
+static int config_report_commit(struct fyai_cfg *cfg, fy_generic report,
+				fy_generic *docp)
 {
 	fy_generic problems, problem;
 
@@ -2114,7 +2118,7 @@ static int config_report_commit(fy_generic report, fy_generic *docp)
 	}
 	problems = fy_get(report, "problems", fy_seq_empty);
 	fy_foreach(problem, problems)
-		fprintf(stderr, "config: %s\n", fy_castp(&problem, ""));
+		fyai_cfg_error(cfg, "%s", fy_castp(&problem, ""));
 	return -1;
 }
 
@@ -2138,7 +2142,7 @@ int fyai_config_delete(struct fyai_ctx *ctx, const char *key)
 		return -1;
 	}
 	report = fyai_config_validate_report(ctx->cfg, root, "config");
-	if (config_report_commit(report, &root))
+	if (config_report_commit(ctx->cfg, report, &root))
 		return -1;
 	ctx->cfg->config_doc = config_doc_mirror_key(gb, ctx->cfg->config_doc,
 						     root, key);
@@ -2159,7 +2163,7 @@ int fyai_config_import(struct fyai_ctx *ctx, const char *path)
 	doc = fy_parse_file(ctx->gb,
 			    FYAI_YAML_PARSE_FLAGS, path);
 	report = fyai_config_validate_report(ctx->cfg, doc, path);
-	if (config_report_commit(report, &doc))
+	if (config_report_commit(ctx->cfg, report, &doc))
 		return -1;
 	if (fyai_publish_root(ctx, doc, fy_invalid, fy_invalid))
 		return -1;
@@ -2177,7 +2181,7 @@ int fyai_config_reset(struct fyai_ctx *ctx)
 	}
 	/* An empty document takes every default of the schema. */
 	report = fyai_config_validate_report(ctx->cfg, doc, "config");
-	if (config_report_commit(report, &doc))
+	if (config_report_commit(ctx->cfg, report, &doc))
 		return -1;
 	if (fyai_publish_root(ctx, doc, fy_invalid, fy_invalid))
 		return -1;
@@ -2233,7 +2237,7 @@ int fyai_config_undo(struct fyai_ctx *ctx, long long n, long long *foundp)
 		return -1;
 	}
 	report = fyai_config_validate_report(ctx->cfg, config, "config");
-	if (config_report_commit(report, &config))
+	if (config_report_commit(ctx->cfg, report, &config))
 		return -1;
 	return fyai_publish_root(ctx, config, fy_invalid, fy_invalid);
 }
@@ -2328,7 +2332,7 @@ static void fyai_config_edit_service(void *userdata)
 		goto out;
 	}
 	report = fyai_config_validate_report(ctx->cfg, doc, "edited config");
-	if (config_report_commit(report, &doc)) {
+	if (config_report_commit(ctx->cfg, report, &doc)) {
 		fyai_error(ctx, "edits kept at %s", request->path);
 		rc = -1;
 		goto out;
