@@ -13,7 +13,7 @@ mock_start ui_card_separation.json
 # does nothing: the next command still runs.
 FYAI_PTY_ROWS=40 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
 FYAI_PTY_NEEDLE="banana" \
-FYAI_PTY_AFTER="raw:6e6f742073656e74|wait-screen:not sent|raw:1b00|wait-gone:not sent|raw:1b00|send:/status|click:[expand]|wait-screen:Auth / provider|raw:1b00|wait-gone:Auth / provider" \
+FYAI_PTY_AFTER="raw:6e6f742073656e74|wait-screen:not sent|raw:1b00|wait-gone:not sent|raw:1b00|send:/status|click:□|wait-screen:Auth / provider|raw:1b00|wait-gone:Auth / provider" \
 "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
