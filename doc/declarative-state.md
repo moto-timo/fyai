@@ -454,10 +454,9 @@ the first pass for the second:
   configuration before and after the change, and shows their unified diff
   in the `diff` slot. A trial compares the session layer. YAML file headers
   let the renderer highlight the configuration syntax.
-- **The diff cannot be forged by a value.** A value that the model gave can
-  hold a fence. The diff is fenced with more backticks than any run in it,
-  and its control bytes become `?`, so a value cannot close the fence and
-  write Markdown of its own into the diff slot.
+- **The diff cannot be forged by a value.** The diff panel reads unified
+  diff data directly. A value in that data cannot open page markup or a
+  Markdown block. Control bytes become `?` before the review.
 - **The diff covers the changed paths.** It shows each value under a
   replaced subtree that the model may read. A
   summary row counts the keys and the lines added and removed and names
@@ -465,9 +464,12 @@ the first pass for the second:
 - **The heading is fixed.** The headings of both slots and the question are
   written by fyai; the question names the number of keys and the access.
   The model cannot write them.
-- **The diff keeps its rows.** The options stand above both slots. The diff
-  takes up to half the screen first; the proposal takes what is left of
-  two thirds, and on a short screen it is the one that goes.
+- **The diff keeps its rows.** The options and proposal stand on the left,
+  and the diff stands on the right. The diff view holds all rendered rows
+  and the default page gives it the height of the left column.
+  Page Up and Page
+  Down move through it with one row of overlap. Its scroll bar shows the
+  position; its arrows move one row and its track moves one page.
 - **What was shown is what is applied.** Accept applies the document that
   the panel diffed. A pending proposal is checked and diffed again when the
   user reviews it.

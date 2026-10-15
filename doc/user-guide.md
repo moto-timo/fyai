@@ -576,9 +576,20 @@ The model never writes the configuration. It presents a change and an
 explanation; fyai checks it and makes the diff. fyai applies a change of
 `write` keys at once only when `model_access` is `write` and the sandbox
 denies the arena to the shell. Every other change appears in a review
-panel: the explanation of the model, then the diff that fyai made. Reject
+page: the explanation and choices on the left, the diff on the right, and
+a reply input box spanning the width below both columns. Select Other to
+focus the input box, or start typing. Right from the choices focuses the
+diff; Down from the last choice focuses the input box, and Up returns to the
+choices. Tab cycles between these components. The focused diff takes Up and
+Down for scrolling; the input box keeps Left and Right for editing.
+Page Up and Page Down scroll the diff. The scroll bar also moves it by one
+row with its arrows, or by one page with its track. The layout is the
+`ask_permissions` page; [page panels](page-panels.md) can be placed in other
+parts of a page. Reject
 is the first option; Down and Enter accept; a typed reply rejects the
-change and goes back to the model. When nobody can review a change, as in
+change and goes back to the model. Spaces and digits enter the reply; they
+do not choose an option in a permission review. When nobody can review a
+change, as in
 a one-shot prompt, it is kept as a proposal:
 
 ```sh
