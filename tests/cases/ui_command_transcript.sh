@@ -104,4 +104,35 @@ if any("Auth / provider" in row for row in rows):
 PY
 	fail "a command with pane output reached the transcript"
 
+# A command that reports a status, /model, stays out of the transcript even
+# with command_output set to transcript: no card, and its output is shown in
+# the panel and not in the conversation.
+run_steps \
+	"send:/model|wait-screen:provider|raw:1b|wait-gone:provider|send:yellow?|wait-screen:second" \
+	--set display/command_output=transcript
+"$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
+import sys
+
+sys.path.insert(0, sys.argv[2])
+from screen import Screen
+
+data = open(sys.argv[1], "rb").read()
+screen = Screen(60, 100)
+end = b"\x1b[?2026l"
+pos = 0
+while True:
+    at = data.find(end, pos)
+    if at < 0:
+        break
+    screen.feed(data[pos:at + len(end)])
+    pos = at + len(end)
+    for row in screen.display():
+        if "│ /model" in row:
+            raise SystemExit("the card of the status command was drawn: %r" % row)
+rows = screen.display()
+if any("(provider " in row for row in rows):
+    raise SystemExit("the status was drawn into the transcript")
+PY
+	fail "the output of /model reached the transcript"
+
 pass
