@@ -1285,7 +1285,7 @@ list the changes of the model
 
 **Usage:** `fyai config changes`
 
-List the changes of the configuration that the model presented
+List the changes of the configuration or catalogue that the model presented
 with the settings tool and that fyai applied: each with its id,
 its status, its access, and the keys it changed. The branch keeps
 the newest 64.
@@ -1304,7 +1304,7 @@ list the changes that wait for you
 
 **Usage:** `fyai config proposals`
 
-List the changes that the model presented when nobody could review
+List the configuration and catalogue changes that the model presented when nobody could review
 them, with their status. `config review ID` shows one with its
 diff; `config approve ID` applies it, and `config reject ID` drops
 it.
@@ -1324,7 +1324,7 @@ show a proposal of the model with its diff
 **Usage:** `fyai config review ID`
 
 Show the pending proposal ID: the diff that fyai makes of it over
-the configuration in force, and the explanation that the model
+the configuration or catalogue in force, and the explanation that the model
 wrote, quoted.
 
 
@@ -1348,7 +1348,7 @@ apply a proposal of the model
 **Usage:** `fyai config approve ID`
 
 Apply the pending proposal ID. In a session the review panel shows
-its diff over the configuration in force first; a proposal that is
+its diff over the configuration or catalogue in force first; a proposal that is
 no longer valid is refused.
 
 
@@ -4049,7 +4049,7 @@ list the changes of the model
 
 **Usage:** `/config changes`
 
-List the changes of the configuration that the model presented
+List the changes of the configuration or catalogue that the model presented
 with the settings tool and that fyai applied: each with its id,
 its status, its access, and the keys it changed. The branch keeps
 the newest 64.
@@ -4067,7 +4067,7 @@ list the changes that wait for you
 
 **Usage:** `/config proposals`
 
-List the changes that the model presented when nobody could review
+List the configuration and catalogue changes that the model presented when nobody could review
 them, with their status. `config review ID` shows one with its
 diff; `config approve ID` applies it, and `config reject ID` drops
 it.
@@ -4086,7 +4086,7 @@ show a proposal of the model with its diff
 **Usage:** `/config review ID`
 
 Show the pending proposal ID: the diff that fyai makes of it over
-the configuration in force, and the explanation that the model
+the configuration or catalogue in force, and the explanation that the model
 wrote, quoted.
 
 
@@ -4109,7 +4109,7 @@ apply a proposal of the model
 **Usage:** `/config approve ID`
 
 Apply the pending proposal ID. In a session the review panel shows
-its diff over the configuration in force first; a proposal that is
+its diff over the configuration or catalogue in force first; a proposal that is
 no longer valid is refused.
 
 

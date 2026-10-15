@@ -598,7 +598,19 @@ for one session. Approving or rejecting in a session tells the model.
 
 The same tool reads the catalogue (`document: catalog`): the model can
 search the models by name, capability or provider before it suggests one.
-It cannot change the catalogue. A sub-agent has no settings tool.
+The model can use a source it inspected itself. `settings` accepts
+`document: catalog`, `action: change`, a `source`, and up to 32
+`{path, value}` or `{path, delete: true}` changes. Paths may
+change model properties under `models/NAME` and provider offerings under
+`providers/NAME/models/ID`; provider URLs and endpoints are outside this
+action. fyai checks the whole change against the catalogue schema and makes a
+diff. Under the normal `model_access: review`, a session presents the same
+review panel as a configuration change; a one-shot run keeps a proposal for
+`config review`, `config approve`, or `config reject`. Under `model_access:
+write`, fyai applies the change directly only when the arena is protected,
+as it does for configuration changes. `config revert` applies only to
+configuration changes; use `catalog set` or `catalog delete` to correct an
+approved catalogue entry. A sub-agent has no settings tool.
 
 For a question over many entries, such as "which model of Anthropic is the
 cheapest?", the model uses `select`: it filters, sorts and projects the

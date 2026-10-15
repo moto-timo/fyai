@@ -45,7 +45,7 @@ need no support in the validator: the code that reads a document reads them.
 | Document | Schema | Stored in | Changed by | Model access today |
 |---|---|---|---|---|
 | Configuration | `data/config.schema.yaml` | branch `store/config`; session layer; `--config` file; `--set` | `config set/delete/import/edit/reset/undo`, setting commands (`/theme`, `/temperature`, ...), `/session lockdown`, `/session yolo` | none through a tool; see [the shell path](#the-shell-path) |
-| Provider catalogue | `data/catalog.schema.yaml` (output of scrape-providers) | branch `store/catalog`; `data/catalog.yaml` is the seed | `catalog set/delete/import/edit/reset/update`, all through `fyai_catalog_commit()` | none |
+| Provider catalogue | `data/catalog.schema.yaml` (output of scrape-providers) | branch `store/catalog`; `data/catalog.yaml` is the seed | `catalog set/delete/import/edit/reset/update` and model `settings change`, all through `fyai_catalog_commit()` | provider connection fields are excluded from model changes |
 | Commands | `data/command.schema.yaml` | embedded at build time | a build | none |
 | Model tools | wire shape, `doc/tools-yaml.md` | embedded at build time | a build | the model gets the specifications of its tools |
 | Page document | `data/page.schema.yaml`, then `fyai_page_check()` | embedded `data/page.yaml`, or the file that `display/page` names | configuration | none |
@@ -589,7 +589,7 @@ table of documents of the tool, not in that schema.
 
 | Document | Class | Notes |
 |---|---|---|
-| Catalogue | read | Built. `document: catalog` selects it. `search` matches each word against the name, display name, capabilities and modalities of a model and the providers that offer it, models that hold every word in their name first, and marks the model in use. `get` reads a path as `catalog get` does (`fyai_catalog_at()`): `models/NAME`, `providers/NAME` - whose offerings shrink to their ids - or `providers/NAME/models/ID`. `list` names the items under a path. Any other action is refused. The schema is the output of scrape-providers, so it is not annotated. |
+| Catalogue | read and review/write | `document: catalog` selects it. `search` matches model names, capabilities, modalities and providers. `get`, `list`, `select` and `export` read it. `change` accepts sourced edits under `models/NAME` or `providers/NAME/models/ID` only and checks the whole document against `data/catalog.schema.yaml`. It uses the same `model_access`, arena protection, review panel and `config` proposal commands as a configuration change. Provider connection fields cannot be changed by this action. |
 | Skills | review | `change` makes a proposal of a new or an edited skill. The front matter is checked against `data/skill.schema.yaml`. The review shows the whole `SKILL.md`, each file, `context: fork` and each tool that `allowed-tools` adds. A model never sets the executable bit; the review can grant it. |
 | Theme | write | `display/theme`, from `markdown_theme_selectors()`. |
 | Key bindings | review | `display/keys`. The reserved keys stay refused. |
@@ -618,7 +618,7 @@ Each phase is three patches: implementation, tests, documentation.
 4. **Revert and trial.** `revert`, `config revert/keep`, `trial` and the
    approval events: built, with `tests/cases/settings_revert.sh` and
    `tests/cases/settings_approve.sh`. A sub-agent has no settings tool.
-5. **Catalogue read.** Built, with `tests/cases/settings_catalog.sh`.
+5. **Catalogue read and edits.** Built, with `tests/cases/settings_catalog.sh`.
 6. **Skill proposals.**
 7. **Display documents:** theme, keys, and stored page documents.
 
