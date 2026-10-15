@@ -364,7 +364,8 @@ int fyai_chrome_focus_cells(struct fyai_ctx *ctx, struct fytim_cell *cells,
 }
 
 int fyai_chrome_panel(struct fyai_ctx *ctx, struct response_buffer *out,
-		      int *colsp, int *buttonp)
+		      int messages, enum fyai_error_type level,
+		      struct fyai_chrome_panel_info *info)
 {
 	/* Each kind takes a role of the palette theme, else a style of the
 	 * theme of the chrome. */
@@ -378,27 +379,35 @@ int fyai_chrome_panel(struct fyai_ctx *ctx, struct response_buffer *out,
 		  FYMD_STYLE_INDICATOR_PENDING },
 	};
 	const char *glyph, *on, *off;
-	int counts[3], i, n, cols, rc = 0;
-	bool hidden, color;
+	int counts[3], i, n, cols = 0, rc = 0;
+	bool hidden, color, work;
 
+	memset(info, 0, sizeof(*info));
 	fyai_tools_counts(ctx, &counts[0], &counts[1], &counts[2]);
 	hidden = fyai_workpane_hidden(ctx->workpane);
-	if (!hidden && !counts[0] && !counts[1] && !counts[2])
+	work = hidden || counts[0] || counts[1] || counts[2];
+	if (!work && messages <= 0)
 		return 0;
 	color = markdown_color_enabled(ctx->cfg->color);
-	/* The button: a full box while the pane shows, an empty one while it
-	 * is hidden. */
-	glyph = hidden ? markdown_glyph(ctx->cfg, "panel.hidden", "\xe2\x96\xa2") :
-			 markdown_glyph(ctx->cfg, "panel.shown", "\xe2\x96\xa3");
-	on = off = NULL;
-	if (color)
-		fyai_ui_theme_pair(ctx, "text", FYMD_STYLE_STRONG, &on, &off);
-	rc = response_buffer_append(out, fy_sprintfa("%s%s%s", on ? on : "",
-			glyph, off ? off : ""));
-	n = fymd_str_width(glyph, strlen(glyph));
-	cols = n > 0 ? n : 1;
-	*buttonp = cols;
-	for (i = 0; i < 3 && !rc; i++) {
+	if (work) {
+		/* The button: a full box while the pane shows, an empty one
+		 * while it is hidden. */
+		glyph = hidden ?
+			markdown_glyph(ctx->cfg, "panel.hidden",
+				       "\xe2\x96\xa2") :
+			markdown_glyph(ctx->cfg, "panel.shown",
+				       "\xe2\x96\xa3");
+		on = off = NULL;
+		if (color)
+			fyai_ui_theme_pair(ctx, "text", FYMD_STYLE_STRONG, &on,
+					   &off);
+		rc = response_buffer_append(out, fy_sprintfa("%s%s%s",
+				on ? on : "", glyph, off ? off : ""));
+		n = fymd_str_width(glyph, strlen(glyph));
+		cols = n > 0 ? n : 1;
+		info->button_cols = cols;
+	}
+	for (i = 0; i < 3 && !rc && work; i++) {
 		if (!counts[i])
 			continue;
 		glyph = markdown_glyph(ctx->cfg, kinds[i].glyph,
@@ -413,12 +422,37 @@ int fyai_chrome_panel(struct fyai_ctx *ctx, struct response_buffer *out,
 		cols += 1 + (n > 0 ? n : 1) +
 			(int)strlen(fy_sprintfa("%d", counts[i]));
 	}
+	if (!rc && messages > 0) {
+		glyph = markdown_glyph(ctx->cfg, "panel.messages",
+				       "\xe2\x89\xa1");
+		on = off = NULL;
+		/* The indicator has the colour of its worst level. */
+		if (color && level >= FYAIET_ERROR)
+			fyai_ui_theme_pair(ctx, "notice.sigil",
+					   FYMD_STYLE_INDICATOR_FAILURE, &on,
+					   &off);
+		else if (color && level >= FYAIET_WARNING)
+			fyai_ui_theme_pair(ctx, "tile.state.asks",
+					   FYMD_STYLE_INDICATOR_PENDING, &on,
+					   &off);
+		else if (color)
+			fyai_ui_theme_pair(ctx, "text", FYMD_STYLE_STRONG, &on,
+					   &off);
+		rc = response_buffer_append(out, fy_sprintfa("%s%s%s%d%s",
+				work ? " " : "", on ? on : "", glyph, messages,
+				off ? off : ""));
+		n = fymd_str_width(glyph, strlen(glyph));
+		info->messages_col = cols + (work ? 1 : 0);
+		info->messages_cols = (n > 0 ? n : 1) +
+				      (int)strlen(fy_sprintfa("%d", messages));
+		cols = info->messages_col + info->messages_cols;
+	}
 	if (rc) {
 		free(out->data);
 		memset(out, 0, sizeof(*out));
 		return -1;
 	}
-	*colsp = cols;
+	info->cols = cols;
 	return 1;
 }
 

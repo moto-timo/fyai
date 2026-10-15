@@ -3003,7 +3003,7 @@ int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 	struct fyai_ctx *ctx;
 	enum fytim_result res;
 	char *out = NULL;
-	size_t len = 0, count = 0, i, n = 0, tiles = 0;
+	size_t len = 0, count = 0, i, j, n = 0, tiles = 0;
 	int rc, nrows, r;
 
 	if (!pg || !ft || !st)
@@ -3114,19 +3114,23 @@ int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 			n++;
 		}
 	}
-	for (i = 0; i < count && st->header_act && st->header_right_cols > 0 &&
+	for (i = 0; i < count && st->header_acts && st->header_right_cols > 0 &&
 	     n < FYTIM_PAGE_REGIONS_MAX; i++) {
 		if (fr[i].kind == FYMD_REGION_ACT || strcmp(fr[i].id, "header") ||
 		    st->header_right_cols >= fr[i].width)
 			continue;
-		regions[n].id = st->header_act->id;
-		regions[n].kind = FYTIM_PAGE_ACT;
-		regions[n].row = (int)fr[i].row + (int)fr[i].height - 1;
-		regions[n].col = fr[i].col + fr[i].width -
-				 st->header_right_cols + st->header_act->col;
-		regions[n].width = st->header_act->width;
-		regions[n].height = 1;
-		n++;
+		for (j = 0; j < st->header_nacts &&
+		     n < FYTIM_PAGE_REGIONS_MAX; j++) {
+			regions[n].id = st->header_acts[j].id;
+			regions[n].kind = FYTIM_PAGE_ACT;
+			regions[n].row = (int)fr[i].row + (int)fr[i].height - 1;
+			regions[n].col = fr[i].col + fr[i].width -
+					 st->header_right_cols +
+					 st->header_acts[j].col;
+			regions[n].width = st->header_acts[j].width;
+			regions[n].height = 1;
+			n++;
+		}
 	}
 	/* The acts of the heads are the page's. */
 	for (i = 0; i < count; i++) {

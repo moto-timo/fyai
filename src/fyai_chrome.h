@@ -133,19 +133,32 @@ int fyai_chrome_cap_source(const struct fyai_ctx *ctx,
 
 /* The id of the act of the panel that shows or hides the work pane. */
 #define FYAI_CHROME_PANEL_PANE	"panel:pane"
+/* The id of the act of the panel that shows or hides the results popup. */
+#define FYAI_CHROME_PANEL_MESSAGES "panel:messages"
+
+/* Where the acts of the panel stand, in columns from its start. A width of 0
+ * says that the panel has no such act. */
+struct fyai_chrome_panel_info {
+	int cols;		/* the columns of the whole panel */
+	int button_cols;	/* the pane button, which is at the start */
+	int messages_col;	/* the results indicator */
+	int messages_cols;
+};
 
 /*
  * The panel at the right edge of the input header: a button that hides and
  * shows the work pane, then the live shells of the user, the live shells of
  * the model and the running sub-agents, each only when there is one. Its
  * glyphs are glyphs of the theme and its colours are roles of the palette.
- * Returns 1 and the text in @out with its columns in @colsp and the columns of
- * the button, which is at its start, in @buttonp. Returns 0 when no panel is
- * due: the pane is shown and there is no live work. Returns -1 when memory runs
- * out; @out is then empty.
+ * The indicator of the results popup ends it when @messages is not 0: a glyph
+ * and the count of the results that the popup keeps.
+ * Returns 1 and the text in @out with its geometry in @info. Returns 0 when no
+ * panel is due: the pane is shown, there is no live work and no result.
+ * Returns -1 when memory runs out; @out is then empty.
  */
 int fyai_chrome_panel(struct fyai_ctx *ctx, struct response_buffer *out,
-		      int *colsp, int *buttonp);
+		      int messages, enum fyai_error_type level,
+		      struct fyai_chrome_panel_info *info);
 
 /* Map "none" to absent chrome; an empty string stays a rule. */
 const char *fyai_chrome_text(const char *v);

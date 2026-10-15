@@ -86,13 +86,16 @@ struct ui_question {
 };
 struct ui_spool { int saved, reader; off_t off; };
 
+struct ui_log_entry;
+
 struct fyai_ui {
 	struct fyai_ctx *ctx;
 	struct fytim *ft;
 	/* Right-side input-header panel shared by both renderers. */
 	char *panel;
 	int panel_cols;
-	struct fytim_header_act panel_act;
+	struct fytim_header_act panel_acts[2];
+	size_t panel_nacts;
 	struct fymd_renderer *chrome_renderer;
 	struct fyai_event_source *input_src, *timer_src;
 	struct ui_line *head, **tail;
@@ -173,6 +176,12 @@ struct fyai_ui {
 	 * transcript. It is open while @popup is set. */
 	struct fyai_transcript_view *popup;
 	char *popup_title;
+	/* The popup keeps the results of the session while it is hidden. The
+	 * header indicator counts them and shows or hides the popup. */
+	bool popup_shown;
+	struct ui_log_entry *log;
+	int nlog;
+	enum fyai_error_type log_min;	/* lowest level the popup shows */
 	int popup_rows;			/* rows of its region in the last frame */
 	/* A short result stands above the status until the input changes:
 	 * its rows, and the input it was shown over. */
@@ -581,16 +590,143 @@ static int ui_todo_rows(const char *text, int cols)
 	return rows;
 }
 
-/* Close the popup and drop its rows; the next long result opens it again. */
+/* Whether the popup covers the page. */
+static bool ui_popup_open(const struct fyai_ui *ui)
+{
+	return ui->popup && ui->popup_shown;
+}
+
+/* The results kept by the log of the session; the oldest go first. */
+#define UI_LOG_MAX 200
+
+struct ui_log_entry {
+	enum fyai_error_type level;
+	char *heading, *text;
+};
+
+static void ui_log_entry_free(struct ui_log_entry *e)
+{
+	free(e->heading);
+	free(e->text);
+}
+
+/* The name of a level in the title of the popup. */
+static const char *ui_log_level_name(enum fyai_error_type level)
+{
+	switch (level) {
+	case FYAIET_ERROR:
+		return "errors";
+	case FYAIET_WARNING:
+		return "warnings and errors";
+	case FYAIET_NOTICE:
+		return "notices, warnings and errors";
+	default:
+		return "all";
+	}
+}
+
+/* The entries of the log at @min or above. */
+static int ui_log_count(const struct fyai_ui *ui, enum fyai_error_type min)
+{
+	int i, n = 0;
+
+	for (i = 0; i < ui->nlog; i++)
+		n += ui->log[i].level >= min;
+	return n;
+}
+
+/* The highest level of the entries at the filter or above; INFO for none. */
+static enum fyai_error_type ui_log_worst(const struct fyai_ui *ui)
+{
+	enum fyai_error_type worst = FYAIET_INFO;
+	int i;
+
+	for (i = 0; i < ui->nlog; i++)
+		if (ui->log[i].level >= ui->log_min && ui->log[i].level > worst)
+			worst = ui->log[i].level;
+	return worst;
+}
+
+/* Drop the log and the popup that shows it. */
 static void ui_popup_close(struct fyai_ui *ui)
 {
-	if (!ui->popup)
-		return;
-	fyai_transcript_view_destroy(ui->popup);
-	ui->popup = NULL;
+	int i;
+
+	for (i = 0; i < ui->nlog; i++)
+		ui_log_entry_free(&ui->log[i]);
+	free(ui->log);
+	ui->log = NULL;
+	ui->nlog = 0;
+	if (ui->popup) {
+		fyai_transcript_view_destroy(ui->popup);
+		ui->popup = NULL;
+	}
 	free(ui->popup_title);
 	ui->popup_title = NULL;
+	ui->popup_shown = false;
 	ui->frame_pending = true;
+}
+
+/* Hide the popup; the log stays for the indicator to show again. */
+static void ui_popup_hide(struct fyai_ui *ui)
+{
+	if (!ui->popup_shown)
+		return;
+	ui->popup_shown = false;
+	ui->frame_pending = true;
+}
+
+/*
+ * Make the popup again from the entries of the log at the filter or above.
+ * The newest entry shows from its heading.
+ */
+static void ui_log_rebuild(struct fyai_ui *ui)
+{
+	struct fyai_transcript_view *view;
+	struct ui_log_entry *e;
+	size_t before = 0, after = 0;
+	char *title;
+	int i, height;
+
+	view = fyai_transcript_view_create();
+	if (!view)
+		goto err;
+	for (i = 0; i < ui->nlog; i++) {
+		e = &ui->log[i];
+		if (e->level < ui->log_min)
+			continue;
+		before = fyai_transcript_view_rows(view);
+		if (fyai_transcript_view_append_live(view, e->heading,
+						     strlen(e->heading)) ||
+		    fyai_transcript_view_append_live(view, "\n", 1) ||
+		    fyai_transcript_view_append_live(view, e->text,
+						     strlen(e->text)) ||
+		    (*e->text && e->text[strlen(e->text) - 1] != '\n' &&
+		     fyai_transcript_view_append_live(view, "\n", 1)))
+			goto err_view;
+	}
+	after = fyai_transcript_view_rows(view);
+	if (asprintf(&title, "log \xc2\xb7 %s \xc2\xb7 %d",
+		     ui_log_level_name(ui->log_min),
+		     ui_log_count(ui, ui->log_min)) < 0)
+		goto err_view;
+	fyai_transcript_view_destroy(ui->popup);
+	ui->popup = view;
+	free(ui->popup_title);
+	ui->popup_title = title;
+	height = ui->popup_rows > 0 ? ui->popup_rows :
+		 ui->render_rows > 1 ? ui->render_rows - 1 : 23;
+	fyai_transcript_view_scroll(view, INT_MIN / 2, height);
+	if (after - before > (size_t)height)
+		fyai_transcript_view_scroll(view,
+					    (int)(after - before) - height, height);
+	ui->frame_pending = true;
+	return;
+
+err_view:
+	fyai_transcript_view_destroy(view);
+err:
+	fyai_warning(ui->ctx, "cannot show the log of the session");
 }
 
 /* The rows of @text of @len bytes, a last row without a newline included. */
@@ -635,47 +771,47 @@ static void ui_note_set(struct fyai_ui *ui, const char *heading,
 }
 
 /*
- * Show a result of a fullscreen session: above the status when it is short
- * and no popup is open, else in the popup under its @heading, from its top.
+ * Keep a result of a fullscreen session in the log. A short result at the
+ * filter or above also stands above the status while the popup is hidden; a
+ * long one opens the popup, which shows the log from the new entry.
  */
-static void ui_popup_append(struct fyai_ui *ui, const char *title,
+static void ui_popup_append(struct fyai_ui *ui, enum fyai_error_type level,
 			    const char *heading, const char *text, size_t len)
 {
-	int rows = ui_text_rows(text, len), height;
-	size_t before, after;
+	struct ui_log_entry *grown, e;
+	int rows = ui_text_rows(text, len);
+	bool shown = level >= ui->log_min;
 
-	if (!ui->popup && rows <= UI_NOTE_ROWS) {
+	e.level = level;
+	e.heading = strdup(heading);
+	e.text = strndup(text, len);
+	if (!e.heading || !e.text) {
+		ui_log_entry_free(&e);
+		fyai_warning(ui->ctx, "cannot keep the result in the log");
+		return;
+	}
+	if (ui->nlog == UI_LOG_MAX) {
+		ui_log_entry_free(&ui->log[0]);
+		memmove(ui->log, ui->log + 1,
+			(size_t)(ui->nlog - 1) * sizeof(*ui->log));
+		ui->nlog--;
+	}
+	grown = realloc(ui->log, (size_t)(ui->nlog + 1) * sizeof(*ui->log));
+	if (!grown) {
+		ui_log_entry_free(&e);
+		fyai_warning(ui->ctx, "cannot keep the result in the log");
+		return;
+	}
+	ui->log = grown;
+	ui->log[ui->nlog++] = e;
+	if (!ui_popup_open(ui) && rows <= UI_NOTE_ROWS)
 		ui_note_set(ui, heading, text, len, rows);
-		return;
-	}
-	ui_note_clear(ui);
-	if (!ui->popup)
-		ui->popup = fyai_transcript_view_create();
-	free(ui->popup_title);
-	ui->popup_title = strdup(title);
-	if (!ui->popup || !ui->popup_title) {
-		fyai_warning(ui->ctx, "cannot open the popup for the result");
-		ui_popup_close(ui);
-		return;
-	}
-	before = fyai_transcript_view_rows(ui->popup);
-	if (fyai_transcript_view_append_live(ui->popup, heading,
-					     strlen(heading)) ||
-	    fyai_transcript_view_append_live(ui->popup, "\n", 1) ||
-	    fyai_transcript_view_append_live(ui->popup, text, len) ||
-	    (len && text[len - 1] != '\n' &&
-	     fyai_transcript_view_append_live(ui->popup, "\n", 1)))
-		fyai_warning(ui->ctx, "cannot keep the output of the session");
-	after = fyai_transcript_view_rows(ui->popup);
-	/* The newest result shows from its heading. */
-	height = ui->popup_rows > 0 ? ui->popup_rows :
-		 ui->render_rows > 1 ? ui->render_rows - 1 : 23;
-	fyai_transcript_view_scroll(ui->popup, INT_MIN / 2, height);
-	if (after - before > (size_t)height)
-		fyai_transcript_view_scroll(ui->popup,
-					    (int)(after - before) - height,
-					    height);
-	ui->frame_pending = true;
+	else
+		ui_note_clear(ui);
+	if (shown && rows > UI_NOTE_ROWS)
+		ui->popup_shown = true;
+	ui_log_rebuild(ui);
+	fyai_ui_panel_update(ui->ctx);
 }
 
 /*
@@ -1554,7 +1690,45 @@ static void ui_ask_dismiss(struct fyai_ctx *ctx, const char *arg)
 static void ui_popup_close_act(struct fyai_ctx *ctx, const char *arg)
 {
 	(void)arg;
+	ui_popup_hide(ctx->ui);
+}
+
+static void ui_popup_clear_act(struct fyai_ctx *ctx, const char *arg)
+{
+	(void)arg;
 	ui_popup_close(ctx->ui);
+	fyai_ui_panel_update(ctx);
+}
+
+/* Show the popup of the results, or hide it when it shows. */
+static void ui_popup_toggle(struct fyai_ui *ui)
+{
+	if (ui->popup_shown) {
+		ui_popup_hide(ui);
+		return;
+	}
+	if (!ui->popup || !ui->fullscreen)
+		return;
+	ui_note_clear(ui);
+	ui->popup_shown = true;
+	ui->frame_pending = true;
+}
+
+/* Raise the lowest level the popup shows, from all back round to all. */
+static void ui_popup_level_act(struct fyai_ctx *ctx, const char *arg)
+{
+	struct fyai_ui *ui = ctx->ui;
+
+	(void)arg;
+	if (!ui_popup_open(ui))
+		return;
+	/* The zero of a fresh UI is the lowest level, which is INFO here. */
+	if (ui->log_min < FYAIET_INFO)
+		ui->log_min = FYAIET_INFO;
+	ui->log_min = ui->log_min >= FYAIET_ERROR ? FYAIET_INFO :
+		      ui->log_min + 1;
+	ui_log_rebuild(ui);
+	fyai_ui_panel_update(ctx);
 }
 
 /* Scroll the popup one row: "up" goes back through it. */
@@ -1562,7 +1736,7 @@ static void ui_popup_scroll_act(struct fyai_ctx *ctx, const char *arg)
 {
 	struct fyai_ui *ui = ctx->ui;
 
-	if (!ui->popup)
+	if (!ui_popup_open(ui))
 		return;
 	fyai_transcript_view_scroll(ui->popup, !strcmp(arg, "up") ? 1 : -1,
 				    ui->popup_rows);
@@ -1596,6 +1770,8 @@ static const struct fyai_page_action ui_page_action_table[] = {
 	{ "ask.dismiss", ui_ask_dismiss },
 	{ "panel.scroll", ui_panel_scroll_act },
 	{ "popup.close", ui_popup_close_act },
+	{ "popup.clear", ui_popup_clear_act },
+	{ "popup.level", ui_popup_level_act },
 	{ "popup.scroll", ui_popup_scroll_act },
 };
 static const struct fyai_page_action *const ui_page_actions =
@@ -1648,6 +1824,8 @@ static void ui_page_action(struct fyai_ui *ui, const char *id)
 /* A key that the page bound: call the action that the active mode gives it. */
 /* The action of a key of the surface mode that gives the keys back. */
 #define UI_ACT_FOCUS_PROMPT "fyai.focus.prompt"
+/* The action of a key that shows or hides the popup of the log. */
+#define UI_ACT_MESSAGES "fyai.messages.toggle"
 
 static void ui_page_key(struct fyai_ui *ui, const struct fytim_event *ev)
 {
@@ -1656,6 +1834,13 @@ static void ui_page_key(struct fyai_ui *ui, const struct fytim_event *ev)
 	if (ev->text && ev->text_len == strlen(UI_ACT_FOCUS_PROMPT) &&
 	    !strncmp(ev->text, UI_ACT_FOCUS_PROMPT, ev->text_len)) {
 		fyai_tools_keys_to_prompt(ui->ctx);
+		fyai_ui_wake(ui->ctx);
+		return;
+	}
+
+	if (ev->text && ev->text_len == strlen(UI_ACT_MESSAGES) &&
+	    !strncmp(ev->text, UI_ACT_MESSAGES, ev->text_len)) {
+		ui_popup_toggle(ui);
 		fyai_ui_wake(ui->ctx);
 		return;
 	}
@@ -1969,7 +2154,8 @@ static void ui_page_update(struct fyai_ui *ui)
 	}
 	st.header_right = ui->panel;
 	st.header_right_cols = ui->panel_cols;
-	st.header_act = ui->panel ? &ui->panel_act : NULL;
+	st.header_acts = ui->panel ? ui->panel_acts : NULL;
+	st.header_nacts = ui->panel_nacts;
 	if (ui->busy) {
 		fyai_event_elapsed_format(elapsed, sizeof(elapsed),
 					  ui->busy_since_ms);
@@ -2134,12 +2320,12 @@ static void ui_page_update(struct fyai_ui *ui)
 	st.todo_shown = ui->todo_shown &&
 			!fyai_agent_delegated(ctx) &&
 			!(st.fullscreen && st.popup_title);
-	st.popup_title = ui->popup ? ui->popup_title : NULL;
+	st.popup_title = ui_popup_open(ui) ? ui->popup_title : NULL;
 	st.fullscreen = ui->fullscreen;
 	fyai_page_fit(&st, rows);
 	rc = fyai_page_fit_document(ui->page, &st, cols, rows);
 	fyai_error_check(ctx, !rc, err_page, "cannot fit the page document");
-	if (ui->popup) {
+	if (ui_popup_open(ui)) {
 		ui->popup_rows = st.popup_rows;
 		st.popup_lines = fyai_transcript_view_window(ui->popup,
 			st.popup_rows, &st.popup_nlines);
@@ -2199,7 +2385,7 @@ err_page:
 		ui_page_keys_bind(ui, &keys);
 		/* What the page gave a tile is the grant of the tile. A popup
 		 * hides the tiles, and gives them nothing to size to. */
-		for (i = 0; !ui->popup && i < st.ntiles; i++) {
+		for (i = 0; !ui_popup_open(ui) && i < st.ntiles; i++) {
 			if (tiles[i].surface)
 				fyai_workpane_tile_set_page_grant(ctx->workpane,
 					tiles[i].surface, tiles[i].granted_rows,
@@ -2353,7 +2539,7 @@ static void ui_select(struct fyai_ui *ui, const struct fytim_event *ev)
 		text = fyai_transcript_view_copy(ui->view, ui->view_rows,
 						 ev->row, ev->col,
 						 ev->end_row, ev->end_col);
-	} else if (ui->popup && ev->text_len == 5 &&
+	} else if (ui_popup_open(ui) && ev->text_len == 5 &&
 		   !memcmp(ev->text, "popup", 5)) {
 		text = fyai_transcript_view_copy(ui->popup, ui->popup_rows,
 						 ev->row, ev->col,
@@ -2515,7 +2701,7 @@ static enum fyai_event_action ui_service(struct fyai_ui *ui)
 			/* An open popup covers the page: every scroll is its.
 			 * Else a key, or the wheel over the transcript, scrolls
 			 * the view of a fullscreen page. */
-			if (ui->popup) {
+			if (ui_popup_open(ui)) {
 				fyai_transcript_view_scroll(ui->popup, ev.delta,
 							    ui->popup_rows);
 				ui->frame_pending = true;
@@ -2914,6 +3100,8 @@ void fyai_ui_pane_begin(struct fyai_ctx *ctx)
 	fyai_ui_drain_output(ctx);
 	ui_band_close(ui, &ui->message_band);
 	ui->pane_out.len = 0;
+	fyai_diag_set_bare(true);
+	(void)fyai_diag_take_drained_max();
 	ui->capture_out = ui->out.off;
 	ui->capture_err = ui->err.off;
 	ui->capture = true;
@@ -3011,7 +3199,17 @@ static void ui_pane_end(struct fyai_ctx *ctx, const char *title, bool error,
 	struct response_buffer out = {0};
 	struct fyai_ui *ui = ctx ? ctx->ui : NULL;
 	char *heading;
+	enum fyai_error_type level = FYAIET_INFO;
 
+	if (ui) {
+		/* The popup shows a diagnostic as its cause, with no module. */
+		fyai_diag_set_bare(false);
+		level = fyai_diag_take_drained_max();
+		if (level < FYAIET_INFO)
+			level = FYAIET_INFO;
+		if (error && level < FYAIET_ERROR)
+			level = FYAIET_ERROR;
+	}
 	if (!ui || !ui->capture)
 		return;
 	/* What the sink presented, then what a stray writer spooled. */
@@ -3068,8 +3266,7 @@ static void ui_pane_end(struct fyai_ctx *ctx, const char *title, bool error,
 	}
 	/* A fullscreen page shows it above the status, or in its popup. */
 	if (ui->fullscreen) {
-		ui_popup_append(ui, title ? title : (error ? "error" : "status"),
-				heading, out.data, out.len);
+		ui_popup_append(ui, level, heading, out.data, out.len);
 		free(heading);
 		free(out.data);
 		return;
@@ -3409,7 +3606,8 @@ static bool ui_key_action_known(const char *action)
 
 	if (!*action)
 		return true;
-	if (!strcmp(action, UI_ACT_FOCUS_PROMPT))
+	if (!strcmp(action, UI_ACT_FOCUS_PROMPT) ||
+	    !strcmp(action, UI_ACT_MESSAGES))
 		return true;
 	for (i = 0; (name = fytim_action_name(i)); i++)
 		if (!strcmp(name, action))
@@ -3877,24 +4075,38 @@ void fyai_ui_panel_update(struct fyai_ctx *ctx)
 {
 	struct fyai_ui *ui = ctx ? ctx->ui : NULL;
 	struct response_buffer out = {0};
-	int cols = 0, button = 0, rc;
+	struct fyai_chrome_panel_info info;
+	int rc, messages;
 
 	if (!ui || !ui->ft)
 		return;
 	free(ui->panel);
 	ui->panel = NULL;
 	ui->panel_cols = 0;
-	rc = fyai_chrome_panel(ctx, &out, &cols, &button);
+	ui->panel_nacts = 0;
+	messages = ui_log_count(ui, ui->log_min);
+	rc = fyai_chrome_panel(ctx, &out, messages, ui_log_worst(ui), &info);
 	if (rc < 0) {
 		fyai_warning(ctx, "cannot write the panel of the input header");
 		return;
 	}
 	if (rc > 0) {
 		ui->panel = out.data;
-		ui->panel_cols = cols;
-		ui->panel_act.id = FYAI_CHROME_PANEL_PANE;
-		ui->panel_act.col = 0;
-		ui->panel_act.width = button;
+		ui->panel_cols = info.cols;
+		if (info.button_cols > 0) {
+			ui->panel_acts[ui->panel_nacts].id =
+				FYAI_CHROME_PANEL_PANE;
+			ui->panel_acts[ui->panel_nacts].col = 0;
+			ui->panel_acts[ui->panel_nacts++].width =
+				info.button_cols;
+		}
+		if (info.messages_cols > 0) {
+			ui->panel_acts[ui->panel_nacts].id =
+				FYAI_CHROME_PANEL_MESSAGES;
+			ui->panel_acts[ui->panel_nacts].col = info.messages_col;
+			ui->panel_acts[ui->panel_nacts++].width =
+				info.messages_cols;
+		}
 	}
 	ui->frame_pending = true;
 }
@@ -4819,6 +5031,10 @@ static void ui_act(struct fyai_ui *ui, const struct fytim_event *ev)
 	id[len] = '\0';
 	if (!strcmp(id, FYAI_CHROME_PANEL_PANE)) {
 		fyai_workpane_set_hidden(wm, !fyai_workpane_hidden(wm));
+		return;
+	}
+	if (!strcmp(id, FYAI_CHROME_PANEL_MESSAGES)) {
+		ui_popup_toggle(ui);
 		return;
 	}
 	/* Any other act of the page names an action of the document. */

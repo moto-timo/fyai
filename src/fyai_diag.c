@@ -28,6 +28,23 @@
  * the subsystem prefix already reads as a failure, so labelling every one of
  * them would only add noise to the messages this replaces.
  */
+/* The drain settings of the process; the main thread drains. */
+static bool diag_bare;
+static enum fyai_error_type diag_drained_max;
+
+void fyai_diag_set_bare(bool bare)
+{
+	diag_bare = bare;
+}
+
+enum fyai_error_type fyai_diag_take_drained_max(void)
+{
+	enum fyai_error_type max = diag_drained_max;
+
+	diag_drained_max = FYAIET_DEBUG;
+	return max;
+}
+
 static const char *const diag_type_names[FYAIET_COUNT] = {
 	[FYAIET_DEBUG]		= "debug",
 	[FYAIET_INFO]		= "info",
@@ -297,7 +314,8 @@ void fyai_diag_cleanup(struct fyai_diag *diag)
 
 /* Format one diagnostic onto @fp, in the shape the subsystems used to print by
  * hand: "<module>: [<severity>: ]<message>". */
-static void diag_emit(FILE *fp, bool source, enum fyai_error_type type,
+static void diag_emit(FILE *fp, bool source, bool module_prefix,
+		      enum fyai_error_type type,
 		      enum fyai_error_module module, const char *msg,
 		      const char *file, int line, const char *func)
 {
@@ -308,7 +326,7 @@ static void diag_emit(FILE *fp, bool source, enum fyai_error_type type,
 	typename = (unsigned int)type < FYAIET_COUNT ?
 			diag_type_names[type] : NULL;
 
-	if (modname)
+	if (modname && module_prefix)
 		fprintf(fp, "%s: ", modname);
 	if (typename)
 		fprintf(fp, "%s: ", typename);
@@ -389,8 +407,9 @@ void fyai_diagf(struct fyai_diag *diag, enum fyai_error_type type,
 	 * never lost merely because it was raised too early.
 	 */
 	if (!diag || !diag->gb || !diag->collect) {
-		diag_emit(diag ? diag->fp : stderr, diag ? diag->source : false,
-			  type, module, msg, file, line, func);
+		diag_emit(diag ? diag->fp : stderr,
+			  diag ? diag->source : false, !diag_bare, type, module, msg, file,
+			  line, func);
 		return;
 	}
 
@@ -426,7 +445,8 @@ void fyai_diagf(struct fyai_diag *diag, enum fyai_error_type type,
 }
 
 /* Render one collected item onto @fp. The item may live in any builder. */
-static void diag_emit_item(FILE *fp, bool source, fy_generic item)
+static void diag_emit_item(FILE *fp, bool source, bool module_prefix,
+			   fy_generic item)
 {
 	fy_generic msg, file, func;
 
@@ -437,7 +457,8 @@ static void diag_emit_item(FILE *fp, bool source, fy_generic item)
 	 * short string lives inline in the generic word. */
 	file = fy_get(item, "file", fy_invalid);
 	func = fy_get(item, "func", fy_invalid);
-	diag_emit(fp, source, (enum fyai_error_type)fy_get(item, "type", 0LL),
+	diag_emit(fp, source, module_prefix,
+		  (enum fyai_error_type)fy_get(item, "type", 0LL),
 		  (enum fyai_error_module)fy_get(item, "module", 0LL),
 		  fy_castp(&msg, ""), fy_castp(&file, ""),
 		  (int)fy_get(item, "line", 0LL), fy_castp(&func, ""));
@@ -454,8 +475,12 @@ void fyai_diag_drain(struct fyai_diag *diag)
 	 * rather than being reported twice or not at all. */
 	list.v = fy_atomic_exchange(&diag->list, fy_seq_empty_value);
 
-	fy_foreach(item, list)
-		diag_emit_item(diag->fp, diag->source, item);
+	fy_foreach(item, list) {
+		if (fy_get(item, "type", 0LL) > (long long)diag_drained_max)
+			diag_drained_max = (enum fyai_error_type)
+				fy_get(item, "type", 0LL);
+		diag_emit_item(diag->fp, diag->source, !diag_bare, item);
+	}
 	fflush(diag->fp);
 
 	/*
@@ -482,7 +507,7 @@ char *fyai_diag_string(struct fyai_diag *diag)
 	/* Read the diagnostics but do not remove them. */
 	list.v = fy_atomic_load(&diag->list);
 	fy_foreach(item, list)
-		diag_emit_item(fp, false, item);
+		diag_emit_item(fp, false, true, item);
 	if (fclose(fp)) {
 		free(text);
 		return NULL;

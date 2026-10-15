@@ -86,7 +86,9 @@ struct fyai_page_state {
 	 * columns, and its button, from the first column of the panel. */
 	const char *header_right;
 	int header_right_cols;
-	const struct fytim_header_act *header_act;
+	/* The acts of the panel: the pane button and the results indicator. */
+	const struct fytim_header_act *header_acts;
+	size_t header_nacts;
 	const char *elapsed;
 	const char *activity;
 	const char *hint;

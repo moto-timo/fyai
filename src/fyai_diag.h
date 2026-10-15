@@ -77,6 +77,15 @@ struct fyai_diag {
 	bool collect;			/* false: drain each diagnostic at once */
 };
 
+/*
+ * A bare drain leaves out the module prefix: the popup of the log shows the
+ * cause. The setting is process-wide because a configuration change replaces
+ * the sink in the middle of a command.
+ */
+void fyai_diag_set_bare(bool bare);
+/* The highest severity drained since the last call, and clear it. */
+enum fyai_error_type fyai_diag_take_drained_max(void);
+
 int fyai_diag_setup(struct fyai_diag *diag);
 void fyai_diag_cleanup(struct fyai_diag *diag);
 

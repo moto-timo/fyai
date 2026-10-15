@@ -68,6 +68,8 @@ pages:
                     Escape: popup.close
                     Enter: popup.close
                     q: popup.close
+                    l: popup.level
+                    x: popup.clear
                     Up: "popup.scroll:up"
                     Down: "popup.scroll:down"
                   body:
@@ -424,7 +426,7 @@ pages:
             name: chrome
             items:
               - text: "── {popup.title} "
-        - act: { action: popup.close, text: "[Esc closes]" }
+        - act: { action: popup.close, text: "[Esc closes \u00b7 l level \u00b7 x clears]" }
         - role:
             name: chrome
             items:
