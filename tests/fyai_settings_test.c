@@ -418,6 +418,16 @@ int settings_catalog(void)
 	FYAI_TCHECK(text && strstr(text, "`models/m`") &&
 		    strstr(text, "9 tokens") && strstr(text, "**in use**"));
 	free(text);
+	text = def->format_result(&test_ctx, test_ctx.transient_gb,
+		doc("{document: catalog, action: change}"),
+		"{\"document\": \"catalog\", \"status\": \"applied\", "
+		"\"id\": \"c1\", \"source\": \"https://example.test\", "
+		"\"diff\": \"--- a/catalog.yaml\\n+++ b/catalog.yaml\\n"
+		"@@ -1 +1 @@\\n-models/m: null\\n+models/m:\\n"
+		"+  capabilities:\\n+  - tool_calling\\n\"}");
+	FYAI_TCHECK(text && strstr(text, "```diff\n--- a/catalog.yaml\n") &&
+		    strstr(text, "+  - tool_calling\n```"));
+	free(text);
 
 	settings_teardown();
 	return 0;

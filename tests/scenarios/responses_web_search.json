@@ -9,6 +9,14 @@
             "type": "web_search_call", "id": "ws-1", "status": "completed",
             "action": { "type": "search", "query": "libfyaml release notes" }
         } },
+        { "type": "response.output_item.done", "output_index": 1, "item": {
+            "type": "web_search_call", "id": "ws-2", "status": "completed",
+            "action": { "type": "open_page", "url": "https://example.test/notes" }
+        } },
+        { "type": "response.output_item.done", "output_index": 2, "item": {
+            "type": "web_search_call", "id": "ws-3", "status": "completed",
+            "action": { "type": "find_in_page", "pattern": "release" }
+        } },
         { "type": "response.output_text.delta", "delta": "Found the notes." },
         { "type": "response.completed", "response": {
             "id": "resp-ws-1", "object": "response", "model": "mock-model",

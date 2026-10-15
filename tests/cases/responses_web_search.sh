@@ -14,10 +14,21 @@ assert_status 0
 assert_stdout_contains "Found the notes."
 assert_stderr_contains "web_search libfyaml release notes"
 assert_stderr_contains "libfyaml release notes"
+assert_stderr_contains "open page"
+assert_stderr_contains "https://example.test/notes"
+assert_stderr_contains "find in page"
+assert_stderr_contains "release"
 
 # the stored display document keeps the title row for replay
 assert_state_contains "libfyaml release notes" dump anchors
+assert_state_contains "https://example.test/notes" dump anchors
+assert_state_contains "find in page" dump anchors
 assert_state_contains "tool_head" dump anchors
+
+run_fyai history --raw
+assert_status 0
+assert_stdout_contains '**web search** open page `https://example.test/notes`'
+assert_stdout_contains '**web search** find in page `release`'
 
 mock_stop 1
 pass
