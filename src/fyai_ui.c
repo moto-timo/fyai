@@ -131,6 +131,7 @@ struct fyai_ui {
 	 * While it is set, it is the render width in place of @render_cols. */
 	int side_cols;
 	struct response_buffer pane_grid;	/* the pane source of the page */
+	char page_focus[FYTIM_PAGE_ID_MAX + 1];
 	struct fyai_page_keys page_keys;	/* the keys the page has bound */
 	struct ui_question *questions;	/* first the one the input area shows */
 	char *editor_path;
@@ -186,10 +187,8 @@ struct fyai_ui {
 	bool todo_shown;
 	/* The entry the todo panel was built from, to see it change. */
 	fy_generic_value todo_entry;
-	/* The rendered preview of the option under the cursor of a question,
-	 * or the proposal of a reviewed change, and the diff of that change. */
+	/* The rendered preview of the option under the cursor of a question. */
 	struct ui_rendered preview;
-	struct ui_rendered diff;
 	int note_nlines;
 	char *note_input;
 	fyai_event_ms_t next_frame_ms;
@@ -1331,6 +1330,8 @@ int fyai_ui_ask(struct fyai_ctx *ctx, fy_generic questions, const char *from,
 	for (qp = &ui->questions; *qp; qp = &(*qp)->next)
 		;
 	*qp = q;
+	if (ui->questions == q)
+		ui->page_focus[0] = '\0';
 	ui->frame_pending = true;
 	fyai_ui_wake(ctx);
 	return 0;
@@ -1349,6 +1350,7 @@ static void ui_question_finish(struct fyai_ui *ui, bool answered)
 	if (!q)
 		return;
 	ui->questions = q->next;
+	ui->page_focus[0] = '\0';
 	ui->frame_pending = true;
 	(void)fytim_set_input(ui->ft, NULL);
 	q->done(q->user, answered ? q->replies : NULL, q->nq);
@@ -1390,6 +1392,7 @@ static void ui_question_enter(struct fyai_ui *ui, struct ui_question *q,
 			      size_t cur)
 {
 	q->cur = cur;
+	ui->page_focus[0] = '\0';
 	(void)fytim_set_input(ui->ft, cur < q->nq ? q->replies[cur].other : NULL);
 	ui->frame_pending = true;
 }
@@ -1417,16 +1420,19 @@ static void ui_ask_prev(struct fyai_ctx *ctx, const char *arg)
 	}
 }
 
+static void ui_page_focus(struct fyai_ctx *ctx, const char *arg);
+
 static void ui_ask_next(struct fyai_ctx *ctx, const char *arg)
 {
 	struct ui_question *q = ctx->ui->questions;
 
-	(void)arg;
 	if (!q || q->cur >= q->nq)
 		return;
 	if (q->cursor[q->cur] + 1 < ui_question_current(q)->nopts) {
 		q->cursor[q->cur]++;
 		ctx->ui->frame_pending = true;
+	} else if (!fy_str_empty(arg)) {
+		ui_page_focus(ctx, arg);
 	}
 }
 
@@ -1562,8 +1568,23 @@ static void ui_popup_scroll_act(struct fyai_ctx *ctx, const char *arg)
 	ui->frame_pending = true;
 }
 
+static void ui_panel_scroll_act(struct fyai_ctx *ctx, const char *arg)
+{
+	if (fyai_page_panel_scroll(ctx->ui->page, arg))
+		ctx->ui->frame_pending = true;
+}
+
+static void ui_page_focus(struct fyai_ctx *ctx, const char *arg)
+{
+	snprintf(ctx->ui->page_focus, sizeof(ctx->ui->page_focus), "%s", arg);
+	fyai_tools_focus_prompt(ctx);
+	ctx->ui->frame_pending = true;
+	ui_page_update(ctx->ui);
+}
+
 /* The actions of the page, by name. */
 static const struct fyai_page_action ui_page_action_table[] = {
+	{ "page.focus", ui_page_focus },
 	{ "ask.prev", ui_ask_prev },
 	{ "ask.next", ui_ask_next },
 	{ "ask.choose", ui_ask_choose },
@@ -1572,6 +1593,7 @@ static const struct fyai_page_action ui_page_action_table[] = {
 	{ "ask.forward", ui_ask_forward },
 	{ "ask.accept", ui_ask_accept },
 	{ "ask.dismiss", ui_ask_dismiss },
+	{ "panel.scroll", ui_panel_scroll_act },
 	{ "popup.close", ui_popup_close_act },
 	{ "popup.scroll", ui_popup_scroll_act },
 };
@@ -1703,13 +1725,13 @@ static bool ui_typed_changed(struct fyai_ui *ui, const char *typed)
 	if (h == ui->typed_hash)
 		return false;
 	ui->typed_hash = h;
+	if (typed && *typed)
+		snprintf(ui->page_focus, sizeof(ui->page_focus), "prompt");
 	return true;
 }
 
 /* The rows of the preview of an option, at most. */
 #define UI_PREVIEW_ROWS_MAX 14
-/* The rows of the diff of a reviewed change, at most. */
-#define UI_DIFF_ROWS_MAX 24
 /* The blanks before each row of a preview. */
 #define UI_PREVIEW_INDENT 4
 
@@ -1810,45 +1832,26 @@ static int ui_rendered_update(struct fyai_ui *ui, struct ui_rendered *r,
 static void ui_preview_clear(struct fyai_ui *ui)
 {
 	ui_rendered_clear(&ui->preview);
-	ui_rendered_clear(&ui->diff);
 }
 
-/*
- * Render the rows of question @q: the diff that fyai made for a reviewed
- * change, then the proposal of the model, or the preview of the option under
- * the cursor. The diff takes its rows first, so a short screen drops the
- * proposal before it drops the diff. *@ndiffp is the rows of the diff;
- * returns the rows of the preview.
- */
+/* Render the preview of the option under the cursor; page panels render reviews. */
 static int ui_preview_update(struct fyai_ui *ui, const struct ui_question *q,
-			     int cols, int rows, int *ndiffp)
+			     int cols, int rows)
 {
 	const struct ui_qtext *t;
 	const char *text;
 	size_t opt;
-	int cap, ndiff;
+	int cap;
 
-	*ndiffp = 0;
 	if (!q || q->cur >= q->nq) {
 		ui_preview_clear(ui);
 		return 0;
 	}
 	t = &q->text[q->cur];
 	opt = q->cursor[q->cur];
-	/* A third of the screen at most, so the options stay in view. A
-	 * reviewed change takes two thirds: the diff half of the screen
-	 * first, and the proposal what is left. */
-	cap = rows / 2 < UI_DIFF_ROWS_MAX ? rows / 2 : UI_DIFF_ROWS_MAX;
-	ndiff = ui_rendered_update(ui, &ui->diff, t->diff, cols, cap);
-	*ndiffp = ndiff;
 	cap = rows / 3 < UI_PREVIEW_ROWS_MAX ? rows / 3 : UI_PREVIEW_ROWS_MAX;
-	if (ndiff) {
-		cap = rows * 2 / 3 - ndiff - 2;
-		if (cap > UI_PREVIEW_ROWS_MAX)
-			cap = UI_PREVIEW_ROWS_MAX;
-	}
-	text = !fy_str_empty(t->proposal) ? t->proposal :
-	       opt < t->nopts && !t->multi ? t->opt[opt].preview : NULL;
+	text = fy_str_empty(t->proposal) && opt < t->nopts && !t->multi ?
+	       t->opt[opt].preview : NULL;
 	return ui_rendered_update(ui, &ui->preview, text, cols, cap);
 }
 
@@ -1944,6 +1947,8 @@ static void ui_page_update(struct fyai_ui *ui)
 	rc = fytim_size(ui->ft, &cols, &rows);
 	fyai_error_check(ctx, rc == FYTIM_OK, err_page,
 			 "cannot read the terminal size for the page");
+	st.screen_cols = cols;
+	st.screen_rows = rows;
 	/* The layout of the document is chosen before the fit: it says
 	 * whether the pane takes rows of the page or a column beside it. */
 	rc = fyai_page_layout(ui->page, cols, rows, ui->fullscreen, &layout);
@@ -1987,6 +1992,7 @@ static void ui_page_update(struct fyai_ui *ui)
 	/* A question takes the input area; its options take the number keys
 	 * while nothing is typed. */
 	q = ui->questions;
+	st.input_focus = ui->page_focus;
 	st.input_mode = "prompt";
 	if (q) {
 		typed = fytim_input(ui->ft);
@@ -1994,9 +2000,10 @@ static void ui_page_update(struct fyai_ui *ui)
 		ui_question_state(q, &ask, ask_options, ask_lines, ask_answers);
 		ask.bar = markdown_glyph(ctx->cfg, "select.bar",
 			markdown_glyph(ctx->cfg, "pane.edge", "\xe2\x96\x8c"));
-		ask.npreview = ui_preview_update(ui, q, cols, rows, &ask.ndiff);
+		ask.npreview = ui_preview_update(ui, q, cols, rows);
 		ask.preview = (const char *const *)ui->preview.rows;
-		ask.diff = (const char *const *)ui->diff.rows;
+		ask.diff_text = q->cur < q->nq ? q->text[q->cur].diff : NULL;
+		ask.proposal_text = q->cur < q->nq ? q->text[q->cur].proposal : NULL;
 		ask.proposal = q->cur < q->nq &&
 			       !fy_str_empty(q->text[q->cur].proposal);
 		if (ask.npreview && !ask.proposal) {
@@ -2036,6 +2043,17 @@ static void ui_page_update(struct fyai_ui *ui)
 	}
 	st.pane_below = fyai_workpane_position(ctx->workpane) ==
 			FYAI_WORKPANE_POS_BELOW;
+	{
+		char edge[256];
+		uint32_t bg;
+		bool focused = fy_str_empty(ui->page_focus) ? !ui->questions :
+			!strcmp(ui->page_focus, "prompt");
+
+		(void)fyai_ui_focus_ground(ctx, focused, &bg);
+		(void)fytim_set_prompt_bg(ui->ft, bg);
+		(void)fytim_set_prompt_edge(ui->ft, focused ?
+			ui_edge(ui, edge, sizeof(edge)) : " ");
+	}
 	st.prompt_rows = fytim_prompt_rows(ui->ft);
 	st.prompt_card = fytim_prompt_card(ui->ft);
 	st.review = ui->page_review;
@@ -2118,6 +2136,8 @@ static void ui_page_update(struct fyai_ui *ui)
 	st.popup_title = ui->popup ? ui->popup_title : NULL;
 	st.fullscreen = ui->fullscreen;
 	fyai_page_fit(&st, rows);
+	rc = fyai_page_fit_document(ui->page, &st, cols, rows);
+	fyai_error_check(ctx, !rc, err_page, "cannot fit the page document");
 	if (ui->popup) {
 		ui->popup_rows = st.popup_rows;
 		st.popup_lines = fyai_transcript_view_window(ui->popup,
@@ -2267,6 +2287,15 @@ static void ui_click_off_tiles(struct fyai_ui *ui, const struct fytim_event *ev)
 	}
 	if (sf && fyai_tools_focus_tile(ui->ctx, sf))
 		return;
+	if (ev->text && ev->text_len == 6 && !memcmp(ev->text, "prompt", 6))
+		ui_page_focus(ui->ctx, "prompt");
+	else if (ev->text && ev->text_len > 6 && !memcmp(ev->text, "panel:", 6)) {
+		const char *focus = fyai_page_panel_focus(ui->page,
+			fy_sprintfa("%.*s", (int)ev->text_len - 6, ev->text + 6));
+
+		if (focus)
+			ui_page_focus(ui->ctx, focus);
+	}
 	fyai_tools_focus_prompt(ui->ctx);
 }
 
@@ -2489,6 +2518,15 @@ static enum fyai_event_action ui_service(struct fyai_ui *ui)
 				fyai_transcript_view_scroll(ui->popup, ev.delta,
 							    ui->popup_rows);
 				ui->frame_pending = true;
+			} else if (ev.text && ev.text_len > 6 &&
+				   !memcmp(ev.text, "panel:", 6)) {
+				int step, n = ev.delta < 0 ? -ev.delta : ev.delta;
+				const char *arg = fy_sprintfa("%.*s/%s",
+					(int)ev.text_len - 6, ev.text + 6,
+					ev.delta > 0 ? "up" : "down");
+
+				for (step = 0; step < n; step++)
+					ui_panel_scroll_act(ui->ctx, arg);
 			} else if (ui_tile_scrolls(ui) &&
 				   ui_band_wheel(ui, ev.text, ev.text_len,
 						 ev.delta)) {

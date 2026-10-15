@@ -43,6 +43,33 @@ $defs:
   text:
     type: string
 
+  extent:
+    anyOf:
+      - $ref: "#/$defs/number"
+      - type: object
+        required: [fraction]
+        additionalProperties: false
+        properties:
+          fraction: { type: number, exclusiveMinimum: 0, maximum: 1 }
+          min: { type: integer, minimum: 1 }
+          max: { type: integer, minimum: 1 }
+      # A panel that takes the rows of its content.
+      - type: object
+        required: [content]
+        additionalProperties: false
+        properties:
+          content: { const: true }
+          min: { type: integer, minimum: 1 }
+          max: { type: integer, minimum: 1 }
+      # A panel that takes the rows of the left cell of its columns, less
+      # `beside` rows that stand above it in its own cell.
+      - type: object
+        required: [beside]
+        additionalProperties: false
+        properties:
+          beside: { type: integer, minimum: 0 }
+          min: { type: integer, minimum: 1 }
+
   nodes:
     type: array
     items:
@@ -50,6 +77,42 @@ $defs:
 
   node:
     anyOf:
+      - type: object
+        required: [keys]
+        additionalProperties: false
+        properties:
+          if: { $ref: "#/$defs/flag" }
+          keys:
+            type: object
+            additionalProperties: { type: string, minLength: 1 }
+      - type: object
+        required: [columns]
+        additionalProperties: false
+        properties:
+          if: { $ref: "#/$defs/flag" }
+          columns:
+            type: object
+            required: [left_cols, left, right]
+            additionalProperties: false
+            properties:
+              left_cols: { $ref: "#/$defs/extent" }
+              left: { $ref: "#/$defs/nodes" }
+              right: { $ref: "#/$defs/nodes" }
+      - type: object
+        required: [panel]
+        additionalProperties: false
+        properties:
+          if: { $ref: "#/$defs/flag" }
+          panel:
+            type: object
+            required: [id, type, source, rows]
+            additionalProperties: false
+            properties:
+              id: { type: string, pattern: "^[A-Za-z0-9_.-]+$", maxLength: 39 }
+              focus: { type: string, minLength: 1 }
+              type: { enum: [diff, markdown] }
+              source: { $ref: "#/$defs/flag" }
+              rows: { $ref: "#/$defs/extent" }
       - type: object
         required: [tight]
         additionalProperties: false

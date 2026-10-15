@@ -14,8 +14,13 @@ properties:
   input:
     type: object
     additionalProperties: false
-    required: [mode]
+    required: [mode, focus, focused]
     properties:
+      focus: { description: The page component holding keyboard focus., type: string }
+      focused:
+        description: The active focus name as a boolean flag.
+        type: object
+        additionalProperties: { type: boolean }
       mode:
         description: The mode of the input area.
         type: string
@@ -23,7 +28,7 @@ properties:
   ask:
     type: object
     additionalProperties: false
-    required: [question, header, from, from_agent, options, lines, hint, progress, progress_shown, review, preview_shown, preview_rows, preview_title, preview_option, proposal_shown, diff_shown, diff_rows, bar, question_shown, waiting, waiting_shown]
+    required: [question, header, from, from_agent, options, lines, hint, progress, progress_shown, review, preview_shown, preview_rows, preview_title, preview_option, proposal_shown, diff_shown, diff, proposal, no_diff, bar, question_shown, waiting, waiting_shown]
     properties:
       question: { description: The question to the user., type: string }
       header: { description: The short label of the question., type: string }
@@ -65,7 +70,9 @@ properties:
       preview_option: { description: The preview is that of an option., type: boolean }
       proposal_shown: { description: The preview is the proposal that the model wrote for a reviewed change., type: boolean }
       diff_shown: { description: A reviewed change has a diff that fyai made., type: boolean }
-      diff_rows: { description: The rows of the diff., type: integer }
+      diff: { description: The unified diff of the reviewed change., type: string }
+      proposal: { description: The Markdown explanation of the reviewed change., type: string }
+      no_diff: { description: The question has no diff., type: boolean }
       bar: { description: The glyph of the bar at the edge of the selected answer, one column wide., type: string }
       question_shown: { description: A question, not the review, is shown., type: boolean }
       waiting: { description: Questions after these., type: integer }
@@ -73,8 +80,10 @@ properties:
   screen:
     type: object
     additionalProperties: false
-    required: [mode]
+    required: [mode, rows, cols]
     properties:
+      rows: { description: The terminal height., type: integer }
+      cols: { description: The terminal width., type: integer }
       mode:
         description: >-
           Where the page stands: inline under the scrollback, or on the whole

@@ -15,6 +15,7 @@
 
 struct fyai_ctx;
 struct fytim_surface;
+struct fytim_cell;
 
 /*
  * The one component that decides which chrome a tile carries and builds its
@@ -163,5 +164,11 @@ void fyai_chrome_body(struct fyai_ctx *ctx, struct fytim_surface *sf);
  */
 void fyai_chrome_focus(struct fyai_ctx *ctx, struct fytim_surface *sf,
 		       bool focused);
+
+/* Apply the same focus ground and edge to a region of a page canvas. */
+int fyai_chrome_focus_cells(struct fyai_ctx *ctx, struct fytim_cell *cells,
+	int rows, int cols, int row, int col, int width, int height,
+	bool truecolor);
+
 
 #endif /* FYAI_CHROME_H */

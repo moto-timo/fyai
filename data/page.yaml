@@ -17,6 +17,9 @@
 #                      a case is {keys, body}, and its keys bind actions
 #   each: NAME, body   the body for each item of the list NAME of the state,
 #                      with the item, {index} and {number} in scope
+#   columns: {left_cols, left, right}   two bodies beside each other
+#   panel: {id, type, source, rows}   a scroll view bound to source text
+#   keys: {KEY: ACTION}   bindings while this part of the page is shown
 #
 # An inline item is one of:
 #   text: "{a.b}"      text of the state, escaped
@@ -42,31 +45,34 @@ layouts:
     pane: { place: band }
 
 page:
-  # The page stands inline under the scrollback, or takes the whole screen.
-  - switch: screen.mode
-    cases:
-      inline:
-        body:
-          - page: inline
-      fullscreen:
-        body:
-          # A popup of a result covers the whole screen until it closes.
-          - switch: popup.mode
-            cases:
-              closed:
-                body:
-                  - page: fullscreen
-              open:
-                keys:
-                  Escape: popup.close
-                  Enter: popup.close
-                  q: popup.close
-                  Up: "popup.scroll:up"
-                  Down: "popup.scroll:down"
-                body:
-                  - page: popup
+  - page: session
 
 pages:
+  session:
+    # The page stands inline under the scrollback, or takes the whole screen.
+    - switch: screen.mode
+      cases:
+        inline:
+          body:
+            - page: inline
+        fullscreen:
+          body:
+            # A popup of a result covers the whole screen until it closes.
+            - switch: popup.mode
+              cases:
+                closed:
+                  body:
+                    - page: fullscreen
+                open:
+                  keys:
+                    Escape: popup.close
+                    Enter: popup.close
+                    q: popup.close
+                    Up: "popup.scroll:up"
+                    Down: "popup.scroll:down"
+                  body:
+                    - page: popup
+
   # Inline: the tail of the transcript, then the chrome.
   inline:
     - tight: true
@@ -144,42 +150,48 @@ pages:
       cases:
         prompt:
           body:
-            - page: prompt_box
-        # A question while nothing is typed: the number keys choose.
+            - page: input_box
+        # Reviews keep printable keys for the reply, including the first batch.
         ask:
           keys:
-            Up: ask.prev
-            Down: ask.next
-            Left: ask.back
-            Right: ask.forward
-            Space: ask.toggle
             Enter: ask.accept
             Escape: ask.dismiss
-            "1": "ask.choose:1"
-            "2": "ask.choose:2"
-            "3": "ask.choose:3"
-            "4": "ask.choose:4"
-            "5": "ask.choose:5"
-            "6": "ask.choose:6"
-            "7": "ask.choose:7"
-            "8": "ask.choose:8"
-            "9": "ask.choose:9"
           body:
+            - if: ask.no_diff
+              keys:
+                Up: ask.prev
+                Down: ask.next
+                Left: ask.back
+                Right: ask.forward
+                Space: ask.toggle
+                "1": "ask.choose:1"
+                "2": "ask.choose:2"
+                "3": "ask.choose:3"
+                "4": "ask.choose:4"
+                "5": "ask.choose:5"
+                "6": "ask.choose:6"
+                "7": "ask.choose:7"
+                "8": "ask.choose:8"
+                "9": "ask.choose:9"
             - page: question
-            - page: prompt_box
+            - if: ask.no_diff
+              page: input_box
         # A question with an answer being typed: the number keys type.
         ask_text:
           keys:
-            Up: ask.prev
-            Down: ask.next
             Enter: ask.accept
             Escape: ask.dismiss
           body:
+            - if: ask.no_diff
+              keys:
+                Up: ask.prev
+                Down: ask.next
             - page: question
-            - page: prompt_box
+            - if: ask.no_diff
+              page: input_box
 
   # The prompt on its card, or between two rules.
-  prompt_box:
+  input_box:
     - if: prompt.card
       slot: { id: prompt, rows: "{prompt.card_rows}" }
     - if: prompt.rules
@@ -192,6 +204,69 @@ pages:
   # A question to the user: its header and text, who asks, each option with
   # its description, and the hint below. Many questions end in a review.
   question:
+    - if: ask.diff_shown
+      page: ask_permissions
+    - if: ask.no_diff
+      page: ask_question
+
+  ask_question:
+    - page: question_heading
+    - page: question_body
+
+  ask_permissions:
+    - keys:
+        PageUp: "panel.scroll:permission-diff/page-up"
+        PageDown: "panel.scroll:permission-diff/page-down"
+    - switch: input.focus
+      cases:
+        "":
+          body:
+            - page: permission_choices_keys
+        choices:
+          body:
+            - page: permission_choices_keys
+        permission-diff:
+          body:
+            - keys:
+                Left: page.focus:choices
+                Up: panel.scroll:permission-diff/up
+                Down: panel.scroll:permission-diff/down
+                Tab: page.focus:prompt
+                Shift-Tab: page.focus:choices
+        prompt:
+          body:
+            - keys:
+                Up: page.focus:choices
+                Tab: page.focus:choices
+                Shift-Tab: page.focus:permission-diff
+    - page: question_heading
+    - columns:
+        left_cols: { fraction: 0.4 }
+        left:
+          - row:
+              - space: 4
+              - text: "Decision"
+          - page: question_details
+          - page: question_choices
+          - row:
+              - space: 4
+              - act: { action: page.focus, arg: prompt, role: select.label, text: "Other: type a reply below" }
+        right:
+          - page: question_diff
+    - row:
+        - space: 2
+        - text: "Your reply (optional)"
+    - page: input_box
+
+  permission_choices_keys:
+    - keys:
+        Up: ask.prev
+        Down: ask.next:prompt
+        Right: page.focus:permission-diff
+        Tab: page.focus:permission-diff
+        Shift-Tab: page.focus:prompt
+
+  question_heading:
     - if: ask.question_shown
       row:
         - space: 2
@@ -213,6 +288,12 @@ pages:
         - text: "Review"
         - sgr: header.off
         - text: "  Send these answers?"
+
+  question_body:
+    - page: question_choices
+    - page: question_details
+
+  question_choices:
     - if: ask.from_agent
       row:
         - space: 4
@@ -258,6 +339,8 @@ pages:
                 name: chrome
                 items:
                   - text: "{description}"
+
+  question_details:
     - if: ask.preview_option
       row:
         - space: 4
@@ -274,17 +357,15 @@ pages:
             name: chrome
             items:
               - text: "Proposal \u00b7 written by the model"
-    - if: ask.preview_shown
+    - if: ask.proposal_shown
+      panel:
+        id: permission-proposal
+        focus: choices
+        type: markdown
+        source: ask.proposal
+        rows: { content: true, min: 1, max: 10 }
+    - if: ask.preview_option
       slot: { id: preview, rows: "{ask.preview_rows}" }
-    - if: ask.diff_shown
-      row:
-        - space: 4
-        - role:
-            name: chrome
-            items:
-              - text: "Diff \u00b7 made by fyai"
-    - if: ask.diff_shown
-      slot: { id: diff, rows: "{ask.diff_rows}" }
     - each: ask.lines
       body:
         - row:
@@ -295,7 +376,22 @@ pages:
         - role:
             name: chrome
             items:
+              - if: ask.diff_shown
+                text: "PgUp/PgDn scroll the diff \u00b7 "
               - text: "{ask.hint}"
+
+  question_diff:
+    - row:
+        - space: 4
+        - role:
+            name: chrome
+            items:
+              - text: "Diff \u00b7 made by fyai"
+    - panel:
+        id: permission-diff
+        type: diff
+        source: ask.diff
+        rows: { beside: 1, min: 3 }
 
   # The work pane: its cap row goes first when the page is too tall.
   pane:

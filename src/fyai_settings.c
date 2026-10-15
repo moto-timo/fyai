@@ -1151,7 +1151,7 @@ static fy_generic settings_review_questions(struct fy_generic_builder *gb,
 				   "description", "Apply the change that the "
 				   "diff shows.", "preview", "")),
 		"proposal", explanation,
-		"diff", c->diff));
+		"diff", c->unified));
 }
 
 /*

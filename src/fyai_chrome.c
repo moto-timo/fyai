@@ -334,6 +334,35 @@ void fyai_chrome_focus(struct fyai_ctx *ctx, struct fytim_surface *sf,
 	fyai_ui_set_hint(ctx, focused ? chrome_hint(ctx, sf) : NULL);
 }
 
+int fyai_chrome_focus_cells(struct fyai_ctx *ctx, struct fytim_cell *cells,
+	int rows, int cols, int row, int col, int width, int height,
+	bool truecolor)
+{
+	const char *margin, *on, *off;
+	char edge[256];
+	uint32_t bg;
+	bool reversed;
+	int y, rc;
+
+	reversed = fyai_ui_focus_ground(ctx, true, &bg);
+	rc = fytim_cells_wash(cells, rows, cols, row, col, width, height,
+		bg, ctx->cfg->focus_bg_mix, truecolor);
+	if (rc)
+		return rc;
+	margin = fyai_ui_focus_margin(ctx, edge, sizeof(edge));
+	if (reversed && markdown_reverse_pair(ctx->cfg, &on, &off))
+		margin = fy_sprintfa("%s%s%s", on, ctx->cfg->session_margin, off);
+	if (fy_str_empty(margin))
+		return 0;
+	for (y = 0; y < height; y++) {
+		rc = fytim_cells_draw_text(cells, rows, cols, row + y, col,
+			width, 1, margin, strlen(margin));
+		if (rc < 0)
+			return -1;
+	}
+	return 0;
+}
+
 int fyai_chrome_panel(struct fyai_ctx *ctx, struct response_buffer *out,
 		      int *colsp, int *buttonp)
 {

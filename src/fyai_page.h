@@ -69,17 +69,16 @@ struct fyai_page_ask {
 	int npreview;
 	const char *preview_title;	/* the label of that option */
 	/*
-	 * A change that the user reviews: the preview holds the proposal that
-	 * the model wrote, and the diff holds the rendered rows of the diff
-	 * that fyai made. The two stand under headings of their own.
+	 * Review sources for page panels: Markdown from the model and the
+	 * unified diff made by fyai. Each panel renders at its assigned width.
 	 */
 	bool proposal;
-	const char *const *diff;
-	int ndiff;
+	const char *proposal_text, *diff_text;
 };
 
 struct fyai_page_state {
 	struct fyai_ctx *ctx;	/* diagnostic context for source construction */
+	int screen_cols, screen_rows;
 	const char *header;
 	/* The header rendered to one row of SGR. */
 	const char *header_row;
@@ -151,6 +150,7 @@ struct fyai_page_state {
 	/* The SGR of what the user acts on in the chrome of a tile: the marks,
 	 * the arrows and the thumb of its bar. */
 	const char *control_chrome;
+	const char *input_focus;	/* the focused component of the page */
 	const char *input_mode;	/* the mode of the input area, or "prompt" */
 	/* The question of the input area in an ask mode, or NULL. */
 	const struct fyai_page_ask *ask;
@@ -210,6 +210,10 @@ int fyai_page_chrome_rows(const struct fyai_page_state *st);
  * zero or less changes nothing.
  */
 void fyai_page_fit(struct fyai_page_state *st, int height);
+
+/* Reserve the measured document chrome before allocating conversation rows. */
+int fyai_page_fit_document(struct fyai_page *pg, struct fyai_page_state *st,
+			   int cols, int height);
 
 /*
  * Append the page source for @st to @out: the page document, data/page.yaml,
@@ -395,6 +399,11 @@ struct fytim_surface *fyai_page_canvas(const struct fyai_page *pg);
  */
 int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 		      struct fyai_page_state *st, int cols, int rows);
+/* Scroll the named panel. @action is id/up, id/down, id/page-up or id/page-down. */
+bool fyai_page_panel_scroll(struct fyai_page *pg, const char *action);
+
+/* Borrowed until the next frame is transcribed. */
+const char *fyai_page_panel_focus(struct fyai_page *pg, const char *id);
 
 /*
  * Paint the areas of a review onto the @nrows by @cols @cells of a rendered

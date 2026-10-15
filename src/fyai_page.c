@@ -25,6 +25,7 @@
 #include "fyai_config.h"
 #include "fyai_markdown.h"
 #include "fyai_page.h"
+#include "fyai_panel.h"
 #include "fyai_schema.h"
 #include "fyai_terminal.h"
 #include "fyai_chrome.h"
@@ -42,8 +43,19 @@ fyai_page_action_find(const struct fyai_page_action *actions, size_t n,
 			return &actions[i];
 	return NULL;
 }
+struct page_panel {
+	struct page_panel *next;
+	char *id;
+	struct fyai_panel *view;
+	/* Borrowed from the current frame builder until the next transcription. */
+	fy_generic source, focus;
+	enum fyai_panel_type type;
+	bool active;
+};
+
 struct fyai_page {
 	struct fyai_ctx *ctx;
+	struct page_panel *panels;
 	/* The actions the document may name, for a review, which has no
 	 * state of a frame to take them from. */
 	const struct fyai_page_action *actions;
@@ -83,6 +95,101 @@ struct fyai_page {
 	 * is not given; a height of 0 for none. */
 	int last_tail_row, last_tail_col, last_tail_height;
 };
+
+static struct page_panel *page_panel_find(struct fyai_page *pg, const char *id)
+{
+	struct page_panel *p;
+
+	for (p = pg->panels; p; p = p->next)
+		if (!strcmp(p->id, id))
+			return p;
+	return NULL;
+}
+
+static int page_panel_bind(struct fyai_page *pg, const char *id,
+			   enum fyai_panel_type type, fy_generic source,
+			   fy_generic focus)
+{
+	struct page_panel *p = page_panel_find(pg, id);
+
+	if (!p) {
+		p = calloc(1, sizeof(*p));
+		if (!p)
+			return -1;
+		p->id = strdup(id);
+		p->source = p->focus = fy_invalid;
+		p->type = type;
+		p->view = fyai_panel_create(pg->ctx, type);
+		if (!p->id || !p->view) {
+			free(p->id);
+			fyai_panel_destroy(p->view);
+			free(p);
+			return -1;
+		}
+		p->next = pg->panels;
+		pg->panels = p;
+	}
+	if (p->active)
+		return -1;
+	if (p->type != type || !p->view) {
+		fyai_panel_destroy(p->view);
+		p->view = fyai_panel_create(pg->ctx, type);
+		p->type = type;
+		if (!p->view)
+			return -1;
+	}
+	p->active = true;
+	p->source = source;
+	p->focus = focus;
+	return 0;
+}
+
+const char *fyai_page_panel_focus(struct fyai_page *pg, const char *id)
+{
+	struct page_panel *p = pg && id ? page_panel_find(pg, id) : NULL;
+
+	return p ? fy_castp(&p->focus, "") : NULL;
+}
+
+bool fyai_page_panel_scroll(struct fyai_page *pg, const char *action)
+{
+	struct page_panel *p;
+	const char *slash;
+	bool up, page;
+
+	if (!pg || !action)
+		return false;
+	slash = strrchr(action, '/');
+	if (!slash)
+		return false;
+	up = !strcmp(slash + 1, "up") || !strcmp(slash + 1, "page-up");
+	page = !strncmp(slash + 1, "page-", 5);
+	if (!up && strcmp(slash + 1, "down") && strcmp(slash + 1, "page-down"))
+		return false;
+	for (p = pg->panels; p; p = p->next)
+		if (p->active && strlen(p->id) == (size_t)(slash - action) &&
+		    !strncmp(p->id, action, (size_t)(slash - action))) {
+			fyai_panel_scroll(p->view, up ? -1 : 1, page);
+			return true;
+		}
+	return false;
+}
+
+static void page_panels_prune(struct fyai_page *pg, bool all)
+{
+	struct page_panel **pp = &pg->panels, *p;
+
+	while ((p = *pp)) {
+		if (!all && p->active) {
+			pp = &p->next;
+			continue;
+		}
+		*pp = p->next;
+		free(p->id);
+		fyai_panel_destroy(p->view);
+		free(p);
+	}
+}
 
 /*
  * Append @text to a row of Markdown: no tag of UI Markdown can open in it, a
@@ -197,8 +304,7 @@ static int page_ask_rows(const struct fyai_page_ask *ask)
 	rows = 2 + !fy_str_empty(ask->from);
 	for (i = 0; i < ask->noptions; i++)
 		rows += 1 + !fy_str_empty(ask->options[i].description);
-	return rows + (ask->npreview ? ask->npreview + 1 : 0) +
-	       (ask->ndiff ? ask->ndiff + 1 : 0);
+	return rows + (ask->npreview ? ask->npreview + 1 : 0);
 }
 
 int fyai_page_chrome_rows(const struct fyai_page_state *st)
@@ -635,12 +741,13 @@ static const char *page_ask_hint(const struct fyai_page_ask *ask)
 
 /* The question of the input area, as the document names it. */
 static fy_generic page_ask_generic(struct fy_generic_builder *gb,
+				   const char *focus,
 				   const struct fyai_page_ask *ask)
 {
 	fy_generic options = fy_seq_empty, lines = fy_seq_empty;
 	const struct fyai_page_ask_option *o;
 	char box[8], progress[32];
-	size_t i;
+	size_t i, sel;
 
 	if (!ask)
 		return fy_mapping(gb, "question", "", "header", "", "from", "",
@@ -650,9 +757,12 @@ static fy_generic page_ask_generic(struct fy_generic_builder *gb,
 			"preview_shown", false, "preview_rows", 0,
 			"preview_title", "", "preview_option", false,
 			"proposal_shown", false, "diff_shown", false,
-			"diff_rows", 0, "bar", "",
+			"diff", "", "proposal", "", "no_diff", true, "bar", "",
 			"question_shown", false, "waiting", 0,
 			"waiting_shown", false);
+	/* The choices show a selection only while they hold the focus. */
+	sel = fy_str_empty(focus) || !strcmp(focus, "choices") ?
+	      ask->selected : (size_t)-1;
 	for (i = 0; i < ask->noptions; i++) {
 		o = &ask->options[i];
 		snprintf(box, sizeof(box), "%s", !ask->multi ? "" :
@@ -662,12 +772,12 @@ static fy_generic page_ask_generic(struct fy_generic_builder *gb,
 			"box", box,
 			"description", page_str(o->description),
 			"has_description", (_Bool)!fy_str_empty(o->description),
-			"selected_description", (_Bool)(i == ask->selected &&
+			"selected_description", (_Bool)(i == sel &&
 				!fy_str_empty(o->description)),
-			"other_description", (_Bool)(i != ask->selected &&
+			"other_description", (_Bool)(i != sel &&
 				!fy_str_empty(o->description)),
-			"selected", (_Bool)(i == ask->selected),
-			"other", (_Bool)(i != ask->selected)));
+			"selected", (_Bool)(i == sel),
+			"other", (_Bool)(i != sel)));
 	}
 	for (i = 0; i < ask->nlines; i++)
 		lines = fy_append(gb, lines, fy_mapping(gb,
@@ -690,9 +800,11 @@ static fy_generic page_ask_generic(struct fy_generic_builder *gb,
 		"preview_rows", ask->npreview,
 		"preview_title", page_str(ask->preview_title),
 		"preview_option", (_Bool)(ask->npreview > 0 && !ask->proposal),
-		"proposal_shown", (_Bool)(ask->npreview > 0 && ask->proposal),
-		"diff_shown", (_Bool)(ask->ndiff > 0),
-		"diff_rows", ask->ndiff,
+		"proposal_shown", (_Bool)!fy_str_empty(ask->proposal_text),
+		"diff_shown", (_Bool)!fy_str_empty(ask->diff_text),
+		"no_diff", (_Bool)fy_str_empty(ask->diff_text),
+		"diff", page_str(ask->diff_text),
+		"proposal", page_str(ask->proposal_text),
 		"bar", ask->bar ? ask->bar : "\xe2\x96\x8c",
 		"question_shown", (_Bool)!ask->review,
 		"waiting", ask->waiting,
@@ -710,14 +822,19 @@ fy_generic fyai_page_state_generic(struct fy_generic_builder *gb,
 	bool grid = !fy_str_empty(st->pane_source);
 	bool hint = page_text_visible(st->hint);
 	bool side = st->pane_side && grid;
-	fy_generic ask = page_ask_generic(gb, st->ask);
+	fy_generic ask = page_ask_generic(gb, st->input_focus, st->ask);
 
 	return fy_mapping(gb,
 		"input", fy_mapping(gb, "mode",
-				    st->input_mode ? st->input_mode : "prompt"),
+				    st->input_mode ? st->input_mode : "prompt",
+			"focus", page_str(st->input_focus),
+			"focused", fy_mapping(gb,
+				st->input_focus ? st->input_focus : "", true)),
 		"ask", ask,
 		"screen", fy_mapping(gb, "mode",
-				     st->fullscreen ? "fullscreen" : "inline"),
+			st->fullscreen ? "fullscreen" : "inline",
+			"cols", st->screen_cols > 0 ? st->screen_cols : 80,
+			"rows", st->screen_rows > 0 ? st->screen_rows : 24),
 		"tail", fy_mapping(gb,
 			"shown", (bool)!side,
 			"rows", st->tail_rows),
@@ -799,6 +916,7 @@ static fy_generic page_lookup(fy_generic state, const char *path)
 /* A walk of the page document: the state it names and where it writes. */
 struct page_doc_ctx {
 	struct fyai_ctx *ctx;
+	struct fyai_page *page;
 	fy_generic pages;
 	fy_generic state;
 	struct response_buffer *out;
@@ -823,6 +941,10 @@ struct page_doc_ctx {
 	bool review;
 	const char *area;
 	const char *each;	/* the list of the each the node is in, or NULL */
+	/* The width of the cell being written, 0 for the page, and the rows
+	 * of the left cell of the columns whose right cell is being written. */
+	int cell_cols;
+	int left_rows;
 };
 
 /* Pages of pages deeper than this do not transcribe. */
@@ -1156,9 +1278,120 @@ static int page_doc_items(struct page_doc_ctx *c, fy_generic items,
 }
 
 enum page_doc_node { PDN_TIGHT, PDN_SLOT, PDN_SWITCH, PDN_EACH, PDN_DROP,
-		     PDN_PAGE, PDN_MARKUP, PDN_ROW, PDN_BLANK };
+		     PDN_PAGE, PDN_MARKUP, PDN_ROW, PDN_BLANK,
+		     PDN_COLUMNS, PDN_PANEL, PDN_KEYS };
 
 static int page_doc_nodes(struct page_doc_ctx *c, fy_generic nodes);
+
+static int page_doc_extent(struct page_doc_ctx *c, fy_generic size,
+			   const char *dimension)
+{
+	int n, min, max;
+	fy_generic screen;
+
+	if (!fy_is_mapping(size))
+		return (int)page_doc_int(c, size);
+	screen = page_doc_lookup(c, "screen");
+	n = (int)(fy_get(screen, dimension, 24LL) *
+		  fy_number(fy_get(size, "fraction", fy_invalid), 1.0));
+	min = fy_get(size, "min", 1);
+	max = fy_get(size, "max", n);
+	if (n > max)
+		n = max;
+	return n < min ? min : n;
+}
+
+static const char *page_doc_no_margin(void *userdata, size_t row)
+{
+	(void)userdata;
+	(void)row;
+	return "";
+}
+
+#define FYAI_TIGHT "<fy-tight>\n\n"
+
+/* The rows of @len bytes of page source at @cols columns; -1 on failure. */
+static int page_doc_measure(struct page_doc_ctx *c, const char *source,
+			    size_t len, int cols)
+{
+	struct fyai_cfg *cfg = c->ctx ? c->ctx->cfg : NULL;
+	struct fymd_renderer_cfg rcfg;
+	struct fymd_renderer *r;
+	size_t rows = 0;
+	char *tight;
+	int rc;
+
+	if (cols < 1)
+		return -1;
+	if (cfg) {
+		markdown_renderer_cfg(cfg, &rcfg,
+				      markdown_color_enabled(cfg->color),
+				      cfg->theme_variant, FYMD_RF_UI);
+		rcfg.width = cols + markdown_gutter_cols(cfg);
+		rcfg.sgr_input = FYMD_SGR_SAFE;
+		r = markdown_renderer_new(cfg, &rcfg);
+	} else {
+		memset(&rcfg, 0, sizeof(rcfg));
+		rcfg.flags = FYMD_RF_DEFAULT | FYMD_RF_UI | FYMD_RF_NO_COLOR;
+		rcfg.sgr_input = FYMD_SGR_SAFE;
+		rcfg.width = cols + markdown_gutter_cols(NULL);
+		r = fymd_renderer_create(&rcfg);
+	}
+	if (!r)
+		return -1;
+	/* The page is one fy-tight, so its cells have no blank rows between
+	 * blocks. */
+	rc = fymd_renderer_set_height(r, 0);
+	tight = malloc(len + sizeof(FYAI_TIGHT));
+	if (!tight) {
+		fymd_renderer_destroy(r);
+		return -1;
+	}
+	memcpy(tight, FYAI_TIGHT, sizeof(FYAI_TIGHT) - 1);
+	memcpy(tight + sizeof(FYAI_TIGHT) - 1, source, len);
+	if (!rc)
+		rc = fymd_measure_rows_with_margins(r, tight,
+			len + sizeof(FYAI_TIGHT) - 1, page_doc_no_margin,
+			NULL, &rows);
+	free(tight);
+	fymd_renderer_destroy(r);
+	return rc ? -1 : (int)rows;
+}
+
+/*
+ * The rows of a panel. A number or a fraction is the page's; `content` is the
+ * rows its text renders to in its cell; `beside` is the rows of the left cell
+ * less those above the panel. A walk that cannot measure gives the minimum.
+ */
+static int page_doc_panel_rows(struct page_doc_ctx *c, fy_generic rows,
+			       enum fyai_panel_type type, const char *text)
+{
+	struct fyai_panel *panel;
+	int n, min, max, total, top, shown, cols, above;
+
+	if (!fy_is_mapping(rows) || fy_is_valid(fy_get(rows, "fraction",
+						       fy_invalid)))
+		return page_doc_extent(c, rows, "rows");
+	min = fy_get(rows, "min", 1);
+	n = min;
+	if (fy_get(rows, "content", false) && c->ctx && !c->check) {
+		cols = c->cell_cols > 1 ? c->cell_cols :
+			(int)fy_get(page_doc_lookup(c, "screen"), "cols", 80LL);
+		panel = fyai_panel_create(c->ctx, type);
+		if (panel && !fyai_panel_update(panel, text, cols - 1, 1)) {
+			fyai_panel_extent(panel, &total, &top, &shown);
+			n = total;
+		}
+		fyai_panel_destroy(panel);
+		max = fy_get(rows, "max", n);
+		if (n > max)
+			n = max;
+	} else if (c->left_rows > 0) {
+		above = fy_get(rows, "beside", 0);
+		n = c->left_rows - above;
+	}
+	return n < min ? min : n;
+}
 
 /* The keys that fyai keeps for itself: a document cannot bind them. */
 static bool page_key_reserved(const char *name)
@@ -1249,19 +1482,76 @@ static int page_doc_node_body(struct page_doc_ctx *c, fy_generic node)
 {
 	static const char *const kinds[] = {
 		"tight", "slot", "switch", "each", "drop", "page", "markup", "row",
-		"blank",
+		"blank", "columns", "panel", "keys",
 	};
 	fy_generic v, sub, bound, item, saved_item, cases, key;
 	bool row_start, saved_in_each;
 	const char *saved_each;
 	long long saved_index, index;
 	const char *s;
-	char tag[96];
-	int rc;
+	char tag[192];
+	struct response_buffer lbuf, *saved_out;
+	int rc, lcols, total, saved_cols, saved_left;
 
 	if (!page_doc_shown(c, node))
 		return 0;
-	switch (page_doc_kind(node, kinds, 9)) {
+	switch (page_doc_kind(node, kinds, 12)) {
+	case PDN_KEYS:
+		return page_doc_keys(c, fy_get(node, "keys", fy_invalid));
+	case PDN_COLUMNS:
+		sub = fy_get(node, "columns", fy_invalid);
+		lcols = page_doc_extent(c, fy_get(sub, "left_cols",
+						  fy_invalid), "cols");
+		total = (int)fy_get(page_doc_lookup(c, "screen"), "cols", 80LL);
+		saved_cols = c->cell_cols;
+		saved_left = c->left_rows;
+		/* The left cell is written aside: the right cell takes its
+		 * height. */
+		lbuf = (struct response_buffer){0};
+		saved_out = c->out;
+		c->out = &lbuf;
+		c->cell_cols = lcols;
+		c->left_rows = 0;
+		rc = page_doc_nodes(c, fy_get(sub, "left", fy_invalid));
+		c->out = saved_out;
+		if (!rc && lbuf.len && !c->check)
+			c->left_rows = page_doc_measure(c, lbuf.data, lbuf.len,
+							lcols);
+		snprintf(tag, sizeof(tag),
+			 "<fy-grid rows=\"fit\" cols=\"%d,*\" gap=\"1\">\n"
+			 "<fy-cell row=\"0\" col=\"0\">\n\n", lcols);
+		rc = rc || response_buffer_append(c->out, tag) ||
+		     (lbuf.len && response_buffer_append(c->out, lbuf.data)) ||
+		     response_buffer_append(c->out,
+			"</fy-cell>\n<fy-cell row=\"0\" col=\"1\">\n\n");
+		c->cell_cols = total - lcols - 1;
+		rc = rc || page_doc_nodes(c, fy_get(sub, "right", fy_invalid)) ||
+		     response_buffer_append(c->out, "</fy-cell>\n</fy-grid>\n\n");
+		free(lbuf.data);
+		c->cell_cols = saved_cols;
+		c->left_rows = saved_left;
+		return rc;
+	case PDN_PANEL:
+		sub = fy_get(node, "panel", fy_invalid);
+		s = fy_get(sub, "id", "");
+		if (!*s || !page_id_chars(s) || strchr(s, ':') || strchr(s, '/') ||
+		    strlen(s) > FYTIM_PAGE_ID_MAX - 24)
+			return page_doc_fail(c, "a panel has an invalid id '%s'", s);
+		v = fy_get(sub, "type", fy_invalid);
+		if (!fy_any_equal(v, "diff", "markdown"))
+			return page_doc_fail(c, "panel '%s' has an unknown type", s);
+		bound = page_doc_lookup(c, fy_get(sub, "source", ""));
+		if (c->page && !fy_is_string(bound))
+			return page_doc_fail(c, "panel '%s' has no text source", s);
+		if (c->page && page_panel_bind(c->page, s,
+			fy_equal(v, "diff") ? FYAI_PANEL_DIFF : FYAI_PANEL_MARKDOWN,
+			bound, fy_get(sub, "focus", fy_get(sub, "id", fy_invalid))))
+			return page_doc_fail(c, "cannot bind panel '%s'", s);
+		snprintf(tag, sizeof(tag), "panel:%s", s);
+		return page_slot(c->out, tag, page_doc_panel_rows(c,
+			fy_get(sub, "rows", fy_invalid),
+			fy_equal(v, "diff") ? FYAI_PANEL_DIFF : FYAI_PANEL_MARKDOWN,
+			fy_castp(&bound, "")));
 	case PDN_TIGHT:
 		return response_buffer_append(c->out, "<fy-tight>\n\n");
 	case PDN_SLOT:
@@ -1362,7 +1652,7 @@ static int page_doc_node_body(struct page_doc_ctx *c, fy_generic node)
 		       response_buffer_append(c->out, "<fy-space/>\n\n");
 	default:
 		return page_doc_fail(c, "a node is none of tight, slot, switch, "
-				     "each, drop, page, markup, row or blank");
+				     "each, drop, page, markup, row, blank, columns, panel or keys");
 	}
 }
 
@@ -1401,7 +1691,7 @@ static int page_doc_walk(struct fyai_ctx *ctx, fy_generic doc,
 			 const struct fyai_page_action *actions, size_t n,
 			 struct response_buffer *out,
 			 struct fyai_page_keys *keys, bool check, bool review,
-			 char *why, size_t why_size)
+			 char *why, size_t why_size, struct fyai_page *page)
 {
 	struct page_doc_ctx c;
 
@@ -1409,6 +1699,7 @@ static int page_doc_walk(struct fyai_ctx *ctx, fy_generic doc,
 		why[0] = '\0';
 	memset(&c, 0, sizeof(c));
 	c.ctx = ctx;
+	c.page = page;
 	c.why = why;
 	c.why_size = why_size;
 	c.check = check;
@@ -1439,7 +1730,7 @@ int fyai_page_transcribe(struct fyai_ctx *ctx, fy_generic doc,
 			 struct fyai_page_keys *keys, bool review)
 {
 	return page_doc_walk(ctx, doc, state, actions, n, out, keys, false,
-			     review, NULL, 0);
+			     review, NULL, 0, NULL);
 }
 
 int fyai_page_check(fy_generic doc, const struct fyai_page_action *actions,
@@ -1449,7 +1740,7 @@ int fyai_page_check(fy_generic doc, const struct fyai_page_action *actions,
 	int rc;
 
 	rc = page_doc_walk(NULL, doc, fy_map_empty, actions, n, &scratch, NULL,
-			   true, false, why, why_size);
+			   true, false, why, why_size, NULL);
 	free(scratch.data);
 	return rc;
 }
@@ -1764,6 +2055,7 @@ void fyai_page_destroy(struct fyai_page *pg)
 	 * draw it once the page is gone. */
 	if (pg->canvas)
 		fytim_surface_close(pg->canvas);
+	page_panels_prune(pg, true);
 	fymd_renderer_destroy(pg->renderer);
 	free(pg->source.data);
 	free(pg->cells);
@@ -2400,6 +2692,47 @@ static int page_tail_draw(struct fyai_page *pg, struct fytim *ft,
 	return 0;
 }
 
+static int page_panel_draw(struct fyai_page *pg, struct page_panel *p,
+			   const struct fyai_page_state *st,
+			   const struct fymd_region *r, bool truecolor)
+{
+	enum fyai_chrome_bar_part part;
+	const char *text, *style;
+	int rc, y, total, top, rows;
+
+	if (r->width < 2 || r->height < 1)
+		return 0;
+	rc = fyai_panel_update(p->view, fy_castp(&p->source, ""),
+			       r->width - 1, (int)r->height);
+	if (rc)
+		return rc;
+	text = fyai_panel_text(p->view);
+	rc = page_cells_text(pg, pg->cells, pg->cells_rows, pg->cells_cols,
+		(int)r->row, r->col, r->width - 1, (int)r->height,
+		text, strlen(text));
+	if (rc < 0)
+		return -1;
+	fyai_panel_extent(p->view, &total, &top, &rows);
+	for (y = 0; y < rows; y++) {
+		part = fyai_chrome_bar_part(total, top, rows, rows, true, y);
+		style = part == FYAI_CHROME_BAR_TRACK ?
+			st->band_chrome : st->control_chrome;
+		text = fy_sprintfa("%s%s", style ? style : "",
+				  fyai_chrome_bar_glyph(part));
+		rc = page_cells_text(pg, pg->cells, pg->cells_rows,
+			pg->cells_cols, (int)r->row + y,
+			r->col + r->width - 1, 1, 1, text, strlen(text));
+		if (rc < 0)
+			return -1;
+	}
+	if (!fy_str_empty(st->input_focus) &&
+	    !strcmp(st->input_focus, fy_castp(&p->focus, "")))
+		return fyai_chrome_focus_cells(pg->ctx, pg->cells,
+			pg->cells_rows, pg->cells_cols, (int)r->row, r->col,
+			r->width, (int)r->height, truecolor);
+	return 0;
+}
+
 static int page_canvas(struct fyai_page *pg, struct fytim *ft,
 		       struct fyai_page_state *st,
 		       const struct fymd_region *fr, size_t count,
@@ -2499,11 +2832,14 @@ static int page_canvas(struct fyai_page *pg, struct fytim *ft,
 			fyai_error_check(ctx, !rc, err_out,
 					 "cannot draw the preview into cells");
 		}
-		if (!strcmp(fr[i].id, "diff") && st->ask && st->ask->diff) {
-			rc = page_lines_draw(pg, st->ask->diff, st->ask->ndiff,
-					     &fr[i]);
+		if (!strncmp(fr[i].id, "panel:", 6)) {
+			struct page_panel *panel = page_panel_find(pg, fr[i].id + 6);
+
+			if (!panel || !panel->active)
+				continue;
+			rc = page_panel_draw(pg, panel, st, &fr[i], truecolor);
 			fyai_error_check(ctx, !rc, err_out,
-					 "cannot draw the diff into cells");
+					 "cannot draw panel '%s'", panel->id);
 		}
 		if (!strcmp(fr[i].id, "note") && st->note_lines) {
 			rc = page_lines_draw(pg, st->note_lines,
@@ -2607,6 +2943,53 @@ err_out:
 	return -1;
 }
 
+int fyai_page_fit_document(struct fyai_page *pg, struct fyai_page_state *st,
+			   int cols, int height)
+{
+	struct fy_generic_builder_cfg cfg = { .flags = FYGBCF_SCOPE_LEADER };
+	struct fy_generic_builder *gb;
+	struct fyai_page_state base = *st;
+	struct response_buffer source = {0};
+	size_t rows;
+	int rc, left, framing;
+
+	if (height <= 0)
+		return 0;
+	base.pane_rows = base.tail_rows = base.transcript_rows = 0;
+	base.pane_source = NULL;
+	base.pane_side = false;
+	base.keys = NULL;
+	framing = fyai_page_chrome_rows(st) - fyai_page_chrome_rows(&base);
+	gb = fy_generic_builder_create(&cfg);
+	if (!gb)
+		return -1;
+	rc = fyai_page_transcribe(pg->ctx, pg->doc,
+		fyai_page_state_generic(gb, &base), st->actions, st->nactions,
+		&source, NULL, st->review);
+	if (!rc)
+		rc = page_renderer(pg, cols);
+	if (!rc)
+		rc = fymd_renderer_set_height(pg->renderer, 0);
+	if (!rc)
+		rc = fymd_measure_rows_with_margins(pg->renderer,
+			source.data, source.len, page_no_margin, NULL, &rows);
+	free(source.data);
+	fy_generic_builder_destroy(gb);
+	if (rc)
+		return -1;
+	left = height - (int)rows - framing;
+	if (left < 0)
+		left = 0;
+	if (st->pane_rows > left)
+		st->pane_rows = left;
+	left -= st->pane_rows;
+	if (st->tail_rows > left)
+		st->tail_rows = left;
+	if (st->fullscreen)
+		st->transcript_rows = left;
+	return 0;
+}
+
 int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 		      struct fyai_page_state *st, int cols, int rows)
 {
@@ -2615,6 +2998,7 @@ int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 	};
 	struct fytim_page_region regions[FYTIM_PAGE_REGIONS_MAX];
 	struct fyai_page_tile *t;
+	struct page_panel *panel;
 	const struct fymd_region *fr;
 	struct fyai_ctx *ctx;
 	enum fytim_result res;
@@ -2625,6 +3009,10 @@ int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 	if (!pg || !ft || !st)
 		return -1;
 	ctx = pg->ctx;
+	st->screen_cols = cols;
+	st->screen_rows = rows;
+	for (panel = pg->panels; panel; panel = panel->next)
+		panel->active = false;
 	/* A tile the page places nowhere is granted nothing. */
 	for (r = 0; r < st->ntiles; r++)
 		st->tiles[r].granted_rows = st->tiles[r].granted_cols = 0;
@@ -2638,10 +3026,10 @@ int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 	fyai_error_check(ctx, pg->frame_gb, err_out,
 			 "cannot make a builder for the page state");
 	pg->last_state = fyai_page_state_generic(pg->frame_gb, st);
-	rc = fyai_page_transcribe(ctx, pg->doc, pg->last_state, st->actions,
-				  st->nactions, &pg->source, st->keys,
-				  st->review);
+	rc = page_doc_walk(ctx, pg->doc, pg->last_state, st->actions,
+		st->nactions, &pg->source, st->keys, false, st->review, NULL, 0, pg);
 	fyai_error_check(ctx, !rc, err_out, "cannot build the page source");
+	page_panels_prune(pg, false);
 	rc = page_renderer(pg, cols > 0 ? cols : 80);
 	fyai_error_check(ctx, !rc, err_out, "cannot prepare the page renderer");
 	rc = fymd_renderer_set_height(pg->renderer, rows > 0 ? rows : 0);
@@ -2706,6 +3094,26 @@ int fyai_page_publish(struct fyai_page *pg, struct fytim *ft,
 		n++;
 	}
 	/* Register the header panel button. */
+	for (i = 0; i < count; i++) {
+		int y, height = (int)fr[i].height;
+		const char *action;
+
+		if (fr[i].kind != FYMD_REGION_SLOT || strncmp(fr[i].id, "panel:", 6))
+			continue;
+		for (y = 0; y < height && n < FYTIM_PAGE_REGIONS_MAX; y++) {
+			action = height >= 3 && y == 0 ? "up" :
+				height >= 3 && y == height - 1 ? "down" :
+				y < height / 2 ? "page-up" : "page-down";
+			snprintf(pg->act_ids[n], sizeof(pg->act_ids[n]),
+				 "panel.scroll:%s/%s", fr[i].id + 6, action);
+			regions[n].id = pg->act_ids[n];
+			regions[n].kind = FYTIM_PAGE_ACT;
+			regions[n].row = (int)fr[i].row + y;
+			regions[n].col = fr[i].col + fr[i].width - 1;
+			regions[n].width = regions[n].height = 1;
+			n++;
+		}
+	}
 	for (i = 0; i < count && st->header_act && st->header_right_cols > 0 &&
 	     n < FYTIM_PAGE_REGIONS_MAX; i++) {
 		if (fr[i].kind == FYMD_REGION_ACT || strcmp(fr[i].id, "header") ||
