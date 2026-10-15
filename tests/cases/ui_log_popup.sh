@@ -1,9 +1,10 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT
 # A fullscreen session keeps the results of its slash commands, notices and
-# diagnostics in a log. Escape hides the popup of the log and the indicator in
-# the header, which counts the results, shows it again: a click on it and a key
-# bound to fyai.messages.toggle both do. A result of the log has no module
+# diagnostics in a log. A long result opens the log small above the status; a
+# click on it expands it over the page and Escape collapses it again. The
+# indicator in the header, which counts the results, shows it again: a click on
+# it and a key bound to fyai.messages.toggle both do. A result of the log has no module
 # prefix.
 set -eu
 . "$(dirname "$0")/../harness.sh"
@@ -13,7 +14,7 @@ mock_start chat_basic_twice.json
 driver=0
 FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
 FYAI_PTY_NEEDLE="Hello" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:Hello from the mock provider.|send:/help|wait-screen:Esc closes|raw:1b|wait-gone:Esc closes|wait-screen:≡1|click:≡1|wait-screen:Esc closes|raw:1b|wait-gone:Esc closes|raw:07|wait-screen:Esc closes|raw:07|wait-gone:Esc closes|send:/help|wait-screen:log · all · 2|raw:6c|wait-screen:log · notices|raw:78|wait-gone:Esc closes|send:/theme zzz|wait-screen:invalid display.theme" \
+FYAI_PTY_AFTER="wait-screen:Hello from the mock provider.|send:/help|wait-screen:[expand]|click:[expand]|wait-screen:Esc collapses|raw:1b|wait-gone:Esc collapses|wait-screen:[expand]|click:[x]|wait-gone:[expand]|wait-screen:≡1|click:≡1|wait-screen:[expand]|raw:07|wait-screen:Esc collapses|raw:07|wait-gone:Esc collapses|wait-gone:[expand]|send:/help|wait-screen:log · all · 2|click:[expand]|wait-screen:Esc collapses|raw:6c|wait-screen:log · notices|raw:78|wait-gone:Esc collapses|wait-gone:≡|send:/theme zzz|wait-screen:invalid display.theme" \
 FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
 "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \

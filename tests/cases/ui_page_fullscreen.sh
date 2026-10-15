@@ -115,11 +115,11 @@ PDRAG=$(printf '\033[<0;4;4M\033[<32;40;9M\033[<0;40;9m' |
 # column 18.
 ACLICK=$(printf '\033[<0;21;1M\033[<0;21;1m' | od -An -tx1 | tr -d ' \n')
 session fullscreen "wait-screen:Hello from the mock provider.|"\
-"send:/help|wait-screen:Esc closes|raw:$PDRAG|wait-copy:|"\
-"raw:1b5b367e|wait-gone:/branches|raw:1b|wait-gone:Esc closes|"\
-"send:/help|wait-screen:Esc closes|raw:0d|wait-gone:Esc closes|"\
-"send:/help|wait-screen:Esc closes|raw:$ACLICK|wait-gone:Esc closes|"\
-"send:/zoom|wait-screen:nothing is running to zoom into|"\
+"send:/help|click:[expand]|wait-screen:Esc collapses|raw:$PDRAG|wait-copy:|"\
+"raw:1b5b367e|wait-gone:/branches|raw:1b|wait-gone:Esc collapses|"\
+"send:/help|click:[expand]|wait-screen:Esc collapses|raw:0d|wait-gone:Esc collapses|"\
+"send:/help|click:[expand]|wait-screen:Esc collapses|raw:$ACLICK|wait-gone:Esc collapses|"\
+"raw:1b|wait-gone:── log|send:/zoom|wait-screen:nothing is running to zoom into|"\
 "raw:78|wait-gone:nothing is running to zoom into|raw:1b|wait-gone:❯ x" 30 1
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
@@ -147,7 +147,7 @@ while True:
     screen.feed(data[pos:i + len(END)])
     pos = i + len(END)
     rows = screen.display()
-    if "Esc closes" in rows[0]:
+    if "Esc collapses" in rows[0]:
         popup = True
         # The popup covers the transcript and the chrome.
         for r in rows:
@@ -166,7 +166,7 @@ while True:
                       None)
         # A short result stands above the status, under the prompt.
         if prompt is None or at < prompt or at > 28 or \
-                "Esc closes" in rows[0]:
+                "Esc collapses" in rows[0]:
             raise SystemExit("the short result is not above the status: %r" %
                              rows)
 if not popup:
@@ -182,8 +182,8 @@ PY
 # ends while the shell runs.
 session fullscreen "wait-screen:Hello from the mock provider.|"\
 "send:!sh -c 'while :; do printf \"\\r\\033[KSHELLMARK \"; sleep 0.2; done'|wait-screen:SHELLMARK|"\
-"wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|send:/help|wait-screen:Esc closes|frame:3|"\
-"raw:1b|wait-gone:Esc closes|wait-screen:SHELLMARK" 30 1
+"wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|send:/help|click:[expand]|wait-screen:Esc collapses|frame:3|"\
+"raw:1b|wait-gone:Esc collapses|wait-screen:SHELLMARK" 30 1
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
 
@@ -202,7 +202,7 @@ while True:
     screen.feed(data[pos:i + len(END)])
     pos = i + len(END)
     rows = screen.display()
-    if "Esc closes" in rows[0]:
+    if "Esc collapses" in rows[0]:
         popup = True
         if any("SHELLMARK" in r for r in rows):
             raise SystemExit("the shell shows beside the popup")

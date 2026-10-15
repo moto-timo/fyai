@@ -118,6 +118,8 @@ static const struct fyai_page_action page_golden_actions[] = {
 	{ "ask.back", page_golden_noop },
 	{ "ask.forward", page_golden_noop },
 	{ "popup.close", page_golden_noop },
+	{ "popup.hide", page_golden_noop },
+	{ "popup.expand", page_golden_noop },
 	{ "popup.clear", page_golden_noop },
 	{ "popup.level", page_golden_noop },
 	{ "popup.scroll", page_golden_noop },
@@ -219,6 +221,12 @@ static void page_golden_state(unsigned i, struct fyai_page_state *st)
 		st->popup_rows = 10;
 		st->popup_lines = lines;
 		st->popup_nlines = 2;
+	} else if (st->fullscreen && !page_golden_pick(i, 24, 4)) {
+		/* The compact log stands above the status: one case in four. */
+		st->log_title = "log \xc2\xb7 all \xc2\xb7 2";
+		st->log_rows = 2;
+		st->log_lines = lines;
+		st->log_nlines = 2;
 	}
 	st->actions = page_golden_actions;
 	st->nactions = sizeof(page_golden_actions) /
@@ -1465,6 +1473,8 @@ static const struct fyai_page_action page_test_ask_actions[] = {
 	{ "ask.dismiss", page_test_ask_noop },
 	{ "panel.scroll", page_test_ask_noop },
 	{ "popup.close", page_test_ask_noop },
+	{ "popup.hide", page_test_ask_noop },
+	{ "popup.expand", page_test_ask_noop },
 	{ "popup.clear", page_test_ask_noop },
 	{ "popup.level", page_test_ask_noop },
 	{ "popup.scroll", page_test_ask_noop },

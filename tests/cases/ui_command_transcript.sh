@@ -76,7 +76,7 @@ PY
 # pane, which the harness selects: the output is in the popup, and the
 # transcript keeps nothing of the command, in no frame.
 run_steps \
-	"send:/status|wait-screen:Auth / provider|raw:1b|wait-gone:Auth / provider|send:yellow?|wait-screen:second"
+	"send:/status|click:[expand]|wait-screen:Auth / provider|raw:1b|wait-gone:Auth / provider|send:yellow?|wait-screen:second"
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
 

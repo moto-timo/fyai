@@ -15,6 +15,10 @@
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -240,7 +244,7 @@ CAP <fy-fill/>
 === case 5
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -783,6 +787,10 @@ HINT <b>x</b>
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -869,6 +877,10 @@ CAP <fy-fill/>
 <fy-role name="chrome"><fy-fill char="─"/></fy-role>
 
 </fy-drop>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -1030,6 +1042,10 @@ CAP <fy-fill/>
 <fy-space n="4"/>Style: own <answer>
 
 <fy-space n="4"/><fy-role name="chrome">Enter sends the answers · ← revises · Esc cancels</fy-role>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -1237,7 +1253,7 @@ CAP <fy-fill/>
 === case 28
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -1245,7 +1261,7 @@ CAP <fy-fill/>
 === case 29
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -1253,7 +1269,7 @@ CAP <fy-fill/>
 === case 30
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -1861,6 +1877,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -1996,6 +2016,10 @@ CAP <fy-fill/>
 <fy-space n="4"/><fy-role name="chrome">Space toggles · Enter confirms · or type an answer</fy-role>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -2253,7 +2277,7 @@ CAP <fy-fill/>
 === case 53
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -2306,6 +2330,10 @@ CAP <fy-fill/>
 </fy-drop>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -2615,6 +2643,10 @@ CAP <fy-fill/>
 <fy-slot id="prompt" height="4"/>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -3151,6 +3183,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -3358,6 +3394,10 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-role name="chrome">Space toggles · Enter confirms · or type an answer</fy-role>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 
 === case 77
 <fy-tight>
@@ -3455,7 +3495,7 @@ CAP <fy-fill/>
 === case 79
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -3680,6 +3720,10 @@ CAP <fy-fill/>
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -4129,6 +4173,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -4285,6 +4333,10 @@ CAP <fy-fill/>
 
 <fy-slot id="prompt" height="3"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -4341,7 +4393,7 @@ CAP <fy-fill/>
 === case 98
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -4655,7 +4707,7 @@ HINT <b>x</b>
 === case 106
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -4783,6 +4835,10 @@ CAP <fy-fill/>
 </fy-drop>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -4974,6 +5030,10 @@ CAP <fy-fill/>
 
 </fy-drop>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -5112,7 +5172,7 @@ CAP <fy-fill/>
 === case 116
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -5435,6 +5495,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -5464,6 +5528,10 @@ CAP <fy-fill/>
 <fy-space n="4"/><fy-role name="chrome">or type an answer</fy-role>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -5566,7 +5634,7 @@ CAP <fy-fill/>
 === case 128
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -5813,6 +5881,10 @@ CAP <fy-fill/>
 </fy-drop>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 
 === case 134
@@ -6244,6 +6316,10 @@ CAP <fy-fill/>
 
 <fy-slot id="prompt" height="3"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -6256,7 +6332,7 @@ CAP <fy-fill/>
 === case 142
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -6298,7 +6374,7 @@ CAP <fy-fill/>
 === case 144
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -6682,6 +6758,10 @@ STATUS line
 
 <fy-slot id="prompt" height="4"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -6752,7 +6832,7 @@ STATUS line
 === case 154
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -6926,6 +7006,10 @@ CAP <fy-fill/>
 
 </fy-drop>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -6943,7 +7027,7 @@ CAP <fy-fill/>
 === case 159
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -7009,7 +7093,7 @@ CAP <fy-fill/>
 === case 161
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -7093,6 +7177,10 @@ CAP <fy-fill/>
 <fy-slot id="prompt" height="3"/>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -7267,6 +7355,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -7315,6 +7407,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -7342,6 +7438,10 @@ CAP <fy-fill/>
 </fy-drop>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 
 === case 169
@@ -7554,6 +7654,10 @@ HINT <b>x</b>
 <fy-slot id="transcript" height="20"/>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -8131,6 +8235,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -8143,7 +8251,7 @@ CAP <fy-fill/>
 === case 186
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -8151,7 +8259,7 @@ CAP <fy-fill/>
 === case 187
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -8203,7 +8311,7 @@ CAP <fy-fill/>
 === case 189
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -8504,7 +8612,7 @@ CAP <fy-fill/>
 === case 194
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -8512,7 +8620,7 @@ CAP <fy-fill/>
 === case 195
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -8520,7 +8628,7 @@ CAP <fy-fill/>
 === case 196
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -8707,6 +8815,10 @@ CAP <fy-fill/>
 <fy-slot id="header" height="1"/>
 
 </fy-drop>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -9042,7 +9154,7 @@ CAP <fy-fill/>
 === case 210
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -9050,7 +9162,7 @@ CAP <fy-fill/>
 === case 211
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -9108,7 +9220,7 @@ HINT <b>x</b>
 === case 213
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -9228,6 +9340,10 @@ HINT <b>x</b>
 
 <fy-slot id="prompt" height="4"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -9240,7 +9356,7 @@ HINT <b>x</b>
 === case 217
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -9505,7 +9621,7 @@ HINT <b>x</b>
 === case 224
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -9731,6 +9847,10 @@ STATUS line
 <fy-slot id="prompt" height="3"/>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -10013,6 +10133,10 @@ CAP <fy-fill/>
 
 <fy-slot id="prompt" height="3"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -10140,7 +10264,7 @@ CAP <fy-fill/>
 === case 238
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -10288,7 +10412,7 @@ CAP <fy-fill/>
 === case 242
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -10371,6 +10495,10 @@ CAP <fy-fill/>
 </fy-drop>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -10769,7 +10897,7 @@ CAP <fy-fill/>
 === case 253
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -11006,7 +11134,7 @@ CAP <fy-fill/>
 === case 259
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -11026,6 +11154,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 HINT <b>x</b>
@@ -11038,7 +11170,7 @@ HINT <b>x</b>
 === case 261
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -11064,7 +11196,7 @@ CAP <fy-fill/>
 === case 263
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -11267,6 +11399,10 @@ CAP <fy-fill/>
 </fy-drop>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -12020,7 +12156,7 @@ CAP <fy-fill/>
 === case 286
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12180,7 +12316,7 @@ CAP <fy-fill/>
 === case 291
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12188,7 +12324,7 @@ CAP <fy-fill/>
 === case 292
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12196,7 +12332,7 @@ CAP <fy-fill/>
 === case 293
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12204,7 +12340,7 @@ CAP <fy-fill/>
 === case 294
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12340,6 +12476,10 @@ CAP <fy-fill/>
 <fy-slot id="prompt" height="3"/>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -12618,7 +12758,7 @@ HINT <b>x</b>
 === case 304
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12711,7 +12851,7 @@ CAP <fy-fill/>
 === case 306
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12774,7 +12914,7 @@ CAP <fy-fill/>
 === case 308
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -12853,6 +12993,10 @@ CAP <fy-fill/>
 
 </fy-drop>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -12922,7 +13066,7 @@ CAP <fy-fill/>
 === case 312
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -13249,6 +13393,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -13310,7 +13458,7 @@ CAP <fy-fill/>
 === case 321
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -13318,7 +13466,7 @@ CAP <fy-fill/>
 === case 322
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -13555,6 +13703,10 @@ STATUS line
 <fy-slot id="prompt" height="3"/>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -13803,6 +13955,10 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-role name="chrome">Space toggles · Enter confirms · ← back · or type an answer</fy-role>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-space/>
 
 <fy-slot id="pane" height="3"/>
@@ -13993,6 +14149,10 @@ STATUS line
 <fy-slot id="header" height="1"/>
 
 </fy-drop>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -14270,6 +14430,10 @@ STATUS line
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -14359,6 +14523,10 @@ CAP <fy-fill/>
 <fy-space n="7"/><fy-role name="chrome">means <i>yes</i></fy-role>
 
 <fy-space n="4"/><fy-role name="chrome">Space toggles · Enter confirms · ← back · or type an answer</fy-role>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -14633,7 +14801,7 @@ HINT <b>x</b>
 === case 353
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -14984,7 +15152,7 @@ CAP <fy-fill/>
 === case 363
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -15048,6 +15216,10 @@ CAP <fy-fill/>
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space n="4"/><fy-role name="chrome">something else</fy-role><fy-fill/></fy-role>
 
 <fy-space n="4"/><fy-role name="chrome">Space toggles · Enter confirms · or type an answer</fy-role>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 
 === case 366
@@ -15446,6 +15618,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 [2mSTATUS line[22m
@@ -15767,6 +15943,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 [2mHINT <b>x</b>[22m
@@ -15965,7 +16145,7 @@ HINT <b>x</b>
 === case 383
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -16217,7 +16397,7 @@ CAP <fy-fill/>
 === case 389
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -16301,7 +16481,7 @@ CAP <fy-fill/>
 === case 392
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -16486,7 +16666,7 @@ CAP <fy-fill/>
 === case 397
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -16639,6 +16819,10 @@ CAP <fy-fill/>
 </fy-drop>
 
 <fy-slot id="note" height="1"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -17206,6 +17390,10 @@ CAP <fy-fill/>
 
 <fy-slot id="prompt" height="3"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -17248,7 +17436,7 @@ CAP <fy-fill/>
 === case 414
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -17471,6 +17659,10 @@ STATUS line
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -17549,7 +17741,7 @@ STATUS line
 === case 422
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -17810,6 +18002,10 @@ CAP <fy-fill/>
 
 <fy-slot id="prompt" height="4"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -17918,6 +18114,10 @@ CAP <fy-fill/>
 <fy-slot id="prompt" height="4"/>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -18028,7 +18228,7 @@ STATUS line
 === case 433
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18152,6 +18352,10 @@ HINT <b>x</b>
 
 <fy-slot id="prompt" height="4"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -18164,7 +18368,7 @@ HINT <b>x</b>
 === case 437
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18371,7 +18575,7 @@ CAP <fy-fill/>
 === case 442
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18379,7 +18583,7 @@ CAP <fy-fill/>
 === case 443
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18387,7 +18591,7 @@ CAP <fy-fill/>
 === case 444
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18435,7 +18639,7 @@ CAP <fy-fill/>
 === case 446
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18596,7 +18800,7 @@ STATUS line
 === case 450
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18604,7 +18808,7 @@ STATUS line
 === case 451
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -18790,6 +18994,10 @@ STATUS line
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -18847,6 +19055,10 @@ STATUS line
 <fy-role name="chrome"><fy-fill char="─"/></fy-role>
 
 </fy-drop>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -19023,7 +19235,7 @@ HINT <b>x</b>
 === case 461
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -19352,7 +19564,7 @@ CAP <fy-fill/>
 === case 469
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -19774,7 +19986,7 @@ HINT <b>x</b>
 === case 479
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -19935,6 +20147,10 @@ HINT <b>x</b>
 <fy-slot id="prompt" height="4"/>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -20322,7 +20538,7 @@ HINT <b>x</b>
 === case 492
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -20743,6 +20959,10 @@ HINT <b>x</b>
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -20837,6 +21057,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 HINT <b>x</b>
@@ -20884,7 +21108,7 @@ CAP <fy-fill/>
 === case 506
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -21156,7 +21380,7 @@ CAP <fy-fill/>
 === case 513
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -21460,7 +21684,7 @@ CAP <fy-fill/>
 === case 520
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -21571,7 +21795,7 @@ CAP <fy-fill/>
 === case 523
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -22378,6 +22602,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="1"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -22609,6 +22837,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -22652,6 +22884,10 @@ CAP <fy-fill/>
 <fy-space n="4"/><fy-role name="chrome">Enter sends the answers · ← revises · Esc cancels</fy-role>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 
 === case 547
@@ -22961,7 +23197,7 @@ CAP <fy-fill/>
 === case 554
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -23493,7 +23729,7 @@ STATUS line
 === case 565
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -23691,6 +23927,10 @@ STATUS line
 
 <fy-slot id="prompt" height="3"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>
@@ -23824,6 +24064,10 @@ CAP <fy-fill/>
 
 <fy-space n="4"/><fy-role name="chrome">Space toggles · Enter confirms · ← back · or type an answer</fy-role>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
@@ -23844,7 +24088,7 @@ CAP <fy-fill/>
 === case 573
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -24103,7 +24347,7 @@ CAP <fy-fill/>
 === case 579
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -24341,6 +24585,10 @@ CAP <fy-fill/>
 
 <fy-slot id="note" height="2"/>
 
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
+
 <fy-drop order="1">
 
 <fy-space/>STATUS line
@@ -24362,7 +24610,7 @@ CAP <fy-fill/>
 === case 586
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -24415,7 +24663,7 @@ CAP <fy-fill/>
 === case 588
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -24423,7 +24671,7 @@ CAP <fy-fill/>
 === case 589
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
@@ -24531,6 +24779,10 @@ HINT <b>x</b>
 <fy-slot id="prompt" height="4"/>
 
 <fy-slot id="note" height="2"/>
+
+<fy-role name="chrome">── </fy-role><fy-act id="popup.expand">log · all · 2</fy-act><fy-role name="chrome"> <fy-fill char="─"/> </fy-role><fy-act id="popup.expand">[expand]</fy-act><fy-role name="chrome"> </fy-role><fy-act id="popup.hide">[x]</fy-act>
+
+<fy-slot id="log" height="2"/>
 
 <fy-drop order="1">
 
@@ -24684,7 +24936,7 @@ HINT <b>x</b>
 === case 596
 <fy-tight>
 
-<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc closes · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
+<fy-role name="chrome">── /stats <x> </fy-role><fy-act id="popup.close">[Esc collapses · l level · x clears]</fy-act><fy-role name="chrome"> <fy-fill char="─"/></fy-role>
 
 <fy-slot id="popup" height="10"/>
 
