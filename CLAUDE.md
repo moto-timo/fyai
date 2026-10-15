@@ -1284,7 +1284,14 @@ register, focus, zoom, resize - and sizes nothing itself.
   the page. Their regions are regions of the head, so a head is made again
   at every new width (`repaint_head`), or a click finds a button where the
   old width put it.
-- Maximize toggles zoom. Minimize is manager state
+- Maximize toggles zoom. In a fullscreen session it also gives the tile the
+  whole page (`pane.full` of the page state, `ui->tile_full`): the
+  `tile_full` page draws the grid of the pane alone, the fit gives it every
+  row but a hint row, and the tile has the keys. The page is back when the
+  maximize button is used again, on `Ctrl-]`, or when the tile is no longer
+  zoomed. The expand, collapse and close buttons of the log use the glyphs of
+  these tile buttons (`tile.maximize`, `tile.minimize`, `tile.close`), through
+  `glyphs` of the page state. Minimize is manager state
   (`fyai_workpane_set_minimized()`). A minimized tile renders only its header
   in a fitted row below the screens through `fytim_surface_set_collapsed()`.
   It cannot be focused or zoomed. Its program keeps its current size because

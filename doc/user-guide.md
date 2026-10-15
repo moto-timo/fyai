@@ -1348,7 +1348,7 @@ panel or popup, and no card is drawn.
 A fullscreen session keeps the results that reach the panel, the notices and
 the diagnostics in a log, each with a level: info, notice, warning or error.
 A long result opens the log small, above the status. A click on its heading or
-on `[expand]` expands it over the page, and Escape collapses it again; `[x]` or
+on the maximize glyph (`□`) expands it over the page, and Escape collapses it again; the close glyph (`×`) or
 Escape hides the small log, and the log stays. The header shows the count of
 the log, in the colour of its worst level, next to the live work; a click on it
 steps the log from hidden to small, to expanded and back to hidden. Bind a key
@@ -1356,6 +1356,10 @@ to `fyai.messages.toggle` to step it from the keyboard, for example
 `--set 'display/keys={prompt: {Ctrl-G: fyai.messages.toggle}}'`. In the popup,
 `l` raises the lowest level that it shows and `x` clears the log. The log shows
 the cause of a diagnostic without the name of the module that raised it.
+
+In a fullscreen session the maximize button (`□`) of a shell or sub-agent tile
+gives the tile the whole page and the keys; a hint row says the way back. The
+same button, or `Ctrl-]`, gives the page back.
 
 `ember:auto` is the default `display/theme` when fyai is built with
 libfypalette. A build without it uses `default:auto`.
