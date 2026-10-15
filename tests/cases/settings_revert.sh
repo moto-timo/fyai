@@ -70,6 +70,20 @@ run_fyai config keep c4
 assert_status_nonzero
 assert_stderr_contains 'is not a trial'
 
+# Keep can persist a trial of a key that session commands treat as temporary.
+run_fyai tool settings '{"action":"change","changes":[{"path":"display/theme_ground","value":"theme"}],"trial":true,"explanation":"t"}'
+assert_status 0
+assert_stdout_contains '"id": "c7"'
+run_fyai config keep c7
+assert_status 0
+run_fyai config get display/theme_ground
+assert_stdout_contains 'theme'
+
+# A normal model change persists even for a session-scoped setting command.
+change '[{"path":"display/table_border","value":"grid"}]'
+run_fyai config get display/table_border
+assert_stdout_contains 'grid'
+
 run_fyai config changes --output json
 assert_status 0
 assert_stdout_contains '"kept"'

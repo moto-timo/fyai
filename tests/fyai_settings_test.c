@@ -145,6 +145,9 @@ int settings_read(void)
 	FYAI_TCHECK(!fy_is_valid(fy_get(fy_get(r, "schema", fy_invalid),
 					"x-fyai-model", fy_invalid)));
 	FYAI_TCHECK(fy_equal(fy_get(r, "arena_protected", fy_invalid), false));
+	r = run("{action: describe, path: display/theme_ground}", &ok);
+	FYAI_TCHECK(ok && fy_equal(fy_get(r, "scope", fy_invalid),
+				  "stored"));
 
 	r = run("{action: get, path: shell/timeout_ms}", &ok);
 	FYAI_TCHECK(ok && fy_equal(fy_get(r, "layer", fy_invalid),
@@ -278,12 +281,32 @@ int settings_offered(void)
 int settings_format(void)
 {
 	const struct fyai_tool_def *def = fyai_tool_find("settings");
-	fy_generic r;
+	fy_generic r, saved_config;
 	char *text;
 	bool ok;
 
 	if (settings_setup())
 		return 1;
+	FYAI_TCHECK(fyai_config_session_scoped("display/theme_ground"));
+	FYAI_TCHECK(fyai_config_session_scoped("display/table_border"));
+	/* A default is the displayed old value even when the branch is empty. */
+	saved_config = test_ctx.arena_config;
+	test_ctx.arena_config = doc("{}");
+	r = run("{action: change, changes: [{path: display/table_border, "
+		"value: grid}]}", &ok);
+	FYAI_TCHECK(ok);
+	FYAI_TCHECK(strstr(fy_get(r, "diff", ""),
+				"--- a/config.yaml\n+++ b/config.yaml\n"));
+	FYAI_TCHECK(strstr(fy_get(r, "diff", ""),
+				"-  table_border: theme"));
+	FYAI_TCHECK(strstr(fy_get(r, "diff", ""),
+				"+  table_border: grid"));
+	r = run("{action: change, changes: [{path: display/theme_ground, "
+		"value: theme}]}", &ok);
+	FYAI_TCHECK(ok && strstr(fy_get(r, "diff", ""),
+				"--- a/config.yaml\n+++ b/config.yaml\n") &&
+		    !fy_is_valid(fy_get(r, "scope", fy_invalid)));
+	test_ctx.arena_config = saved_config;
 	FYAI_TCHECK(def && def->format_result);
 	FYAI_TCHECK(fyai_tool_has("settings", FYAI_TOOL_WHOLE_RESULT));
 	FYAI_TCHECK(fyai_tool_has("settings", FYAI_TOOL_ROOT_ONLY));
@@ -296,6 +319,12 @@ int settings_format(void)
 				  doc("{action: describe}"), fy_castp(&r, ""));
 	FYAI_TCHECK(text && strstr(text, "`temperature`") &&
 		    strstr(text, "write") && strstr(text, "(branch)"));
+	free(text);
+	text = def->format_result(&test_ctx, test_ctx.transient_gb,
+		doc("{action: change}"),
+		"{\"status\": \"applied\", \"id\": \"c1\", "
+		"\"scope\": \"session\"}");
+	FYAI_TCHECK(text && strstr(text, "Applied for this session"));
 	free(text);
 
 	/* A group shows the defaults of its members. */
@@ -315,9 +344,12 @@ int settings_format(void)
 	text = def->format_result(&test_ctx, test_ctx.transient_gb,
 		doc("{action: change}"),
 		"{\"status\": \"pending\", \"id\": \"p1\", \"diff\": "
-		"\"@@ -1 +1 @@\\n-a: 1\\n+a: 2\\n\"}");
+		"\"--- a/config.yaml\\n+++ b/config.yaml\\n"
+		"@@ -1 +1 @@\\n-a: 1\\n+a: 2\\n\"}");
 	FYAI_TCHECK(text && strstr(text, "**Waits** as proposal `p1`") &&
-		    strstr(text, "```diff\n@@ -1 +1 @@\n-a: 1\n+a: 2\n```"));
+		    strstr(text, "```diff\n--- a/config.yaml\n"
+				 "+++ b/config.yaml\n@@ -1 +1 @@\n"
+				 "-a: 1\n+a: 2\n```"));
 	free(text);
 
 	settings_teardown();
