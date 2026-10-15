@@ -145,6 +145,8 @@ size_t fyai_cmd_session_prefix(const char *name, size_t len);
 
 /* True when the slash command @line ends the session. */
 bool fyai_cmd_session_ends(const char *line);
+/* True when the output of the slash command is a status, not conversation. */
+bool fyai_cmd_session_is_status(const char *line);
 
 /* True when the slash command @line may run while a turn is in flight. */
 bool fyai_cmd_session_immediate(const char *line);

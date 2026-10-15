@@ -3528,7 +3528,7 @@ static int fyai_interactive_handle_slash(struct fyai_ctx *ctx,
 {
 	fy_generic head;
 	char *branch;
-	bool transcript;
+	bool transcript, status;
 	int rc;
 
 	if (line[0] != '/' || line[1] == '/')
@@ -3536,13 +3536,16 @@ static int fyai_interactive_handle_slash(struct fyai_ctx *ctx,
 	/* A skill that the user runs is a turn of the conversation. */
 	if (fyai_skill_user_line(ctx, line))
 		return -1;
-	transcript = !strcmp(ctx->cfg->command_output, "transcript");
+	status = fyai_cmd_session_is_status(line + 1);
+	transcript = !status && !strcmp(ctx->cfg->command_output, "transcript");
 	fyai_ui_history_save(ctx, histfile, line);
 	if (transcript)
 		fyai_echo_user_turn(ctx, line);
 	head = ctx->last_message;
 	branch = ctx->branch ? strdup(ctx->branch) : NULL;
+	fyai_ui_pane_status(ctx, status);
 	rc = fyai_session_slash(ctx, line);
+	fyai_ui_pane_status(ctx, false);
 	/* /exit and /quit end the session and store nothing. */
 	if (transcript && record && rc == 0 && branch)
 		fyai_interactive_record_command(ctx, line, head, branch);

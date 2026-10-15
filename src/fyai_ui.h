@@ -225,6 +225,9 @@ void fyai_ui_pane_end(struct fyai_ctx *ctx, const char *title, bool error,
  * The output that the last pane drew into the transcript, with
  * display/command_output set to transcript, or NULL. The caller frees it.
  */
+/* The output of the next command is a status: it goes to the panel and not
+ * to the transcript, whatever display/command_output says. */
+void fyai_ui_pane_status(struct fyai_ctx *ctx, bool status);
 char *fyai_ui_pane_take(struct fyai_ctx *ctx);
 void fyai_ui_diag_drain(struct fyai_ctx *ctx, const char *title);
 

@@ -112,6 +112,7 @@ $defs:
           enum: [model, no-storage, storage-optional, transient, interactive]
       view: {type: boolean}
       ends_session: {type: boolean}
+      status: {type: boolean}
       setting:
         type: object
         required: [key]

@@ -1938,6 +1938,23 @@ bool fyai_cmd_session_ends(const char *line)
 	return ends;
 }
 
+bool fyai_cmd_session_is_status(const char *line)
+{
+	struct fyai_cmd_walk w;
+	char **words;
+	size_t *offs;
+	bool status;
+	int n;
+
+	n = fyai_cmd_split(line, false, &words, &offs);
+	status = n > 0 && !fyai_cmd_walk(FYAI_CMD_SESSION, (size_t)n,
+					 (const char *const *)words, (size_t)n,
+					 &w) &&
+		 fy_get(w.def, "status", false);
+	fyai_cmd_split_free(words, n, offs);
+	return status;
+}
+
 bool fyai_cmd_session_immediate(const char *line)
 {
 	struct fyai_cmd_walk w;

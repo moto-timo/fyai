@@ -538,6 +538,7 @@ commands:
       one provider.
     surfaces: [cli, session]
     handler: model
+    status: true
     while_busy: bare
     see_also: [config-paths]
     arguments:

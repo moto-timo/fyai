@@ -142,6 +142,7 @@ struct fyai_ui {
 	off_t capture_err;
 	struct response_buffer pane_out;	/* what a pane captured */
 	char *pane_kept;		/* output drawn into the transcript */
+	bool pane_status;		/* the command output is a status */
 	struct response_buffer open_row;	/* a row not ended yet */
 	bool capture;
 	bool recalled;
@@ -3034,7 +3035,8 @@ static void ui_pane_end(struct fyai_ctx *ctx, const char *title, bool error,
 	}
 	/* A command that waits for input must keep the prompt accessible. */
 	if ((ctx->cmd_call && ctx->cmd_call->input) ||
-	    (command && !strcmp(ctx->cfg->command_output, "transcript"))) {
+	    (command && !ui->pane_status &&
+	     !strcmp(ctx->cfg->command_output, "transcript"))) {
 		ui_pane_to_transcript(ui, &out);
 		free(out.data);
 		return;
@@ -3085,6 +3087,12 @@ void fyai_ui_pane_end(struct fyai_ctx *ctx, const char *title, bool error,
 		      bool show_output)
 {
 	ui_pane_end(ctx, title, error, show_output, true);
+}
+
+void fyai_ui_pane_status(struct fyai_ctx *ctx, bool status)
+{
+	if (ctx && ctx->ui)
+		ctx->ui->pane_status = status;
 }
 
 char *fyai_ui_pane_take(struct fyai_ctx *ctx)
