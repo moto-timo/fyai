@@ -384,8 +384,7 @@ static fy_generic settings_describe(struct settings_walk *w, const char *path)
 		"path", path,
 		"access", fyai_model_access_name(
 				fyai_config_model_access(path)),
-		"scope", fyai_config_session_scoped(path) ? "session" :
-			 "stored",
+		"scope", "stored",
 		"layer", layer);
 	if (fy_is_valid(value))
 		result = fy_assoc(w->gb, result, "value", value);
@@ -430,9 +429,7 @@ static void settings_list_walk(struct settings_walk *w, const char *path,
 		if (w->full) {
 			dflt = settings_redact(w, path,
 				settings_schema_default(w->gb, node, 0), 0);
-			row = fy_assoc(w->gb, row, "scope",
-				fyai_config_session_scoped(path) ?
-				"session" : "stored");
+			row = fy_assoc(w->gb, row, "scope", "stored");
 			row = fy_assoc(w->gb, row, "default",
 				fy_is_valid(dflt) ? dflt : fy_null);
 			/* What a layer set that the default does not have. */
@@ -465,6 +462,7 @@ struct settings_change {
 	fy_generic session;	/* the session layer after, or fy_invalid */
 	enum fyai_model_access access;	/* the strictest of every path */
 	bool trial;		/* the session layer only, for every scope */
+	bool legacy_scope;	/* an older change used schema scope */
 	const char *diff;	/* Markdown that fyai made, in the builder */
 	const char *unified;	/* the unified diff alone */
 	/* The entry of the change log that this change reverts or keeps,
@@ -614,28 +612,25 @@ static const char *settings_emit(struct fy_generic_builder *gb, fy_generic v)
 					fy_castp(&text, "")) : NULL;
 }
 
-/*
- * @unified without the header rows of each file: the summary row names the
- * layer, and the rows of the panel are few.
- */
-static const char *settings_diff_body(struct fy_generic_builder *gb,
-				      const char *unified)
+/* Copy only paths already approved for a change into a display document. */
+static fy_generic settings_changed_values(struct settings_walk *w,
+					   fy_generic doc, fy_generic changes)
 {
-	struct response_buffer out = { 0 };
-	const char *line, *nl, *body;
-	size_t len;
-	int rc = 0;
+	fy_generic out, item, value;
+	const char *path;
 
-	for (line = unified; *line && !rc; line += len) {
-		nl = strchr(line, '\n');
-		len = nl ? (size_t)(nl - line) + 1 : strlen(line);
-		if (!strncmp(line, "--- ", 4) || !strncmp(line, "+++ ", 4))
-			continue;
-		rc = response_buffer_append_data(&out, line, len);
+	out = fy_mapping(w->gb);
+	fy_foreach(item, changes) {
+		path = fy_get(item, "path", "");
+		value = fy_is_mapping(doc) ?
+			fy_get_at_pathstr(w->gb, doc, path) : fy_invalid;
+		if (fy_is_valid(value))
+			out = settings_doc_set(w->gb, out, path,
+				settings_redact(w, path, value, 0));
+		if (!fy_is_valid(out))
+			break;
 	}
-	body = rc ? NULL : fy_gb_intern_string(gb, out.data ? out.data : "");
-	free(out.data);
-	return body;
+	return out;
 }
 
 /*
@@ -665,43 +660,83 @@ static const char *settings_fence(struct fy_generic_builder *gb,
 	return fy_gb_intern_string(gb, fence);
 }
 
-/* @unified as a fenced diff block, without the header rows of each file. */
+/* Keep file headers so the diff renderer detects the YAML language. */
 static const char *settings_diff_block(struct fy_generic_builder *gb,
 				       const char *unified)
 {
-	const char *body, *fence;
+	const char *fence;
 
-	body = settings_diff_body(gb, unified);
-	fence = body ? settings_fence(gb, body) : NULL;
+	fence = settings_fence(gb, unified);
 	if (!fence)
 		return NULL;
 	return fy_gb_intern_string(gb, fy_sprintfa("%sdiff\n%s%s\n", fence,
-						   body, fence));
+					   unified, fence));
 }
 
 /*
- * Make the diff of @c: the unified diff of the emitted documents of each
- * layer that it writes, under a summary row. The diff holds values that the
- * model wrote, so its fence is longer than every run of backticks in it, and
- * no control byte stays.
+ * Make the diff of @c from the effective values of changed paths, grouped by
+ * the layer written. The fence must contain arbitrary values of those paths.
  */
 static int settings_change_diff(struct settings_walk *w,
-				struct settings_change *c, fy_generic stored0,
-				fy_generic session0)
+				struct settings_change *c)
 {
 	struct response_buffer all = { 0 };
+	fy_generic shown0, stored, session, old_layer, new_layer, item, value;
 	const char *a, *b, *p, *scope, *body;
+	const char *path, *layer;
 	char *part;
 	size_t added = 0, removed = 0;
 	int rc = -1;
 
+	/* Keep hidden keys of the active document out of the diff. */
+	shown0 = fy_mapping(w->gb);
+	fy_foreach(item, c->changes) {
+		path = fy_get(item, "path", "");
+		value = settings_value(w, path, &layer);
+		if (fy_is_valid(value))
+			shown0 = settings_doc_set(w->gb, shown0, path,
+					settings_redact(w, path, value, 0));
+		if (!fy_is_valid(shown0))
+			goto out;
+	}
+	stored = shown0;
+	session = shown0;
+	fy_foreach(item, c->changes) {
+		path = fy_get(item, "path", "");
+		value = fy_get(item, "value", fy_invalid);
+		if (fy_is_valid(value))
+			value = settings_redact(w, path, value, 0);
+		if (c->trial || (c->legacy_scope &&
+				 fyai_config_session_scoped(path)))
+			session = settings_doc_set(w->gb, session, path, value);
+		else
+			stored = settings_doc_set(w->gb, stored, path, value);
+		if (!fy_is_valid(stored) || !fy_is_valid(session))
+			goto out;
+	}
+
 	if (fy_is_valid(c->stored)) {
-		a = settings_emit(w->gb, stored0);
-		b = settings_emit(w->gb, c->stored);
+		a = settings_emit(w->gb, shown0);
+		b = settings_emit(w->gb, stored);
 		if (!a || !b || fyai_diff_unified(a, strlen(a), b, strlen(b),
-				"branch configuration", "branch configuration",
+				"a/config.yaml", "b/config.yaml",
 				2, &part))
 			goto out;
+		if (!*part) {
+			free(part);
+			old_layer = settings_changed_values(w,
+				w->ctx->arena_config, c->changes);
+			new_layer = settings_changed_values(w, c->stored,
+				c->changes);
+			if (!fy_is_valid(old_layer) || !fy_is_valid(new_layer))
+				goto out;
+			a = settings_emit(w->gb, old_layer);
+			b = settings_emit(w->gb, new_layer);
+			if (!a || !b || fyai_diff_unified(a, strlen(a), b,
+					strlen(b), "a/config.yaml",
+					"b/config.yaml", 2, &part))
+				goto out;
+		}
 		rc = response_buffer_append(&all, part);
 		free(part);
 		if (rc)
@@ -709,11 +744,26 @@ static int settings_change_diff(struct settings_walk *w,
 		rc = -1;
 	}
 	if (fy_is_valid(c->session)) {
-		a = settings_emit(w->gb, session0);
-		b = settings_emit(w->gb, c->session);
+		a = settings_emit(w->gb, shown0);
+		b = settings_emit(w->gb, session);
 		if (!a || !b || fyai_diff_unified(a, strlen(a), b, strlen(b),
-				"session layer", "session layer", 2, &part))
+				"a/session.yaml", "b/session.yaml", 2, &part))
 			goto out;
+		if (!*part) {
+			free(part);
+			old_layer = settings_changed_values(w,
+				w->ctx->cfg->config_session, c->changes);
+			new_layer = settings_changed_values(w, c->session,
+				c->changes);
+			if (!fy_is_valid(old_layer) || !fy_is_valid(new_layer))
+				goto out;
+			a = settings_emit(w->gb, old_layer);
+			b = settings_emit(w->gb, new_layer);
+			if (!a || !b || fyai_diff_unified(a, strlen(a), b,
+					strlen(b), "a/session.yaml",
+					"b/session.yaml", 2, &part))
+				goto out;
+		}
 		rc = response_buffer_append(&all, part);
 		free(part);
 		if (rc)
@@ -749,9 +799,8 @@ out:
 }
 
 /*
- * Build the configuration after @c: each path in the session layer when it
- * is session-scoped or the change is a trial, else in the branch
- * configuration. Both are checked; the diff is made from them.
+ * Build the configuration after @c in the branch, or in the session layer
+ * for a trial. Both are checked; the diff is made from them.
  */
 static int settings_change_build(struct settings_walk *w,
 				 struct settings_change *c,
@@ -775,7 +824,8 @@ static int settings_change_build(struct settings_walk *w,
 	fy_foreach(item, c->changes) {
 		path = fy_get(item, "path", "");
 		value = fy_get(item, "value", fy_invalid);
-		in_session = c->trial || fyai_config_session_scoped(path);
+		in_session = c->trial || (c->legacy_scope &&
+					    fyai_config_session_scoped(path));
 		c->before = fy_assoc(w->gb, c->before, path, settings_doc_get(
 			w->gb, in_session ? session0 : stored0, path));
 		if (in_session) {
@@ -818,11 +868,12 @@ static int settings_change_build(struct settings_walk *w,
 	}
 	fy_foreach(item, c->changes) {
 		path = fy_get(item, "path", "");
-		in_session = c->trial || fyai_config_session_scoped(path);
+		in_session = c->trial || (c->legacy_scope &&
+					    fyai_config_session_scoped(path));
 		c->after = fy_assoc(w->gb, c->after, path, settings_doc_get(
 			w->gb, in_session ? session : stored, path));
 	}
-	if (settings_change_diff(w, c, stored0, session0)) {
+	if (settings_change_diff(w, c)) {
 		snprintf(why, why_size, "the diff could not be made");
 		return -1;
 	}
@@ -926,6 +977,7 @@ static fy_generic settings_entry(struct fyai_ctx *ctx,
 		"paths", c->paths,
 		"changes", c->changes,
 		"trial", c->trial,
+		"persistent", !c->trial && !c->legacy_scope,
 		"before", c->before,
 		"after", c->after,
 		"diff", c->unified ? c->unified : "",
@@ -1290,6 +1342,9 @@ static fy_generic settings_present(struct settings_walk *w,
 	}
 	result = fy_mapping(w->gb, "status", status, "access",
 			    fyai_model_access_name(access), "diff", c->unified);
+	if (!strcmp(status, "applied") && !fy_is_valid(c->stored))
+		result = fy_assoc(w->gb, result, "scope", "session",
+			"note", "This change lasts only for this invocation.");
 	if (id)
 		result = fy_assoc(w->gb, result, "id", id);
 	if (reply) {
@@ -1325,6 +1380,7 @@ static int settings_revert_build(struct settings_walk *w, fy_generic entry,
 
 	memset(c, 0, sizeof(*c));
 	c->trial = fy_get(entry, "trial", false);
+	c->legacy_scope = !fy_get(entry, "persistent", false);
 	before = fy_get(entry, "before", fy_invalid);
 	after = fy_get(entry, "after", fy_invalid);
 	out = fy_sequence(w->gb);
@@ -1332,7 +1388,8 @@ static int settings_revert_build(struct settings_walk *w, fy_generic entry,
 	conflicts = fy_sequence(w->gb);
 	fy_foreach(item, fy_get(entry, "paths", fy_invalid)) {
 		path = fy_gb_intern_string(w->gb, fy_castp(&item, ""));
-		in_session = c->trial || fyai_config_session_scoped(path);
+		in_session = c->trial || (c->legacy_scope &&
+					    fyai_config_session_scoped(path));
 		cur = settings_doc_get(w->gb, in_session ?
 				       ctx->cfg->config_session :
 				       ctx->arena_config, path);
@@ -1461,7 +1518,7 @@ int fyai_settings_keep(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 {
 	struct settings_walk w;
 	struct settings_change c;
-	fy_generic entry, after, item, v, out, paths, session, stored0;
+	fy_generic entry, after, item, v, out, paths, session;
 	fy_generic session0;
 	const char *path, *cid;
 	char why[1024];
@@ -1472,10 +1529,12 @@ int fyai_settings_keep(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 	entry = settings_change_entry(ctx, id);
 	if (!fy_is_mapping(entry))
 		return -1;
-	fyai_error_check(ctx, fy_get(entry, "trial", false), err_out,
-			 "change '%s' is not a trial", id);
-	/* Each key of stored scope goes to the branch with the value of the
-	 * trial, and leaves the session layer. */
+	fyai_error_check(ctx, fy_get(entry, "trial", false) ||
+			 (fy_equal(fy_get(entry, "status", fy_invalid),
+				   "session") &&
+			  !fy_get(entry, "persistent", false)), err_out,
+			 "change '%s' is not a trial or session-only change", id);
+	/* Store each trial key in the branch and remove its session override. */
 	after = fy_get(entry, "after", fy_invalid);
 	out = fy_sequence(gb);
 	paths = fy_sequence(gb);
@@ -1483,8 +1542,6 @@ int fyai_settings_keep(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 		  ctx->cfg->config_session : fy_map_empty;
 	fy_foreach(item, fy_get(entry, "paths", fy_invalid)) {
 		path = fy_gb_intern_string(gb, fy_castp(&item, ""));
-		if (fyai_config_session_scoped(path))
-			continue;
 		v = fy_get(after, path, fy_null);
 		out = fy_append(gb, out, fy_is_null(v) ?
 			fy_mapping(gb, "path", path, "delete", true) :
@@ -1504,14 +1561,12 @@ int fyai_settings_keep(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 		fyai_error(ctx, "change '%s' is not kept: %s", id, why);
 		return -1;
 	}
-	stored0 = fy_is_mapping(ctx->arena_config) ? ctx->arena_config :
-		  fy_map_empty;
 	session0 = fy_is_mapping(ctx->cfg->config_session) ?
 		   ctx->cfg->config_session : fy_map_empty;
 	c.session = fy_compare(session, session0) ? session : fy_invalid;
 	if ((fy_is_valid(c.session) &&
 	     !fyai_config_session_layer_valid(ctx, session)) ||
-	    settings_change_diff(&w, &c, stored0, session0)) {
+	    settings_change_diff(&w, &c)) {
 		fyai_error(ctx, "change '%s' is not kept: the session layer "
 			   "cannot give up its keys", id);
 		return -1;
@@ -2799,7 +2854,8 @@ static char *settings_format(struct fyai_ctx *ctx,
 		if (!strcmp(status, "applied"))
 			fprintf(mf, "**%s** as change %s\n",
 				fy_equal(action, "revert") ? "Taken back" :
-				"Applied",
+				!strcmp(fy_get(data, "scope", ""), "session") ?
+				"Applied for this session" : "Applied",
 				settings_span(gb, fy_get(data, "id", "")));
 		else if (!strcmp(status, "pending"))
 			fprintf(mf, "**Waits** as proposal %s for `config "

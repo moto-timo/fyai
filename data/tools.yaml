@@ -735,7 +735,8 @@
       Each key has an access: `read`, `review` and `write` keys can be read, and `hidden` keys are
       left out of every answer and named under `hidden`. `change` presents a change of `review`
       and `write` keys: give the `changes` and an `explanation` for the user. fyai checks the
-      change and makes its diff. It applies a change of `write` keys at once when the
+      change and makes its diff. A normal change is stored in the branch; `trial: true` lasts
+      only for the invocation. It applies a change of `write` keys at once when the
       configuration allows it; otherwise the user reviews your explanation and the diff and
       accepts or rejects it, or types a reply. When nobody can review it now, it is kept as a
       proposal. You never write the configuration yourself, and you cannot change a `read` key.

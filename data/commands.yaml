@@ -1559,11 +1559,11 @@ commands:
             - "{?diff}{diff}"
 
       - command: keep
-        title: store a trial change of the model
+        title: store a temporary change of the model
         description: |
-          Store the trial change ID: each key it changed for this session
-          goes to the configuration of the branch, with the value of the
-          trial, and leaves the session layer.
+          Store a trial change or an older session-only change by ID: each
+          key goes to the configuration of the branch with the value of
+          that change, and leaves the session layer.
         handler: config_keep
         arguments:
           type: object
@@ -1572,7 +1572,7 @@ commands:
           properties:
             id:
               type: string
-              description: the id of the trial change, such as c1
+              description: the id of the temporary change, such as c1
               x-fyai-positional: 0
               x-fyai-meta: ID
         render:
