@@ -40,6 +40,7 @@ FYAI_TEST_ENTRY(markdown, source_rows_utf8, markdown_source_rows_utf8)
 FYAI_TEST_ENTRY(markdown, role_palette, markdown_role_palette)
 FYAI_TEST_ENTRY(markdown, focus_ground, markdown_focus_ground_test)
 FYAI_TEST_ENTRY(markdown, fullscreen_ground, markdown_fullscreen_ground_test)
+FYAI_TEST_ENTRY(markdown, command_ground_theme, markdown_command_ground_theme)
 FYAI_TEST_ENTRY(markdown, gutter_palette, markdown_gutter_palette)
 FYAI_TEST_ENTRY(markdown, reasoning_palette, markdown_reasoning_palette)
 FYAI_TEST_ENTRY(markdown, theme_selectors, markdown_theme_selectors_test)
@@ -504,6 +505,53 @@ int markdown_fullscreen_ground_test(void)
  * finished call, and the result marker, and tool output starts after it.
  * Without a palette the gutter keeps two columns.
  */
+/* On a fullscreen page with a theme ground, the output of a command stands on
+ * the ground of the theme and not on the background of the terminal. */
+int markdown_command_ground_theme(void)
+{
+	struct fyai_cfg cfg = {
+		.markdown = true,
+		.color = "on",
+		.screen = "fullscreen",
+		.theme_ground = "theme",
+		.command_bg = "theme",
+		.command_bg_mix = 0,
+		.terminal = {
+			.flags = FYPAL_TERM_BACKGROUND,
+			.background = 0x300a24,
+		},
+	};
+	struct fypal_caps caps = {
+		.depth = FYPAL_DEPTH_TRUECOLOR,
+		.attrs = FYPAL_ATTR_ALL,
+	};
+	struct fypal_ctx *palette;
+	unsigned int r, g, b;
+	uint32_t bg = 0;
+	char sgr[64];
+	int rc;
+
+	palette = fypal_ctx_create(&caps);
+	FYAI_TCHECK(palette != NULL);
+	if (!palette)
+		return EXIT_FAILURE;
+	rc = fypal_ctx_load_builtin(palette, "ember");
+	FYAI_TCHECK(!rc);
+	cfg.palette = palette;
+	FYAI_TCHECK(markdown_fullscreen_ground_sgr(&cfg, sgr, sizeof(sgr)) > 0);
+	FYAI_TCHECK(sscanf(sgr, "\033[48;2;%u;%u;%um", &r, &g, &b) == 3);
+	FYAI_TCHECK(markdown_command_ground(&cfg, &bg));
+	FYAI_TCHECK(bg == ((r << 16) | (g << 8) | b));
+	FYAI_TCHECK(bg != 0x300a24);
+
+	/* Without a theme ground the terminal's background is the base. */
+	cfg.theme_ground = "terminal";
+	FYAI_TCHECK(markdown_command_ground(&cfg, &bg));
+	FYAI_TCHECK(bg == 0x300a24);
+	fypal_ctx_destroy(palette);
+	return 0;
+}
+
 int markdown_gutter_palette(void)
 {
 	char mark[FYAI_GLYPH_MAX];
