@@ -3,7 +3,7 @@
 # binding names any value. fyai decides every flag.
 type: object
 additionalProperties: false
-required: [input, ask, screen, tail, transcript, popup, note, log, todo, layout, pane, header, prompt, status]
+required: [input, ask, screen, tail, transcript, popup, note, log, glyphs, todo, layout, pane, header, prompt, status]
 properties:
   layout:
     type: object
@@ -109,6 +109,14 @@ properties:
         enum: [closed, open]
       title: { description: What the popup shows., type: string }
       rows: { description: Rows of the popup under its heading., type: integer }
+  glyphs:
+    type: object
+    additionalProperties: false
+    required: [expand, collapse, close]
+    properties:
+      expand: { description: The glyph of the button that expands the log., type: string }
+      collapse: { description: The glyph of the button that collapses the log., type: string }
+      close: { description: The glyph of the button that hides the log., type: string }
   log:
     type: object
     additionalProperties: false
@@ -143,11 +151,13 @@ properties:
   pane:
     type: object
     additionalProperties: false
-    required: [above, below, side, cap, cap_source, grid, grid_source, slot, rows]
+    required: [above, below, side, full, normal, cap, cap_source, grid, grid_source, slot, rows]
     properties:
       above: { description: The pane stands above the prompt., type: boolean }
       below: { description: The pane stands below the prompt., type: boolean }
       side: { description: The pane is a column beside the transcript, in the grid source., type: boolean }
+      full: { description: One tile of the pane holds the whole page., type: boolean }
+      normal: { description: No tile holds the whole page., type: boolean }
       cap: { description: The pane has a cap row., type: boolean }
       cap_source: { description: UI Markdown of the cap row that fyai wrote., type: string }
       grid: { description: The pane is a grid that fyai wrote., type: boolean }

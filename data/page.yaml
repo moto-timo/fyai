@@ -62,7 +62,10 @@ pages:
               cases:
                 closed:
                   body:
-                    - page: fullscreen
+                    - if: pane.normal
+                      page: fullscreen
+                    - if: pane.full
+                      page: tile_full
                 open:
                   keys:
                     Escape: popup.close
@@ -93,6 +96,17 @@ pages:
     - if: pane.side
       markup: pane.grid_source
     - page: chrome
+
+  # A maximized tile: the grid of the pane alone, then a hint row.
+  tile_full:
+    - tight: true
+    - markup: pane.grid_source
+    - row:
+        - space: 2
+        - role:
+            name: chrome
+            items:
+              - text: "{glyphs.expand} or Ctrl-] returns to the page"
 
   # The pane, the header, the input area and the status, in either screen.
   chrome:
@@ -438,12 +452,12 @@ pages:
               - text: " "
               - fill: { char: "─" }
               - text: " "
-        - act: { action: popup.expand, text: "[expand]" }
+        - act: { action: popup.expand, text: "{glyphs.expand}" }
         - role:
             name: chrome
             items:
               - text: " "
-        - act: { action: popup.hide, text: "[x]" }
+        - act: { action: popup.hide, text: "{glyphs.close}" }
     - slot: { id: log, rows: "{log.rows}" }
 
   # The popup of a fullscreen session: its heading, then the result.
@@ -454,7 +468,11 @@ pages:
             name: chrome
             items:
               - text: "── {popup.title} "
-        - act: { action: popup.close, text: "[Esc collapses \u00b7 l level \u00b7 x clears]" }
+        - act: { action: popup.close, text: "{glyphs.collapse}" }
+        - role:
+            name: chrome
+            items:
+              - text: " Esc collapses \u00b7 l level \u00b7 x clears"
         - role:
             name: chrome
             items:

@@ -341,6 +341,15 @@ void fyai_page_fit(struct fyai_page_state *st, int height)
 
 	if (!st || height <= 0)
 		return;
+	/* A maximized tile takes every row but the hint under it. */
+	if (st->fullscreen && st->pane_full && !st->popup_title) {
+		st->pane_rows = height > 1 ? height - 1 : height;
+		st->todo_rows = 0;
+		st->todo_shown = false;
+		st->tail_rows = 0;
+		st->transcript_rows = 0;
+		return;
+	}
 	/* A popup covers the page: its heading, then its rows. */
 	if (st->fullscreen && st->popup_title) {
 		st->popup_rows = height > 1 ? height - 1 : 0;
@@ -862,6 +871,13 @@ fy_generic fyai_page_state_generic(struct fy_generic_builder *gb,
 		"note", fy_mapping(gb,
 			"shown", (bool)(st->note_nlines > 0),
 			"rows", st->note_nlines),
+		"glyphs", fy_mapping(gb,
+			"expand", st->glyph_expand ? st->glyph_expand :
+				  "\xe2\x96\xa1",
+			"collapse", st->glyph_collapse ? st->glyph_collapse :
+				    "\xe2\x96\x81",
+			"close", st->glyph_close ? st->glyph_close :
+				 "\xc3\x97"),
 		"log", fy_mapping(gb,
 			"shown", (_Bool)(st->log_title && st->log_rows > 0),
 			"title", page_str(st->log_title),
@@ -872,6 +888,8 @@ fy_generic fyai_page_state_generic(struct fy_generic_builder *gb,
 			"above", (bool)(pane && !st->pane_below),
 			"below", (bool)(pane && st->pane_below),
 			"side", side,
+			"full", (_Bool)(st->fullscreen && st->pane_full && grid),
+			"normal", (_Bool)!(st->fullscreen && st->pane_full && grid),
 			"cap", (bool)!fy_str_empty(st->cap),
 			"cap_source", page_str(st->cap),
 			"grid", grid,

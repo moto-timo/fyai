@@ -115,6 +115,13 @@ struct fyai_page_state {
 	int popup_rows;
 	const char *const *popup_lines;
 	int popup_nlines;
+	/* The glyphs of the theme for the buttons of the log: expand, collapse
+	 * and close, which are the maximize, minimize and close of a tile. NULL
+	 * takes the glyph a tile has without a palette. */
+	/* One tile of the work pane holds the whole page of a fullscreen
+	 * session: nothing else shows but a hint row. */
+	bool pane_full;
+	const char *glyph_expand, *glyph_collapse, *glyph_close;
 	/* The compact log: a heading and @log_rows rows above the status, which
 	 * @log_lines hold, borrowed for the frame. @log_rows is the rows asked
 	 * for; the fit gives what the page can spare. It stands while

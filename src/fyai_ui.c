@@ -179,6 +179,9 @@ struct fyai_ui {
 	/* The popup keeps the results of the session while it is hidden. The
 	 * header indicator counts them and shows or hides the popup. */
 	int popup_state;		/* enum ui_popup_state */
+	/* The tile that maximize gave the whole page of a fullscreen session;
+	 * the page shows nothing else while it stays zoomed. */
+	struct fytim_surface *tile_full;
 	struct ui_log_entry *log;
 	int nlog;
 	enum fyai_error_type log_min;	/* lowest level the popup shows */
@@ -213,6 +216,7 @@ static void ui_inline_keys_hold(struct fyai_ui *ui);
 static void ui_popup_style(struct fyai_ui *ui);
 static void ui_completion_configure(struct fyai_ctx *ctx);
 static void ui_keys_configure(struct fyai_ctx *ctx);
+static bool ui_tile_full(struct fyai_ui *ui);
 static void ui_page_keys_clear(struct fyai_ui *ui);
 
 /* The library mode that holds the keys of the cases of the page. */
@@ -1872,6 +1876,11 @@ static void ui_page_key(struct fyai_ui *ui, const struct fytim_event *ev)
 
 	if (ev->text && ev->text_len == strlen(UI_ACT_FOCUS_PROMPT) &&
 	    !strncmp(ev->text, UI_ACT_FOCUS_PROMPT, ev->text_len)) {
+		/* The prompt is on the page again. */
+		if (ui->tile_full) {
+			ui->tile_full = NULL;
+			(void)fyai_ui_surface_zoom(ui->ctx, NULL);
+		}
 		fyai_tools_keys_to_prompt(ui->ctx);
 		fyai_ui_wake(ui->ctx);
 		return;
@@ -2359,6 +2368,10 @@ static void ui_page_update(struct fyai_ui *ui)
 	st.todo_shown = ui->todo_shown &&
 			!fyai_agent_delegated(ctx) &&
 			!(st.fullscreen && st.popup_title);
+	st.glyph_expand = markdown_glyph(ctx->cfg, "tile.maximize", NULL);
+	st.glyph_collapse = markdown_glyph(ctx->cfg, "tile.minimize", NULL);
+	st.glyph_close = markdown_glyph(ctx->cfg, "tile.close", NULL);
+	st.pane_full = ui->fullscreen && ui_tile_full(ui);
 	st.popup_title = ui_popup_open(ui) ? ui->popup_title : NULL;
 	if (ui_popup_compact(ui)) {
 		st.log_title = ui->popup_title;
@@ -2539,6 +2552,45 @@ static void ui_click_off_tiles(struct fyai_ui *ui, const struct fytim_event *ev)
 }
 
 /*
+ * Maximize @sf: in a fullscreen session it takes the whole page and the keys.
+ * A second maximize of the same tile gives the page back. Elsewhere it zooms.
+ */
+static void ui_tile_maximize(struct fyai_ui *ui, struct fytim_surface *sf)
+{
+	struct fyai_workpane_manager *wm = ui->ctx->workpane;
+	int rc;
+
+	if (fyai_workpane_zoomed(wm) == sf) {
+		ui->tile_full = NULL;
+		(void)fyai_ui_surface_zoom(ui->ctx, NULL);
+		ui->frame_pending = true;
+		return;
+	}
+	rc = fyai_ui_surface_zoom(ui->ctx, sf);
+	if (rc) {
+		fyai_warning(ui->ctx, "cannot maximize the tile");
+		return;
+	}
+	if (!ui->fullscreen)
+		return;
+	ui->tile_full = sf;
+	if (!fyai_tools_focus_tile(ui->ctx, sf))
+		fyai_warning(ui->ctx,
+			     "cannot give the maximized tile the keys");
+	ui->frame_pending = true;
+}
+
+/* Whether a tile holds the whole page. A tile that is no longer zoomed, or
+ * that is gone, gives it back. */
+static bool ui_tile_full(struct fyai_ui *ui)
+{
+	if (ui->tile_full &&
+	    fyai_workpane_zoomed(ui->ctx->workpane) != ui->tile_full)
+		ui->tile_full = NULL;
+	return ui->tile_full != NULL;
+}
+
+/*
  * Handle a click on tile @sf. @id identifies a minimize or maximize button;
  * NULL and "tile:focus" focus the header. Restore a minimized tile first.
  */
@@ -2555,8 +2607,7 @@ static void ui_tile_act(struct fyai_ui *ui, struct fytim_surface *sf,
 	if (minimized)
 		(void)fyai_workpane_set_minimized(wm, sf, false);
 	if (id && !strcmp(id, "tile:maximize")) {
-		(void)fyai_ui_surface_zoom(ui->ctx,
-				fyai_workpane_zoomed(wm) == sf ? NULL : sf);
+		ui_tile_maximize(ui, sf);
 		return;
 	}
 	(void)fyai_tools_focus_tile(ui->ctx, sf);
