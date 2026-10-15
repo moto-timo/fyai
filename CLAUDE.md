@@ -925,12 +925,22 @@ the page source; the terminal library draws its slots.
   Escape clears it. A longer one opens a popup that covers the page - the
   transcript, the tiles and the chrome - under a heading that names it. The
   popup is the `open` case of the `popup.mode` switch of the page, and its
-  keys are the page's: Escape, Enter and `q` close it (`popup.close`), and Up
-  and Down scroll it a row (`popup.scroll`). PageUp, PageDown and the wheel
-  scroll it too. Its rows are a transcript view model that shows the newest
-  result from its heading; a result that arrives while it is open is added
-  under the others. A drag over it copies the text of its rows. A closed
-  popup drops its rows.
+  keys are the page's: Escape, Enter and `q` hide it (`popup.close`), Up
+  and Down scroll it a row (`popup.scroll`), `l` raises the lowest level it
+  shows (`popup.level`) and `x` clears the log (`popup.clear`). PageUp,
+  PageDown and the wheel scroll it too.
+- The popup shows the log of the session. Each result, notice and
+  diagnostic that goes to the pane is an entry with a level - info, notice,
+  warning or error, from the highest severity that the drain reported - and
+  the log keeps the last `UI_LOG_MAX` entries. The popup is a transcript view
+  model made again from the entries at or above the level, with the newest
+  from its heading; a drag over it copies the text of its rows. Hiding the
+  popup keeps the log. The header panel shows its count with the colour of the
+  worst level, and a click on it, or a key bound to `fyai.messages.toggle` in
+  `display/keys`, shows or hides the popup. A diagnostic that the pane shows
+  has no module prefix: `fyai_diag_set_bare()` holds for the span of
+  `fyai_ui_pane_begin()` to `fyai_ui_pane_end()`, and is process-wide because
+  a configuration change replaces the sink in the middle of a command.
 - A popup hides the tiles, so the page gives them no grant while it is open:
   a grant of no rows would size every program to nothing.
 - A cell of the page keeps the OSC 8 link it was drawn with, so a URL of

@@ -1345,6 +1345,16 @@ slash-command results. A command that reports a status, such as `/model`,
 stays out of the transcript whatever this setting says: its output goes to the
 panel or popup, and no card is drawn.
 
+A fullscreen session keeps the results that reach the panel, the notices and
+the diagnostics in a log, each with a level: info, notice, warning or error.
+Escape hides the popup of the log and keeps it. The header shows the count of
+the log, in the colour of its worst level, next to the live work; a click on it
+shows the popup again. Bind a key to `fyai.messages.toggle` to show and hide the
+popup from the keyboard, for example
+`--set 'display/keys={prompt: {Ctrl-G: fyai.messages.toggle}}'`. In the popup,
+`l` raises the lowest level that it shows and `x` clears the log. The log shows
+the cause of a diagnostic without the name of the module that raised it.
+
 `ember:auto` is the default `display/theme` when fyai is built with
 libfypalette. A build without it uses `default:auto`.
 
