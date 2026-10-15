@@ -1341,7 +1341,9 @@ the page background to the terminal and adapts the palette to that background.
 the live transcript. It is the default. Set `display/notice_output=pane` to
 show them in the notice panel or fullscreen popup. Errors still use the error
 panel. This setting is separate from `display/command_output`, which places
-slash-command results.
+slash-command results. A command that reports a status, such as `/model`,
+stays out of the transcript whatever this setting says: its output goes to the
+panel or popup, and no card is drawn.
 
 `ember:auto` is the default `display/theme` when fyai is built with
 libfypalette. A build without it uses `default:auto`.
