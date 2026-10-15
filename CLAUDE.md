@@ -922,11 +922,15 @@ the page source; the terminal library draws its slots.
   no card is drawn and nothing is stored. Its output, and every notice and
   diagnostic, goes to the pane. `fyai_ui_pane_end()` shows a
   result of two rows or less above the status, until the input changes or
-  Escape clears it. A longer one opens a popup that covers the page - the
-  transcript, the tiles and the chrome - under a heading that names it. The
-  popup is the `open` case of the `popup.mode` switch of the page, and its
-  keys are the page's: Escape, Enter and `q` hide it (`popup.close`), Up
-  and Down scroll it a row (`popup.scroll`), `l` raises the lowest level it
+  Escape clears it. A longer one opens the log small: the `log_panel` page
+  above the status, a heading and at most `UI_LOG_ROWS` rows, which the fit
+  holds to a third of the page and never takes from the input. A click on its
+  heading or on `[expand]` (`popup.expand`) expands it to a popup that covers
+  the page - the transcript, the tiles and the chrome - under a heading that
+  names it; `[x]` and Escape hide the small log (`popup.hide`). The popup is
+  the `open` case of the `popup.mode` switch of the page, and its keys are the
+  page's: Escape, Enter and `q` collapse it to the small log (`popup.close`),
+  Up and Down scroll it a row (`popup.scroll`), `l` raises the lowest level it
   shows (`popup.level`) and `x` clears the log (`popup.clear`). PageUp,
   PageDown and the wheel scroll it too.
 - The popup shows the log of the session. Each result, notice and
@@ -937,7 +941,8 @@ the page source; the terminal library draws its slots.
   from its heading; a drag over it copies the text of its rows. Hiding the
   popup keeps the log. The header panel shows its count with the colour of the
   worst level, and a click on it, or a key bound to `fyai.messages.toggle` in
-  `display/keys`, shows or hides the popup. A diagnostic that the pane shows
+  `display/keys`, steps the log from hidden to small, to expanded and back to
+  hidden. A diagnostic that the pane shows
   has no module prefix: `fyai_diag_set_bare()` holds for the span of
   `fyai_ui_pane_begin()` to `fyai_ui_pane_end()`, and is process-wide because
   a configuration change replaces the sink in the middle of a command.
