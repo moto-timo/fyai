@@ -289,7 +289,7 @@ static int catalog_check(struct fyai_ctx *ctx, fy_generic doc,
 }
 
 int fyai_catalog_commit(struct fyai_ctx *ctx, fy_generic doc,
-			const char *origin)
+			const char *origin, fy_generic store)
 {
 	fy_generic effective, new_config;
 
@@ -308,6 +308,8 @@ int fyai_catalog_commit(struct fyai_ctx *ctx, fy_generic doc,
 	new_config = fy_is_valid(ctx->arena_config) ?
 		fyai_config_sync_catalog(ctx->gb, effective, ctx->arena_config) :
 		fy_invalid;
+	if (fy_is_valid(store))
+		ctx->branch_store = store;
 	/* A null catalogue removes the member; the branch uses the embedded one. */
 	if (fyai_publish_root(ctx, new_config, doc, fy_invalid))
 		return -1;
@@ -325,7 +327,7 @@ int fyai_catalog_import(struct fyai_ctx *ctx, const char *path)
 		fyai_error(ctx, "cannot parse %s", path);
 		return -1;
 	}
-	return fyai_catalog_commit(ctx, doc, path);
+	return fyai_catalog_commit(ctx, doc, path, fy_invalid);
 }
 
 /*
@@ -490,7 +492,7 @@ static fy_generic catalog_current(struct fyai_ctx *ctx)
 	return fyai_catalog_effective(ctx->arena_catalog, ctx->cfg->gb);
 }
 
-fy_generic fyai_catalog_at(struct fyai_ctx *ctx, const char *path)
+fy_generic fyai_catalog_doc_at(fy_generic doc, const char *path)
 {
 	char *segs[CATALOG_PATH_MAX_DEPTH];
 	fy_generic v;
@@ -501,9 +503,14 @@ fy_generic fyai_catalog_at(struct fyai_ctx *ctx, const char *path)
 	if (!copy)
 		return fy_invalid;
 	n = catalog_path_split(copy, segs);
-	v = n < 0 ? fy_invalid : catalog_path_get(catalog_current(ctx), segs, n);
+	v = n < 0 ? fy_invalid : catalog_path_get(doc, segs, n);
 	free(copy);
 	return v;
+}
+
+fy_generic fyai_catalog_at(struct fyai_ctx *ctx, const char *path)
+{
+	return fyai_catalog_doc_at(catalog_current(ctx), path);
 }
 
 int fyai_catalog_value(struct fyai_ctx *ctx, const char *path,
@@ -553,11 +560,56 @@ static int catalog_put(struct fyai_ctx *ctx, const char *path, fy_generic value)
 			 "catalogue has nothing at '%s'" :
 			 "catalogue path '%s' does not lead to a mapping or "
 			 "a sequence", path);
-	rc = fyai_catalog_commit(ctx, doc, "the edited catalogue");
+	rc = fyai_catalog_commit(ctx, doc, "the edited catalogue", fy_invalid);
 	return rc;
 
 err_out:
 	return -1;
+}
+
+int fyai_catalog_patch_models_prepare(struct fyai_ctx *ctx,
+		fy_generic changes, fy_generic *docp)
+{
+	char *segs[CATALOG_PATH_MAX_DEPTH], *copy;
+	fy_generic doc, item, value;
+	const char *path;
+	int n;
+
+	if (!ctx->durable_gb) {
+		fyai_error(ctx, "no arena; run fyai init");
+		return -1;
+	}
+	doc = catalog_current(ctx);
+	fy_foreach(item, changes) {
+		path = fy_get(item, "path", "");
+		copy = strdup(path);
+		if (!copy) {
+			fyai_error(ctx, "out of memory reading catalogue path");
+			return -1;
+		}
+		n = catalog_path_split(copy, segs);
+		if (!((n >= 2 && !strcmp(segs[0], "models")) ||
+		      (n >= 4 && !strcmp(segs[0], "providers") &&
+		       !strcmp(segs[2], "models")))) {
+			fyai_error(ctx, "catalogue path '%s' must name a model or "
+				   "a provider offering", path);
+			free(copy);
+			return -1;
+		}
+		value = fy_get(item, "delete", false) ? fy_invalid :
+			fy_gb_internalize(ctx->gb,
+				fy_get(item, "value", fy_invalid));
+		doc = catalog_path_put(ctx->gb, doc, segs, n, value);
+		free(copy);
+		if (!fy_is_valid(doc)) {
+			fyai_error(ctx, "catalogue path '%s' cannot be changed", path);
+			return -1;
+		}
+	}
+	if (catalog_check(ctx, doc, "the model catalogue change"))
+		return -1;
+	*docp = doc;
+	return 0;
 }
 
 int fyai_catalog_set(struct fyai_ctx *ctx, const char *path, const char *value)
@@ -600,7 +652,8 @@ int fyai_catalog_reset(struct fyai_ctx *ctx)
 {
 	if (fy_is_invalid(ctx->arena_catalog))
 		return 0;
-	return fyai_catalog_commit(ctx, fy_null, "the embedded catalogue");
+	return fyai_catalog_commit(ctx, fy_null, "the embedded catalogue",
+			   fy_invalid);
 }
 
 /* Quote @s for /bin/sh into @out. */
@@ -745,7 +798,7 @@ static int catalog_update_apply(struct fyai_ctx *ctx, const char *cmd,
 				 "catalogue", cmd);
 		doc = merged;
 	}
-	if (fyai_catalog_commit(ctx, doc, cmd))
+	if (fyai_catalog_commit(ctx, doc, cmd, fy_invalid))
 		goto err;
 	fyai_result(ctx, "catalog: updated (%zu models, %zu providers)\n",
 		    fy_len(fy_get(doc, "models")),

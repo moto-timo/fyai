@@ -753,6 +753,12 @@
       pricing/blended`, `limit: 1`. `export` writes the document to a file that fyai names and
       removes when the session ends, so a program, such as jq, can search it: the
       configuration without its hidden keys, as a tree or as rows, or the catalogue.
+      For `document: catalog`, inspect a current source before using `change`
+      to correct model properties or provider offerings. Give the source in
+      `source`. fyai validates the whole change and applies it, asks the user
+      to review it, or keeps it as a proposal according to `model_access` and
+      arena protection, as for configuration changes. It cannot change
+      provider URLs, endpoints or credentials.
     parameters:
       type: object
       properties:
@@ -765,7 +771,11 @@
           type: string
           enum: [config, catalog]
           description: |-
-            What to read: `config`, the default, or `catalog`, the providers and models fyai knows. The catalogue is read only: `search` finds models by name, capability, modality or provider; `get` reads `models/NAME`, `providers/NAME` or `providers/NAME/models/ID`; `list` names the items under a path.
+            What to read: `config`, the default, or `catalog`, the providers and models fyai knows. For the catalogue, `search` finds models by name, capability, modality or provider; `get` reads `models/NAME`, `providers/NAME` or `providers/NAME/models/ID`; `list` names the items under a path; `change` presents sourced model or offering edits for approval.
+        source:
+          type: string
+          description: |-
+            For a catalogue `change`: the URL or other source of the values you verified.
         path:
           type: string
           description: |-
@@ -833,7 +843,7 @@
         changes:
           type: array
           description: |-
-            For `change`: up to 32 changes, each `{path, value}` to set a key or `{path, delete: true}` to remove it, so that it takes its default.
+            For `change`: up to 32 changes, each `{path, value}` to set a key or `{path, delete: true}` to remove it. Catalogue changes may target `models/NAME/...` or `providers/NAME/models/ID/...` only.
           items:
             type: object
             properties:

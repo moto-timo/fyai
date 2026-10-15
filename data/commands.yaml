@@ -1418,7 +1418,7 @@ commands:
       - command: changes
         title: list the changes of the model
         description: |
-          List the changes of the configuration that the model presented
+          List the changes of the configuration or catalogue that the model presented
           with the settings tool and that fyai applied: each with its id,
           its status, its access, and the keys it changed. The branch keeps
           the newest 64.
@@ -1427,9 +1427,10 @@ commands:
           table:
             title: Changes of the model
             empty: no changes of the model
-            keys: [id, status, access, keys, origin, time]
+            keys: [id, document, status, access, keys, origin, time]
             columns:
               id: {name: Id, align: left}
+              document: {name: Document, align: left}
               status: {name: Status, align: left}
               access: {name: Access, align: left}
               keys: {name: Keys, align: left}
@@ -1439,7 +1440,7 @@ commands:
       - command: proposals
         title: list the changes that wait for you
         description: |
-          List the changes that the model presented when nobody could review
+          List the configuration and catalogue changes that the model presented when nobody could review
           them, with their status. `config review ID` shows one with its
           diff; `config approve ID` applies it, and `config reject ID` drops
           it.
@@ -1448,9 +1449,10 @@ commands:
           table:
             title: Proposals of the model
             empty: no proposals of the model
-            keys: [id, status, access, keys, origin, time]
+            keys: [id, document, status, access, keys, origin, time]
             columns:
               id: {name: Id, align: left}
+              document: {name: Document, align: left}
               status: {name: Status, align: left}
               access: {name: Access, align: left}
               keys: {name: Keys, align: left}
@@ -1461,7 +1463,7 @@ commands:
         title: show a proposal of the model with its diff
         description: |
           Show the pending proposal ID: the diff that fyai makes of it over
-          the configuration in force, and the explanation that the model
+          the configuration or catalogue in force, and the explanation that the model
           wrote, quoted.
         handler: config_review
         view: true
@@ -1489,7 +1491,7 @@ commands:
         title: apply a proposal of the model
         description: |
           Apply the pending proposal ID. In a session the review panel shows
-          its diff over the configuration in force first; a proposal that is
+          its diff over the configuration or catalogue in force first; a proposal that is
           no longer valid is refused.
         handler: config_approve
         mode: async

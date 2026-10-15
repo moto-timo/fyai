@@ -2318,7 +2318,8 @@ static void fyai_config_edit_service(void *userdata)
 	}
 	doc = fy_parse_file(ctx->gb, FYAI_YAML_PARSE_FLAGS, request->path);
 	if (request->catalog) {
-		rc = fyai_catalog_commit(ctx, doc, "the edited catalogue");
+		rc = fyai_catalog_commit(ctx, doc, "the edited catalogue",
+				 fy_invalid);
 		if (rc) {
 			fyai_error(ctx, "edits kept at %s", request->path);
 			goto out;

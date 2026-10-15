@@ -88,8 +88,9 @@ fy_generic fyai_catalog_schema(struct fy_generic_builder *gb);
  * branch. fy_null removes the catalogue of the branch, which then uses the
  * embedded one. The model_info block of the configuration follows.
  */
+/* @store, when valid, is published with the catalogue in one root. */
 int fyai_catalog_commit(struct fyai_ctx *ctx, fy_generic doc,
-			const char *origin);
+			const char *origin, fy_generic store);
 
 /* verb backends */
 int fyai_catalog_import(struct fyai_ctx *ctx, const char *path);
@@ -98,6 +99,9 @@ int fyai_catalog_value(struct fyai_ctx *ctx, const char *path,
 		       fy_generic *valuep);
 int fyai_catalog_set(struct fyai_ctx *ctx, const char *path, const char *value);
 int fyai_catalog_delete(struct fyai_ctx *ctx, const char *path);
+/* Build and validate model and offering changes without publishing them. */
+int fyai_catalog_patch_models_prepare(struct fyai_ctx *ctx,
+		fy_generic changes, fy_generic *docp);
 int fyai_catalog_validate(struct fyai_ctx *ctx);
 int fyai_catalog_reset(struct fyai_ctx *ctx);
 /*
@@ -140,6 +144,8 @@ int fyai_catalog_document(struct fyai_ctx *ctx, fy_generic *catp);
  * the path leads nowhere. The value is held by the arena or by the process.
  */
 fy_generic fyai_catalog_at(struct fyai_ctx *ctx, const char *path);
+/* The value at @path of @doc, borrowed from @doc. */
+fy_generic fyai_catalog_doc_at(fy_generic doc, const char *path);
 
 /* The models, or with @what "providers" the providers, of the catalogue. */
 fy_generic fyai_catalog_list_data(struct fyai_ctx *ctx,

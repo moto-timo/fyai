@@ -183,6 +183,7 @@ static int config_settings_rows(struct fyai_cmd_call *call, const char *member,
 				 "config: cannot list the keys of a change");
 		rows = fy_append(call->gb, rows, fy_mapping(call->gb,
 			"id", fy_get(item, "name", ""),
+			"document", fy_get(item, "document", "config"),
 			"status", fy_get(item, "status", ""),
 			"access", fy_get(item, "access", ""),
 			"keys", fy_value(call->gb, keys.data ? keys.data : ""),

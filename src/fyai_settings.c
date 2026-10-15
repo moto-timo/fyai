@@ -460,7 +460,10 @@ struct settings_change {
 	fy_generic after;
 	fy_generic stored;	/* the branch configuration after */
 	fy_generic session;	/* the session layer after, or fy_invalid */
+	fy_generic catalog_doc;	/* the validated catalogue after */
 	enum fyai_model_access access;	/* the strictest of every path */
+	bool catalog;		/* a change of the catalogue */
+	const char *source;	/* evidence for catalogue values */
 	bool trial;		/* the session layer only, for every scope */
 	bool legacy_scope;	/* an older change used schema scope */
 	const char *diff;	/* Markdown that fyai made, in the builder */
@@ -470,6 +473,11 @@ struct settings_change {
 	const char *mark_id;
 	const char *mark_status;
 };
+
+static int settings_catalog_prepare(struct settings_walk *w,
+				    fy_generic changes, const char *source,
+				    struct settings_change *c,
+				    char *why, size_t why_size);
 
 /*
  * @text without control bytes: a line break and a tab stay, every other
@@ -923,14 +931,10 @@ static fy_generic settings_log_append(struct fy_generic_builder *gb,
 	return fy_append(gb, out, entry);
 }
 
-/*
- * Publish @member of the store of this branch as @log, and @member2 as @log2
- * when it is not NULL, with the configuration of the context, under the
- * operation `settings`.
- */
-static int settings_publish(struct fyai_ctx *ctx, const char *member,
-			    fy_generic log, const char *member2,
-			    fy_generic log2)
+/* Build the store with one or two settings logs for one publication. */
+static fy_generic settings_store_build(struct fyai_ctx *ctx,
+				       const char *member, fy_generic log,
+				       const char *member2, fy_generic log2)
 {
 	struct fyai_branch prev;
 	fy_generic store;
@@ -942,6 +946,16 @@ static int settings_publish(struct fyai_ctx *ctx, const char *member,
 	if (member2)
 		store = fy_assoc(ctx->gb, store, member2,
 				 fy_gb_internalize(ctx->gb, log2));
+	return store;
+}
+
+static int settings_publish(struct fyai_ctx *ctx, const char *member,
+			    fy_generic log, const char *member2,
+			    fy_generic log2)
+{
+	fy_generic store;
+
+	store = settings_store_build(ctx, member, log, member2, log2);
 	fyai_error_check(ctx, fy_is_valid(store), err_out,
 			 "settings: cannot build the store of branch '%s'",
 			 fyai_ctx_branch(ctx));
@@ -984,6 +998,9 @@ static fy_generic settings_entry(struct fyai_ctx *ctx,
 		"explanation", explanation,
 		"origin", fyai_ctx_branch(ctx),
 		"time", (long long)fyai_branch_timestamp());
+	if (c->catalog)
+		entry = fy_assoc(gb, entry, "document", "catalog",
+				 "source", c->source ? c->source : "");
 	if (c->mark_id)
 		entry = fy_assoc(gb, entry, "of", fy_mapping(gb,
 			"id", c->mark_id, "status", c->mark_status));
@@ -1027,20 +1044,34 @@ static int settings_apply(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 			  const char **idp, const char *member2,
 			  fy_generic log2)
 {
-	fy_generic log;
+	fy_generic log, store;
 	const char *id;
 
 	log = fyai_settings_log(ctx, "config_changes");
 	id = settings_next_id(gb, log, 'c');
 	if (c->mark_id)
 		log = settings_log_status(gb, log, c->mark_id, c->mark_status);
+	log = settings_log_append(gb, log, settings_entry(ctx, gb, c, id,
+		explanation, c->catalog ? "applied" :
+		fy_is_valid(c->stored) ? "applied" : "session"));
+	if (c->catalog) {
+		store = settings_store_build(ctx, "config_changes", log,
+					     member2, log2);
+		if (!fy_is_valid(store))
+			return -1;
+		fyai_branch_op_set(ctx, FYAI_BRANCH_OP_SETTINGS, NULL);
+		if (fyai_catalog_commit(ctx, c->catalog_doc,
+					      "the approved catalogue change",
+					      store))
+			return -1;
+		*idp = id;
+		return 0;
+	}
 	if (fy_is_valid(c->session) &&
 	    fyai_config_session_layer_adopt(ctx, c->session))
 		return -1;
 	if (fy_is_valid(c->stored))
 		ctx->arena_config = c->stored;
-	log = settings_log_append(gb, log, settings_entry(ctx, gb, c, id,
-		explanation, fy_is_valid(c->stored) ? "applied" : "session"));
 	if (settings_publish(ctx, "config_changes", log, member2, log2))
 		return -1;
 	if (fy_is_valid(c->stored) && fyai_config_rederive(ctx))
@@ -1101,9 +1132,10 @@ static fy_generic settings_review_questions(struct fy_generic_builder *gb,
 {
 	return fy_sequence(gb, fy_mapping(gb,
 		"id", "settings",
-		"header", "Settings",
+		"header", c->catalog ? "Catalogue" : "Settings",
 		"question", fy_sprintfa("The model presents a change of %zu "
-			"key%s (%s). Apply it?", fy_len(c->paths),
+			"%s%s (%s). Apply it?", fy_len(c->paths),
+			c->catalog ? "catalogue field" : "key",
 			fy_len(c->paths) == 1 ? "" : "s",
 			fyai_model_access_name(c->access)),
 		"multi_select", false,
@@ -1111,8 +1143,10 @@ static fy_generic settings_review_questions(struct fy_generic_builder *gb,
 		 * or one pasted with a reply, must not apply a change. */
 		"options", fy_sequence(gb,
 			fy_mapping(gb, "id", "reject", "label", "Reject",
-				   "description", "Leave the configuration as "
-				   "it is.", "preview", ""),
+				   "description", c->catalog ?
+				   "Leave the catalogue as it is." :
+				   "Leave the configuration as it is.",
+				   "preview", ""),
 			fy_mapping(gb, "id", "accept", "label", "Accept",
 				   "description", "Apply the change that the "
 				   "diff shows.", "preview", "")),
@@ -1211,6 +1245,16 @@ static int settings_proposal_prepare(struct settings_walk *w, const char *id,
 		c->mark_status = fy_gb_intern_string(w->gb,
 						     fy_get(of, "status", ""));
 	}
+	if (fy_equal(fy_get(entry, "document", fy_invalid), "catalog")) {
+		if (settings_catalog_prepare(w,
+			fy_get(entry, "changes", fy_invalid),
+			fy_get(entry, "source", ""), c, why, sizeof(why))) {
+			fyai_error(w->ctx, "proposal '%s' cannot be applied: %s",
+				   id, why);
+			return -1;
+		}
+		return 0;
+	}
 	if (settings_change_normalize(w, fy_get(entry, "changes", fy_invalid),
 				      c, why, sizeof(why)) ||
 	    settings_change_build(w, c, why, sizeof(why))) {
@@ -1235,7 +1279,8 @@ fy_generic fyai_settings_proposal_show(struct fyai_ctx *ctx,
 	if (settings_proposal_prepare(&w, id, &c, &explanation))
 		return fy_invalid;
 	return fy_mapping(gb, "id", id, "explanation", explanation,
-			  "diff", c.diff);
+			  "diff", c.diff, "document",
+			  c.catalog ? "catalog" : "config");
 }
 
 /*
@@ -1277,6 +1322,8 @@ int fyai_settings_proposal_decide(struct fyai_ctx *ctx,
 				     fy_invalid))
 			return -1;
 		*resultp = fy_mapping(gb, "id", id, "status", "rejected");
+		if (c.catalog)
+			*resultp = fy_assoc(gb, *resultp, "document", "catalog");
 		if (notify)
 			settings_proposal_event(ctx, gb, id, *resultp);
 		return 0;
@@ -1287,10 +1334,13 @@ int fyai_settings_proposal_decide(struct fyai_ctx *ctx,
 		return -1;
 	*resultp = fy_mapping(gb, "id", id, "status", "approved",
 			      "change", cid, "diff", c.diff);
+	if (c.catalog)
+		*resultp = fy_assoc(gb, *resultp, "document", "catalog");
 	if (notify)
 		settings_proposal_event(ctx, gb, id, fy_mapping(gb,
 			"id", id, "status", "approved", "change", cid,
-			"diff", c.unified));
+			"diff", c.unified, "document",
+			c.catalog ? "catalog" : "config"));
 	return 0;
 err_out:
 	return -1;
@@ -1342,7 +1392,11 @@ static fy_generic settings_present(struct settings_walk *w,
 	}
 	result = fy_mapping(w->gb, "status", status, "access",
 			    fyai_model_access_name(access), "diff", c->unified);
-	if (!strcmp(status, "applied") && !fy_is_valid(c->stored))
+	if (c->catalog)
+		result = fy_assoc(w->gb, result, "document", "catalog",
+				  "source", c->source);
+	if (!strcmp(status, "applied") && !c->catalog &&
+	    !fy_is_valid(c->stored))
 		result = fy_assoc(w->gb, result, "scope", "session",
 			"note", "This change lasts only for this invocation.");
 	if (id)
@@ -1470,6 +1524,9 @@ static fy_generic settings_revert_run(struct settings_walk *w,
 			  "session"))
 		return fy_value(w->gb, fy_sprintfa("settings: no change '%s' "
 				"to take back", id));
+	if (fy_equal(fy_get(entry, "document", fy_invalid), "catalog"))
+		return fy_value(w->gb, "settings: catalogue changes are "
+				"reverted with catalog commands");
 	if (!fy_equal(fy_get(entry, "access", fy_invalid), "write"))
 		return fy_value(w->gb, fy_sprintfa("settings: change %s has "
 				"review keys; only the user takes it back",
@@ -1496,6 +1553,10 @@ int fyai_settings_revert(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 	entry = settings_change_entry(ctx, id);
 	if (!fy_is_mapping(entry))
 		return -1;
+	fyai_error_check(ctx, !fy_equal(fy_get(entry, "document", fy_invalid),
+					   "catalog"), err_out,
+			 "change '%s' is of the catalogue; use catalog commands",
+			 id);
 	if (settings_revert_build(&w, entry, force, &c, &conflicts, why,
 				  sizeof(why))) {
 		fyai_error(ctx, "change '%s' is not taken back: %s", id, why);
@@ -1590,6 +1651,7 @@ static fy_generic settings_proposals_run(struct settings_walk *w)
 	fy_foreach(item, fyai_settings_log(w->ctx, "config_proposals"))
 		rows = fy_append(w->gb, rows, fy_mapping(w->gb,
 			"id", fy_get(item, "name", ""),
+			"document", fy_get(item, "document", "config"),
 			"status", fy_get(item, "status", ""),
 			"paths", fy_get(item, "paths", fy_invalid),
 			"changes", fy_get(item, "changes", fy_invalid)));
@@ -1668,9 +1730,13 @@ int fyai_settings_review_apply(struct fyai_settings_review *r,
 		return -1;
 	*resultp = fy_mapping(gb, "id", r->id, "status", "approved",
 			      "change", cid, "diff", r->c.diff);
+	if (r->c.catalog)
+		*resultp = fy_assoc(gb, *resultp, "document", "catalog");
 	if (notify) {
 		event = fy_mapping(gb, "id", r->id, "status", "approved",
-				   "change", cid, "diff", r->c.unified);
+				   "change", cid, "diff", r->c.unified,
+				   "document", r->c.catalog ? "catalog" :
+					"config");
 		settings_proposal_event(ctx, gb, r->id, event);
 	}
 	return 0;
@@ -1717,11 +1783,7 @@ static fy_generic settings_change_run(struct settings_walk *w, fy_generic args,
 	return settings_present(w, &c, explanation, okp);
 }
 
-/*
- * The catalogue is read only: the model learns what models and providers
- * exist and what they can do, and changes nothing. A path names an item of a
- * list by its name, as `catalog get` does.
- */
+/* A catalogue path names an item of a list by its name. */
 
 static fy_generic settings_catalog_select(struct settings_walk *w,
 					  fy_generic cat, fy_generic args);
@@ -1869,9 +1931,128 @@ static fy_generic catalog_names(struct settings_walk *w, fy_generic v)
 	return out;
 }
 
+static int settings_catalog_prepare(struct settings_walk *w,
+				    fy_generic changes, const char *source,
+				    struct settings_change *c,
+				    char *why, size_t why_size)
+{
+	fy_generic item, paths, old, now;
+	const char *path, *a, *b, *block;
+	const unsigned char *p;
+	char *unified = NULL;
+	bool del;
+
+	if (!fy_is_sequence(changes) || fy_empty(changes) ||
+	    fy_len(changes) > SETTINGS_CHANGES_MAX) {
+		snprintf(why, why_size, "give 1 to 32 catalogue changes");
+		return -1;
+	}
+	if (!*source || strlen(source) > 2048) {
+		snprintf(why, why_size, "give a source for the catalogue values");
+		return -1;
+	}
+	for (p = (const unsigned char *)source; *p; p++)
+		if (*p < 0x20 || *p == 0x7f || *p == '`') {
+			snprintf(why, why_size, "source must be one line of text");
+			return -1;
+		}
+	memset(c, 0, sizeof(*c));
+	c->catalog = true;
+	c->access = FYAI_MODEL_WRITE;
+	c->stored = fy_invalid;
+	c->session = fy_invalid;
+	c->changes = changes;
+	c->source = settings_clean(w->gb, source);
+	if (!c->source)
+		return -1;
+	paths = fy_sequence(w->gb);
+	c->before = fy_mapping(w->gb);
+	c->after = fy_mapping(w->gb);
+	fy_foreach(item, changes) {
+		path = fy_get(item, "path", "");
+		del = fy_get(item, "delete", false);
+		if (!*path || !settings_path_valid(path) ||
+		    strchr(path, '*') || seq_has(paths, path) ||
+		    (del == fy_is_valid(fy_get(item, "value", fy_invalid)))) {
+			snprintf(why, why_size, "each catalogue change needs a "
+				 "unique slash path and either a value or delete: true");
+			return -1;
+		}
+		paths = fy_append(w->gb, paths, path);
+		old = fyai_catalog_at(w->ctx, path);
+		c->before = fy_assoc(w->gb, c->before, path,
+				     fyai_generic_or_null(old));
+	}
+	c->paths = paths;
+	if (fyai_catalog_patch_models_prepare(w->ctx, changes,
+					      &c->catalog_doc)) {
+		snprintf(why, why_size, "the catalogue change is invalid");
+		return -1;
+	}
+	fy_foreach(item, changes) {
+		path = fy_get(item, "path", "");
+		now = fyai_catalog_doc_at(c->catalog_doc, path);
+		c->after = fy_assoc(w->gb, c->after, path,
+				    fyai_generic_or_null(now));
+	}
+	a = settings_emit(w->gb, c->before);
+	b = settings_emit(w->gb, c->after);
+	if (!a || !b || fyai_diff_unified(a, strlen(a), b, strlen(b),
+				    "a/catalog.yaml", "b/catalog.yaml", 2,
+				    &unified))
+		goto diff_error;
+	c->unified = settings_clean(w->gb, unified);
+	free(unified);
+	unified = NULL;
+	if (!c->unified || !*c->unified)
+		goto diff_error;
+	block = settings_diff_block(w->gb, c->unified);
+	if (!block)
+		goto diff_error;
+	c->diff = fy_gb_intern_string(w->gb, block);
+	return c->diff ? 0 : -1;
+diff_error:
+	free(unified);
+	snprintf(why, why_size, "the catalogue diff could not be made");
+	return -1;
+}
+
+static fy_generic settings_catalog_change(struct settings_walk *w,
+					  fy_generic args, bool *okp)
+{
+	struct settings_change c;
+	const char *explanation;
+	char why[1024];
+
+	*okp = false;
+	if (!w->ctx->gb)
+		return fy_value(w->gb, "settings: no arena; run fyai init");
+	if (w->ctx->cfg->model_access < FYAI_MODEL_REVIEW)
+		return fy_value(w->gb, "settings: model_access allows reads only");
+	explanation = fy_get(args, "explanation", "");
+	if (strlen(explanation) > SETTINGS_EXPLANATION_MAX)
+		return fy_value(w->gb, "settings: the explanation is too long");
+	explanation = settings_clean(w->gb, explanation);
+	if (!explanation)
+		return fy_value(w->gb, "settings: the explanation could not "
+				"be kept");
+	explanation = fy_gb_intern_string(w->gb, fy_sprintfa("%s%sSource: %s",
+		*explanation ? explanation : "Catalogue update",
+		*explanation ? "\n\n" : ".\n\n",
+		fy_get(args, "source", "")));
+	if (!explanation)
+		return fy_value(w->gb, "settings: the explanation could not "
+				"be kept");
+	if (settings_catalog_prepare(w,
+		fy_get(args, "changes", fy_invalid),
+		fy_get(args, "source", ""), &c, why, sizeof(why)))
+		return fy_value(w->gb, fy_sprintfa("settings: %s", why));
+	return settings_present(w, &c, explanation, okp);
+}
+
 static fy_generic settings_catalog_run(struct settings_walk *w,
 				       fy_generic action, const char *path,
-				       fy_generic args)
+				       fy_generic args, bool *okp)
 {
 	fy_generic cat, v;
 
@@ -1879,6 +2060,8 @@ static fy_generic settings_catalog_run(struct settings_walk *w,
 	if (!fy_is_mapping(cat))
 		return fy_value(w->gb, "settings: the catalogue cannot be "
 				"read");
+	if (fy_equal(action, "change"))
+		return settings_catalog_change(w, args, okp);
 	if (fy_equal(action, "search"))
 		return catalog_search(w, cat, fy_get(args, "query", ""),
 				      fy_get(args, "limit", 0LL));
@@ -1887,9 +2070,8 @@ static fy_generic settings_catalog_run(struct settings_walk *w,
 	if (fy_equal(action, "export"))
 		return settings_export(w, true, args);
 	if (!fy_any_equal(action, "get", "list"))
-		return fy_value(w->gb, "settings: the catalogue is read only; "
-				"its actions are search, get, list, select "
-				"and export");
+		return fy_value(w->gb, "settings: catalogue actions are search, "
+				"get, list, select, export and change");
 	v = *path ? fyai_catalog_at(w->ctx, path) : cat;
 	if (!fy_is_valid(v))
 		return fy_value(w->gb, fy_sprintfa("settings: the catalogue "
@@ -2460,10 +2642,14 @@ static fy_generic settings_run_generic(struct fyai_ctx *ctx, fy_generic args,
 		return fy_value(w.gb, fy_sprintfa("settings: %s is hidden "
 				"from the model", path));
 	if (fy_equal(fy_get(args, "document", fy_invalid), "catalog")) {
-		result = settings_catalog_run(&w, action, path, args);
+		result = settings_catalog_run(&w, action, path, args, okp);
 		if (!fy_is_mapping(result))
 			return result;
-		*okp = true;
+		if (!fy_equal(action, "change"))
+			*okp = true;
+		else
+			result = fy_assoc(w.gb, result, "arena_protected",
+					  settings_arena_protected(ctx));
 		return result;
 	}
 	if (!fy_any_equal(fy_get(args, "document", "config"), "config")) {
@@ -2649,7 +2835,8 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 		path = "?";
 	if (fy_equal(fy_get(args, "document", fy_invalid), "catalog")) {
 		fprintf(mf, "**catalog** %s ", fy_any_equal(action, "search",
-			"get", "list", "select", "export") ?
+			"get", "list", "select", "export",
+			"change") ?
 			fy_castp(&action, "") : "?");
 		if (fy_equal(action, "search"))
 			fprintf(mf, "%s", settings_span(gb, query));
@@ -2658,7 +2845,13 @@ static void settings_head(struct fyai_ctx *ctx, FILE *mf,
 				fy_get(args, "from", "")));
 		else if (fy_equal(action, "export"))
 			fprintf(mf, "%s", fy_get(args, "format", "json"));
-		else
+		else if (fy_equal(action, "change")) {
+			first = fy_get(fy_get_at(changes, 0, fy_invalid),
+					"path", "");
+			fprintf(mf, "%s", settings_span(gb, first));
+			if (fy_len(changes) > 1)
+				fprintf(mf, " (+%zu more)", fy_len(changes) - 1);
+		} else
 			fprintf(mf, "`%s`", *path ? path : "catalog");
 	} else if (fy_equal(action, "search")) {
 		fprintf(mf, "**settings** search %s", settings_span(gb, query));
@@ -2759,6 +2952,23 @@ static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
 {
 	fy_generic row, v;
 	size_t n = 0;
+
+	if (fy_equal(action, "change")) {
+		const char *status = fy_get(data, "status", "");
+		const char *id = fy_get(data, "id", "");
+
+		fprintf(mf, "**%s** catalogue change from %s\n\n",
+			!strcmp(status, "pending") ? "Pending" :
+			!strcmp(status, "applied") ? "Applied" : "Rejected",
+			settings_span(gb, fy_get(data, "source", "")));
+		if (*id)
+			fprintf(mf, "Id: %s\n\n", settings_span(gb, id));
+		fprintf(mf, "%s\n", fy_get(data, "diff", ""));
+		if (!strcmp(status, "pending"))
+			fprintf(mf, "Review with `config review %s`; apply with "
+				"`config approve %s`.\n", id, id);
+		return;
+	}
 
 	if (fy_equal(action, "select")) {
 		settings_format_select(mf, gb, data);
