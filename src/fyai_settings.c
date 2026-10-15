@@ -2951,6 +2951,7 @@ static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
 				    fy_generic action, fy_generic data)
 {
 	fy_generic row, v;
+	const char *diff, *block;
 	size_t n = 0;
 
 	if (fy_equal(action, "change")) {
@@ -2963,7 +2964,10 @@ static void settings_format_catalog(FILE *mf, struct fy_generic_builder *gb,
 			settings_span(gb, fy_get(data, "source", "")));
 		if (*id)
 			fprintf(mf, "Id: %s\n\n", settings_span(gb, id));
-		fprintf(mf, "%s\n", fy_get(data, "diff", ""));
+		diff = fy_get(data, "diff", "");
+		block = *diff ? settings_diff_block(gb, diff) : NULL;
+		if (block)
+			fprintf(mf, "%s\n", block);
 		if (!strcmp(status, "pending"))
 			fprintf(mf, "Review with `config review %s`; apply with "
 				"`config approve %s`.\n", id, id);

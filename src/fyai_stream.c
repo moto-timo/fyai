@@ -811,7 +811,7 @@ static void stream_report_failure(struct stream_response *stream,
 static int responses_hosted_search(struct stream_response *stream,
 				   fy_generic item)
 {
-	fy_generic action, query, status;
+	fy_generic action, query, status, args;
 	bool ok;
 
 	action = fy_get(item, "action");
@@ -820,10 +820,15 @@ static int responses_hosted_search(struct stream_response *stream,
 		query = fy_get(fy_get(action, "queries"), 0);
 	status = fy_get(item, "status");
 	ok = fy_not_equal(status, "failed");
+	args = fy_mapping(stream->gb,
+		"query", fy_is_string(query) ? query : fy_value(""),
+		"action", fy_get(action, "type", ""),
+		"url", fy_get(action, "url", ""),
+		"pattern", fy_get(action, "pattern", ""),
+		"ref_id", fy_get(action, "ref_id", ""));
 	stream_finish_reasoning(stream);
 	return fyai_present_hosted_call(stream->ctx, "web_search",
-			fy_mapping(stream->gb, "query",
-				   fy_is_string(query) ? query : fy_value("")),
+			args,
 			ok, ok ? NULL : "search failed");
 }
 

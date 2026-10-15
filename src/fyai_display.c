@@ -2097,13 +2097,33 @@ static void tool_head_web_search(struct fyai_ctx *ctx, FILE *mf,
 {
 	fy_generic gc = fy_get(args, "query");
 	const char *c = fy_castp(&gc, "");
+	const char *action = fy_get(args, "action", "");
+	const char *detail = "";
+	const char *verb = "";
 
 	(void)ctx;
 	(void)gb;
 	(void)preview_lines;
 	(void)blocks;
-	if (*c)
+	if (!strcmp(action, "open_page")) {
+		verb = "open page";
+		detail = fy_get(args, "url", "");
+		if (!*detail)
+			detail = fy_get(args, "ref_id", "");
+	} else if (!strcmp(action, "find_in_page")) {
+		verb = "find in page";
+		detail = fy_get(args, "pattern", "");
+	} else if (*action && strcmp(action, "search")) {
+		verb = action;
+	}
+	if (*verb && *detail)
+		fprintf(mf, "**web search** %s `%s`\n\n", verb, detail);
+	else if (*verb)
+		fprintf(mf, "**web search** %s\n\n", verb);
+	else if (*c)
 		fprintf(mf, "**web search** `%s`\n\n", c);
+	else if (*action)
+		fprintf(mf, "**web search** %s\n\n", action);
 	else
 		fprintf(mf, "**web search**\n\n");
 }
@@ -3019,6 +3039,7 @@ int fyai_present_hosted_call(struct fyai_ctx *ctx, const char *name,
 			     fy_generic args, bool ok, const char *cause)
 {
 	char *md = NULL;
+	const char *action, *detail, *verb;
 	size_t mdlen = 0;
 	size_t base;
 	size_t head;
@@ -3062,11 +3083,25 @@ int fyai_present_hosted_call(struct fyai_ctx *ctx, const char *name,
 				 "could not record the %s call title", name);
 		if (ctx->cfg->markdown)
 			(void)fyai_display_tool_head(ctx, md, head, ok, cause);
-		else
+		else {
+			action = fy_get(args, "action", "");
+			verb = !strcmp(action, "open_page") ? "open page" :
+				!strcmp(action, "find_in_page") ? "find in page" :
+				!strcmp(action, "search") ? "" : action;
+			detail = fy_get(args, "query", "");
+			if (!strcmp(action, "open_page")) {
+				detail = fy_get(args, "url", "");
+				if (!*detail)
+					detail = fy_get(args, "ref_id", "");
+			} else if (!strcmp(action, "find_in_page")) {
+				detail = fy_get(args, "pattern", "");
+			}
 			(void)fyai_sink_printf(ctx->sink, FYAI_SINK_STATUS,
-					       "%s %s%s\n", name,
-					       fy_get(args, "query", ""),
-					       ok ? "" : " (failed)");
+				"%s%s%s%s%s%s\n", name,
+				*verb ? " " : "", verb,
+				*detail ? " " : "", detail,
+				ok ? "" : " (failed)");
+		}
 	}
 	free(md);
 	md = NULL;
