@@ -1,6 +1,6 @@
 # Tool gap analysis
 
-Updated 2026-10-12 against commit `071131ef24b46f1a231e7c35c0ae777209b0b6e3`.
+Updated 2026-10-16 against commit `a7661292416f3141676349b0094fd4a7f71e24f0`.
 This review reconciles the two root reports,
 [`fyai-gap-analysis-2026-10-08.md`](../fyai-gap-analysis-2026-10-08.md) and
 [`fyai-alternative-harness-gap-analysis-2026-10-09.md`](../fyai-alternative-harness-gap-analysis-2026-10-09.md),
@@ -15,8 +15,8 @@ multiquestion user interaction, background and supervised agents with
 structured messages and receipts, branch-stored skills, and isolated Linux
 project views. The earlier analysis described several of these as missing. The
 broad remaining opportunities are trusted lifecycle extensions,
-provider-independent URL retrieval, MCP resources and deferred discovery, and a
-stable external session control protocol.
+provider-independent URL retrieval, a tested editor client for the ACP adapter,
+and evidence of MCP context savings on real catalogues.
 Image inspection, durable unattended execution, and editor clients depend more
 strongly on the intended audience.
 
@@ -26,7 +26,7 @@ to add a daemon, a second store, or a new isolation policy.
 
 ## Evidence and current native surface
 
-`data/tools.yaml` defines **20** model tools:
+`data/tools.yaml` defines **24** model tools:
 
 | Area | Tools | Current capability |
 | --- | --- | --- |
@@ -34,6 +34,9 @@ to add a daemon, a second store, or a new isolation policy.
 | Live sessions | `shell_input`, `shell_output`, `shell_close`, `monitor` | Named shell interaction and bounded event monitoring. |
 | Agents | `agent`, `agent_message`, `agent_input`, `ask_parent`, `list`, `cancel`, `project_view` | Fork/fresh context, background launch, status, cancellation, queued messages with receipts, input while waiting, questions to the owning agent, isolated views, change inspection, and conflict-aware apply. |
 | Skills | `skill` | Loads a branch-stored skill, or runs a forked skill as a sub-agent. |
+| Discovery and MCP | `tool_search`, `mcp_resource` | Bounded search of a large tool catalogue; paged reads of MCP resources and templates. |
+| Configuration | `settings` | Reads, selects, and exports the configuration and the catalogue by the `x-fyai-model` access of each key. Changes the model proposes go to a user review. Reserved for the session of the user. |
+| Automation | `structured_output` | Gives the final answer in the shape that the caller declared. Arguments that do not match return their problems for correction, and the turn ends on acceptance. |
 | Planning, interaction, and time | `todo_write`, `ask_user`, `time`, `wait` | Branch-stored task lists; one to four questions with stable IDs, descriptions, previews, multi-select, free text, and background answers; interruptible waits. |
 
 The `agent` schema supports `background` and `isolated`; `list` exposes agent
@@ -99,10 +102,12 @@ controller. Availability in source is not a production reliability claim.
 | Busy-agent steering | `agent_message` receipts and `ask_parent`; delivery at a model request boundary | Decide whether preempting a long tool call is needed; characterize delivery latency | P3 |
 | Web retrieval | Hosted search depends on endpoint; no native bounded URL fetch | Provider-independent fetch with URL, title, time, source, limits, network policy, and replayable citation metadata | P1 |
 | MCP breadth | Tool calls, OAuth, resource/template list and reads, deferred tool discovery, and HTTP session recovery work; only selected schemas from a large catalog enter requests | Measure context savings with real large catalogs; test OAuth expiry for resource reads | P1 |
-| External control | One-run worker RPC and internal agent protocol; no stable durable-session client contract established | Versioned branch open/resume, input, correlated events, questions, cancellation, and reconnect semantics | P1 |
+| External control | `fyai acp` serves ACP versions 1 and 2 over standard I/O with durable `acp/` branches ([`acp.md`](acp.md)); `structured_output` serves headless callers. The one-run worker RPC stays separate. The ACP compatibility suite checks the protocol; no editor client is demonstrated. MCP servers cannot come from the client | Run one real editor client against the adapter. Decide whether a non-ACP controller needs correlated events, questions, and reconnect semantics beyond ACP | P2 |
+| Nested instructions | Instructions are discovered from the root to the start directory and frozen for the conversation; a session that moves to another subtree does not see that subtree's `AGENTS.md` | A versioned instruction snapshot or an explicit refresh with visible provenance; do not rewrite stored history | P2 |
+| Skill sharing | Import from the skills of Claude Code; no export or install from a URL | A package format that `skill import` and a matching export read and write | P2 |
 | Visual input | Native reader is text-oriented | MIME and size checks, capability negotiation, durable attachment identity, provider serialization, replay | P2; P1 for frontend work |
 | Recovery of unfinished effects | Durable conversation history; no general execution-intent/replay contract established | Characterize crash boundaries before optional unattended jobs; classify ambiguous effects and deduplicate submissions | P2; P1 for unattended work |
-| Editor and automation clients | Terminal-first CLI | Build a thin client against the session contract; consider ACP after demonstrated compatibility | P2 |
+| Editor and automation clients | ACP adapter exists; no editor extension of fyai's own | Document a tested editor setup; add a thin client only on evidence of need | P2 |
 | Diagnostics and special formats | Shell/MCP composition; no dedicated LSP, notebook edit, or artifact lifecycle | Add only against measured failures or a chosen workload | P2/P3 |
 | Hosted scheduling | Invocation owns its lifetime | External controller owns scheduling and durable jobs if required | P3 |
 
@@ -124,7 +129,10 @@ Hosted web search is already adapted for capable provider endpoints, but it
 does not make a selected URL retrievable across providers. A native fetch must
 bound redirects, time, size, and MIME types; use the existing network controls;
 and preserve source and failure information in transcript replay. Do not route
-it invisibly through shell output. MCP resources and templates are distinct
+it invisibly through shell output. It would be the first local tool that returns
+external content to the model, so it needs a prompt-injection boundary: model
+access through `x-fyai-model`, the existing egress controls, and a visible
+origin on every result. MCP resources and templates are distinct
 from MCP tool results. The resource tool returns one page at a time and caps a
 response at 64 KiB. A catalog with more than eight tools exposes a bounded
 search; selected schemas enter later model requests. Measure context savings
@@ -140,7 +148,9 @@ package format. Hooks need trust, timeouts, output bounds, and no automatic exec
 because a repository contains one. A small subprocess event/tool contract fits
 the native executable. A stable session API can use subprocesses without a
 resident server; it should be distinguished from the existing transient worker
-RPC. Demonstrate it with one client before claiming ACP compatibility.
+RPC. The ACP adapter is that contract for editors. It passes the ACP test
+compatibility kit through `ninja acp-testsuite`; demonstrate it with one real
+editor client before advertising editor support.
 
 ### Durability and visual work
 
