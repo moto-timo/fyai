@@ -2153,6 +2153,35 @@ static void ui_question_state(const struct ui_question *q,
 	ask->selected = q->cursor[q->cur];
 }
 
+/*
+ * Copy @hint to @buf, cut to @cols columns with an ellipsis. A row of Markdown
+ * wraps a longer hint onto a second row that the fit does not count.
+ */
+static const char *ui_hint_fit(const char *hint, int cols, char *buf,
+			       size_t size)
+{
+	size_t len, keep, n;
+	int w;
+
+	if (fy_str_empty(hint) || cols <= 0)
+		return hint;
+	len = strlen(hint);
+	if ((int)fymd_str_width(hint, len) <= cols)
+		return hint;
+	keep = 0;
+	for (n = 1; n <= len; n++) {
+		if (n < len && ((unsigned char)hint[n] & 0xc0) == 0x80)
+			continue;
+		w = (int)fymd_str_width(hint, n);
+		if (w > cols - 1 || n + 4 > size)
+			break;
+		keep = n;
+	}
+	memcpy(buf, hint, keep);
+	memcpy(buf + keep, "\xe2\x80\xa6", 4);
+	return buf;
+}
+
 static void ui_page_update(struct fyai_ui *ui)
 {
 	struct fyai_ctx *ctx = ui->ctx;
@@ -2167,6 +2196,7 @@ static void ui_page_update(struct fyai_ui *ui)
 	struct fyai_page_ask_option ask_options[FYAI_ASK_OPTIONS_MAX];
 	struct fyai_page_ask_review ask_lines[FYAI_ASK_QUESTIONS_MAX];
 	char ask_answers[FYAI_ASK_QUESTIONS_MAX][256];
+	char hint_fit[256];
 	struct fyai_transcript_view *blocks;
 	const char *rule_off, *typed, *tail;
 	char *activity = NULL;
@@ -2213,7 +2243,9 @@ static void ui_page_update(struct fyai_ui *ui)
 					(size_t)ui->activity_phase, NULL);
 		st.activity = activity;
 	}
-	st.hint = ui->status_hint;
+	st.hint = ui_hint_fit(ui->status_hint,
+			      cols - markdown_gutter_cols(ctx->cfg), hint_fit,
+			      sizeof(hint_fit));
 	st.status = ui->status_bottom;
 	st.tail_rows = fytim_tail_rows(ui->ft);
 	/* An inline page draws the live blocks under its tail. */
