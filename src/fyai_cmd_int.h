@@ -208,6 +208,7 @@ int fyai_cmd_view_rm(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_view_cp(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_view_fs(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_mock_server(struct fyai_cmd_call *call, fy_generic *result);
+int fyai_cmd_check_builtins(struct fyai_cmd_call *call, fy_generic *result);
 
 fyai_cmd_prepare_fn fyai_cmd_prepare(const char *name);
 fyai_cmd_prepare_fn fyai_cmd_early_hook(const char *name);

@@ -1844,6 +1844,46 @@ fy_generic fyai_page_load(struct fy_generic_builder *gb, const char *path,
 	return doc;
 }
 
+int fyai_page_check_embedded(char *why, size_t size)
+{
+	struct fy_generic_builder_cfg cfg = {
+		.flags = FYGBCF_SCOPE_LEADER | FYGBCF_DEDUP_ENABLED,
+	};
+	fy_generic_sized_string text;
+	struct fy_generic_builder *gb;
+	fy_generic schema, report;
+	char *problems;
+	int rc = -1;
+
+	gb = fy_generic_builder_create(&cfg);
+	if (!gb) {
+		page_load_why(why, size, "cannot make a builder");
+		return -1;
+	}
+	text.data = (const char *)FYAI_EMBEDDED_PAGE_SCHEMA;
+	text.size = FYAI_EMBEDDED_PAGE_SCHEMA_LEN;
+	schema = fy_parse(gb, text,
+			  FYAI_YAML_PARSE_FLAGS | FYOPPF_INPUT_TYPE_STRING, NULL);
+	if (!fy_is_mapping(schema) || !fy_is_mapping(page_doc())) {
+		page_load_why(why, size, "the page document or its schema do "
+			      "not parse");
+		goto out;
+	}
+	report = fyai_schema_validate(gb, schema, page_doc());
+	if (!fyai_schema_valid(report)) {
+		problems = fyai_schema_report_string(report);
+		page_load_why(why, size, "the embedded page does not match the "
+			      "page schema: %s",
+			      problems ? problems : "no problem was reported");
+		free(problems);
+		goto out;
+	}
+	rc = 0;
+out:
+	fy_generic_builder_destroy(gb);
+	return rc;
+}
+
 int fyai_page_source(const struct fyai_page_state *st,
 		     struct response_buffer *out)
 {

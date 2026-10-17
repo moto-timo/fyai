@@ -266,6 +266,13 @@ int fyai_page_check(fy_generic doc, const struct fyai_page_action *actions,
 		    size_t n, char *why, size_t why_size);
 
 /*
+ * Check the embedded page document against data/page.schema.yaml. The action
+ * names are not checked: only the input area knows them. Returns 0, or -1 with
+ * the reason in @why.
+ */
+int fyai_page_check_embedded(char *why, size_t size);
+
+/*
  * Load the page document of the file @path into @gb: parse it, validate it
  * against data/page.schema.yaml, and check it with @actions. Returns the
  * document, or fy_invalid with the reason in @why.

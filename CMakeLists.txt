@@ -483,6 +483,7 @@ set(FYAI_SOURCES
     src/fyai_tool_registry.c
     src/fyai_monitor.c
     src/fyai_mock.c
+    src/fyai_builtin.c
     src/fyai_tool_template.c
     src/fyai_turn.c
     src/utils.c
@@ -528,6 +529,20 @@ add_executable(fyai
     src/main.c
     ${FYAI_SOURCES}
 )
+# The embedded data is fixed by a build: check it one time here, not at every
+# start. A build for another machine cannot run fyai.
+if(NOT CMAKE_CROSSCOMPILING)
+    add_custom_command(TARGET fyai POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E env
+            HOME=${CMAKE_CURRENT_BINARY_DIR}
+            XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}
+            XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}
+            $<TARGET_FILE:fyai> __check-builtins
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Checking the embedded data"
+        VERBATIM)
+endif()
+
 # Write the command reference, doc/commands.md, from the definitions. The
 # case commands_reference fails when the file is out of date.
 add_custom_target(docs-commands

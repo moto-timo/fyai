@@ -4106,6 +4106,22 @@ commands:
           x-fyai-positional: 1
           x-fyai-meta: PATH
 
+  - command: __check-builtins
+    title: check the embedded data
+    description: |
+      Check the embedded command definitions, catalogue, configuration sample,
+      page document and tool specifications against their schemas, and against
+      the code where a schema is not enough. The build runs it one time after
+      it links fyai. It is not for a person.
+    surfaces: [cli]
+    handler: check_builtins
+    hidden: true
+    flags: [no-storage]
+    arguments:
+      type: object
+      additionalProperties: false
+      properties: {}
+
   - command: __mock-server
     title: serve a scenario as a mock AI provider
     description: |
