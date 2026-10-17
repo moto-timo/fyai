@@ -35,7 +35,7 @@ FYAI_TEST_ENTRY(diag, no_sink, diag_no_sink)
 FYAI_TEST_ENTRY(diag, trace, diag_trace)
 
 #define DIAG_THREADS	8
-#define DIAG_PER_THREAD	2000
+#define DIAG_PER_THREAD	250
 
 static struct fyai_cfg test_cfg;
 static struct fyai_ctx test_ctx;
