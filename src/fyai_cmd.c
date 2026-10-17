@@ -16,6 +16,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <regex.h>
 
 #include "fyai.h"
 #include "fyai_cmd.h"
@@ -879,6 +880,124 @@ static void parse_error(struct fyai_cfg *cfg, fy_generic def, const char *path,
 	free(usage);
 }
 
+/*
+ * Add a problem to @msg. The problems of one command line are joined as the
+ * schema validator joins them.
+ */
+static void arg_problem(char *msg, size_t size, const char *fmt, ...)
+	__attribute__((format(printf, 3, 4)));
+
+static void arg_problem(char *msg, size_t size, const char *fmt, ...)
+{
+	size_t len = strlen(msg);
+	va_list ap;
+
+	if (len >= size - 1)
+		return;
+	if (len) {
+		snprintf(msg + len, size - len, "; ");
+		len = strlen(msg);
+	}
+	va_start(ap, fmt);
+	vsnprintf(msg + len, size - len, fmt, ap);
+	va_end(ap);
+}
+
+/*
+ * Check one value of the property @p. The scanner converted the type already.
+ * This covers the keywords that the definitions can use: enum, minLength,
+ * pattern, minimum and maximum. The schema of data/command.schema.yaml allows
+ * no other.
+ */
+static void arg_check_value(fy_generic p, fy_generic v, const char *name,
+			    char *msg, size_t size)
+{
+	fy_generic e, item, limit;
+	const char *s, *pattern;
+	long long min;
+	regex_t re;
+	bool found = false;
+	double d;
+	int rc;
+
+	e = fy_get(p, "enum", fy_invalid);
+	if (fy_is_sequence(e)) {
+		fy_foreach(item, e)
+			found = found || fy_equal(item, v);
+		if (!found)
+			arg_problem(msg, size, "%s: not in enum", name);
+	}
+	if (fy_is_string(v)) {
+		s = fy_castp(&v, "");
+		limit = fy_get(p, "minLength", fy_invalid);
+		min = fy_number(limit, 0LL);
+		if (fy_is_valid(limit) && (long long)fyai_utf8_length(s) < min)
+			arg_problem(msg, size,
+				    "%s: string length %zu < minLength %lld",
+				    name, fyai_utf8_length(s), min);
+		limit = fy_get(p, "pattern", fy_invalid);
+		if (fy_is_string(limit)) {
+			pattern = fy_castp(&limit, "");
+			rc = regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB);
+			if (rc) {
+				arg_problem(msg, size, "%s: invalid pattern '%s'",
+					    name, pattern);
+			} else {
+				rc = regexec(&re, s, 0, NULL, 0);
+				regfree(&re);
+				if (rc == REG_NOMATCH)
+					arg_problem(msg, size,
+						    "%s: does not match pattern '%s'",
+						    name, pattern);
+			}
+		}
+	} else if (fy_is_int(v) || fy_is_float(v)) {
+		limit = fy_get(p, "minimum", fy_invalid);
+		d = fy_number(v, 0.0);
+		if (fy_is_valid(limit) && d < fy_number(limit, 0.0))
+			arg_problem(msg, size, "%s: %g < minimum %g", name, d,
+				    fy_number(limit, 0.0));
+		limit = fy_get(p, "maximum", fy_invalid);
+		if (fy_is_valid(limit) && d > fy_number(limit, 0.0))
+			arg_problem(msg, size, "%s: %g > maximum %g", name, d,
+				    fy_number(limit, 0.0));
+	}
+}
+
+/*
+ * Check the arguments that the scanner built against the keywords of the
+ * properties. The scanner has rejected an unknown option, a wrong type and a
+ * missing argument, so no full schema validation follows. The message is empty
+ * when the arguments are right.
+ */
+static void args_check(const struct fyai_cmd_prop *props, int n, fy_generic args,
+		       char *msg, size_t size)
+{
+	fy_generic v, item, limit;
+	long long min;
+	int k;
+
+	msg[0] = '\0';
+	for (k = 0; k < n; k++) {
+		v = fy_get(args, props[k].name, fy_invalid);
+		if (!fy_is_valid(v))
+			continue;
+		if (!props[k].array) {
+			arg_check_value(props[k].p, v, props[k].name, msg, size);
+			continue;
+		}
+		limit = fy_get(props[k].p, "minItems", fy_invalid);
+		min = fy_number(limit, 0LL);
+		if (fy_is_valid(limit) && (long long)fy_len(v) < min)
+			arg_problem(msg, size,
+				    "%s: array length %zu < minItems %lld",
+				    props[k].name, (size_t)fy_len(v), min);
+		fy_foreach(item, v)
+			arg_check_value(fy_get(props[k].p, "items", fy_invalid),
+					item, props[k].name, msg, size);
+	}
+}
+
 static int parse_set(struct fyai_cmd_parse_state *st, struct fyai_cmd_prop *cp,
 		     fy_generic value)
 {
@@ -938,9 +1057,9 @@ static const char *parse_rest(struct fyai_cmd_parse_state *st, size_t i)
 static int parse_args(struct fyai_cmd_parse_state *st, size_t i)
 {
 	struct fyai_cmd_prop props[FYAI_CMD_MAX_PROPS], *cp;
-	fy_generic value, report, dflt, argschema, req;
+	fy_generic value, dflt, req;
 	const char *w, *eq, *text;
-	char *problems;
+	char problems[512];
 	bool opts_done, negated;
 	long long npos;
 	size_t len, j;
@@ -1122,17 +1241,11 @@ static int parse_args(struct fyai_cmd_parse_state *st, size_t i)
 				    props[k].lname);
 		return -1;
 	}
-	argschema = fy_get(st->out->def, "arguments", fy_invalid);
-	if (fy_is_valid(argschema)) {
-		report = fyai_schema_validate(st->gb, argschema, st->args);
-		if (!fyai_schema_valid(report)) {
-			problems = fyai_schema_report_string(report);
-			parse_error(st->cfg, st->out->def, st->out->path,
-				    st->surface, "%s",
-				    problems ? problems : "invalid arguments");
-			free(problems);
-			return -1;
-		}
+	args_check(props, n, st->args, problems, sizeof(problems));
+	if (*problems) {
+		parse_error(st->cfg, st->out->def, st->out->path, st->surface,
+			    "%s", problems);
+		return -1;
 	}
 	st->out->args = st->args;
 	return 0;
@@ -1146,8 +1259,8 @@ static int parse_group_args(struct fyai_cmd_parse_state *st,
 			    struct fyai_cmd_walk *w)
 {
 	struct fyai_cmd_prop props[FYAI_CMD_MAX_PROPS];
-	fy_generic group, gargs, value, report, dflt, schema;
-	char *problems;
+	fy_generic group, gargs, value, dflt, schema;
+	char problems[512];
 	size_t g, j;
 	int n, k;
 
@@ -1184,13 +1297,10 @@ static int parse_group_args(struct fyai_cmd_parse_state *st,
 				gargs = fy_assoc(st->gb, gargs, props[k].name,
 						 dflt);
 		}
-		report = fyai_schema_validate(st->gb, schema, gargs);
-		if (!fyai_schema_valid(report)) {
-			problems = fyai_schema_report_string(report);
+		args_check(props, n, gargs, problems, sizeof(problems));
+		if (*problems) {
 			parse_error(st->cfg, st->out->def, st->out->path,
-				    st->surface, "%s",
-				    problems ? problems : "invalid arguments");
-			free(problems);
+				    st->surface, "%s", problems);
 			return -1;
 		}
 		st->out->args = fy_merge(st->gb, st->out->args, gargs);

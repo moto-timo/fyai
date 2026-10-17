@@ -57,13 +57,35 @@ $defs:
         type: object
         additionalProperties: {$ref: "#/$defs/property"}
 
+  # The keywords that the argument scanner of src/fyai_cmd.c checks. The
+  # scanner does not validate an argument against its schema: a keyword that
+  # is not here would be ignored, so a definition cannot use one.
   property:
     type: object
     required: [type, description]
+    additionalProperties: false
     properties:
       type:
         enum: [string, integer, number, boolean, array]
       description: {type: string, minLength: 1}
+      default: {}
+      enum: {type: array}
+      minLength: {type: integer, minimum: 0}
+      minimum: {type: number}
+      maximum: {type: number}
+      pattern: {type: string}
+      minItems: {type: integer, minimum: 0}
+      items:
+        type: object
+        additionalProperties: false
+        properties:
+          type:
+            enum: [string, integer, number, boolean]
+          enum: {type: array}
+          minLength: {type: integer, minimum: 0}
+          minimum: {type: number}
+          maximum: {type: number}
+          pattern: {type: string}
       x-fyai-positional: {type: integer, minimum: 0}
       x-fyai-rest: {type: boolean}
       # A long option of a foreign grammar, such as the Claude CLI, can
