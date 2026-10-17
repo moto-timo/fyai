@@ -1,0 +1,13 @@
+{
+  "steps": [
+    {"match": {"path": "/held"}, "wait_for": "release", "response": {"held": true}},
+    {"match": {"path": "/quick"}, "response": {"quick": true}},
+    {"match": {"path": "/cut"}, "sse": [{"n": 1}, {"n": 2}, {"n": 3}], "close_after": 2},
+    {"match": {"path": "/ka"}, "response": {"ka": 1}},
+    {"match": {"path": "/ka"}, "response": {"ka": 2}},
+    {"match": {"path": "/chunked"}, "response": {"chunked": true}},
+    {"match": {"http": "GET", "path": "/url"}, "raw": "{{BASE_URL}}/x"},
+    {"match": {"path": "/by-body", "body_contains": "second"}, "response": {"which": "second"}},
+    {"match": {"path": "/by-body", "body_contains": "first"}, "response": {"which": "first"}}
+  ]
+}

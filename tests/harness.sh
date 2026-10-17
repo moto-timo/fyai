@@ -16,7 +16,6 @@ FYAI_BIN="${FYAI_BIN:-${1:-}}"
 PYTHON="${PYTHON:-python3}"
 TESTS_DIR="${TESTS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 SCENARIOS_DIR="$TESTS_DIR/scenarios"
-MOCK_PROVIDER="$TESTS_DIR/mock/mock_provider.py"
 FYAI_VALGRIND="${FYAI_VALGRIND:-}"
 
 [ -x "$FYAI_BIN" ] || { echo "harness: FYAI_BIN not set/executable" >&2; exit 99; }
@@ -212,7 +211,8 @@ mock_start() {
 	# a new bind in that window fails and the old server answers the
 	# new leg with exhausted steps. Stop it first so the port is free.
 	mock_stop_quiet
-	"$PYTHON" "$MOCK_PROVIDER" "$scenario" "$TEST_DIR" \
+	# FYAI_MOCK_LOG=1 puts a line for each request in mock.log.
+	"$FYAI_BIN" __mock-server ${FYAI_MOCK_LOG:+--log} "$scenario" "$TEST_DIR" \
 		2>"$TEST_DIR/mock.log" &
 	MOCK_PID=$!
 

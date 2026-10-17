@@ -716,7 +716,7 @@ if(BUILD_TESTING)
     endforeach()
 
     # Functional cases: each script drives the real fyai binary against the
-    # scenario-driven mock provider (tests/mock/mock_provider.py) in a
+    # scenario-driven mock provider (fyai __mock-server) in a
     # hermetic sandbox (private HOME/XDG_*, localhost only).
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
