@@ -230,8 +230,8 @@ fyai_cmd_fn fyai_cmd_handler(const char *name)
 /* ---- registry ------------------------------------------------------------ */
 
 /*
- * The registry is parsed and checked one time. The builder lives as long as
- * the process and the document is read only, as the embedded page is.
+ * The registry is parsed one time. The builder lives as long as the process
+ * and the document is read only, as the embedded page is.
  */
 static struct fy_generic_builder *reg_gb;
 static fy_generic reg_doc = fy_invalid;
@@ -372,8 +372,6 @@ fy_generic fyai_cmd_registry(void)
 	struct fy_generic_builder_cfg cfg = {
 		.flags = FYGBCF_SCOPE_LEADER | FYGBCF_DEDUP_ENABLED,
 	};
-	fy_generic doc, schema, report, def;
-	char *problems;
 
 	if (reg_tried)
 		return reg_doc;
@@ -383,12 +381,31 @@ fy_generic fyai_cmd_registry(void)
 		reg_fail("cannot create the command registry builder");
 		return fy_invalid;
 	}
-	doc = reg_parse(FYAI_EMBEDDED_COMMANDS, FYAI_EMBEDDED_COMMANDS_LEN);
+	reg_doc = reg_parse(FYAI_EMBEDDED_COMMANDS, FYAI_EMBEDDED_COMMANDS_LEN);
+	if (!fy_is_mapping(reg_doc)) {
+		reg_doc = fy_invalid;
+		reg_fail("the command definitions do not parse");
+	}
+	return reg_doc;
+}
+
+/*
+ * The definitions are embedded, so a build fixes their content. The check
+ * runs in the unit test, not in every invocation.
+ */
+int fyai_cmd_registry_check(void)
+{
+	fy_generic doc, schema, report, def;
+	char *problems;
+
+	doc = fyai_cmd_registry();
+	if (!fy_is_valid(doc))
+		return -1;
 	schema = reg_parse(FYAI_EMBEDDED_COMMAND_SCHEMA,
 			   FYAI_EMBEDDED_COMMAND_SCHEMA_LEN);
-	if (!fy_is_mapping(doc) || !fy_is_mapping(schema)) {
-		reg_fail("the command definitions do not parse");
-		return fy_invalid;
+	if (!fy_is_mapping(schema)) {
+		reg_fail("the command schema does not parse");
+		return -1;
 	}
 	report = fyai_schema_validate(reg_gb, schema, doc);
 	if (!fyai_schema_valid(report)) {
@@ -396,15 +413,14 @@ fy_generic fyai_cmd_registry(void)
 		reg_fail("the command definitions do not match their schema: %s",
 			 problems ? problems : "no problem was reported");
 		free(problems);
-		return fy_invalid;
+		return -1;
 	}
 	if (reg_check_props(fy_get(doc, "global", fy_invalid), "global"))
-		return fy_invalid;
+		return -1;
 	fy_foreach(def, fy_get(doc, "commands", fy_invalid))
 		if (reg_check_command(def, NULL))
-			return fy_invalid;
-	reg_doc = doc;
-	return reg_doc;
+			return -1;
+	return 0;
 }
 
 const char *fyai_cmd_registry_why(void)

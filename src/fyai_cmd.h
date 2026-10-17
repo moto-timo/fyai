@@ -89,12 +89,19 @@ struct fyai_cmd_call {
 };
 
 /*
- * The parsed and validated registry, or fy_invalid when the embedded
- * definitions do not load. The value lives as long as the process.
+ * The parsed registry, or fy_invalid when the embedded definitions do not
+ * parse. The value lives as long as the process. It is not checked against
+ * its schema: see fyai_cmd_registry_check().
  */
 fy_generic fyai_cmd_registry(void);
 
-/* Why fyai_cmd_registry() failed; an empty string when it did not. */
+/*
+ * Check the embedded definitions against their schema, and their handlers,
+ * hooks and arguments against the code. Return 0 when they are right.
+ */
+int fyai_cmd_registry_check(void);
+
+/* Why fyai_cmd_registry() or fyai_cmd_registry_check() failed; empty when not. */
 const char *fyai_cmd_registry_why(void);
 
 /* True if the parsed command @st is the command at @path ("branch new"). */
