@@ -4106,6 +4106,39 @@ commands:
           x-fyai-positional: 1
           x-fyai-meta: PATH
 
+  - command: __mock-server
+    title: serve a scenario as a mock AI provider
+    description: |
+      The mock provider of the test suite. Serve the replies of SCENARIO, a
+      YAML or JSON file, on a loopback port until the process is stopped. Write
+      `port`, `requests.jsonl` and `served` in RUNDIR. See doc/mock-provider.md.
+      It is not for a person.
+    surfaces: [cli]
+    handler: mock_server
+    hidden: true
+    flags: [no-storage]
+    arguments:
+      type: object
+      additionalProperties: false
+      required: [scenario]
+      properties:
+        log:
+          type: boolean
+          default: false
+          description: report each request on standard error
+          x-fyai-long: log
+        scenario:
+          type: string
+          description: the scenario file
+          x-fyai-positional: 0
+          x-fyai-meta: SCENARIO
+        rundir:
+          type: string
+          default: '.'
+          description: the directory of the run files
+          x-fyai-positional: 1
+          x-fyai-meta: RUNDIR
+
   - command: __complete
     title: list the completion candidates of a command line
     description: |

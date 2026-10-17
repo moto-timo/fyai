@@ -32,6 +32,7 @@
 #include "fyai_catalog.h"
 #include "fyai_log.h"
 #include "fyai_merge.h"
+#include "fyai_mock.h"
 #include "fyai_secret.h"
 #include "fyai_storage.h"
 #include "fyai_view.h"
@@ -521,4 +522,14 @@ int fyai_cmd_render(struct fyai_cmd_call *call, fy_generic *result)
 	return 0;
 err:
 	return -1;
+}
+
+int fyai_cmd_mock_server(struct fyai_cmd_call *call, fy_generic *result)
+{
+	const char *scenario = fyai_cmd_arg_str(call, "scenario");
+	const char *rundir = fyai_cmd_arg_str(call, "rundir");
+
+	*result = fy_invalid;
+	return fyai_mock_serve(call->ctx, call->gb, scenario, rundir ? rundir : ".",
+			       fyai_cmd_arg_bool(call, "log"));
 }

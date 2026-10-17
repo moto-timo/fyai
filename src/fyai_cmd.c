@@ -164,6 +164,7 @@ static const struct {
 	{ "view_rm",		fyai_cmd_view_rm },
 	{ "view_cp",		fyai_cmd_view_cp },
 	{ "view_fs",		fyai_cmd_view_fs },
+	{ "mock_server",	fyai_cmd_mock_server },
 	{ "view_sync",		fyai_cmd_view_sync },
 	{ "view_mount",		fyai_cmd_view_mount },
 	{ "view_unmount",	fyai_cmd_view_unmount },
