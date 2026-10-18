@@ -537,6 +537,9 @@ static void test_closed_peer_is_no_error(void)
 	}
 	FYAI_TCHECK(jsonrpc_conn_closed(p.conn));
 	FYAI_TCHECK(!fyai_diag_got_error(&test_cfg.diag));
+	/* Nothing is left to wait for: a caller that flushes the connection
+	 * before it exits must not wait for output that cannot be written. */
+	FYAI_TCHECK(!jsonrpc_conn_has_output(p.conn));
 	peer_close(&p);
 	rc = sigaction(SIGPIPE, &old, NULL);
 	FYAI_TCHECK(!rc);
