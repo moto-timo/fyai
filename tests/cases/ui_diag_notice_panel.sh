@@ -8,8 +8,23 @@ set -eu
 
 fyai_test_setup
 
+# The limit is advisory, so a sub-agent that outlives it by any time raises the
+# notice when it completes. A limit of 1 ms spares the case a command that
+# runs for longer than a real limit, and the wait for it.
+"$PYTHON" - "$SCENARIOS_DIR/agent_tool_responses.json" \
+    "$TEST_DIR/quick-agent.json" <<'PY'
+import json
+import sys
+
+scenario = json.load(open(sys.argv[1]))
+shell = scenario["steps"][1]["response"]["output"][0]["action"]
+shell["commands"] = ["printf '\\141gent-was-here\\n'"]
+with open(sys.argv[2], "w") as out:
+    json.dump(scenario, out)
+PY
+
 for screen in fullscreen inline; do
-	mock_start agent_tool_responses.json
+	mock_start "$TEST_DIR/quick-agent.json"
 	FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
 	FYAI_PTY_NEEDLE="delegate a" FYAI_PTY_TIMEOUT=30 \
 	FYAI_PTY_AFTER="wait-screen:Delegated and done.|wait-screen:advisory|snapshot" \
@@ -20,7 +35,7 @@ for screen in fullscreen inline; do
 	    --set "display/screen=$screen" --set display/tool_display=inline \
 	    --set display/notice_output=pane \
 	    --set tools=true --set api=responses --set builtin_shell=true \
-	    --set agent/timeout_ms=800 \
+	    --set agent/timeout_ms=1 \
 	    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
 	mock_stop 4
 
@@ -50,17 +65,7 @@ done
 
 # A session can place the same notice below its transcript instead of opening
 # the fullscreen popup.
-"$PYTHON" - "$SCENARIOS_DIR/agent_tool_responses.json" \
-    "$TEST_DIR/slow-agent.json" <<'PY'
-import json
-import sys
-
-scenario = json.load(open(sys.argv[1]))
-scenario["steps"][2]["delay"] = 2.0
-with open(sys.argv[2], "w") as out:
-    json.dump(scenario, out)
-PY
-mock_start "$TEST_DIR/slow-agent.json"
+mock_start "$TEST_DIR/quick-agent.json"
 FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
 FYAI_PTY_NEEDLE="delegate a" FYAI_PTY_TIMEOUT=30 \
 FYAI_PTY_AFTER="wait-screen:Delegated and done.|wait-screen:advisory|snapshot" \
@@ -70,7 +75,7 @@ FYAI_PTY_SNAPSHOT="$TEST_DIR/transcript-notice.out" \
     --set display/markdown=true --set display/stream=false \
     --set display/screen=fullscreen \
     --set display/tool_display=inline --set tools=true --set api=responses \
-    --set builtin_shell=true --set agent/timeout_ms=800 \
+    --set builtin_shell=true --set agent/timeout_ms=1 \
     --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
 mock_stop 4
 
