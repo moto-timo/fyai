@@ -108,8 +108,11 @@ while time.time() < end:
             os.write(fd, ANSWER.encode() + b"\n")
             sent = True
             end = time.time() + 10
-        elif sent and not exit_sent and b"initialized" in buf:
-            # Send EOF once; repeated PTY writes can block.
+        elif sent and not exit_sent and b"initialized" in buf and \
+                b"\x1b[?25h\x1b[?2026l" in buf[buf.find(b"initialized"):]:
+            # Send EOF once; repeated PTY writes can block. The session
+            # reads it only after it painted the input: an earlier EOF is
+            # lost and the run waits for the time limit.
             try:
                 os.write(fd, b"\x04")
                 exit_sent = True
