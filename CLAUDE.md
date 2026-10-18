@@ -249,12 +249,15 @@ a slash table entry, or a hand-written parser.
 - `flags` replace the verb flags. `model` says that the verb talks to the
   model: only such a verb sets up the request state and needs a provider
   credential, so a verb that does not send a model request never asks for
-  a key. `no-storage` opens no arena, `storage-optional` opens the arena
-  only when it exists and never makes one (`__complete`), `transient` gives
-  the handler the transient builder, and `interactive` opens the terminal
-  UI. `while_busy` says whether a slash command runs beside a turn: `run`,
-  `wait` (the default), or `bare` (only with no arguments). `view: true`
-  keeps the result in the scrollback of a session.
+  a key. `model-state` reads the model that the catalogue resolves, such as
+  `api` and `list`, but sends no request; every other verb starts without
+  resolving it, which parses the catalogue. `no-storage` opens no arena,
+  `storage-optional` opens the arena only when it exists and never makes
+  one (`__complete`), `transient` gives the handler the transient builder,
+  and `interactive` opens the terminal UI. `while_busy` says whether a
+  slash command runs beside a turn: `run`, `wait` (the default), or `bare`
+  (only with no arguments). `view: true` keeps the result in the
+  scrollback of a session.
 - A session setting is a command with `setting: {key: PATH}`: the
   configuration schema gives its values and completion, and its
   `x-fyai-scope` decides whether a change is stored or goes into the session
