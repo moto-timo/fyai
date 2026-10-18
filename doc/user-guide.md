@@ -1196,6 +1196,27 @@ in the parent is what names the cause.
 The file is only appended to, and never rotated or cleared by fyai. Remove it
 yourself when you no longer need it.
 
+### Record the screen
+
+Use `FYAI_CAST` when the display shows a glitch that you cannot see again, such
+as a row that is painted wrong after a resize. The variable names a file, or a
+directory that gets a file for the process. An interactive session records
+what the terminal received as an
+[asciicast](https://docs.asciinema.org/manual/asciicast/v2/) file.
+
+```sh
+FYAI_CAST=/tmp/casts fyai            # /tmp/casts/fyai-PID-TIME.cast
+asciinema play /tmp/casts/fyai-*.cast
+```
+
+The file holds the bytes of the UI, a resize event when the window changes, and
+a marker at the start of each turn and at each interrupt. The keys that you type
+are not recorded. The recording holds all that the screen showed, thus it can
+hold text that you would not share. fyai makes the file with mode 0600 and
+removes the variable from the environment of the programs that it starts, so
+they do not record to the same file. The bytes that fyai writes before the UI
+opens, such as the query of the terminal, are not in the file.
+
 ### Crash backtrace
 
 When fyai itself dies of a fatal signal (`SIGSEGV`, `SIGABRT`, `SIGBUS`,
