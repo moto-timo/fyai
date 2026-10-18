@@ -564,7 +564,7 @@ int fyai_cmd_pty_driver(struct fyai_cmd_call *call, fy_generic *result)
 	rc = fyai_ptydrv_run(call->ctx, call->gb,
 			     fyai_cmd_arg_str(call, "script"),
 			     fyai_cmd_arg_str(call, "output"), argv,
-			     (char *const *)env);
+			     (char *const *)env, fyai_cmd_arg_str(call, "cast"));
 out:
 	free(argv);
 	free(env);

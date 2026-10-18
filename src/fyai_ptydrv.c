@@ -40,6 +40,7 @@
 #include <unistd.h>
 
 #include "fyai.h"
+#include "fyai_cast.h"
 #include "fyai_ptydrv.h"
 #include "fyai_ptyscr.h"
 #include "fyai_yaml_flags.h"
@@ -175,6 +176,7 @@ struct driver {
 	bool exit_clear;
 	struct step *steps;
 	size_t nsteps;
+	struct fyai_cast *cast;	/* the recording, or NULL */
 	char **owned;		/* the expanded strings */
 	size_t nowned;
 
@@ -359,6 +361,7 @@ static ssize_t term_read(struct driver *d)
 		return -1;
 	if (append(d, chunk, (size_t)n))
 		return -1;
+	fyai_cast_output(d->cast, chunk, (size_t)n);
 	queries[nq++] = fixed[0];
 	queries[nq++] = fixed[1];
 	if (d->background) {
@@ -404,8 +407,10 @@ static ssize_t term_read(struct driver *d)
 		else
 			rc = snprintf(reply, sizeof(reply), "\x1b]11;%s\x1b\\",
 				      d->background);
-		if (rc > 0)
+		if (rc > 0) {
+			fyai_cast_input(d->cast, reply, (size_t)rc);
 			write_quiet(d->master, reply, (size_t)rc);
+		}
 		start = best + qlen;
 	}
 	/* A query can be split between two reads: hold its start. */
@@ -714,6 +719,13 @@ static ssize_t write_all(int fd, const void *buf, size_t len)
 	return 0;
 }
 
+/* Send keys to the program, and record them. */
+static ssize_t send_keys(struct driver *d, const void *buf, size_t len)
+{
+	fyai_cast_input(d->cast, buf, len);
+	return write_all(d->master, buf, len);
+}
+
 static int touch_file(const char *path)
 {
 	int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -743,6 +755,16 @@ static double step_deadline(const struct driver *d, const struct step *st)
 	return now_sec() + (st->timeout >= 0 ? st->timeout : d->wait_sec);
 }
 
+/* Name a step on the timeline of the recording. */
+static void step_marker(struct driver *d, const struct step *st)
+{
+	char label[160];
+
+	snprintf(label, sizeof(label), "step %zu: %s %.80s", st->index,
+		 st->def->name, st->text ? st->text : "");
+	fyai_cast_marker(d->cast, label);
+}
+
 /*
  * Run one step. A resize is the barrier of the script: the window is painted
  * again whole, so the view reads from here and the rows made for the old size
@@ -758,6 +780,8 @@ static int run_step(struct driver *d, const struct step *st)
 	int row, col, rc;
 	bool ok;
 
+	if (d->cast)
+		step_marker(d, st);
 	switch (st->def->kind) {
 	case STEP_TYPE:
 	case STEP_WRITE:
@@ -770,15 +794,15 @@ static int run_step(struct driver *d, const struct step *st)
 	}
 	switch (st->def->kind) {
 	case STEP_TYPE:
-		rc = (int)write_all(d->master, st->text, st->len);
+		rc = (int)send_keys(d, st->text, st->len);
 		if (!rc)
-			rc = (int)write_all(d->master, "\n", 1);
+			rc = (int)send_keys(d, "\n", 1);
 		fyai_error_check(d->ctx, !rc, err,
 				 "step %zu: cannot type: %s", st->index,
 				 strerror(errno));
 		return 0;
 	case STEP_WRITE:
-		rc = (int)write_all(d->master, st->text, st->len);
+		rc = (int)send_keys(d, st->text, st->len);
 		fyai_error_check(d->ctx, !rc, err,
 				 "step %zu: cannot write: %s", st->index,
 				 strerror(errno));
@@ -802,7 +826,7 @@ static int run_step(struct driver *d, const struct step *st)
 			rc = snprintf(seq, sizeof(seq),
 				      "\x1b[<0;%d;%dM\x1b[<0;%d;%dm", col + 1,
 				      row + 1, col + 1, row + 1);
-			rc = (int)write_all(d->master, seq, (size_t)rc);
+			rc = (int)send_keys(d, seq, (size_t)rc);
 		}
 		fyai_error_check(d->ctx, !rc, err,
 				 "step %zu: cannot click: %s", st->index,
@@ -814,6 +838,7 @@ static int run_step(struct driver *d, const struct step *st)
 		d->resize_cols = st->cols;
 		set_size(d->master, d->resize_rows, d->resize_cols);
 		d->resized = true;
+		fyai_cast_resize(d->cast, d->resize_cols, d->resize_rows);
 		rc = fyai_ptyscr_resize(&d->term, d->resize_rows,
 					d->resize_cols);
 		fyai_error_check(d->ctx, !rc, err,
@@ -872,7 +897,7 @@ static int run_step(struct driver *d, const struct step *st)
 		gate.extra = PROMPT_MARKER;
 		wc.target = (long)count_of(d->data, d->len, st->extra) + 1;
 		for (;;) {
-			rc = (int)write_all(d->master, "\n", 1);
+			rc = (int)send_keys(d, "\n", 1);
 			fyai_error_check(d->ctx, !rc, err,
 					 "step %zu: cannot submit: %s",
 					 st->index, strerror(errno));
@@ -1582,8 +1607,12 @@ static int session_exit(struct driver *d)
 	/* A program that ends on its own leaves no terminal to write to. The
 	 * exit line asks a session that still runs to leave; no step depends
 	 * on it. */
-	if (d->exit_clear)
+	fyai_cast_marker(d->cast, "exit");
+	if (d->exit_clear) {
+		fyai_cast_input(d->cast, "\x15", 1);
 		write_quiet(d->master, "\x15", 1);
+	}
+	fyai_cast_input(d->cast, "/exit\n", 6);
 	write_quiet(d->master, "/exit\n", 6);
 	while (now_sec() < d->session_end) {
 		if (!d->eof)
@@ -1657,6 +1686,7 @@ static void driver_free(struct driver *d)
 {
 	size_t i;
 
+	fyai_cast_close(d->cast);
 	for (i = 0; i < d->nowned; i++)
 		free(d->owned[i]);
 	free(d->owned);
@@ -1669,7 +1699,7 @@ static void driver_free(struct driver *d)
 
 int fyai_ptydrv_run(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 		    const char *script, const char *output,
-		    char *const *argv, char *const *env)
+		    char *const *argv, char *const *env, const char *cast)
 {
 	struct driver d = { .ctx = ctx, .gb = gb, .master = -1 };
 	int rc, failed;
@@ -1687,6 +1717,11 @@ int fyai_ptydrv_run(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 		for (i = 0; i < d.nsteps; i++)
 			if (d.steps[i].def->kind == STEP_SNAPSHOT)
 				d.snapshot_taken = true;
+	}
+	if (cast) {
+		d.cast = fyai_cast_open(ctx, cast, d.cols, d.rows, argv[0]);
+		if (!d.cast)
+			goto out;
 	}
 	if (session_start(&d, argv, env))
 		goto out;

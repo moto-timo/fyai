@@ -4182,6 +4182,12 @@ commands:
           x-fyai-long: env
           x-fyai-repeat: true
           x-fyai-meta: NAME=VALUE
+        cast:
+          type: string
+          description: record the session as an asciicast in this new file
+          x-fyai-long: cast
+          x-fyai-meta: PATH
+          x-fyai-complete: file
         script:
           type: string
           description: the script file

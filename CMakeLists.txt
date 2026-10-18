@@ -519,6 +519,7 @@ set(FYAI_SOURCES
     src/fyai_tool_registry.c
     src/fyai_monitor.c
     src/fyai_mock.c
+    src/fyai_cast.c
     src/fyai_ptydrv.c
     src/fyai_ptyscr.c
     src/fyai_builtin.c
