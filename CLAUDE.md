@@ -1514,8 +1514,8 @@ do not put a colour for a role in C.
   it, and on the event it makes its rows again as a width change does,
   forgetting the rows of the fullscreen view
   (`fyai_transcript_view_invalidate()`). A PTY case plays VTE with
-  `$FYAI_PTY_EMOJI_VS=narrow`; the driver answers the cursor query from its
-  screen model.
+  `emoji_vs: narrow` in its script; the driver answers the cursor query from
+  its terminal model.
 - `fyai_ui_open()` gives the result to the UI. The capabilities that the
   terminal reported replace the guess from the environment
   (`fytim_set_caps()`), and the keys typed during the probe go to
@@ -1527,7 +1527,7 @@ do not put a colour for a role in C.
   the theme keeps its steps over that background. The theme names the ground
   and decides what follows it; fyai holds no colour. The background comes
   from the probe. A background of the other variant is not applied. A PTY
-  case answers the query with `$FYAI_PTY_BACKGROUND`.
+  case answers the query with `background:` in its script.
 - A theme of the `auto` variant takes its variant from the terminal's measured
   background when available. Without a background reply, it uses
   `fypal_term_variant()`: the scheme the terminal reported, then
@@ -1535,7 +1535,7 @@ do not put a colour for a role in C.
   time, so a configuration change during the session gets the same variant,
   and the colours of the conversation on the screen do not change. A PTY case
   stops answering OSC 11 when the session is started
-  (`$FYAI_PTY_BACKGROUND_WHILE_STARTING`).
+  (`background_while_starting:` in its script).
 - A fullscreen page with `display/theme_ground=theme` fills cells whose
   background is default with the palette's `ground` colour. Keep explicit
   backgrounds and cell attributes. Resolve the escape through the palette's
@@ -1993,36 +1993,41 @@ on macOS. Wait by reading with a deadline. Do not sleep.
 Do not pace a test with a delay. A delay that is sufficient on one runner is
 too short on a slower runner, and every run spends its full time. Wait for the
 state that the next step needs. The PTY driver does not pause after an action.
-A PTY case waits on the terminal state that `tests/screen.py` models:
+
+A PTY case is a YAML script for `fyai __pty-driver` (`doc/pty-driver.md`) that
+the case gives to `pty_run` from `tests/harness.sh`. Do not set an
+`FYAI_PTY_` variable in a case: `tests/case-lint.sh` fails on it. The script
+waits on the terminal state that the driver models with libfyvterm:
 `wait-screen` for text on the screen, or on a row that scrolled off it or that
-an erase of the display removed since the last action, `wait-repaint` for text
+an erase of the display removed since the last key, `wait-repaint` for text
 drawn again after an erase of the display, `wait-row` for a row that holds the
 text alone, `wait-gone` for text that left the screen, `wait-copy` for an OSC
 52 copy, and `frame` for a key that must be acted on. `click` presses and
 releases the mouse on the first cell of a text found on the screen, so a click
 does not depend on the rows around its target. Do not wait on the raw capture
-bytes with `wait` or `wait-frame`: a frame paints only the cells that changed,
-so the bytes do not say what the screen shows. Do not use `drain` or `settle`
-to wait for a state. A program in a tile that reports a changing value, such
-as its size, prints it on a short interval, and the case waits for the
-expected value on the screen. A key that must change nothing has no state to
-wait for: send it in one write with the key that follows it, which keeps their
-order.
+bytes with `wait` or `wait-frame` for text that the screen shows: a frame
+paints only the cells that changed, so the bytes do not say what the screen
+shows. Do not wait on a word that the command row of a tool also holds: wait
+for the row of its output with `wait-row`. A program in a tile that reports a
+changing value, such as its size, prints it on a short interval, and the case
+waits for the expected value on the screen. A key that must change nothing has
+no state to wait for: send it in one `write` with the key that follows it,
+which keeps their order.
 
 Do not delay a test at all: not in a case, not in the PTY driver, and not in
-a mock scenario. `FYAI_PTY_DURING_DELAY` and a scenario `delay` are for a
-case that tests a wait itself, such as an interrupt of a request in flight.
-Order the steps of a case with state:
+a mock scenario. The `sleep` step and a scenario `delay` are for a case that
+tests a wait itself, such as an interrupt of a request in flight. Order the
+steps of a case with state:
 
-- Before input during a turn, set `FYAI_PTY_PROGRESS_NEEDLE` to text that
-  the turn shows. The driver then sends the input after that text and not
-  after a time.
+- Before input during a turn, wait for text that the turn shows, or for the
+  `served` file of the mock (`wait-file`). The driver then sends the input
+  after that state and not after a time.
 - Hold a mock reply with `wait_for: <marker>`. Without `wait_after_event`,
   the mock holds the whole reply until the marker exists in the run
-  directory. The case creates the marker with the `release:` step of
-  `FYAI_PTY_AFTER` when the state that the reply must follow is on the
-  screen. A marker that is not created in time makes the mock write
-  `stream-wait-failed`; the case must fail on that file.
+  directory. The case creates the marker with a `touch:` step when the state
+  that the reply must follow is on the screen. A marker that is not created in
+  time makes the mock write `stream-wait-failed`; the case must fail on that
+  file.
 - Select the reply for one of several concurrent requests with `match`, for
   example `body_contains`, and not with the order of arrival. A forked
   sub-agent request contains the conversation of its parent, so put the
