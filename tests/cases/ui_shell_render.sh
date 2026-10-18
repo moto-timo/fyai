@@ -8,19 +8,23 @@ set -eu
 fyai_test_setup
 mock_start ui_shell_render.json
 
-FYAI_PTY_INPUT="run it" \
-FYAI_PTY_PROGRESS_NEEDLE="tool-progress" \
-FYAI_PTY_PROGRESS_TIMEOUT="1.5" \
-FYAI_PTY_RESIZE_COLS="72" \
-FYAI_PTY_NEEDLE="Interactive shell rendering done." \
-FYAI_PTY_AFTER="send:/status|wait-screen:Usage / total" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/snapshot.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/tool_preview_lines=5 \
     --set builtin_shell=true --set api=responses \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+snapshot: "${TEST_DIR}/snapshot.out"
+steps:
+  - type: run it
+  - wait: tool-progress
+    timeout: 1.5
+  - resize: "30x72"
+  - wait: Interactive shell rendering done.
+    timeout: session
+  - type: "/status"
+  - wait-screen: Usage / total
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
     fail "live shell rendering diverged from canonical tool rendering"

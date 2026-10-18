@@ -10,17 +10,23 @@ set -eu
 fyai_test_setup
 mock_start inline_tool_prose.json
 
-FYAI_PTY_INPUT="run foo" FYAI_PTY_NEEDLE="run foo" FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-row:line-3|release:$TMPDIR/dup-release|"\
-"wait-screen:All done." \
-FYAI_PTY_AFTER_PAUSE=0 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+export TMPDIR
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set "display/screen=${FYAI_INLINE_SCREEN:-fullscreen}" \
     --set display/tool_display=inline \
     --set tools=true --set api=responses \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: run foo
+  - wait: run foo
+    timeout: session
+  - wait-row: line-3
+  - touch: "${TMPDIR}/dup-release"
+  - wait-screen: All done.
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' || fail "the prose before the call is wrong"
 import sys

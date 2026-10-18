@@ -12,13 +12,26 @@ assert_status 0
 run_fyai branch create main-sibling
 assert_status 0
 
-FYAI_PTY_INPUT="/branches" \
-FYAI_PTY_NEEDLE="╰─" \
-FYAI_PTY_AFTER="raw:1b5b48|raw:6a6a|raw:1b5b44|wait-gone:- deep|raw:6a0d|wait-screen:switched to branch main-sibling|send:/config set display/diagram_charset ascii|send:/branches|wait-screen:+-|raw:1b|wait-gone:Esc close" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/diagram.out" \
+pty_run "$TEST_DIR/diagram.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/diagram_charset=unicode \
-    -m mock-model -i
+    -m mock-model -i <<'PTY'
+steps:
+  - type: "/branches"
+  - wait: "╰─"
+    timeout: session
+  - write: "\e[H"
+  - write: "jj"
+  - write: "\e[D"
+  - wait-gone: "- deep"
+  - write: "j\r"
+  - wait-screen: switched to branch main-sibling
+  - type: "/config set display/diagram_charset ascii"
+  - type: "/branches"
+  - wait-screen: "+-"
+  - write: "\e"
+  - wait-gone: Esc close
+PTY
 
 grep -qF "switched to branch main-sibling" "$TEST_DIR/diagram.out" || \
 	fail "tree navigation skipped the row after a collapsed group"

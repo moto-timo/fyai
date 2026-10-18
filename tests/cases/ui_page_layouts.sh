@@ -9,43 +9,59 @@ set -eu
 CAPTURES=$(mktemp -d)
 trap 'rm -rf "$CAPTURES"' EXIT
 
-shell()
-{
-    printf '%s' "!sh -c 'while :; do printf \"\\r\\033[K$1 %s \" \"\$(stty size)\"; sleep 0.2; done'"
-}
-
-# The size each shell is granted once the notice stands under the screens.
-# The case waits for these on the screen, and for each head to be made again
-# at the width of its grant, which leaves no head cut with an ellipsis.
+# The steps that wait for the size each shell is granted once the notice
+# stands under the screens, and for each head to be made again at the width of
+# its grant, which leaves no head cut with an ellipsis.
 sizes()
 {
     case $1 in
-    auto|columns) echo "FIRST 8 47|SECOND 8 46|THIRD 8 98" ;;
-    stack) echo "FIRST 6 98|SECOND 4 98|THIRD 4 98" ;;
-    main-top) echo "FIRST 8 98|SECOND 8 47|THIRD 8 46" ;;
-    main-left) echo "FIRST 18 47|SECOND 8 46|THIRD 8 46" ;;
+    auto|columns) set -- "FIRST 8 47" "SECOND 8 46" "THIRD 8 98" ;;
+    stack) set -- "FIRST 6 98" "SECOND 4 98" "THIRD 4 98" ;;
+    main-top) set -- "FIRST 8 98" "SECOND 8 47" "THIRD 8 46" ;;
+    main-left) set -- "FIRST 18 47" "SECOND 8 46" "THIRD 8 46" ;;
     esac
+    printf '  - wait-screen: "%s"\n' "$@"
 }
 
 run_with()
 {
     renderer=$1
     layout=$2
-    settled=$(sizes "$layout" | sed 's/^/wait-screen:/; s/|/|wait-screen:/g')
     fyai_test_setup
-    FYAI_TRACE="$TEST_DIR/trace.log" \
-    FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="$(shell FIRST)" \
-    FYAI_PTY_NEEDLE="FIRST" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|"\
-"send:$(shell SECOND)|wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|"\
-"send:$(shell THIRD)|wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|"\
-"send:/nosuch|wait-screen:unknown|$settled|frame:4|"\
-"send:/kill bang-1|wait-screen:stopping shell bang-1|"\
-"send:/kill bang-2|wait-screen:stopping shell bang-2|"\
-"send:/kill bang-3|wait-screen:stopping shell bang-3" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    {
+        cat <<'PTY'
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!sh -c 'while :; do printf \"\\r\\033[KFIRST %s \" \"$(stty size)\"; sleep 0.2; done'"
+  - wait: FIRST
+    timeout: session
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "!sh -c 'while :; do printf \"\\r\\033[KSECOND %s \" \"$(stty size)\"; sleep 0.2; done'"
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "!sh -c 'while :; do printf \"\\r\\033[KTHIRD %s \" \"$(stty size)\"; sleep 0.2; done'"
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "/nosuch"
+  - wait-screen: unknown
+PTY
+        sizes "$layout"
+        cat <<'PTY'
+  - frame: 4
+  - type: "/kill bang-1"
+  - wait-screen: stopping shell bang-1
+  - type: "/kill bang-2"
+  - wait-screen: stopping shell bang-2
+  - type: "/kill bang-3"
+  - wait-screen: stopping shell bang-3
+PTY
+    } | FYAI_TRACE="$TEST_DIR/trace.log" pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/work_min_tile_cols=30 \
         --set "display/work_layout=$layout" --set display/work_columns=2 \

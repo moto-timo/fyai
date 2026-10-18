@@ -10,15 +10,24 @@ set -eu
 fyai_test_setup
 driver=0
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="!printf BANG%sOUT X" \
-FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:BANGXOUT|wait-screen:Esc closes|wait-screen:×|raw:1b|wait-gone:BANGXOUT" \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true \
-    --set display/work_controls=full -m mock-model -i || driver=$?
+    --set display/work_controls=full -m mock-model -i <<'PTY' || driver=$?
+rows: 30
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!printf BANG%sOUT X"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: BANGXOUT
+  - wait-screen: Esc closes
+  - wait-screen: "×"
+  - write: "\e"
+  - wait-gone: BANGXOUT
+PTY
 if [ "$driver" -ne 0 ]; then
     tail -c 2000 "$TEST_DIR/pty.out" >&2
     fail "the bang tile did not keep its output and go when dismissed"

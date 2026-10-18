@@ -7,16 +7,21 @@ set -eu
 fyai_test_setup
 mock_start ui_reflow.json
 
-FYAI_PTY_INPUT="say it" \
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_NEEDLE="Reflow streaming done." \
-FYAI_PTY_AFTER="resize:52|wait-repaint:Reflow streaming done." \
-FYAI_PTY_TIMEOUT=40 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 30
+cols: 100
+timeout: 40
+steps:
+  - type: say it
+  - wait: Reflow streaming done.
+    timeout: session
+  - resize: 52
+  - wait-repaint: Reflow streaming done.
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PY' || fail "an idle resize was never acted on"
 import os

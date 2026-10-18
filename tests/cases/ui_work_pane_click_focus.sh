@@ -9,18 +9,6 @@ set -eu
 CAPTURES=$(mktemp -d)
 trap 'rm -rf "$CAPTURES"' EXIT
 
-# An SGR press and release at one-based column $1 and row $2, as hex.
-click()
-{
-    printf '\033[<0;%d;%dM\033[<0;%d;%dm' "$1" "$2" "$1" "$2" |
-        od -An -tx1 | tr -d ' \n'
-}
-
-hex()
-{
-    printf '%s' "$1" | od -An -tx1 | tr -d ' \n'
-}
-
 # Each tile prints a marker in its screen and then runs cat to expose received
 # input. A click finds the marker. The second tile starts focused.
 # The status row is outside every tile. The provider uses a closed loopback
@@ -29,27 +17,48 @@ run_with()
 {
     renderer=$1
     fyai_test_setup
-    FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
-    FYAI_PTY_INPUT="!sh -c 'echo LEFT\"\"-SCREEN; exec cat'" \
-    FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|"\
-"send:!sh -c 'echo RIGHT\"\"-SCREEN; exec cat'|wait-screen:RIGHT-SCREEN|wait-screen:Ctrl-]|"\
-"click:LEFT-SCREEN|send:LEFTKEYS|wait-screen:LEFTKEYS|"\
-"click:RIGHT-SCREEN|send:RIGHTKEYS|wait-screen:RIGHTKEYS|"\
-"click:[bang-1]|send:HEADKEYS|wait-screen:HEADKEYS|"\
-"raw:$(click 10 30)|wait-gone:Ctrl-]|"\
-"raw:$(hex PROMPTKEYS)|wait-screen:PROMPTKEYS|raw:15|wait-gone:PROMPTKEYS|"\
-"send:/kill bang-1|wait-screen:stopping shell bang-1|"\
-"send:/kill bang-2|wait-screen:stopping shell bang-2" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/work_controls=zoom \
         --set display/work_min_tile_cols=30 \
         --set retry/max_attempts=1 \
         --set api=chat-completions \
         --set "api_url=http://127.0.0.1:9/v1/chat/completions" \
-        -m mock-model -i ||
+        -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!sh -c 'echo LEFT\"\"-SCREEN; exec cat'"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "!sh -c 'echo RIGHT\"\"-SCREEN; exec cat'"
+  - wait-screen: RIGHT-SCREEN
+  - wait-screen: "Ctrl-]"
+  - click: LEFT-SCREEN
+  - type: LEFTKEYS
+  - wait-screen: LEFTKEYS
+  - click: RIGHT-SCREEN
+  - type: RIGHTKEYS
+  - wait-screen: RIGHTKEYS
+  - click: "[bang-1]"
+  - type: HEADKEYS
+  - wait-screen: HEADKEYS
+  - write: "\e[<0;10;30M\e[<0;10;30m"
+  - wait-gone: "Ctrl-]"
+  - write: "PROMPTKEYS"
+  - wait-screen: PROMPTKEYS
+  - write: "\x15"
+  - wait-gone: PROMPTKEYS
+  - type: "/kill bang-1"
+  - wait-screen: stopping shell bang-1
+  - type: "/kill bang-2"
+  - wait-screen: stopping shell bang-2
+PTY
         fail "$renderer: a click did not change keyboard focus"
     cp "$TEST_DIR/pty.out" "$CAPTURES/$renderer.out"
 }

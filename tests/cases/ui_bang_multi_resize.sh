@@ -8,25 +8,36 @@ set -eu
 
 fyai_test_setup
 
-CMD_A="!$PYTHON $TESTS_DIR/resize_tui.py A"
-CMD_B="!$PYTHON $TESTS_DIR/resize_tui.py B"
-
-# The steps that wait for both programs at @1 rows after a resize to @2 rows.
-at()
-{
-    printf 'resize:%sx80|wait-screen:A SIZE %sx37|wait-screen:B SIZE %sx36|' \
-        "$2" "$1" "$1"
-}
-
-AFTER="wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|send:$CMD_B|"
-AFTER="${AFTER}wait-screen:A SIZE 20x47|wait-screen:B SIZE 20x46|"
-AFTER="${AFTER}$(at 14 24)$(at 18 28)$(at 16 26)$(at 22 32)raw:1d"
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="$CMD_A" FYAI_PTY_NEEDLE="A SIZE 20x98" \
-FYAI_PTY_AFTER="$AFTER" FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
-    --set display/markdown=true -m mock-model -i ||
+    --set display/markdown=true -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+wait_timeout: 10
+steps:
+  - type: "!${PYTHON} ${TESTS_DIR}/resize_tui.py A"
+  - wait: A SIZE 20x98
+    timeout: session
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "!${PYTHON} ${TESTS_DIR}/resize_tui.py B"
+  - wait-screen: A SIZE 20x47
+  - wait-screen: B SIZE 20x46
+  - resize: "24x80"
+  - wait-screen: A SIZE 14x37
+  - wait-screen: B SIZE 14x36
+  - resize: "28x80"
+  - wait-screen: A SIZE 18x37
+  - wait-screen: B SIZE 18x36
+  - resize: "26x80"
+  - wait-screen: A SIZE 16x37
+  - wait-screen: B SIZE 16x36
+  - resize: "32x80"
+  - wait-screen: A SIZE 22x37
+  - wait-screen: B SIZE 22x36
+  - write: "\x1d"
+PTY
     fail "parallel bang shells did not take the same rows after each resize"
 
 pass

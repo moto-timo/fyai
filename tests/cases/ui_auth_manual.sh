@@ -10,7 +10,7 @@ import urllib.parse
 
 binary, scratch, tests = sys.argv[1:]
 sys.path.insert(0, tests)
-from pty_driver import Terminal
+from pty_terminal import Terminal
 
 master, slave = os.openpty()
 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 1000, 0, 0))

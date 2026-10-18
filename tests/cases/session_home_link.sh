@@ -15,12 +15,16 @@ ln -s "$HOME" "$TEST_DIR/home-link"
 export HOME="$TEST_DIR/home-link"
 
 cd "$TEST_DIR/home/sub"
-FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="" \
-FYAI_PTY_NEEDLE="fyai:" FYAI_PTY_TIMEOUT=20 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark --set display/markdown=true \
-    -m mock-model -i >/dev/null 2>&1 || true
+    -m mock-model -i <<'PTY' >/dev/null 2>&1 || true
+cols: 100
+timeout: 20
+steps:
+  - type: ""
+  - wait: "fyai:"
+    timeout: session
+PTY
 cd "$TEST_DIR"
 
 grep -a -q '~/sub' "$TEST_DIR/pty.out" || \

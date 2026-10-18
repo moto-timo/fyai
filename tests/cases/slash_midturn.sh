@@ -44,15 +44,27 @@ export OTHERPROV_API_KEY=other-secret
 
 # Leg 1: /status typed while the first turn stalls runs beside it: its
 # report reaches the screen before the stalled answer does.
-FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="The stalled answer." \
-FYAI_PTY_DURING_INPUT="/status" \
-FYAI_PTY_DURING_DELAY=0.5 \
-FYAI_PTY_AFTER="send:second question|wait-screen:The follow-up answer." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/immediate.out" \
+pty_run "$TEST_DIR/immediate.out" \
     "$FYAI_BIN" --color off \
     --set display/markdown=false --set display/stream=false \
-    --set tools=false --set builtin_shell=false -i -m foo
+    --set tools=false --set builtin_shell=false -i -m foo <<'PTY'
+steps:
+  - type: first question
+  - wait-file: "${TEST_DIR}/served"
+    equals: "1"
+    timeout: 1.5
+  - write: "/status\n"
+  - wait: Usage / calls
+    timeout: 1.5
+  - wait-frame: Usage / calls
+    from: start
+    timeout: session
+  - touch: "${TEST_DIR}/release-1"
+  - wait: The stalled answer.
+    timeout: session
+  - type: second question
+  - wait-screen: The follow-up answer.
+PTY
 
 # The status band holds the last rows of a long table, so the model rows
 # scroll off it: read the usage row instead. calls 0 proves the report ran
@@ -88,15 +100,27 @@ assert_request 1 'r["auth"] == "Bearer mock-secret"'
 # Leg 2: /model typed while the first turn stalls stays queued: the
 # stalled answer arrives first, on the first provider, and only then
 # does the switch run. The follow-up prompt afterwards uses it.
-FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="The stalled answer." \
-FYAI_PTY_DURING_INPUT="/model baz" \
-FYAI_PTY_DURING_DELAY=0.5 \
-FYAI_PTY_AFTER="send:second question|wait-screen:The follow-up answer." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/queued.out" \
+pty_run "$TEST_DIR/queued.out" \
     "$FYAI_BIN" --color off \
     --set display/markdown=false --set display/stream=false \
-    --set tools=false --set builtin_shell=false -i -m foo
+    --set tools=false --set builtin_shell=false -i -m foo <<'PTY'
+steps:
+  - type: first question
+  - wait-file: "${TEST_DIR}/served"
+    equals: "3"
+    timeout: 1.5
+  - write: "/model baz\n"
+  - wait: "/model baz"
+    timeout: 1.5
+  - wait-frame: "/model baz"
+    from: start
+    timeout: session
+  - touch: "${TEST_DIR}/release-2"
+  - wait: The stalled answer.
+    timeout: session
+  - type: second question
+  - wait-screen: The follow-up answer.
+PTY
 
 "$PYTHON" - "$TEST_DIR/queued.out" <<'EOF' || \
     fail "the mid-turn /model did not wait behind the turn"

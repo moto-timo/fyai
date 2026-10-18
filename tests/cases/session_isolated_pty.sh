@@ -16,11 +16,16 @@ printf baseline > file
 mock_start session_isolated.json
 
 driver=0
-FYAI_PTY_INPUT="edit the files" FYAI_PTY_NEEDLE="Session edit done." FYAI_PTY_TIMEOUT=60 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --set view/isolate_session=true \
     --set display/stream=false --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i || driver=$?
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' || driver=$?
+timeout: 60
+steps:
+  - type: edit the files
+  - wait: Session edit done.
+    timeout: session
+PTY
 if [ "$driver" -ne 0 ]; then
 	tail -c 2000 "$TEST_DIR/pty.out" >&2
 	fail "the isolated session did not finish"
@@ -42,14 +47,22 @@ assert_stdout_contains 'file'
 assert_stdout_contains 'added'
 
 # The bottom row of the prompt names the view that the session runs in.
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="/stream" FYAI_PTY_NEEDLE="/stream" \
-FYAI_PTY_TIMEOUT=60 FYAI_PTY_AFTER="wait-screen:· view session|send:/exit" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty-view.out" \
+pty_run "$TEST_DIR/pty-view.out" \
     "$FYAI_BIN" -k test-key --set view/isolate_session=true \
     --theme dark --set display/markdown=true \
     --set display/screen=fullscreen \
     --set display/stream=false --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 60
+steps:
+  - type: "/stream"
+  - wait: "/stream"
+    timeout: session
+  - wait-screen: "· view session"
+  - type: "/exit"
+PTY
 	fail "the bottom row does not name the view"
 
 mock_stop 2

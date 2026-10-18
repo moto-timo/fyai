@@ -8,18 +8,25 @@ fyai_test_setup
 run_fyai branch create existing
 assert_status 0
 
-after="raw:69|wait-screen:Field|raw:1b|wait-gone:Field|"
-after="${after}raw:6b0d|wait-gone:Branches|wait-screen:existing|raw:1d"
-
-FYAI_PTY_INPUT="/branches" \
-FYAI_PTY_PROGRESS_NEEDLE="Branches" \
-FYAI_PTY_DURING_INPUT=$'nreview\r\r' \
-FYAI_PTY_DURING_SUBMIT=0 \
-FYAI_PTY_NEEDLE="created branch review" \
-FYAI_PTY_AFTER="$after" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/browser.out" \
+pty_run "$TEST_DIR/browser.out" \
 	"$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
-	--set display/markdown=true -m mock-model -i
+	--set display/markdown=true -m mock-model -i <<'PTY'
+steps:
+  - type: "/branches"
+  - wait: Branches
+    timeout: 1.5
+  - write: "nreview\r\r"
+  - wait: created branch review
+    timeout: session
+  - write: "i"
+  - wait-screen: Field
+  - write: "\e"
+  - wait-gone: Field
+  - write: "k\r"
+  - wait-gone: Branches
+  - wait-screen: existing
+  - write: "\x1d"
+PTY
 
 run_fyai branch list
 assert_status 0

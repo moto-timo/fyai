@@ -6,15 +6,19 @@ set -eu
 fyai_test_setup
 mock_start chat_stream_tool_overlap.json
 
-FYAI_PTY_INPUT="run a streamed tool" \
-FYAI_PTY_PROGRESS_NEEDLE="1" \
-FYAI_PTY_NEEDLE="Streaming tool overlap verified." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
 	"$FYAI_BIN" -k test-key --theme dark \
 	--set display/markdown=true --set display/stream=true \
 	--set tools=true --set api=chat-completions \
 	--set "api_url=$MOCK_URL/v1/chat/completions" \
-	-m mock-model -i
+	-m mock-model -i <<'PTY'
+steps:
+  - type: run a streamed tool
+  - wait: "1"
+    timeout: 1.5
+  - wait: Streaming tool overlap verified.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' ||
 	fail "streamed tool workband touched unterminated assistant prose"

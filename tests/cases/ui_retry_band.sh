@@ -9,14 +9,17 @@ set -eu
 fyai_test_setup
 mock_start ui_retry_band.json
 
-FYAI_PTY_INPUT="hello" \
-FYAI_PTY_NEEDLE="recovered" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set api=responses \
     --set retry/max_attempts=4 \
     --set retry/initial_delay_ms=1 --set retry/max_delay_ms=10 \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+steps:
+  - type: hello
+  - wait: recovered
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PYEOF' || fail "the retry was not drawn as a band"
 import re

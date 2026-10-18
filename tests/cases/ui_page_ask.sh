@@ -7,26 +7,38 @@
 set -eu
 . "$(dirname "$0")/../harness.sh"
 
-# Ask under the page and drive the answer with the after script $2; further
+# Ask under the page and drive the answer with the steps on standard input; further
 # arguments go to fyai.
 ask()
 {
+    local steps
+    steps="$(cat)"
     name=$1
     fyai_test_setup
     mock_start ask_user.json
     driver=0
-    FYAI_TRACE="$TEST_DIR/trace.log" \
-    FYAI_PTY_COLS=100 FYAI_PTY_INPUT="ask me something" \
-    FYAI_PTY_NEEDLE="Proceed with the mock plan?" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="wait-screen:or type an answer|$2|wait-screen:User said yes" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    {
+        cat <<'PTY'
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: ask me something
+  - wait: "Proceed with the mock plan?"
+    timeout: session
+  - wait-screen: or type an answer
+PTY
+        printf '%s\n' "$steps"
+        cat <<'PTY'
+  - wait-screen: User said yes
+PTY
+    } | FYAI_TRACE="$TEST_DIR/trace.log" pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/stream=false \
         --set tools=true \
         --set api=chat-completions \
         --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model \
-        "${@:3}" -i ||
+        "${@:2}" -i ||
         driver=$?
     if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out" "$TEST_DIR/trace.log"; then
         skip "this build has no page support"
@@ -64,7 +76,9 @@ PY
         fail "$2 did not give the answer '$1'"
 }
 
-ask enter "raw:0d"
+ask enter <<'PTY'
+  - write: "\r"
+PTY
 # The page drew the question and its options in the input area.
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
@@ -120,25 +134,41 @@ if not at or "\u2192 yes" not in rows[at[0] + 1]:
 PY
     fail "the transcript did not show the answer for the user"
 
-ask down "raw:1b5b42|wait-screen:▌ 2. no|raw:0d"
+ask down <<'PTY'
+  - write: "\e[B"
+  - wait-screen: "▌ 2. no"
+  - write: "\r"
+PTY
 answered sel:no "Down and Enter"
 mock_stop 2
 
-ask number "raw:32"
+ask number <<'PTY'
+  - write: "2"
+PTY
 answered sel:no "the key 2"
 mock_stop 2
 
 # Once text is typed the number keys type too.
-ask typed "raw:6d|frame:2|raw:32|frame:2|raw:0d"
+ask typed <<'PTY'
+  - write: "m"
+  - frame: 2
+  - write: "2"
+  - frame: 2
+  - write: "\r"
+PTY
 answered other:m2 "typed text"
 mock_stop 2
 
-ask escape "raw:1b"
+ask escape <<'PTY'
+  - write: "\e"
+PTY
 answered declined "Escape"
 mock_stop 2
 
 # A click on an option chooses it; the tile controls grab the mouse.
-ask click "click:2. no" --set display/work_controls=zoom
+ask click --set display/work_controls=zoom <<'PTY'
+  - click: "2. no"
+PTY
 answered sel:no "a click on the option"
 mock_stop 2
 

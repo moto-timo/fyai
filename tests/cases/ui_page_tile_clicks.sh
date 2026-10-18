@@ -18,18 +18,30 @@ run_with()
     fyai_test_setup
     driver=0
     FYAI_TRACE="$TEST_DIR/trace.log" \
-    FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="!sh -c 'while :; do printf \"\\r\\033[KCLICK %s %s%s \" \"\$(stty size)\" SIZ ED; sleep 0.2; done'" \
-    FYAI_PTY_NEEDLE="CLICK" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="wait-screen:SIZED|wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|"\
-"click:[bang-1]|wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|"\
-"click:□|frame:2|"\
-"click:×|wait-gone:▁" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/work_controls=zoom \
-        -m mock-model -i || driver=$?
+        -m mock-model -i <<'PTY' || driver=$?
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!sh -c 'while :; do printf \"\\r\\033[KCLICK %s %s%s \" \"$(stty size)\" SIZ ED; sleep 0.2; done'"
+  - wait: CLICK
+    timeout: session
+  - wait-screen: SIZED
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - click: "[bang-1]"
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - click: "□"
+  - frame: 2
+  - click: "×"
+  - wait-gone: "▁"
+PTY
     cp "$TEST_DIR/pty.out" "$CAPTURES/$renderer.out"
     cp "$TEST_DIR/trace.log" "$CAPTURES/$renderer.trace"
     if [ "$driver" -ne 0 ]; then

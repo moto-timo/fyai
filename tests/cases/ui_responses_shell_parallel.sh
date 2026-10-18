@@ -24,20 +24,27 @@ with open(sys.argv[2], "w") as out:
 PY
 mock_start "$TEST_DIR/shell-parallel.json"
 
-FYAI_PTY_INPUT="run both" \
-FYAI_PTY_PROGRESS_NEEDLE="native-early-a" \
-FYAI_PTY_PROGRESS_RELEASE="$TEST_DIR/release-shells" \
-FYAI_PTY_PROGRESS_TIMEOUT="3" \
-FYAI_PTY_NEEDLE="Native interactive tools done." \
-FYAI_PTY_AFTER="send:/status|wait-screen:Usage / total" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/snapshot.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
 	"$FYAI_BIN" -k test-key --theme dark \
 	--set display/markdown=true --set display/stream=false \
 	--set display/tool_preview_lines=5 --set tools=true \
 	--set api=responses --set builtin_shell=true \
 	--set "api_url=$MOCK_URL/v1/responses" \
-	-m mock-model -i
+	-m mock-model -i <<'PTY'
+snapshot: "${TEST_DIR}/snapshot.out"
+steps:
+  - type: run both
+  - wait: native-early-a
+    timeout: 3
+  - wait-frame: native-early-a
+    from: start
+    timeout: session
+  - touch: "${TEST_DIR}/release-shells"
+  - wait: Native interactive tools done.
+    timeout: session
+  - type: "/status"
+  - wait-screen: Usage / total
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
 	fail "native shell workbands did not update progressively"

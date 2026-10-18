@@ -19,14 +19,20 @@ assert_status 0
 mock_stop_quiet
 
 COLORTERM=truecolor \
-FYAI_PTY_ROWS=40 FYAI_PTY_COLS=120 \
-FYAI_PTY_INPUT="" FYAI_PTY_SUBMIT_INPUT=0 \
-FYAI_PTY_READY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_NEEDLE="toggle foreign sessions" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="raw:1b5b42|wait-screen:Heading|raw:1b" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pick.out" \
+pty_run "$TEST_DIR/pick.out" \
 	"$FYAI_BIN" -k test-key --color on --theme dark -m mock-model \
-	--set display/markdown=true --set display/branch_preview=bottom resume
+	--set display/markdown=true --set display/branch_preview=bottom resume <<'PTY'
+rows: 40
+cols: 120
+timeout: 20
+ready: toggle foreign sessions
+steps:
+  - wait: toggle foreign sessions
+    timeout: session
+  - write: "\e[B"
+  - wait-screen: Heading
+  - write: "\e"
+PTY
 
 if grep -a -q "invalid display.theme 'ember:dark'" "$TEST_DIR/pick.out"; then
 	skip "fyai is built without libfypalette"

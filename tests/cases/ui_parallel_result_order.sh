@@ -11,15 +11,18 @@ set -eu
 fyai_test_setup
 mock_start ui_parallel_result_order.json
 
-FYAI_PTY_INPUT="run both" \
-FYAI_PTY_NEEDLE="Both parallel sleep commands" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
 	"$FYAI_BIN" -k test-key --theme dark \
 	--set display/markdown=true --set display/stream=false \
 	--set display/tool_preview_lines=5 --set tools=true \
 	--set api=responses --set builtin_shell=true \
 	--set "api_url=$MOCK_URL/v1/responses" \
-	-m mock-model -i
+	-m mock-model -i <<'PTY'
+steps:
+  - type: run both
+  - wait: Both parallel sleep commands
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'EOF' || fail "parallel results were not shown under their own band"
 import sys

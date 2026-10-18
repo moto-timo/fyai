@@ -14,13 +14,21 @@ session()
     background=$2
     hint=$3
     fyai_test_setup
-    COLORFGBG="$hint" COLORTERM=truecolor FYAI_PTY_BACKGROUND="$background" \
-    FYAI_PTY_INPUT="!sh -c 'printf READY; sleep 2'" \
-    FYAI_PTY_NEEDLE=READY FYAI_PTY_AFTER='raw:1d' FYAI_PTY_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    export background
+    COLORFGBG="$hint" \
+    COLORTERM=truecolor \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --color on --set display/markdown=true \
         --theme ember:auto \
-        --set display/screen=fullscreen -m mock-model -i
+        --set display/screen=fullscreen -m mock-model -i <<'PTY'
+timeout: 10
+background: "${background}"
+steps:
+  - type: "!sh -c 'printf READY; sleep 2'"
+  - wait: READY
+    timeout: session
+  - write: "\x1d"
+PTY
     cp "$TEST_DIR/pty.out" "$CAPTURES/$label.out"
 }
 

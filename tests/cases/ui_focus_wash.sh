@@ -17,15 +17,23 @@ run_on()
     name=$1
     background=$2
     fyai_test_setup
-    COLORTERM=truecolor FYAI_PTY_BACKGROUND=$background \
-    FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="!sh -c 'printf WASHED; sleep 3'" \
-    FYAI_PTY_NEEDLE="WASHED" FYAI_PTY_TIMEOUT=25 \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-] returns to the prompt|raw:1d|wait-gone:Ctrl-] returns to the prompt" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/$name.out" \
+    export background
+    COLORTERM=truecolor \
+    pty_run "$TEST_DIR/$name.out" \
         "$FYAI_BIN" -k test-key --color on --theme ember:auto \
-        --set display/markdown=true -m mock-model -i \
-        2>"$TEST_DIR/stderr" || true
+        --set display/markdown=true -m mock-model -i <<'PTY' 2>"$TEST_DIR/stderr" || true
+rows: 30
+cols: 100
+timeout: 25
+background: "${background}"
+steps:
+  - type: "!sh -c 'printf WASHED; sleep 3'"
+  - wait: WASHED
+    timeout: session
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-] returns to the prompt"
+PTY
     if grep -a -q "invalid display.theme 'ember:\|needs a libfypalette" \
             "$TEST_DIR/$name.out" "$TEST_DIR/stderr"; then
         skip "this build has no palette themes"

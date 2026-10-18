@@ -11,16 +11,23 @@ fyai_test_setup
 mock_start shell_long_title.json
 driver=0
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_ROWS=24 FYAI_PTY_COLS=60 FYAI_PTY_INPUT="open a session" \
-FYAI_PTY_NEEDLE="CUTOUT" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:CUTOUT|wait-screen:×" \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true \
     --set display/work_controls=full --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 24
+cols: 60
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: open a session
+  - wait: CUTOUT
+    timeout: session
+  - wait-screen: CUTOUT
+  - wait-screen: "×"
+PTY
     driver=$?
 if [ "$driver" -ne 0 ]; then
     tail -c 2000 "$TEST_DIR/pty.out" >&2

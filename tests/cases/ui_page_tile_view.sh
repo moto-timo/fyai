@@ -10,20 +10,35 @@ set -eu
 CAPTURES=$(mktemp -d)
 trap 'rm -rf "$CAPTURES"' EXIT
 
-# $1 is the pane height, $2 the steps that wait for the view to take effect.
+# run_at ROWS < STEPS: the steps wait for the view to take effect.
 run_at()
 {
+    local steps
+
     rows=$1
-    view=$2
+    steps="$(cat)"
     fyai_test_setup
     # The output is not a word of the command: the command stands in the
     # user card and in the head, and only the screen holds VIEWOUT.
-    FYAI_TRACE="$TEST_DIR/trace.log" \
-    FYAI_PTY_INPUT="!sh -c 'printf %s%s VIEW OUT; sleep 60'" \
-    FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-]|$view|raw:1d|wait-gone:Ctrl-]|send:/status|wait-screen:Usage / total" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    {
+        cat <<'PTY'
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!sh -c 'printf %s%s VIEW OUT; sleep 60'"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: "Ctrl-]"
+PTY
+        printf '%s\n' "$steps"
+        cat <<'PTY'
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "/status"
+  - wait-screen: Usage / total
+PTY
+    } | FYAI_TRACE="$TEST_DIR/trace.log" pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
         --set "display/work_zoom_rows=$rows" -m mock-model -i || driver=$?
@@ -38,13 +53,18 @@ run_at()
 # A bang shell is not a turn, so the warning is not drained to the screen; the
 # trace records it when it is raised.
 driver=0
-run_at 5 "wait-screen:VIEWOUT|wait-gone:bang-1"
+run_at 5 <<'PTY'
+  - wait-screen: VIEWOUT
+  - wait-gone: bang-1
+PTY
 if grep -a -q "needs a libfytimui" "$CAPTURES/5.out" "$CAPTURES/5.trace" \
         2>/dev/null; then
     skip "this build has no page support"
 fi
 [ "$driver" -eq 0 ] || fail "the five-row session did not run to its end"
-run_at 3 "wait-screen:bang-1"
+run_at 3 <<'PTY'
+  - wait-screen: bang-1
+PTY
 [ "$driver" -eq 0 ] || fail "the three-row session did not run to its end"
 
 "$PYTHON" - "$CAPTURES/5.out" "$CAPTURES/3.out" "$TESTS_DIR" <<'PY' || \

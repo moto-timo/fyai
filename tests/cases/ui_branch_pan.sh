@@ -12,15 +12,23 @@ done
 
 # Twelve moves down take the selection past the foot of the pane. The drawing
 # is one window, so the rows above pan off instead of the page turning.
-FYAI_PTY_ROWS=20 FYAI_PTY_COLS=60 \
-FYAI_PTY_INPUT="/branches" \
-FYAI_PTY_NEEDLE="Branches" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/pan.snap" \
-FYAI_PTY_AFTER="raw:1b5b48|raw:6a6a6a6a6a6a6a6a6a6a6a6a|wait-screen:b12|snapshot|raw:1b|wait-gone:Esc close" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pan.out" \
+pty_run "$TEST_DIR/pan.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/diagram_charset=unicode \
-    -m mock-model -i
+    -m mock-model -i <<'PTY'
+rows: 20
+cols: 60
+steps:
+  - type: "/branches"
+  - wait: Branches
+    timeout: session
+  - write: "\e[H"
+  - write: "jjjjjjjjjjjj"
+  - wait-screen: b12
+  - snapshot: "${TEST_DIR}/pan.snap"
+  - write: "\e"
+  - wait-gone: Esc close
+PTY
 
 # The selected branch is on the pane, with the row of context under it that
 # says the drawing carries on.

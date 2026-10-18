@@ -10,13 +10,16 @@ set -eu
 fyai_test_setup
 mock_start agent_tool_responses.json
 driver=0
-FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
-FYAI_PTY_NEEDLE="Delegated and done." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=responses --set builtin_shell=true \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i || driver=$?
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY' || driver=$?
+steps:
+  - type: delegate a greeting to a sub-agent
+  - wait: Delegated and done.
+    timeout: session
+PTY
 if [ "$driver" -ne 0 ]; then
     tail -c 2000 "$TEST_DIR/pty.out" >&2
     fail "the delegation did not finish"

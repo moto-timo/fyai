@@ -18,19 +18,26 @@ session()
     mock_start ui_card_separation.json
     driver=0
     # The ground is compared as RGB, which a 256-colour terminal cannot draw.
-    COLORTERM=truecolor FYAI_PTY_BACKGROUND=rgb:1e1e/1e1e/2e2e \
-    FYAI_PTY_ROWS=40 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
-    FYAI_PTY_NEEDLE="banana" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="send:/status|wait-screen:Auth / provider|snapshot" \
-    FYAI_PTY_SNAPSHOT="$TEST_DIR/status.out" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    COLORTERM=truecolor \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --color on --set display/markdown=true \
         --set display/theme=ember:dark --set display/theme_ground=terminal \
         --set display/screen=fullscreen \
         --set display/command_output=transcript "$@" \
         --set display/stream=true --set api=chat-completions \
-        --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i \
-        2>"$TEST_DIR/stderr" || driver=$?
+        --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' 2>"$TEST_DIR/stderr" || driver=$?
+rows: 40
+cols: 100
+timeout: 20
+background: "rgb:1e1e/1e1e/2e2e"
+steps:
+  - type: first question
+  - wait: banana
+    timeout: session
+  - type: "/status"
+  - wait-screen: Auth / provider
+  - snapshot: "${TEST_DIR}/status.out"
+PTY
     mock_stop_quiet
     if grep -a -q "invalid display.theme 'ember:\|needs a libfypalette\|needs a libfytimui" \
             "$TEST_DIR/pty.out" "$TEST_DIR/stderr"; then

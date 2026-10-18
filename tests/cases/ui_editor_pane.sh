@@ -13,28 +13,42 @@ set -eu
 
 fyai_test_setup
 
-cat >"$TEST_DIR/editor.sh" <<'EOF'
-#!/bin/sh
-printf 'EDITOR-RUNNING\n'
-sleep 2
-printf 'edited prompt' >"$1"
-EOF
-chmod +x "$TEST_DIR/editor.sh"
-
 session()
 {
     local name="$1"; shift
+
+    # The case releases the editor when its screen shows that it runs. The
+    # path is in the script: the editor does not get the environment of the
+    # case.
+    cat >"$TEST_DIR/editor-$name.sh" <<EOF
+#!/bin/sh
+printf 'EDITOR-RUNNING\n'
+while [ ! -e "$TEST_DIR/release-$name" ]; do
+    sleep 0.02
+done
+printf 'edited prompt' >"\$1"
+EOF
+    chmod +x "$TEST_DIR/editor-$name.sh"
     mock_start chat_stream.json
-    EDITOR="$TEST_DIR/editor.sh" \
-    FYAI_PTY_INPUT="draft prompt" \
-    FYAI_PTY_EDIT_INPUT=1 \
-    FYAI_PTY_PROGRESS_TIMEOUT=6 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/$name.out" \
+    export name
+    EDITOR="$TEST_DIR/editor-$name.sh" \
+    pty_run "$TEST_DIR/$name.out" \
         "$FYAI_BIN" -b "editor-$name" -k test-key --theme dark \
         --set display/markdown=true --set display/stream=true \
         --set display/screen=inline \
         --set api=chat-completions \
-        --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i "$@"
+        --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i "$@" <<'PTY'
+steps:
+  - write: "draft prompt\a"
+  - wait: EDITOR-RUNNING
+    timeout: 6
+  - touch: "${TEST_DIR}/release-${name}"
+  - wait: edited prompt
+    timeout: 6
+  - write: "\n"
+  - wait: Streaming hello from the mock.
+    timeout: session
+PTY
     assert_request 0 \
         'r["body"]["messages"][-1]["content"] == "edited prompt"'
     mock_stop 1

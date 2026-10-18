@@ -16,6 +16,8 @@ FYAI_BIN="${FYAI_BIN:-${1:-}}"
 PYTHON="${PYTHON:-python3}"
 TESTS_DIR="${TESTS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 SCENARIOS_DIR="$TESTS_DIR/scenarios"
+# A PTY script names these as ${NAME}.
+export FYAI_BIN PYTHON TESTS_DIR
 FYAI_VALGRIND="${FYAI_VALGRIND:-}"
 
 [ -x "$FYAI_BIN" ] || { echo "harness: FYAI_BIN not set/executable" >&2; exit 99; }
@@ -136,6 +138,25 @@ fyai_test_signal() {
 	kill -s "$sig" $$
 }
 
+# pty_run OUTPUT PROGRAM [ARGS...] < SCRIPT
+# Run PROGRAM on a pseudo-terminal as the YAML script on standard input says
+# (doc/pty-driver.md), and keep what it sent in OUTPUT. The driver is the
+# hidden verb of the binary under test. It keeps the trace variables to the
+# program: a trace of the driver would count it as a start of the program.
+pty_run() {
+	local out="$1" script
+	local -a keep=()
+
+	shift
+	script="$(mktemp "$TEST_DIR/pty-script.XXXXXX")" || return 1
+	cat >"$script" || return 1
+	[ -z "${FYAI_TRACE+x}" ] || keep+=(--env "FYAI_TRACE=$FYAI_TRACE")
+	[ -z "${FYAI_TRACE_LEVEL+x}" ] ||
+		keep+=(--env "FYAI_TRACE_LEVEL=$FYAI_TRACE_LEVEL")
+	env -u FYAI_TRACE -u FYAI_TRACE_LEVEL "$FYAI_BIN" __pty-driver \
+		${keep[@]+"${keep[@]}"} "$script" "$out" "$@"
+}
+
 # The sandbox without a project: scratch dir, redirected HOME/XDG_*, scrubbed
 # provider env. A case that tests what fyai does with no arena uses this one.
 fyai_test_setup_bare() {
@@ -147,6 +168,7 @@ fyai_test_setup_bare() {
 		fyai_test_cleanup
 	fi
 	TEST_DIR="$(mktemp -d "$FYAI_TMPDIR_BASE/fyai-test-XXXXXX")" || exit 99
+	export TEST_DIR
 	trap fyai_test_cleanup EXIT
 	for sig in HUP INT QUIT TERM; do
 		trap "fyai_test_signal $sig" "$sig"
@@ -154,6 +176,7 @@ fyai_test_setup_bare() {
 	cd "$TEST_DIR" || exit 99
 	# Fixture working directories must match getcwd(), including symlink resolution.
 	TEST_DIR="$(pwd -P)" || exit 99
+	export TEST_DIR
 
 	# Every temporary file the run makes lands in the scratch dir, so the
 	# cleanup removes it with the rest of the case.

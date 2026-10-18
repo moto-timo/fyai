@@ -7,16 +7,22 @@ set -eu
 fyai_test_setup
 mock_start shell_band_head.json
 
-FYAI_PTY_INPUT="count" \
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_MID_NEEDLE="⎿" FYAI_PTY_MID_TIMEOUT="8" \
-FYAI_PTY_RESIZE_COLS="60" \
-FYAI_PTY_NEEDLE="FYAI_TEST_END_SHELL_BAND_HEAD_6f2c91a8" FYAI_PTY_TIMEOUT=60 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 30
+cols: 100
+timeout: 60
+steps:
+  - type: count
+  - wait: "⎿"
+    timeout: 8
+  - resize: "30x60"
+  - wait: FYAI_TEST_END_SHELL_BAND_HEAD_6f2c91a8
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PY' || fail "a row ran past the right edge"
 import os

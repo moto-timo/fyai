@@ -13,17 +13,23 @@ mock_start shell_session.json
 
 # The command row quotes PIPE-B: the output is the row that holds it alone.
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_INPUT="drive the shell" FYAI_PTY_NEEDLE="done." FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-row:PIPE-B|"\
-"wait-screen:● shell [lines]|wait-gone:● shell [lines]|"\
-"wait-screen:● shell [lines]" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set "display/screen=${FYAI_INLINE_SCREEN:-fullscreen}" --set display/tool_display=inline \
     --set tools=true --set api=chat-completions \
     --set shell/input_poll_ms=0 \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: drive the shell
+  - wait: done.
+    timeout: session
+  - wait-row: PIPE-B
+  - wait-screen: "● shell [lines]"
+  - wait-gone: "● shell [lines]"
+  - wait-screen: "● shell [lines]"
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' || fail "a session screen is not in the transcript"
 import sys

@@ -38,13 +38,18 @@ page()
     fyai_test_setup
     driver=0
     FYAI_TRACE="$TEST_DIR/trace.log" \
-    FYAI_PTY_COLS=100 FYAI_PTY_INPUT="/page" \
-    FYAI_PTY_NEEDLE="Regions" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
-        --set "display/page=$DOCS/$name.yaml" -m mock-model -i ||
+        --set "display/page=$DOCS/$name.yaml" -m mock-model -i <<'PTY' ||
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "/page"
+  - wait: Regions
+    timeout: session
+PTY
         driver=$?
     if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out" \
             "$TEST_DIR/trace.log" 2>/dev/null; then

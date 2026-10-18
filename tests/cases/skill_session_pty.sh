@@ -12,12 +12,21 @@ printf -- '---\nname: ponytail\ndescription: Lazy mode.\nargument-hint: "[lite|f
 	>"$TEST_DIR/pony/SKILL.md"
 mock_start skill_session.json
 
-FYAI_PTY_INPUT="/skill import $TEST_DIR/pony/SKILL.md" \
-FYAI_PTY_NEEDLE="imported ponytail" FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="raw:2f706f6e09|wait-screen:/ponytail|send:lite|wait-screen:PONY_REPLY|send:/skill exec ponytail full|wait-screen:PONY_EXEC" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
 	"$FYAI_BIN" -k test-key --set api=responses --set display/stream=false \
-	--set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+	--set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: "/skill import ${TEST_DIR}/pony/SKILL.md"
+  - wait: imported ponytail
+    timeout: session
+  - write: "/pon\t"
+  - wait-screen: "/ponytail"
+  - type: lite
+  - wait-screen: PONY_REPLY
+  - type: "/skill exec ponytail full"
+  - wait-screen: PONY_EXEC
+PTY
 assert_request 0 '"PONY_BODY level lite" in json.dumps(r["body"]["input"])'
 assert_request 0 '"The user ran the skill `ponytail`" in json.dumps(r["body"]["input"])'
 # The import offers the skill to the model through the skill tool at once.

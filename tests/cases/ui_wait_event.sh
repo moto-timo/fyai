@@ -12,13 +12,17 @@ set -eu
 fyai_test_setup
 mock_start wait_event.json
 
-FYAI_PTY_INPUT="start a wait" FYAI_PTY_NEEDLE="picking it up." \
-FYAI_PTY_TIMEOUT=30 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: start a wait
+  - wait: picking it up.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/requests.jsonl" <<'EOF' || fail "the wait did not fire into a turn"
 import json

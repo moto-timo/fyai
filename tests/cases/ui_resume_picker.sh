@@ -35,13 +35,23 @@ assert_status 0
 # chose, so the stored state says which session was resumed.
 # The picker draws its footer before its rows, and Enter with no row does
 # nothing: Enter waits for the header of the selected session.
-FYAI_PTY_ROWS=24 FYAI_PTY_COLS=90 \
-FYAI_PTY_INPUT="" FYAI_PTY_SUBMIT_INPUT=0 \
-FYAI_PTY_READY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_AFTER="wait-screen:fyai · newer|raw:0d|wait-gone:toggle foreign sessions|send:say hello|wait-screen:Hello from the mock provider.|send:/help|wait-screen:/transcript-system|raw:1d" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pick.out" \
-	"$FYAI_BIN" -k test-key -m mock-model resume
+pty_run "$TEST_DIR/pick.out" \
+	"$FYAI_BIN" -k test-key -m mock-model resume <<'PTY'
+rows: 24
+cols: 90
+ready: toggle foreign sessions
+steps:
+  - wait: toggle foreign sessions
+    timeout: session
+  - wait-screen: "fyai · newer"
+  - write: "\r"
+  - wait-gone: toggle foreign sessions
+  - type: say hello
+  - wait-screen: Hello from the mock provider.
+  - type: "/help"
+  - wait-screen: "/transcript-system"
+  - write: "\x1d"
+PTY
 mock_stop 1
 
 # The picker drew the sessions it offers and selected the newest one.
@@ -84,18 +94,41 @@ touch -t 203001010000 \
 	"$TEST_DIR/claude-root/projects/project-a/claude-picker.jsonl"
 mock_start chat_basic.json
 CLAUDE_CONFIG_DIR="$TEST_DIR/claude-root" \
-FYAI_PTY_ROWS=24 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="" FYAI_PTY_SUBMIT_INPUT=0 \
-FYAI_PTY_READY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/foreign-picker.snap" \
-FYAI_PTY_AFTER="raw:66|wait-screen:claude-code|raw:66|wait-gone:Continue this imported session|raw:66|wait-screen:Continue this imported session|raw:1b5b48|wait-screen:Group · import|raw:6a|wait-screen:/claude-code|raw:6a|wait-screen:2030-01-01|snapshot|raw:69|wait-screen:Ready to continue.|raw:1b|frame:2|raw:0d|wait-gone:toggle foreign sessions|send:say hello|wait-screen:Hello from the mock provider.|raw:1d" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/foreign-pick.out" \
+pty_run "$TEST_DIR/foreign-pick.out" \
 	"$FYAI_BIN" -k test-key --color off -m mock-model \
 		--set api=chat-completions \
 		--set "api_url=$MOCK_URL/v1/chat/completions" \
 		--set display/stream=false \
-		--set display/branch_preview=bottom resume
+		--set display/branch_preview=bottom resume <<'PTY'
+rows: 24
+cols: 100
+ready: toggle foreign sessions
+steps:
+  - wait: toggle foreign sessions
+    timeout: session
+  - write: "f"
+  - wait-screen: claude-code
+  - write: "f"
+  - wait-gone: Continue this imported session
+  - write: "f"
+  - wait-screen: Continue this imported session
+  - write: "\e[H"
+  - wait-screen: "Group · import"
+  - write: "j"
+  - wait-screen: "/claude-code"
+  - write: "j"
+  - wait-screen: "2030-01-01"
+  - snapshot: "${TEST_DIR}/foreign-picker.snap"
+  - write: "i"
+  - wait-screen: Ready to continue.
+  - write: "\e"
+  - frame: 2
+  - write: "\r"
+  - wait-gone: toggle foreign sessions
+  - type: say hello
+  - wait-screen: Hello from the mock provider.
+  - write: "\x1d"
+PTY
 mock_stop 1
 
 grep -qF "import/claude-code/claude-picker" "$TEST_DIR/foreign-pick.out" || \
@@ -155,15 +188,21 @@ sed "s|@CWD@|$TEST_DIR|g" \
 	"$TEST_DIR/codex-root/sessions/2026/01/01/codex-picker.jsonl"
 # g must change nothing here, so no frame says it was read: g and Escape go in
 # one write, which keeps their order.
-CODEX_HOME="$TEST_DIR/codex-root" CLAUDE_CONFIG_DIR="$TEST_DIR/no-claude" \
-FYAI_PTY_ROWS=24 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="" FYAI_PTY_SUBMIT_INPUT=0 \
-FYAI_PTY_READY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_AFTER="raw:66|wait-screen:Repair session picker|raw:671b" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/codex-picker.out" \
+CODEX_HOME="$TEST_DIR/codex-root" \
+CLAUDE_CONFIG_DIR="$TEST_DIR/no-claude" \
+pty_run "$TEST_DIR/codex-picker.out" \
 	"$FYAI_BIN" -k test-key --color off -m mock-model \
-		--set display/branch_preview=off resume
+		--set display/branch_preview=off resume <<'PTY'
+rows: 24
+cols: 100
+ready: toggle foreign sessions
+steps:
+  - wait: toggle foreign sessions
+    timeout: session
+  - write: "f"
+  - wait-screen: Repair session picker
+  - write: "g\e"
+PTY
 
 grep -qF "Repair session picker" "$TEST_DIR/codex-picker.out" || \
 	fail "the picker did not show the Codex thread name"
@@ -186,12 +225,16 @@ run_fyai list reflog
 assert_status 0
 cp "$TEST_DIR/stdout" "$TEST_DIR/reflog.before"
 
-FYAI_PTY_ROWS=24 FYAI_PTY_COLS=90 \
-FYAI_PTY_INPUT=$'\x1b' \
-FYAI_PTY_READY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_NEEDLE="toggle foreign sessions" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/cancel.out" \
-	"$FYAI_BIN" -k test-key --color off -m mock-model resume
+pty_run "$TEST_DIR/cancel.out" \
+	"$FYAI_BIN" -k test-key --color off -m mock-model resume <<'PTY'
+rows: 24
+cols: 90
+ready: toggle foreign sessions
+steps:
+  - type: "\e"
+  - wait: toggle foreign sessions
+    timeout: session
+PTY
 
 grep -qF "toggle foreign sessions" "$TEST_DIR/cancel.out" || \
 	fail "the picker did not open"

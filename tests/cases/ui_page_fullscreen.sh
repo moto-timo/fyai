@@ -14,21 +14,31 @@ set -eu
 
 session()
 {
+    local steps
+    steps="$(cat)"
     screen=$1
-    rows=${3:-12}
+    rows=${2:-12}
     fyai_test_setup
     mock_start chat_basic_twice.json
     driver=0
-    FYAI_TRACE="$TEST_DIR/trace.log" \
-    FYAI_PTY_ROWS=$rows FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
-    FYAI_PTY_NEEDLE="Hello" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="$2" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    export rows
+    {
+        cat <<'PTY'
+rows: ${rows}
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: first question
+  - wait: Hello
+    timeout: session
+PTY
+        printf '%s\n' "$steps"
+    } | FYAI_TRACE="$TEST_DIR/trace.log" pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/stream=false \
         --set "display/screen=$screen" \
-        ${5:+--set} ${5:+"$5"} \
+        ${4:+--set} ${4:+"$4"} \
         --set api=chat-completions \
         --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
         driver=$?
@@ -40,7 +50,7 @@ session()
         tail -c 2000 "$TEST_DIR/pty.out" >&2
         fail "the $screen session did not go as the case says"
     fi
-    mock_stop "${4:-2}"
+    mock_stop "${3:-2}"
 }
 
 # The view shows both exchanges, goes back to the first with PageUp, and to
@@ -49,7 +59,18 @@ session()
 # The mock answers at once, so no frame need show the first answer over the
 # second question: a wheel step up over the view shows both.
 WHEEL=$(printf '\033[<64;10;3M' | od -An -tx1 | tr -d ' \n')
-session fullscreen "wait-screen:Hello from the mock provider.|send:second question|wait-screen:Hello again from the mock provider.|wait-gone:│ first question|raw:$WHEEL|wait-screen:Hello from the mock provider.|raw:1b5b357e|wait-screen:│ first question|raw:1b5b367e|wait-gone:│ first question" 13
+session fullscreen 13 <<'PTY'
+  - wait-screen: Hello from the mock provider.
+  - type: second question
+  - wait-screen: Hello again from the mock provider.
+  - wait-gone: "│ first question"
+  - write: "\e[<64;10;3M"
+  - wait-screen: Hello from the mock provider.
+  - write: "\e[5~"
+  - wait-screen: "│ first question"
+  - write: "\e[6~"
+  - wait-gone: "│ first question"
+PTY
 grep -a -q $'\x1b\[?1049h' "$TEST_DIR/pty.out" ||
     fail "the fullscreen session did not take the alternate screen"
 grep -a -q $'\x1b\[?1049l' "$TEST_DIR/pty.out" ||
@@ -114,13 +135,36 @@ PDRAG=$(printf '\033[<0;4;4M\033[<32;40;9M\033[<0;40;9m' |
 # "── log · all · N " takes seventeen columns, so the collapse glyph is on
 # column 18.
 ACLICK=$(printf '\033[<0;18;1M\033[<0;18;1m' | od -An -tx1 | tr -d ' \n')
-session fullscreen "wait-screen:Hello from the mock provider.|"\
-"send:/help|click:□|wait-screen:Esc collapses|raw:$PDRAG|wait-copy:|"\
-"raw:1b5b367e|wait-gone:/branches|raw:1b|wait-gone:Esc collapses|"\
-"send:/help|click:□|wait-screen:Esc collapses|raw:0d|wait-gone:Esc collapses|"\
-"send:/help|click:□|wait-screen:Esc collapses|raw:$ACLICK|wait-gone:Esc collapses|"\
-"raw:1b|wait-gone:── log|send:/zoom|wait-screen:nothing is running to zoom into|"\
-"raw:78|wait-gone:nothing is running to zoom into|raw:1b|wait-gone:❯ x" 30 1
+session fullscreen 30 1 <<'PTY'
+  - wait-screen: Hello from the mock provider.
+  - type: "/help"
+  - click: "□"
+  - wait-screen: Esc collapses
+  - write: "\e[<0;4;4M\e[<32;40;9M\e[<0;40;9m"
+  - wait-copy: ""
+  - write: "\e[6~"
+  - wait-gone: "/branches"
+  - write: "\e"
+  - wait-gone: Esc collapses
+  - type: "/help"
+  - click: "□"
+  - wait-screen: Esc collapses
+  - write: "\r"
+  - wait-gone: Esc collapses
+  - type: "/help"
+  - click: "□"
+  - wait-screen: Esc collapses
+  - write: "\e[<0;18;1M\e[<0;18;1m"
+  - wait-gone: Esc collapses
+  - write: "\e"
+  - wait-gone: "── log"
+  - type: "/zoom"
+  - wait-screen: nothing is running to zoom into
+  - write: "x"
+  - wait-gone: nothing is running to zoom into
+  - write: "\e"
+  - wait-gone: "❯ x"
+PTY
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
 
@@ -180,10 +224,21 @@ PY
 
 # A popup covers the tiles too, and they come back when it closes. The session
 # ends while the shell runs.
-session fullscreen "wait-screen:Hello from the mock provider.|"\
-"send:!sh -c 'while :; do printf \"\\r\\033[KSHELLMARK \"; sleep 0.2; done'|wait-screen:SHELLMARK|"\
-"wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|send:/help|click:□|wait-screen:Esc collapses|frame:3|"\
-"raw:1b|wait-gone:Esc collapses|wait-screen:SHELLMARK" 30 1
+session fullscreen 30 1 <<'PTY'
+  - wait-screen: Hello from the mock provider.
+  - type: "!sh -c 'while :; do printf \"\\r\\033[KSHELLMARK \"; sleep 0.2; done'"
+  - wait-screen: SHELLMARK
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "/help"
+  - click: "□"
+  - wait-screen: Esc collapses
+  - frame: 3
+  - write: "\e"
+  - wait-gone: Esc collapses
+  - wait-screen: SHELLMARK
+PTY
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
 
@@ -215,7 +270,11 @@ PY
 # nothing on the terminal's own screen when it ends.
 DRAG=$(printf '\033[<0;3;5M\033[<32;31;5M\033[<0;31;5m' |
     od -An -tx1 | tr -d ' \n')
-session fullscreen "wait-screen:Hello from the mock provider.|raw:$DRAG|wait-copy:Hello from the mock provider." 30 1
+session fullscreen 30 1 <<'PTY'
+  - wait-screen: Hello from the mock provider.
+  - write: "\e[<0;3;5M\e[<32;31;5M\e[<0;31;5m"
+  - wait-copy: Hello from the mock provider.
+PTY
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PY' ||
 import sys
 
@@ -229,7 +288,11 @@ PY
     fail "the session printed the conversation after the exit"
 
 # The same conversation inline stays on the terminal's own screen.
-session inline "wait-screen:Hello from the mock provider.|send:second question|wait-screen:Hello again from the mock provider."
+session inline <<'PTY'
+  - wait-screen: Hello from the mock provider.
+  - type: second question
+  - wait-screen: Hello again from the mock provider.
+PTY
 if grep -a -q $'\x1b\[?1049h' "$TEST_DIR/pty.out"; then
     fail "an inline session took the alternate screen"
 fi

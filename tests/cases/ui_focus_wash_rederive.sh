@@ -10,16 +10,21 @@ set -eu
 
 fyai_test_setup
 
-COLORTERM=truecolor FYAI_PTY_BACKGROUND=rgb:ffff/ffff/ffff \
-FYAI_PTY_BACKGROUND_WHILE_STARTING=1 \
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="/config set display/tool_preview_lines 6|/config set display/work_columns 2" \
-FYAI_PTY_NEEDLE="work_columns" FYAI_PTY_TIMEOUT=25 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/out" \
+COLORTERM=truecolor \
+pty_run "$TEST_DIR/out" \
     "$FYAI_BIN" -k test-key --color on --theme ember:auto \
     --set display/theme_ground=terminal \
-    --set display/markdown=true -m mock-model -i \
-    2>"$TEST_DIR/stderr" || true
+    --set display/markdown=true -m mock-model -i <<'PTY' 2>"$TEST_DIR/stderr" || true
+rows: 30
+cols: 100
+timeout: 25
+background: "rgb:ffff/ffff/ffff"
+background_while_starting: true
+steps:
+  - type: "/config set display/tool_preview_lines 6|/config set display/work_columns 2"
+  - wait: work_columns
+    timeout: session
+PTY
 
 if grep -a -q "invalid display.theme 'ember:\|needs a libfypalette" \
         "$TEST_DIR/out" "$TEST_DIR/stderr"; then

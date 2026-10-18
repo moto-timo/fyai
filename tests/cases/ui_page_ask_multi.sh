@@ -11,15 +11,24 @@ set -eu
 # model was given is checked by $2, a Python expression over res.
 ask()
 {
+    local steps
+    steps="$(cat)"
     name=$1
     fyai_test_setup
     mock_start ask_user_multi.json
     driver=0
-    FYAI_PTY_COLS=100 FYAI_PTY_INPUT="ask me two things" \
-    FYAI_PTY_NEEDLE="How wide?" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="$2" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    {
+        cat <<'PTY'
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: ask me two things
+  - wait: "How wide?"
+    timeout: session
+PTY
+        printf '%s\n' "$steps"
+    } | pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/stream=false \
         --set tools=true \
@@ -33,7 +42,7 @@ ask()
         tail -c 2000 "$TEST_DIR/pty.out" >&2
         fail "the questions were not answered by $name"
     fi
-    assert_request 1 "$3"
+    assert_request 1 "$2"
 }
 
 RES='json.loads([m for m in r["body"]["messages"] if m.get("role") == "tool"][-1]["content"])'
@@ -42,22 +51,58 @@ RES='json.loads([m for m in r["body"]["messages"] if m.get("role") == "tool"][-1
 # The key 2 chooses and goes on; the second question toggles with the number
 # keys; Enter ends the series at the review, and Enter again sends it.
 ask review \
-    "wait-screen:(1 of 2)|wait-screen:The medium choice|raw:32|wait-screen:Which checks?|wait-screen:(2 of 2)|wait-screen:Space toggles|raw:31|wait-screen:1. [x] lint|raw:33|wait-screen:3. [x] asan|raw:0d|wait-screen:Send these answers?|wait-screen:Scope: medium|wait-screen:Checks: lint, asan|raw:0d|wait-screen:Answers received." \
-    "$RES[\"answers\"][0][\"selected\"] == [\"medium\"] and $RES[\"answers\"][1][\"selected\"] == [\"lint\", \"asan\"]"
+    "$RES[\"answers\"][0][\"selected\"] == [\"medium\"] and $RES[\"answers\"][1][\"selected\"] == [\"lint\", \"asan\"]" <<'PTY'
+  - wait-screen: "(1 of 2)"
+  - wait-screen: The medium choice
+  - write: "2"
+  - wait-screen: "Which checks?"
+  - wait-screen: "(2 of 2)"
+  - wait-screen: Space toggles
+  - write: "1"
+  - wait-screen: "1. [x] lint"
+  - write: "3"
+  - wait-screen: "3. [x] asan"
+  - write: "\r"
+  - wait-screen: "Send these answers?"
+  - wait-screen: "Scope: medium"
+  - wait-screen: "Checks: lint, asan"
+  - write: "\r"
+  - wait-screen: Answers received.
+PTY
 mock_stop 2
 
 # Left goes back to the first question, which keeps its answer: choosing
 # another changes it, and the review shows the change.
 ask back \
-    "wait-screen:(1 of 2)|raw:32|wait-screen:(2 of 2)|raw:1b5b44|wait-screen:(1 of 2)|raw:33|wait-screen:(2 of 2)|raw:20|wait-screen:1. [x] lint|raw:0d|wait-screen:Scope: large|raw:0d|wait-screen:Answers received." \
-    "$RES[\"answers\"][0][\"selected\"] == [\"large\"] and $RES[\"answers\"][1][\"selected\"] == [\"lint\"]"
+    "$RES[\"answers\"][0][\"selected\"] == [\"large\"] and $RES[\"answers\"][1][\"selected\"] == [\"lint\"]" <<'PTY'
+  - wait-screen: "(1 of 2)"
+  - write: "2"
+  - wait-screen: "(2 of 2)"
+  - write: "\e[D"
+  - wait-screen: "(1 of 2)"
+  - write: "3"
+  - wait-screen: "(2 of 2)"
+  - write: " "
+  - wait-screen: "1. [x] lint"
+  - write: "\r"
+  - wait-screen: "Scope: large"
+  - write: "\r"
+  - wait-screen: Answers received.
+PTY
 mock_stop 2
 
 # Text typed answers a question in place of its options, and Escape at the
 # review declines the whole series.
 ask text \
-    "wait-screen:(1 of 2)|raw:6d|frame:2|raw:0d|wait-screen:(2 of 2)|raw:1b|wait-screen:Answers received." \
-    "$RES[\"status\"] == \"declined\""
+    "$RES[\"status\"] == \"declined\"" <<'PTY'
+  - wait-screen: "(1 of 2)"
+  - write: "m"
+  - frame: 2
+  - write: "\r"
+  - wait-screen: "(2 of 2)"
+  - write: "\e"
+  - wait-screen: Answers received.
+PTY
 mock_stop 2
 
 pass

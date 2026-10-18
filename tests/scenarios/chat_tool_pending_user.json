@@ -1,7 +1,7 @@
 {
   "steps": [
     {
-      "delay": 2.0,
+      "wait_for": "release-1",
       "response": {
         "id": "chatcmpl-pending-1",
         "object": "chat.completion",

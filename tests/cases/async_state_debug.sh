@@ -19,12 +19,15 @@ mock_stop 1
 
 mock_start responses_stream.json
 
-FYAI_PTY_INPUT="debug turn" \
-FYAI_PTY_NEEDLE="turn state model -> done" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
 	"$FYAI_BIN" -d -k test-key --set api=responses \
 	--set display/markdown=true --set display/stream=true \
-	--set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+	--set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+steps:
+  - type: debug turn
+  - wait: "turn state model -> done"
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
 	fail "interactive turn transitions were not logged"

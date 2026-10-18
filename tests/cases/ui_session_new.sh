@@ -12,11 +12,16 @@ run_fyai -b main --set api=chat-completions \
 	--set display/stream=false
 assert_status 0
 
-FYAI_PTY_INPUT="say hello" \
-FYAI_PTY_NEEDLE="Hello from the mock provider." \
-FYAI_PTY_AFTER="wait-screen:Hello from the mock provider.|send:/session new|wait-screen:new session session/" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/new.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b main -i
+pty_run "$TEST_DIR/new.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b main -i <<'PTY'
+steps:
+  - type: say hello
+  - wait: Hello from the mock provider.
+    timeout: session
+  - wait-screen: Hello from the mock provider.
+  - type: "/session new"
+  - wait-screen: new session session/
+PTY
 mock_stop 1
 
 run_fyai -b main dump state

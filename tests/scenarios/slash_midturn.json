@@ -1,7 +1,7 @@
 {
   "steps": [
     {
-      "delay": 8.0,
+      "wait_for": "release-1",
       "response": {
         "id": "chatcmpl-slash1",
         "object": "chat.completion",
@@ -34,7 +34,7 @@
       }
     },
     {
-      "delay": 8.0,
+      "wait_for": "release-2",
       "response": {
         "id": "chatcmpl-slash3",
         "object": "chat.completion",

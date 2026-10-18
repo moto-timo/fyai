@@ -23,7 +23,7 @@ def set_size(fd, rows, cols):
 
 
 def timeout_scale():
-    """How much longer every deadline waits; see tests/pty_driver.py."""
+    """How much longer every deadline waits; see doc/pty-driver.md."""
     try:
         scale = float(os.environ.get(
             "FYAI_TIMEOUT_SCALE",

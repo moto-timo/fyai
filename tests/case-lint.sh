@@ -20,37 +20,29 @@ for f in "$cases_dir"/*.sh; do
 	fi
 done
 
-# Every AFTER step kind the driver accepts. A misspelled step fails only
-# after the session budget; the driver also validates, but the suite
-# should not depend on one layer.
+# The driver reads a YAML script (doc/pty-driver.md) and checks it before the
+# session starts. An FYAI_PTY_ variable in front of pty_run is not read by the
+# driver, so the case would run on defaults and prove less than it says.
+# pty_resize.py and the emoji model of screen.py read their own variables.
 for f in "$cases_dir"/*.sh; do
-	while IFS= read -r script; do
-		[ -n "$script" ] || continue
-		old_ifs="$IFS"
-		IFS='|'
-		# shellcheck disable=SC2086
-		set -f
-		for step in $script; do
-			case "$step" in
-			send:*|raw:*|resize:*|wait:*|wait-frame:*|wait-gone:*|\
-wait-screen:*|wait-repaint:*|wait-row:*|wait-copy:*|\
-frame:*|release:*|drain:*|settle:*|signal:*|click:*|snapshot|"") ;;
-			# Composed in a shell variable elsewhere; the driver
-			# validates the expanded script at runtime.
-			\$*) ;;
-			*)
-				echo "case-lint: unknown AFTER step '$step': $f" >&2
-				bad=1
-				;;
-			esac
-		done
-		set +f
-		IFS="$old_ifs"
-	done < <(grep -oE 'FYAI_PTY_AFTER="[^"]*"' "$f" | sed 's/^FYAI_PTY_AFTER="//;s/"$//')
+	case "$f" in
+	*/shell_tty_resize.sh|*/ui_page_emoji_width.sh) continue ;;
+	esac
+	if grep -q 'FYAI_PTY_' "$f"; then
+		echo "case-lint: FYAI_PTY_ variable in a case: $f" >&2
+		grep -n 'FYAI_PTY_' "$f" >&2
+		bad=1
+	fi
 done
 
-# Steps composed in shell variables ($AFTER, $ZOOM_AFTER) are invisible
-# to the grep above; the driver validates them at runtime instead.
+# A case waits for a state and never for a time. The sleep step exists for the
+# driver self-test of a wait that is itself under test.
+for f in "$cases_dir"/*.sh; do
+	if grep -n '^[[:space:]]*- sleep:' "$f" >&2; then
+		echo "case-lint: sleep step in a case: $f" >&2
+		bad=1
+	fi
+done
 
 [ "$bad" = 0 ] || exit 1
 echo "PASS: case-lint.sh"

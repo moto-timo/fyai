@@ -8,15 +8,21 @@ set -eu
 
 fyai_test_setup
 mock_start ui_card_separation.json
-FYAI_PTY_ROWS=20 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="banana" \
-FYAI_PTY_AFTER="send:yellow?|wait-screen:second" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set display/screen=fullscreen \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 20
+cols: 100
+steps:
+  - type: first question
+  - wait: banana
+    timeout: session
+  - type: "yellow?"
+  - wait-screen: second
+PTY
 
 if ! "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY'
 import sys

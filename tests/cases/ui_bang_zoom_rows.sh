@@ -45,16 +45,28 @@ run_size()
     policy=$1
     expected=$2
     fyai_test_setup
-    FYAI_PTY_ROWS=32 FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="$SHELL_SIZE" \
-    FYAI_PTY_NEEDLE="bang-1" \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-]|raw:1d|wait-gone:Ctrl-]|"\
-"send:/zoom bang-1|wait-screen:Ctrl-]|wait-screen:$expected 98|snapshot|raw:1d" \
-    FYAI_PTY_SNAPSHOT="$TEST_DIR/zoom-$policy.out" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty-$policy.out" \
+    export SHELL_SIZE
+    export expected
+    export policy
+    pty_run "$TEST_DIR/pty-$policy.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
-        --set "display/work_zoom_rows=$policy" -m mock-model -i
+        --set "display/work_zoom_rows=$policy" -m mock-model -i <<'PTY'
+rows: 32
+cols: 100
+steps:
+  - type: "${SHELL_SIZE}"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: "Ctrl-]"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "/zoom bang-1"
+  - wait-screen: "Ctrl-]"
+  - wait-screen: "${expected} 98"
+  - snapshot: "${TEST_DIR}/zoom-${policy}.out"
+  - write: "\x1d"
+PTY
     last_size "$TEST_DIR/zoom-$policy.out" "$expected" ||
         fail "a zoomed $policy pane did not give the shell $expected rows"
 }
@@ -64,15 +76,24 @@ run_focused_size()
     policy=$1
     expected=$2
     fyai_test_setup
-    FYAI_PTY_ROWS=32 FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="$SHELL_SIZE" \
-    FYAI_PTY_NEEDLE="bang-1" \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-]|wait-screen:$expected 98|snapshot|raw:1d" \
-    FYAI_PTY_SNAPSHOT="$TEST_DIR/focused-$policy.out" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/focused.out" \
+    export SHELL_SIZE
+    export expected
+    export policy
+    pty_run "$TEST_DIR/focused.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
-        --set "display/work_zoom_rows=$policy" -m mock-model -i
+        --set "display/work_zoom_rows=$policy" -m mock-model -i <<'PTY'
+rows: 32
+cols: 100
+steps:
+  - type: "${SHELL_SIZE}"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: "Ctrl-]"
+  - wait-screen: "${expected} 98"
+  - snapshot: "${TEST_DIR}/focused-${policy}.out"
+  - write: "\x1d"
+PTY
     last_size "$TEST_DIR/focused-$policy.out" "$expected" ||
         fail "a focused $policy pane did not give the shell $expected rows"
 }
@@ -80,15 +101,23 @@ run_focused_size()
 run_key_cycle()
 {
     fyai_test_setup
-    FYAI_PTY_ROWS=32 FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="$SHELL_SIZE" \
-    FYAI_PTY_NEEDLE="bang-1" \
-    FYAI_PTY_AFTER="wait-screen:14 98|raw:1b5b3131363b3675|"\
-"wait-screen:work pane height: quarter|wait-screen:6 98|raw:1d" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/cycle.out" \
+    export SHELL_SIZE
+    pty_run "$TEST_DIR/cycle.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
-        --set display/work_zoom_rows=half -m mock-model -i
+        --set display/work_zoom_rows=half -m mock-model -i <<'PTY'
+rows: 32
+cols: 100
+steps:
+  - type: "${SHELL_SIZE}"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: "14 98"
+  - write: "\e[116;6u"
+  - wait-screen: "work pane height: quarter"
+  - wait-screen: "6 98"
+  - write: "\x1d"
+PTY
 }
 
 # The cap includes surrounding UI and shell chrome. The prompt block stands

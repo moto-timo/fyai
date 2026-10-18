@@ -16,16 +16,34 @@ SHELL_SIZE="!sh -c 'n=0; while :; do n=\$((n+1)); echo \"SIZE \$(stty size) #\$n
 focus_keeps_size()
 {
     fyai_test_setup
-    FYAI_PTY_ROWS=32 FYAI_PTY_COLS=120 \
-    FYAI_PTY_INPUT="$SHELL_SIZE" \
-    FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=30 \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-]|wait-screen:SIZE 14 118|raw:1d|wait-gone:Ctrl-]|"\
-"send:$SHELL_SIZE|wait-screen:Ctrl-]|wait-screen:SIZE 14 57|wait-screen:SIZE 14 56|"\
-"raw:14|frame:2|raw:14|frame:2|raw:1d|wait-gone:Ctrl-]|frame:6" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/focus.out" \
+    export SHELL_SIZE
+    pty_run "$TEST_DIR/focus.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/work_min_tile_cols=30 \
-        --set display/work_zoom_rows=half -m mock-model -i ||
+        --set display/work_zoom_rows=half -m mock-model -i <<'PTY' ||
+rows: 32
+cols: 120
+timeout: 30
+steps:
+  - type: "${SHELL_SIZE}"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: "Ctrl-]"
+  - wait-screen: SIZE 14 118
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "${SHELL_SIZE}"
+  - wait-screen: "Ctrl-]"
+  - wait-screen: SIZE 14 57
+  - wait-screen: SIZE 14 56
+  - write: "\x14"
+  - frame: 2
+  - write: "\x14"
+  - frame: 2
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - frame: 6
+PTY
         fail "the two shells did not stand at their sizes around a focus cycle"
     "$PYTHON" - "$TEST_DIR/focus.out" "$TESTS_DIR" <<'PYEOF' || \
         fail "focus cycling changed the size of a tile"
@@ -75,15 +93,24 @@ PYEOF
 resize_recalculates()
 {
     fyai_test_setup
-    FYAI_PTY_ROWS=32 FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="$SHELL_SIZE" \
-    FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=30 \
-    FYAI_PTY_AFTER="wait-screen:Ctrl-]|wait-screen:SIZE 14 98|resize:64x100|"\
-"wait-screen:SIZE 30 98|raw:1d" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/resize-half.out" \
+    export SHELL_SIZE
+    pty_run "$TEST_DIR/resize-half.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
-        --set display/work_zoom_rows=half -m mock-model -i ||
+        --set display/work_zoom_rows=half -m mock-model -i <<'PTY' ||
+rows: 32
+cols: 100
+timeout: 30
+steps:
+  - type: "${SHELL_SIZE}"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: "Ctrl-]"
+  - wait-screen: SIZE 14 98
+  - resize: "64x100"
+  - wait-screen: SIZE 30 98
+  - write: "\x1d"
+PTY
         fail "a half pane did not follow the terminal size"
 }
 

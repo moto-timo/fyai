@@ -30,7 +30,7 @@ from term_reply import answer_da1
 
 BIN, URL = sys.argv[1], sys.argv[2]
 TAG = "fytmo"
-# Every deadline below waits this much longer; see tests/pty_driver.py.
+# Every deadline below waits this much longer; see doc/pty-driver.md.
 try:
     SCALE = float(os.environ.get("FYAI_TIMEOUT_SCALE", "1"))
 except ValueError:

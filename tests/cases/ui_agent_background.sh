@@ -11,13 +11,17 @@ set -eu
 fyai_test_setup
 mock_start agent_background.json
 
-FYAI_PTY_INPUT="start background work" FYAI_PTY_NEEDLE="Picked up the report." \
-FYAI_PTY_TIMEOUT=30 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: start background work
+  - wait: Picked up the report.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/requests.jsonl" <<'PYEOF' || fail "the report did not reach the model"
 import json

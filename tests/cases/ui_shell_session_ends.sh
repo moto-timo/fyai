@@ -14,13 +14,17 @@ set -eu
 fyai_test_setup
 mock_start shell_session_ends.json
 
-FYAI_PTY_INPUT="open a shell that ends" FYAI_PTY_NEEDLE="done." \
-FYAI_PTY_TIMEOUT=30 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: open a shell that ends
+  - wait: done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/requests.jsonl" <<'PYEOF' || fail "the session was reported as unopened"
 import json

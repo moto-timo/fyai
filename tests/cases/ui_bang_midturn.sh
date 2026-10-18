@@ -35,15 +35,29 @@ export MOCKPROV_API_KEY=mock-secret
 # /sessions must still list the user shell afterwards.
 # The needle is the expanded home path: the typed echo holds only the
 # literal $HOME, so it cannot trip the wait before the shell runs.
-FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="shell-home-is-/" \
-FYAI_PTY_DURING_INPUT="!sh -c 'echo shell-home-is-\$HOME; sleep 30'" \
-FYAI_PTY_PROGRESS_NEEDLE="first question" \
-FYAI_PTY_AFTER="wait-screen:Ctrl-] returns to the prompt|raw:14|wait-gone:Ctrl-] returns to the prompt|raw:03|wait-screen:interrupted|send:/sessions|wait-screen:bang-1|send:second question|wait-screen:The follow-up answer." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" --color off \
     --set display/markdown=false --set display/stream=false \
-    --set tools=false --set builtin_shell=false -i -m foo
+    --set tools=false --set builtin_shell=false -i -m foo <<'PTY'
+steps:
+  - type: first question
+  - wait: first question
+    timeout: 1.5
+  - write: "!sh -c 'echo shell-home-is-$HOME; sleep 30'\n"
+  - wait: first question
+    timeout: 1.5
+  - wait: shell-home-is-/
+    timeout: session
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - write: "\x14"
+  - wait-gone: "Ctrl-] returns to the prompt"
+  - write: "\x03"
+  - wait-screen: interrupted
+  - type: "/sessions"
+  - wait-screen: bang-1
+  - type: second question
+  - wait-screen: The follow-up answer.
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
     fail "the mid-turn bang disturbed the turn or died with it"

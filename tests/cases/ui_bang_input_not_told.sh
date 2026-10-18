@@ -18,18 +18,27 @@ mock_start shell_input_wanted.json
 # waits too, and is told so. The watch of the bang session started first and
 # polls at the same interval, so by the time the model answers its own shell,
 # the bang session was looked at at least as many times.
-FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
-FYAI_PTY_INPUT="!sh -c 'printf \"%s-%s\\n\" ASK ME; exec cat'" \
-FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=40 \
-FYAI_PTY_AFTER="wait-screen:ASK-ME|raw:1d|wait-gone:Ctrl-]|"\
-"send:open a shell that asks|wait-screen:It answered.|"\
-"send:/kill bang-1|wait-screen:stopping shell bang-1" \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=20 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/stream=false --set tools=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 40
+wait_timeout: 20
+steps:
+  - type: "!sh -c 'printf \"%s-%s\\n\" ASK ME; exec cat'"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: ASK-ME
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: open a shell that asks
+  - wait-screen: It answered.
+  - type: "/kill bang-1"
+  - wait-screen: stopping shell bang-1
+PTY
     fail "the sessions did not run"
 
 "$PYTHON" - "$TEST_DIR/requests.jsonl" <<'PYEOF' || fail "the model was told about a bang session"

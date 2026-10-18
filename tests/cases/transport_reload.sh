@@ -16,17 +16,24 @@ mock_start transport_reload.json
 
 FYAI_TRANSPORT_ISOLATION=level-b \
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="Reply one." \
-FYAI_PTY_AFTER="wait-screen:Reply one.|"\
-"send:/reload|wait-screen:↳ Reply one.|"\
-"send:second question|wait-screen:Reply two.|"\
-"send:/reload|wait-screen:↳ Reply two.|"\
-"send:third question|wait-screen:Reply three." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark -b main --set api=chat-completions \
     --set "api_url=$MOCK_URL/v1/chat/completions" \
-    --set display/stream=false -m mock-model -i
+    --set display/stream=false -m mock-model -i <<'PTY'
+steps:
+  - type: first question
+  - wait: Reply one.
+    timeout: session
+  - wait-screen: Reply one.
+  - type: "/reload"
+  - wait-screen: "↳ Reply one."
+  - type: second question
+  - wait-screen: Reply two.
+  - type: "/reload"
+  - wait-screen: "↳ Reply two."
+  - type: third question
+  - wait-screen: Reply three.
+PTY
 
 # One process, three images of it (bootstrap, supervisor, and one for each
 # reload), and one transport that outlived all of them.

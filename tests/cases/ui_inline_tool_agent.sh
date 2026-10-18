@@ -10,16 +10,21 @@ fyai_test_setup
 mock_start agent_tool_responses.json
 
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
-FYAI_PTY_NEEDLE="agent-was-here" FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:agent-was-here|snapshot|wait-screen:Delegated and done." \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/live.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set "display/screen=${FYAI_INLINE_SCREEN:-fullscreen}" --set display/tool_display=inline \
     --set tools=true --set api=responses --set builtin_shell=true \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: delegate a greeting to a sub-agent
+  - wait: agent-was-here
+    timeout: session
+  - wait-screen: agent-was-here
+  - snapshot: "${TEST_DIR}/live.out"
+  - wait-screen: Delegated and done.
+PTY
 
 "$PYTHON" - "$TEST_DIR/live.out" "$TESTS_DIR" <<'PY' || fail "the sub-agent screen is not in the transcript"
 import sys

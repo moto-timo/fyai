@@ -7,18 +7,30 @@ set -eu
 fyai_test_setup
 mock_start btw_midturn.json
 
-FYAI_PTY_INPUT="main question" \
-FYAI_PTY_DURING_INPUT="/btw side question" \
-FYAI_PTY_PROGRESS_NEEDLE="main question" \
-FYAI_PTY_NEEDLE="SIDE-ANSWER" \
-FYAI_PTY_AFTER="wait-screen:Esc closes|raw:1b5b357e1b5b357e1b5b357e|wait-screen:SIDE-START|snapshot|raw:1b|wait-gone:SIDE-START|release:$TEST_DIR/release-main|wait-screen:MAIN-ANSWER" \
-FYAI_PTY_AFTER_TIMEOUT="10" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/btw-panel.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set api=responses --set "api_url=$MOCK_URL/v1/responses" \
-    -m mock-model -i
+    -m mock-model -i <<'PTY'
+wait_timeout: 10
+steps:
+  - type: main question
+  - wait: main question
+    timeout: 1.5
+  - write: "/btw side question\n"
+  - wait: main question
+    timeout: 1.5
+  - wait: SIDE-ANSWER
+    timeout: session
+  - wait-screen: Esc closes
+  - write: "\e[5~\e[5~\e[5~"
+  - wait-screen: SIDE-START
+  - snapshot: "${TEST_DIR}/btw-panel.out"
+  - write: "\e"
+  - wait-gone: SIDE-START
+  - touch: "${TEST_DIR}/release-main"
+  - wait-screen: MAIN-ANSWER
+PTY
 
 "$PYTHON" - "$TEST_DIR/btw-panel.out" <<'EOF' || \
     fail "the completed side answer did not stay in its panel"

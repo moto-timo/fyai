@@ -9,16 +9,27 @@ set -eu
 fyai_test_setup
 mock_start ui_resize_tool_prose.json
 
-FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
-FYAI_PTY_NEEDLE="delegate a" FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:agent [greeter]|resize:80|wait-screen:@1|snapshot|release:$TEST_DIR/release-child|wait-screen:Delegated and done." \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/live.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set display/screen=fullscreen --set display/tool_display=inline \
+    --set display/inline_terminal_rows=4 \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: delegate a greeting to a sub-agent
+  - wait: delegate a
+    timeout: session
+  - wait-screen: "agent [greeter]"
+  - resize: 80
+  - wait-screen: "@1"
+  - wait-screen: "Starting a review agent on the last commit."
+  - wait-screen: "I will look at the diff first."
+  - snapshot: "${TEST_DIR}/live.out"
+  - touch: "${TEST_DIR}/release-child"
+  - wait-screen: Delegated and done.
+PTY
 
 "$PYTHON" - "$TEST_DIR/live.out" "$TESTS_DIR" <<'PY' || fail "the prose before the call was drawn again under it"
 import sys

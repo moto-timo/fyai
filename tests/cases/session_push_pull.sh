@@ -34,8 +34,6 @@ with open(sys.argv[2], "w") as target:
     json.dump(scenario, target)
 PY
 
-"$FYAI_BIN" branch create lock >/dev/null 2>&1 || fail 'no branch'
-
 # The files of the case itself are in the project: they are not what it is about.
 IGNORE='view/ignore=["home","tmp","port","served","mock.log","requests.jsonl","pty.out","stdout","stderr","out","err","config.yaml","diff"]'
 
@@ -44,19 +42,34 @@ reset_project() {
 	rm -f added
 }
 
-# One session on the branch `lock`: the first prompt edits the files, then the steps
-# of $1 run on what the screen shows.
+# One session on a branch of its own, $BRANCH: the first prompt edits the files,
+# then the steps on standard input run on what the screen shows. A branch that an
+# earlier session used replays its text, which would satisfy a wait that is
+# about this session.
+SESSIONS=0
 session() {
-	local after="$1" driver=0
-	FYAI_PTY_INPUT="edit the files" FYAI_PTY_NEEDLE="Session edit done." FYAI_PTY_TIMEOUT=60 \
-	FYAI_PTY_AFTER="$after" \
-	"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
-	    "$FYAI_BIN" -b lock -k test-key --set view/isolate_session=true --set sandbox_profile=lockdown --set "$IGNORE" \
+	local driver=0 steps
+
+	steps="$(cat)"
+	SESSIONS=$((SESSIONS + 1))
+	BRANCH="lock-$SESSIONS"
+	"$FYAI_BIN" branch create "$BRANCH" >/dev/null 2>&1 || fail 'no branch'
+	{
+	    cat <<'PTY'
+timeout: 60
+steps:
+  - type: edit the files
+  - wait: Session edit done.
+    timeout: session
+PTY
+	    printf '%s\n' "$steps"
+	} | pty_run "$TEST_DIR/pty.out" \
+	    "$FYAI_BIN" -b "$BRANCH" -k test-key --set view/isolate_session=true --set sandbox_profile=lockdown --set "$IGNORE" \
 	    --set display/stream=false --set tools=true --set api=chat-completions \
 	    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i || driver=$?
 	if [ "$driver" -ne 0 ]; then
 		tail -c 3000 "$TEST_DIR/pty.out" >&2
-		fail "the session did not finish: $after"
+		fail "the session did not finish"
 	fi
 	"$PYTHON" - "$TEST_DIR/requests.jsonl" <<'PY'
 import json, sys
@@ -71,7 +84,11 @@ PY
 # A dry run reports and writes nothing.
 reset_project
 mock_start "$TEST_DIR/root-mutations.json"
-session "send:/session push --dry-run|wait-screen:would|send:/exit"
+session <<'PTY'
+  - type: "/session push --dry-run"
+  - wait-screen: would
+  - type: "/exit"
+PTY
 [ "$(cat file)" = baseline ] || fail 'a dry run changed the project'
 [ ! -e added ] || fail 'a dry run added a file'
 mock_stop 2
@@ -79,7 +96,11 @@ mock_stop 2
 # push writes the changes of the session into the project, while the session runs.
 reset_project
 mock_start "$TEST_DIR/root-mutations.json"
-session "send:/session push|wait-screen:applied|send:/exit"
+session <<'PTY'
+  - type: "/session push"
+  - wait-screen: applied
+  - type: "/exit"
+PTY
 [ "$(cat file)" = changed ] || fail 'push did not write the file'
 [ "$(cat added)" = new ] || fail 'push did not write the added file'
 mock_stop 2
@@ -87,7 +108,11 @@ mock_stop 2
 # pull refuses while the session holds what the project does not.
 reset_project
 mock_start "$TEST_DIR/root-mutations.json"
-session "send:/session pull|wait-screen:would be dropped|send:/exit"
+session <<'PTY'
+  - type: "/session pull"
+  - wait-screen: would be dropped
+  - type: "/exit"
+PTY
 [ "$(cat file)" = baseline ] || fail 'a refused pull changed the project'
 mock_stop 2
 
@@ -95,9 +120,19 @@ mock_stop 2
 # again, and the new view holds no change against the project that now has them.
 reset_project
 mock_start "$TEST_DIR/root-mutations.json"
-session "send:/session push|wait-screen:applied|send:/session pull|wait-screen:starts again|send:/exit"
+session <<'PTY'
+  - type: "/session push"
+  - wait-screen: applied
+  - type: "/session pull"
+  - wait-screen: starts again
+  # The session ends and a new one starts. A key typed before its UI is open,
+  # which says so by taking the keyboard protocol, goes to no session.
+  - wait-count: "\e[>1u"
+    more: 1
+  - type: "/exit"
+PTY
 [ "$(cat file)" = changed ] || fail 'push did not write the file'
-run_fyai -b lock view diff session --stat
+run_fyai -b "$BRANCH" view diff session --stat
 assert_status 0
 assert_stdout_not_contains 'modified'
 assert_stdout_not_contains 'added'
@@ -106,9 +141,17 @@ mock_stop 2
 # --discard drops what the session holds, and the project stays as it was.
 reset_project
 mock_start "$TEST_DIR/root-mutations.json"
-session "send:/session pull --discard|wait-screen:starts again|send:/exit"
+session <<'PTY'
+  - type: "/session pull --discard"
+  - wait-screen: starts again
+  # The session ends and a new one starts. A key typed before its UI is open,
+  # which says so by taking the keyboard protocol, goes to no session.
+  - wait-count: "\e[>1u"
+    more: 1
+  - type: "/exit"
+PTY
 [ "$(cat file)" = baseline ] || fail 'pull --discard changed the project'
-run_fyai -b lock view diff session --stat
+run_fyai -b "$BRANCH" view diff session --stat
 assert_status 0
 assert_stdout_not_contains 'modified'
 mock_stop 2

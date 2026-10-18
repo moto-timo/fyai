@@ -8,16 +8,19 @@ fyai_test_setup
 mock_start native_shell_interrupt.json
 
 start=$(date +%s)
-FYAI_PTY_INPUT="run it" \
-FYAI_PTY_PROGRESS_NEEDLE="nsiRAN" \
-FYAI_PTY_PROGRESS_TIMEOUT="6" \
-FYAI_PTY_INTERRUPT_AFTER_PROGRESS="1" \
-FYAI_PTY_NEEDLE="interrupted" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set builtin_shell=true --set api=responses \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+steps:
+  - type: run it
+  - wait: nsiRAN
+    timeout: 6
+  - write: "\e"
+  - wait: interrupted
+    timeout: session
+PTY
 elapsed=$(($(date +%s) - start))
 
 [ "$elapsed" -lt $((8 * FYAI_TIMEOUT_SCALE)) ] || \

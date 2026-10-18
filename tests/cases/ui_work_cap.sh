@@ -11,14 +11,19 @@ set -eu
 fyai_test_setup
 mock_start shell_session.json
 
-FYAI_PTY_INPUT="drive the shell" FYAI_PTY_NEEDLE="done." FYAI_PTY_TIMEOUT=30 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/cap.out" \
+pty_run "$TEST_DIR/cap.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/work_cap=true --set display/work_zoom_rows=half \
     --set tools=true --set api=chat-completions \
     --set shell/input_poll_ms=0 \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: drive the shell
+  - wait: done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/cap.out" <<'PYEOF' || fail "the cap row is wrong"
 import re
@@ -41,14 +46,19 @@ mock_stop 6
 
 # The setting persists with the branch: turned off, the pane draws no cap.
 mock_start shell_session.json
-FYAI_PTY_INPUT="drive the shell" FYAI_PTY_NEEDLE="done." FYAI_PTY_TIMEOUT=30 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/nocap.out" \
+pty_run "$TEST_DIR/nocap.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/work_cap=false \
     --set tools=true --set api=chat-completions \
     --set shell/input_poll_ms=0 \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: drive the shell
+  - wait: done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/nocap.out" <<'PYEOF' || fail "a cap row was drawn without the setting"
 import re

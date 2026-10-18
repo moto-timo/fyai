@@ -12,15 +12,23 @@ fyai_test_setup
 # Wait for the last row of the resized generation on the screen: the program
 # paints its rows in order, so that row stands once the differential repaint
 # is whole.
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="!env LINES=30 COLUMNS=98 $PYTHON $TESTS_DIR/resize_curses.py" \
-FYAI_PTY_NEEDLE="E29G1:" FYAI_PTY_TIMEOUT=40 \
-FYAI_PTY_AFTER_TIMEOUT=20 \
-FYAI_PTY_AFTER="resize:52|wait-screen:E19G2:|snapshot|raw:1d" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/curses.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+export PYTHON
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
-    --set display/markdown=true -m mock-model -i
+    --set display/markdown=true -m mock-model -i <<'PTY'
+rows: 30
+cols: 100
+timeout: 40
+wait_timeout: 20
+steps:
+  - type: "!env LINES=30 COLUMNS=98 ${PYTHON} ${TESTS_DIR}/resize_curses.py"
+  - wait: "E29G1:"
+    timeout: session
+  - resize: 52
+  - wait-screen: "E19G2:"
+  - snapshot: "${TEST_DIR}/curses.out"
+  - write: "\x1d"
+PTY
 
 "$PYTHON" - "$TEST_DIR/curses.out" "$TESTS_DIR" <<'PYEOF' || \
     fail "the resized ncurses pattern was corrupted"

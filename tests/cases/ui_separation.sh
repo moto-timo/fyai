@@ -12,13 +12,19 @@ mock_start display_parity.json
 
 printf 'int main(void)\n{\n\tputs("old");\n\treturn 0;\n}\n' > hello.c
 
-FYAI_PTY_ROWS=70 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="do things" FYAI_PTY_NEEDLE="Done." FYAI_PTY_TIMEOUT=40 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 70
+cols: 100
+timeout: 40
+steps:
+  - type: do things
+  - wait: Done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PY' || fail "the live separation is wrong"
 import os

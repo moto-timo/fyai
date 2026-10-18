@@ -10,16 +10,27 @@ fyai_test_setup
 mock_start chat_long_line.json
 driver=0
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_ROWS=40 FYAI_PTY_COLS=180 FYAI_PTY_INPUT="say it long" \
-FYAI_PTY_NEEDLE="TAILWORD" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:TAILWORD|send:!sh -c 'printf %s%s SIDE OUT; sleep 60'|wait-screen:SIDEOUT|raw:1d|wait-gone:Ctrl-]|wait-screen:TAILWORD" \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/screen=fullscreen \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 40
+cols: 180
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: say it long
+  - wait: TAILWORD
+    timeout: session
+  - wait-screen: TAILWORD
+  - type: "!sh -c 'printf %s%s SIDE OUT; sleep 60'"
+  - wait-screen: SIDEOUT
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - wait-screen: TAILWORD
+PTY
     driver=$?
 if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out" \
         "$TEST_DIR/trace.log" 2>/dev/null; then

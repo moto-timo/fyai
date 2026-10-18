@@ -13,14 +13,24 @@ fyai_test_setup
 # the loop below is stopped by it. fyai must still be there afterwards, and
 # answer for itself - with no ground of its own it would have taken the
 # interrupt and left.
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="!sh -c 'echo RE\"\"ADY; while :; do sleep .2; done'" \
-FYAI_PTY_NEEDLE="READY" FYAI_PTY_TIMEOUT=25 FYAI_PTY_AFTER_TIMEOUT=15 \
-FYAI_PTY_AFTER="wait-screen:Ctrl-] returns to the prompt|raw:03|wait-screen:signal 2|raw:1d|"\
-"send:/sessions|wait-screen:no active sessions" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
-    --set display/markdown=true -m mock-model -i
+    --set display/markdown=true -m mock-model -i <<'PTY'
+rows: 30
+cols: 100
+timeout: 25
+wait_timeout: 15
+steps:
+  - type: "!sh -c 'echo RE\"\"ADY; while :; do sleep .2; done'"
+  - wait: READY
+    timeout: session
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - write: "\x03"
+  - wait-screen: signal 2
+  - write: "\x1d"
+  - type: "/sessions"
+  - wait-screen: no active sessions
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PYEOF' || fail "^C did not reach the session"
 import re

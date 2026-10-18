@@ -7,20 +7,25 @@ set -eu
 fyai_test_setup
 mock_start ui_reflow.json
 
-FYAI_PTY_INPUT="say it" \
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_MID_NEEDLE="The paragraph is long enough" \
-FYAI_PTY_MID_TIMEOUT="8" \
-FYAI_PTY_RESIZE_COLS="48" \
-FYAI_PTY_NEEDLE="Reflow streaming done." \
-FYAI_PTY_AFTER="raw:0c|wait-repaint:streaming done." \
-FYAI_PTY_AFTER_TIMEOUT="8" \
-FYAI_PTY_TIMEOUT=40 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 30
+cols: 100
+timeout: 40
+wait_timeout: 8
+steps:
+  - type: say it
+  - wait: The paragraph is long enough
+    timeout: 8
+  - resize: "30x48"
+  - wait: Reflow streaming done.
+    timeout: session
+  - write: "\f"
+  - wait-repaint: streaming done.
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PY' || fail "the live region kept its old width"
 import os

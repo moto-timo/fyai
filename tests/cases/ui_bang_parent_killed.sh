@@ -11,13 +11,19 @@ fyai_test_setup
 
 # The shell records its process and writes HOLD in two parts, so only its
 # output holds the word and not the command in the head.
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="!sh -c 'echo \$\$ > $TEST_DIR/shell.pid; printf %s%s HO LD; sleep 60'" \
-FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:HOLD|signal:9" \
-FYAI_PTY_EXIT_SIGNAL=9 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
-    "$FYAI_BIN" -k test-key --theme dark -m mock-model -i ||
+pty_run "$TEST_DIR/pty.out" \
+    "$FYAI_BIN" -k test-key --theme dark -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 20
+exit: {signal: 9}
+steps:
+  - type: "!sh -c 'echo $$$ > ${TEST_DIR}/shell.pid; printf %s%s HO LD; sleep 60'"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: HOLD
+  - signal: 9
+PTY
     fail "the session did not stand before its owner was killed"
 
 [ -s "$TEST_DIR/shell.pid" ] || fail "the shell did not record its process"

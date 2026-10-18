@@ -8,16 +8,25 @@
 set -eu
 . "$(dirname "$0")/../harness.sh"
 
-# run_steps STEPS [ARG...]: ask, run the steps, and end on the second answer.
+# run_steps [ARG...] < STEPS: ask, run the steps, and end on the second
+# answer.
 run_steps() {
-	local steps="$1"
+	local steps
 
-	shift
+	steps="$(cat)"
 	fyai_test_setup
 	mock_start ui_card_separation.json
-	FYAI_PTY_ROWS=60 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
-	FYAI_PTY_NEEDLE="banana" FYAI_PTY_AFTER="$steps" \
-	"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+	{
+	    cat <<'PTY'
+rows: 60
+cols: 100
+steps:
+  - type: first question
+  - wait: banana
+    timeout: session
+PTY
+	    printf '%s\n' "$steps"
+	} | pty_run "$TEST_DIR/pty.out" \
 	    "$FYAI_BIN" -k test-key --theme dark \
 	    --set display/markdown=true --set display/stream=true \
 	    --set display/screen=fullscreen \
@@ -43,9 +52,12 @@ PY
 
 # The output is drawn under the card, with no heading, and both stay after
 # the next turn.
-run_steps \
-	"send:/status|wait-screen:Auth / provider|send:yellow?|wait-screen:second" \
-	--set display/command_output=transcript
+run_steps --set display/command_output=transcript <<'PTY'
+  - type: "/status"
+  - wait-screen: Auth / provider
+  - type: "yellow?"
+  - wait-screen: second
+PTY
 final_rows > "$TEST_DIR/transcript.rows"
 "$PYTHON" - "$TEST_DIR/transcript.rows" <<'PY' ||
 import sys
@@ -75,8 +87,15 @@ PY
 
 # pane, which the harness selects: the output is in the popup, and the
 # transcript keeps nothing of the command, in no frame.
-run_steps \
-	"send:/status|click:□|wait-screen:Auth / provider|raw:1b|wait-gone:Auth / provider|send:yellow?|wait-screen:second"
+run_steps <<'PTY'
+  - type: "/status"
+  - click: "□"
+  - wait-screen: Auth / provider
+  - write: "\e"
+  - wait-gone: Auth / provider
+  - type: "yellow?"
+  - wait-screen: second
+PTY
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
 
@@ -107,9 +126,14 @@ PY
 # A command that reports a status, /model, stays out of the transcript even
 # with command_output set to transcript: no card, and its output is shown in
 # the panel and not in the conversation.
-run_steps \
-	"send:/model|wait-screen:provider|raw:1b|wait-gone:provider|send:yellow?|wait-screen:second" \
-	--set display/command_output=transcript
+run_steps --set display/command_output=transcript <<'PTY'
+  - type: "/model"
+  - wait-screen: provider
+  - write: "\e"
+  - wait-gone: provider
+  - type: "yellow?"
+  - wait-screen: second
+PTY
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' ||
 import sys
 

@@ -1,8 +1,6 @@
 {
   "steps": [
     {
-      "chunk_split": [100, 220],
-      "chunk_delay": 0.5,
       "sse": [
         {
           "choices": [
@@ -26,7 +24,9 @@
           ]
         }
       ],
-      "done": true
+      "done": true,
+      "wait_for": "release-first",
+      "wait_after_event": 0
     },
     {
       "sse": [

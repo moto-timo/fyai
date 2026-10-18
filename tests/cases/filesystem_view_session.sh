@@ -21,20 +21,42 @@ for row in json.load(open(sys.argv[1])):
 PYBRANCH
 )
 [ -n "$BRANCH" ] || fail 'missing active branch'
-FYAI_PTY_INPUT="/view enter demo sh -c 'test -t 0 && printf changed > file && printf \"%s%s\\n\" VIEW -READY'" \
-FYAI_PTY_NEEDLE="VIEW-READY" FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-gone:Ctrl-] returns to the prompt" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
-    "$FYAI_BIN" --branch "$BRANCH" -k test-key -m mock-model -i
+pty_run "$TEST_DIR/pty.out" \
+    "$FYAI_BIN" --branch "$BRANCH" -k test-key -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: "/view enter demo sh -c 'test -t 0 && printf changed > file && printf \"%s%s\\n\" VIEW -READY'"
+  - wait: VIEW-READY
+    timeout: session
+  - wait-gone: "Ctrl-] returns to the prompt"
+PTY
 [ "$(cat project/file)" = baseline ] || fail 'view changed the host'
 run_fyai view diff demo --stat
 assert_status 0
 assert_stdout_contains 'file'
-FYAI_PTY_INPUT="/view enter demo" \
-FYAI_PTY_NEEDLE="Ctrl-] returns to the prompt" FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="raw:1d|wait-gone:Ctrl-] returns to the prompt|send:/view list|wait-screen:Filesystem views|send:/view list --full|wait-screen:manifest: |send:!printf '%s%s\\n' BANG -READY|wait-screen:BANG-READY|raw:1d|wait-gone:Ctrl-] returns to the prompt|send:/zoom view-1|wait-screen:Ctrl-] returns to the prompt|send:printf '%s%s\\n' SHELL -READY; exit|wait-screen:SHELL-READY|wait-gone:Ctrl-] returns to the prompt" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/shell.out" \
-    "$FYAI_BIN" --branch "$BRANCH" -k test-key -m mock-model -i
+pty_run "$TEST_DIR/shell.out" \
+    "$FYAI_BIN" --branch "$BRANCH" -k test-key -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: "/view enter demo"
+  - wait: "Ctrl-] returns to the prompt"
+    timeout: session
+  - write: "\x1d"
+  - wait-gone: "Ctrl-] returns to the prompt"
+  - type: "/view list"
+  - wait-screen: Filesystem views
+  - type: "/view list --full"
+  - wait-screen: "manifest: "
+  - type: "!printf '%s%s\\n' BANG -READY"
+  - wait-screen: BANG-READY
+  - write: "\x1d"
+  - wait-gone: "Ctrl-] returns to the prompt"
+  - type: "/zoom view-1"
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - type: "printf '%s%s\\n' SHELL -READY; exit"
+  - wait-screen: SHELL-READY
+  - wait-gone: "Ctrl-] returns to the prompt"
+PTY
 if grep -q "view command failed" "$TEST_DIR/shell.out"; then
     fail 'a tool child notified the parent view exit callback'
 fi

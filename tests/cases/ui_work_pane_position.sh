@@ -19,12 +19,8 @@ run_at()
     fyai_test_setup
     mock_start ui_band_invocation_held.json
 
-    FYAI_PTY_COLS=100 FYAI_PTY_INPUT="run it" \
-    FYAI_PTY_NEEDLE="Done." \
-    FYAI_PTY_PROGRESS_NEEDLE="[50%] Building object 5" \
-    FYAI_PTY_PROGRESS_TIMEOUT=5 \
-    FYAI_PTY_PROGRESS_RELEASE="$TMPDIR/band-release" \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/$position.out" \
+    export TMPDIR
+    pty_run "$TEST_DIR/$position.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/stream=false \
         --set display/tool_update_interval_ms=0 \
@@ -32,7 +28,19 @@ run_at()
         --set "display/work_position=$position" \
         --set 'display/prompt=PROMPTMARK ' \
         --set builtin_shell=true --set api=responses \
-        --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+        --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+cols: 100
+steps:
+  - type: run it
+  - wait: "[50%] Building object 5"
+    timeout: 5
+  - wait-frame: "[50%] Building object 5"
+    from: start
+    timeout: session
+  - touch: "${TMPDIR}/band-release"
+  - wait: Done.
+    timeout: session
+PTY
 
     mock_stop 2
     cp "$TEST_DIR/$position.out" "$CAPTURES/$position.out"
@@ -53,19 +61,28 @@ run_set()
     # that applies it. An echo-matched needle would send the turn while
     # the commit is still queued, and the band would run above-prompt
     # even though the setting takes a frame later.
-    FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="/config set display/work_position below-prompt" \
-    FYAI_PTY_NEEDLE="below-prompt" \
-    FYAI_PTY_AFTER="send:/config get display/work_position|wait-row:below-prompt|send:run it|wait-screen:[50%] Building object 5|release:$TMPDIR/band-release|wait-screen:Done." \
-    FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/set.out" \
+    export TMPDIR
+    pty_run "$TEST_DIR/set.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/stream=false \
         --set display/tool_update_interval_ms=0 \
         --set display/tool_preview_lines=5 \
         --set 'display/prompt=PROMPTMARK ' \
         --set builtin_shell=true --set api=responses \
-        --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+        --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+cols: 100
+wait_timeout: 10
+steps:
+  - type: "/config set display/work_position below-prompt"
+  - wait: below-prompt
+    timeout: session
+  - type: "/config get display/work_position"
+  - wait-row: below-prompt
+  - type: run it
+  - wait-screen: "[50%] Building object 5"
+  - touch: "${TMPDIR}/band-release"
+  - wait-screen: Done.
+PTY
 
     mock_stop 2
     cp "$TEST_DIR/set.out" "$CAPTURES/set.out"

@@ -7,17 +7,26 @@ set -eu
 fyai_test_setup
 mock_start ui_resize_repaint_tools.json
 
-FYAI_PTY_INPUT="turn 1 please" \
-FYAI_PTY_ROWS=40 FYAI_PTY_COLS=100 \
-FYAI_PTY_NEEDLE="Turn 1 answered." \
-FYAI_PTY_AFTER="send:turn 2 please|wait-screen:Turn 2 answered.|send:turn 3 please|wait-screen:Turn 3 answered.|resize:72|wait-repaint:Turn 3 answered." \
-FYAI_PTY_AFTER_TIMEOUT=20 \
-FYAI_PTY_TIMEOUT=60 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set tools=true --set approval=never --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 40
+cols: 100
+timeout: 60
+wait_timeout: 20
+steps:
+  - type: turn 1 please
+  - wait: Turn 1 answered.
+    timeout: session
+  - type: turn 2 please
+  - wait-screen: Turn 2 answered.
+  - type: turn 3 please
+  - wait-screen: Turn 3 answered.
+  - resize: 72
+  - wait-repaint: Turn 3 answered.
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || fail "the repaint dropped the tool exchanges"
 import re

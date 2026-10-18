@@ -8,14 +8,25 @@ fyai_test_setup
 printf 'tool input\n' > data.txt
 mock_start chat_tool_pending_user.json
 
-FYAI_PTY_INPUT="read the file" \
-FYAI_PTY_DURING_INPUT="also explain the result" \
-FYAI_PTY_DURING_DELAY=0.2 \
-FYAI_PTY_NEEDLE="I saw the follow-up during the tool loop." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pending.out" \
+pty_run "$TEST_DIR/pending.out" \
 	"$FYAI_BIN" -b main -k test-key -m mock-model -i \
 	--set display/stream=false --set api=chat-completions \
-	--set tools=true --set "api_url=$MOCK_URL/v1/chat/completions"
+	--set tools=true --set "api_url=$MOCK_URL/v1/chat/completions" <<'PTY'
+steps:
+  - type: read the file
+  - wait-file: "${TEST_DIR}/served"
+    equals: "1"
+    timeout: 1.5
+  - write: "also explain the result\n"
+  - wait: also explain the result
+    timeout: 1.5
+  - wait-frame: also explain the result
+    from: start
+    timeout: session
+  - touch: "${TEST_DIR}/release-1"
+  - wait: I saw the follow-up during the tool loop.
+    timeout: session
+PTY
 
 mock_stop 2
 assert_request 0 'r["body"]["messages"][-1]["content"] == "read the file"'
@@ -30,21 +41,32 @@ import sys
 
 with open(sys.argv[1], encoding="utf-8") as fp:
     scenario = json.load(fp)
-scenario["steps"][0]["delay"] = 2.0
+scenario["steps"][0]["wait_for"] = "release-2"
 with open(sys.argv[2], "w", encoding="utf-8") as fp:
     json.dump(scenario, fp)
 PY
 mock_start "$TEST_DIR/responses-pending.json"
 
-FYAI_PTY_INPUT="read the file" \
-FYAI_PTY_DURING_INPUT="also explain the result" \
-FYAI_PTY_DURING_DELAY=0.2 \
-FYAI_PTY_NEEDLE="The file says: mock data payload." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/responses.out" \
+pty_run "$TEST_DIR/responses.out" \
 	"$FYAI_BIN" -b main -k test-key -m mock-model -i \
 	--set display/stream=false --set api=responses \
 	--set response_chain=true --set tools=true \
-	--set "api_url=$MOCK_URL/v1/responses"
+	--set "api_url=$MOCK_URL/v1/responses" <<'PTY'
+steps:
+  - type: read the file
+  - wait-file: "${TEST_DIR}/served"
+    equals: "1"
+    timeout: 1.5
+  - write: "also explain the result\n"
+  - wait: also explain the result
+    timeout: 1.5
+  - wait-frame: also explain the result
+    from: start
+    timeout: session
+  - touch: "${TEST_DIR}/release-2"
+  - wait: "The file says: mock data payload."
+    timeout: session
+PTY
 
 mock_stop 2
 assert_request 1 'any(i.get("role") == "user" for i in r["body"]["input"])'

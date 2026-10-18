@@ -9,14 +9,23 @@ set -eu
 # text $3 on the screen.
 ask()
 {
+    local steps
+    steps="$(cat)"
     fyai_test_setup
     mock_start "$1"
     driver=0
-    FYAI_PTY_COLS=100 FYAI_PTY_INPUT="ask me without waiting" \
-    FYAI_PTY_NEEDLE="How wide?" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="$2" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    {
+        cat <<'PTY'
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: ask me without waiting
+  - wait: "How wide?"
+    timeout: session
+PTY
+        printf '%s\n' "$steps"
+    } | pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/stream=false \
         --set tools=true \
@@ -36,7 +45,12 @@ TOOL='{m["tool_call_id"]: m["content"] for m in r["body"]["messages"] if m.get("
 
 # The wait of the same response holds until the user chooses; the list in
 # between saw the question waiting.
-ask ask_user_named.json "wait-screen:How wide?|wait-screen:still running|raw:32|wait-screen:Scope settled."
+ask ask_user_named.json <<'PTY'
+  - wait-screen: "How wide?"
+  - wait-screen: still running
+  - write: "2"
+  - wait-screen: Scope settled.
+PTY
 assert_request 1 "$TOOL[\"call_ask\"].startswith(\"[question 'ask-1' asked]\")"
 assert_request 1 "json.loads($TOOL[\"call_list\"])[\"questions\"][0][\"name\"] == \"ask-1\""
 # A poll of the same name looked once and found it running.
@@ -45,7 +59,10 @@ assert_request 3 "\"[question 'ask-1' answered]\" in $TOOL[\"call_wait\"] and \"
 mock_stop 4
 
 # Cancel takes the question out of the input area, and list no longer has it.
-ask ask_user_cancel.json "wait-gone:or type an answer|wait-screen:Question withdrawn."
+ask ask_user_cancel.json <<'PTY'
+  - wait-gone: or type an answer
+  - wait-screen: Question withdrawn.
+PTY
 assert_request 1 "$TOOL[\"call_cancel\"] == \"[question 'later' cancelled]\""
 assert_request 1 "json.loads($TOOL[\"call_list\"])[\"questions\"] == []"
 mock_stop 2

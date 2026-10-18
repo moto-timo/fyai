@@ -12,15 +12,21 @@ assert_status 0
 run_fyai -b source config set display/stream true
 assert_status 0
 
-FYAI_PTY_INPUT="/checkout source" \
-FYAI_PTY_NEEDLE="switched to branch source" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/checkout.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b main -i
+pty_run "$TEST_DIR/checkout.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b main -i <<'PTY'
+steps:
+  - type: "/checkout source"
+  - wait: switched to branch source
+    timeout: session
+PTY
 
-FYAI_PTY_INPUT="/checkout source@{2}" \
-FYAI_PTY_NEEDLE="switched to branch session/" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/snapshot.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b source -i
+pty_run "$TEST_DIR/snapshot.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b source -i <<'PTY'
+steps:
+  - type: "/checkout source@{2}"
+  - wait: switched to branch session/
+    timeout: session
+PTY
 
 snapshot_name="$(grep -aoE 'created branch session/[0-9T.-]+' \
 	"$TEST_DIR/snapshot.out" | head -1 | sed 's/^created branch //')"
@@ -33,10 +39,13 @@ run_fyai list reflog
 assert_status 0
 assert_stdout_contains "checkout"
 
-FYAI_PTY_INPUT="/rewind source@{0}" \
-FYAI_PTY_NEEDLE="the previous head is session/" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/rewind.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b "$snapshot_name" -i
+pty_run "$TEST_DIR/rewind.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b "$snapshot_name" -i <<'PTY'
+steps:
+  - type: "/rewind source@{0}"
+  - wait: the previous head is session/
+    timeout: session
+PTY
 
 run_fyai config get display/stream
 assert_status 0
@@ -45,19 +54,25 @@ run_fyai list reflog
 assert_status 0
 assert_stdout_contains "reset"
 
-FYAI_PTY_INPUT="/checkout -b named source@{2}" \
-FYAI_PTY_NEEDLE="switched to branch named" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/named.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b source -i
+pty_run "$TEST_DIR/named.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b source -i <<'PTY'
+steps:
+  - type: "/checkout -b named source@{2}"
+  - wait: switched to branch named
+    timeout: session
+PTY
 
 run_fyai -b named config get display/stream
 assert_status 0
 assert_stdout_contains "false"
 
-FYAI_PTY_INPUT="/reset source@{0}" \
-FYAI_PTY_NEEDLE="the previous head is named@{1}" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/reset.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b named -i
+pty_run "$TEST_DIR/reset.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b named -i <<'PTY'
+steps:
+  - type: "/reset source@{0}"
+  - wait: "the previous head is named@{1}"
+    timeout: session
+PTY
 
 run_fyai -b named list reflog
 assert_status 0

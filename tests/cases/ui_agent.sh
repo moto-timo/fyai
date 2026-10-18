@@ -12,17 +12,21 @@ set -eu
 fyai_test_setup
 mock_start agent_tool_responses.json
 
-FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
-FYAI_PTY_MID_NEEDLE="printf" \
-FYAI_PTY_MID_TIMEOUT="8" \
-FYAI_PTY_NEEDLE="Delegated and done." \
-FYAI_PTY_AFTER="send:/status|wait-screen:Usage / total" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/snapshot.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=responses --set builtin_shell=true \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+snapshot: "${TEST_DIR}/snapshot.out"
+steps:
+  - type: delegate a greeting to a sub-agent
+  - wait: printf
+    timeout: 8
+  - wait: Delegated and done.
+    timeout: session
+  - type: "/status"
+  - wait-screen: Usage / total
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
     fail "agent presentation is wrong"

@@ -25,18 +25,24 @@ PY
 
 for screen in fullscreen inline; do
 	mock_start "$TEST_DIR/quick-agent.json"
-	FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
-	FYAI_PTY_NEEDLE="delegate a" FYAI_PTY_TIMEOUT=30 \
-	FYAI_PTY_AFTER="wait-screen:Delegated and done.|wait-screen:advisory|snapshot" \
-	FYAI_PTY_SNAPSHOT="$TEST_DIR/live-$screen.out" \
-	"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty-$screen.out" \
+	export screen
+	pty_run "$TEST_DIR/pty-$screen.out" \
 	    "$FYAI_BIN" -k test-key --theme dark \
 	    --set display/markdown=true --set display/stream=false \
 	    --set "display/screen=$screen" --set display/tool_display=inline \
 	    --set display/notice_output=pane \
 	    --set tools=true --set api=responses --set builtin_shell=true \
 	    --set agent/timeout_ms=1 \
-	    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+	    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: delegate a greeting to a sub-agent
+  - wait: delegate a
+    timeout: session
+  - wait-screen: Delegated and done.
+  - wait-screen: advisory
+  - snapshot: "${TEST_DIR}/live-${screen}.out"
+PTY
 	mock_stop 4
 
 	"$PYTHON" - "$TEST_DIR/live-$screen.out" "$TESTS_DIR" <<'PY' ||
@@ -66,17 +72,22 @@ done
 # A session can place the same notice below its transcript instead of opening
 # the fullscreen popup.
 mock_start "$TEST_DIR/quick-agent.json"
-FYAI_PTY_INPUT="delegate a greeting to a sub-agent" \
-FYAI_PTY_NEEDLE="delegate a" FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:Delegated and done.|wait-screen:advisory|snapshot" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/transcript-notice.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty-transcript.out" \
+pty_run "$TEST_DIR/pty-transcript.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/screen=fullscreen \
     --set display/tool_display=inline --set tools=true --set api=responses \
     --set builtin_shell=true --set agent/timeout_ms=1 \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: delegate a greeting to a sub-agent
+  - wait: delegate a
+    timeout: session
+  - wait-screen: Delegated and done.
+  - wait-screen: advisory
+  - snapshot: "${TEST_DIR}/transcript-notice.out"
+PTY
 mock_stop 4
 
 "$PYTHON" - "$TEST_DIR/transcript-notice.out" "$TESTS_DIR" <<'PY' ||

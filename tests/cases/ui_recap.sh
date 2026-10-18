@@ -17,17 +17,25 @@ set_args() {
 }
 set_args
 
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/first.out" \
-    "$FYAI_BIN" "${common_args[@]}"
+pty_run "$TEST_DIR/first.out" \
+    "$FYAI_BIN" "${common_args[@]}" <<'PTY'
+steps:
+  - type: hello
+  - wait: Streaming hello from the mock.
+    timeout: session
+PTY
 mock_stop 1
 
 # The second session opens on the stored conversation.
 mock_start recap_second.json
 set_args
-FYAI_PTY_INPUT="second" \
-FYAI_PTY_NEEDLE="Second reply from the mock." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/second.out" \
-    "$FYAI_BIN" "${common_args[@]}"
+pty_run "$TEST_DIR/second.out" \
+    "$FYAI_BIN" "${common_args[@]}" <<'PTY'
+steps:
+  - type: second
+  - wait: Second reply from the mock.
+    timeout: session
+PTY
 mock_stop 1
 
 "$PYTHON" - "$TEST_DIR/second.out" <<'EOF' || \
@@ -46,10 +54,13 @@ EOF
 # Recap off keeps the bare opening.
 mock_start recap_second.json
 set_args
-FYAI_PTY_INPUT="third" \
-FYAI_PTY_NEEDLE="Second reply from the mock." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/third.out" \
-    "$FYAI_BIN" "${common_args[@]}" --set display/recap_exchanges=0
+pty_run "$TEST_DIR/third.out" \
+    "$FYAI_BIN" "${common_args[@]}" --set display/recap_exchanges=0 <<'PTY'
+steps:
+  - type: third
+  - wait: Second reply from the mock.
+    timeout: session
+PTY
 mock_stop 1
 
 "$PYTHON" - "$TEST_DIR/third.out" <<'EOF' || \

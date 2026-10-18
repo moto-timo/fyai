@@ -8,21 +8,32 @@
 set -eu
 . "$(dirname "$0")/../harness.sh"
 
+# The driver plays the terminal that draws the selector in one column through
+# emoji_vs; the model that reads the capture below follows the variable.
 export FYAI_PTY_EMOJI_VS=narrow
 fyai_test_setup
 mock_start chat_emoji_table.json
 driver=0
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="a table" \
-FYAI_PTY_NEEDLE="heart" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:heart|send:/layout|wait-screen:layout: auto" \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/screen=fullscreen \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 20
+wait_timeout: 10
+emoji_vs: narrow
+steps:
+  - type: a table
+  - wait: heart
+    timeout: session
+  - wait-screen: heart
+  - type: "/layout"
+  - wait-screen: "layout: auto"
+PTY
     driver=$?
 if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out" \
         "$TEST_DIR/trace.log" 2>/dev/null; then

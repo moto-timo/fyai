@@ -7,13 +7,6 @@
 set -eu
 . "$(dirname "$0")/../harness.sh"
 
-# An SGR press and release at one-based column $1 and row $2, as hex.
-click()
-{
-    printf '\033[<0;%d;%dM\033[<0;%d;%dm' "$1" "$2" "$1" "$2" |
-        od -An -tx1 | tr -d ' \n'
-}
-
 # Each program prints a line its command does not hold, so the line leaves
 # the screen with the screen of its tile. In a 100-column terminal the minimize
 # button of the first tile is column 45 and the maximize button of the second
@@ -25,27 +18,44 @@ run_with()
 {
     renderer=$1
     fyai_test_setup
-    FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
-    FYAI_PTY_INPUT="!sh -c 'printf \"%s-%s\\n\" LEFT OUT; exec cat'" \
-    FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="wait-screen:LEFT-OUT|raw:1d|wait-gone:Ctrl-]|"\
-"send:!sh -c 'printf \"%s-%s\\n\" RIGHT OUT; exec cat'|wait-screen:RIGHT-OUT|"\
-"raw:$(click 45 2)|wait-gone:LEFT-OUT|wait-screen:RIGHT OUT; exec cat'|"\
-"click:LEFT OUT; exec cat'|wait-screen:LEFT-OUT|wait-gone:RIGHT OUT; exec cat'|"\
-"raw:$(click 98 2)|wait-gone:bang-1|"\
-"raw:$(click 98 2)|wait-screen:bang-1|"\
-"raw:1d|wait-gone:Ctrl-]|"\
-"send:/kill bang-1|wait-screen:stopping shell bang-1|"\
-"send:/kill bang-2|wait-screen:stopping shell bang-2" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
         --set display/work_controls=zoom \
         --set retry/max_attempts=1 \
         --set api=chat-completions \
         --set "api_url=http://127.0.0.1:9/v1/chat/completions" \
-        -m mock-model -i ||
+        -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!sh -c 'printf \"%s-%s\\n\" LEFT OUT; exec cat'"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: LEFT-OUT
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "!sh -c 'printf \"%s-%s\\n\" RIGHT OUT; exec cat'"
+  - wait-screen: RIGHT-OUT
+  - write: "\e[<0;45;2M\e[<0;45;2m"
+  - wait-gone: LEFT-OUT
+  - wait-screen: "RIGHT OUT; exec cat'"
+  - click: "LEFT OUT; exec cat'"
+  - wait-screen: LEFT-OUT
+  - wait-gone: "RIGHT OUT; exec cat'"
+  - write: "\e[<0;98;2M\e[<0;98;2m"
+  - wait-gone: bang-1
+  - write: "\e[<0;98;2M\e[<0;98;2m"
+  - wait-screen: bang-1
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - type: "/kill bang-1"
+  - wait-screen: stopping shell bang-1
+  - type: "/kill bang-2"
+  - wait-screen: stopping shell bang-2
+PTY
         fail "$renderer: a button of a tile did not act"
     if [ "$renderer" = page ] &&
        grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out"; then

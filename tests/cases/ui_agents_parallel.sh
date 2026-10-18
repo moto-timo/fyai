@@ -7,17 +7,21 @@ set -eu
 fyai_test_setup
 mock_start agents_parallel.json
 
-FYAI_PTY_INPUT="delegate both halves" \
-FYAI_PTY_MID_NEEDLE="second half" \
-FYAI_PTY_MID_TIMEOUT="3" \
-FYAI_PTY_NEEDLE="Both sub-agents reported." \
-FYAI_PTY_AFTER="send:/status|wait-screen:Usage / total" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/snapshot.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+snapshot: "${TEST_DIR}/snapshot.out"
+steps:
+  - type: delegate both halves
+  - wait: second half
+    timeout: 3
+  - wait: Both sub-agents reported.
+    timeout: session
+  - type: "/status"
+  - wait-screen: Usage / total
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
     fail "parallel agent bands are wrong"

@@ -5,15 +5,22 @@ set -eu
 
 fyai_test_setup
 mock_start chat_fullscreen_long_stream.json
-FYAI_PTY_ROWS=20 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="stream" \
-FYAI_PTY_AFTER="wait-screen:stream line 10|release:$TEST_DIR/resume-stream|wait-screen:stream line 20" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set display/screen=fullscreen \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 20
+cols: 100
+steps:
+  - type: first question
+  - wait: stream
+    timeout: session
+  - wait-screen: stream line 10
+  - touch: "${TEST_DIR}/resume-stream"
+  - wait-screen: stream line 20
+PTY
 
 if ! "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY'
 import sys

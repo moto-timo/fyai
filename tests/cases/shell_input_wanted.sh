@@ -15,13 +15,17 @@ set -eu
 fyai_test_setup
 mock_start shell_input_wanted.json
 
-FYAI_PTY_INPUT="open a shell that asks" FYAI_PTY_NEEDLE="It answered." \
-FYAI_PTY_TIMEOUT=40 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/stream=false --set tools=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 40
+steps:
+  - type: open a shell that asks
+  - wait: It answered.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/requests.jsonl" <<'PYEOF' || fail "the session never asked for input"
 import json

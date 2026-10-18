@@ -9,15 +9,20 @@ export OPENAI_API_KEY=test-key
 mock_start chat_basic_twice.json
 
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="Hello from the mock provider." \
-FYAI_PTY_AFTER="wait-screen:Hello from the mock provider.|"\
-"send:/reload|wait-screen:↳ Hello from the mock provider.|"\
-"send:second question|wait-screen:Hello again from the mock provider." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" --theme dark -b main --set api=chat-completions \
     --set "api_url=$MOCK_URL/v1/chat/completions" \
-    --set display/stream=false -m mock-model -i
+    --set display/stream=false -m mock-model -i <<'PTY'
+steps:
+  - type: first question
+  - wait: Hello from the mock provider.
+    timeout: session
+  - wait-screen: Hello from the mock provider.
+  - type: "/reload"
+  - wait-screen: "↳ Hello from the mock provider."
+  - type: second question
+  - wait-screen: Hello again from the mock provider.
+PTY
 
 [ "$(grep -c 'start:' "$TEST_DIR/trace.log")" -ge 2 ] || \
     fail "reload did not start a second process image"
@@ -53,17 +58,22 @@ assert_status 0
 run_fyai -b newer config set display/stream false
 assert_status 0
 FYAI_TRACE="$TEST_DIR/branch-trace.log" \
-FYAI_PTY_INPUT="/resume newer" \
-FYAI_PTY_NEEDLE="/resume newer" \
-FYAI_PTY_AFTER="send:first question|"\
-"wait-screen:Hello from the mock provider.|send:/reload|"\
-"wait-screen:↳ Hello from the mock provider.|send:second question|"\
-"wait-screen:Hello again from the mock provider." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/branch.out" \
+pty_run "$TEST_DIR/branch.out" \
     "$FYAI_BIN" --theme dark -b main \
     --set api=chat-completions \
     --set "api_url=$MOCK_URL/v1/chat/completions" \
-    --set display/stream=false -m mock-model -i
+    --set display/stream=false -m mock-model -i <<'PTY'
+steps:
+  - type: "/resume newer"
+  - wait: "/resume newer"
+    timeout: session
+  - type: first question
+  - wait-screen: Hello from the mock provider.
+  - type: "/reload"
+  - wait-screen: "↳ Hello from the mock provider."
+  - type: second question
+  - wait-screen: Hello again from the mock provider.
+PTY
 
 [ "$(grep -c 'start:' "$TEST_DIR/branch-trace.log")" -ge 2 ] || \
     fail "reload after /resume did not execute again"
@@ -79,10 +89,14 @@ mock_stop 2
 fyai_test_setup
 export OPENAI_API_KEY=test-key
 FYAI_TRACE="$TEST_DIR/empty-trace.log" \
-FYAI_PTY_INPUT="/reload" FYAI_PTY_NEEDLE="fyai" \
-FYAI_PTY_NEEDLE_COUNT=2 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/empty.out" \
-    "$FYAI_BIN" --theme dark -i
+pty_run "$TEST_DIR/empty.out" \
+    "$FYAI_BIN" --theme dark -i <<'PTY'
+steps:
+  - type: "/reload"
+  - wait-count: fyai
+    count: 2
+    timeout: session
+PTY
 [ "$(grep -c 'start:' "$TEST_DIR/empty-trace.log")" -ge 2 ] || \
     fail "reload did not restart the fresh session"
 pass

@@ -18,14 +18,25 @@ run_pty() {
 	# environment of the run.
 	local reply="$1" after="$2"
 	shift 2
-	env "$@" FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="question" FYAI_PTY_NEEDLE="question" \
-	FYAI_PTY_AFTER="wait-screen:$reply|wait-screen:$after|send:/exit" \
-	"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+	export after
+	export reply
+	export "$@"
+	pty_run "$TEST_DIR/pty.out" \
 	    "$FYAI_BIN" -k test-key --theme dark -b main --set api=chat-completions \
 	    --set "api_url=$MOCK_URL/v1/chat/completions" \
 	    --set display/stream=false --set display/markdown=true \
 	    --set display/screen=fullscreen \
-	    -m mock-model -i
+	    -m mock-model -i <<'PTY'
+rows: 30
+cols: 100
+steps:
+  - type: question
+  - wait: question
+    timeout: session
+  - wait-screen: "${reply}"
+  - wait-screen: "${after}"
+  - type: "/exit"
+PTY
 }
 
 # With isolation the row ends with the level that is in effect.

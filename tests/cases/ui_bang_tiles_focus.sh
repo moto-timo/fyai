@@ -13,18 +13,29 @@ set -eu
 
 fyai_test_setup
 
-FYAI_PTY_INPUT="!sh -c 'printf FIRST; while :; do sleep 1; done'" \
-FYAI_PTY_NEEDLE="FIRST" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:Ctrl-] returns to the prompt|raw:1d|wait-gone:Ctrl-] returns to the prompt|"\
-"send:!sh -c 'printf SECOND; while :; do sleep 1; done'|wait-screen:Ctrl-] returns to the prompt|"\
-"raw:1b5b393b3575141414|"\
-"wait-gone:Ctrl-] returns to the prompt|send:/sessions|wait-screen:Active sessions|"\
-"send:/kill bang-1|wait-screen:stopping shell bang-1|"\
-"send:/kill bang-2|wait-screen:stopping shell bang-2" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/work_min_tile_cols=30 \
-    -m mock-model -i
+    -m mock-model -i <<'PTY'
+timeout: 20
+steps:
+  - type: "!sh -c 'printf FIRST; while :; do sleep 1; done'"
+  - wait: FIRST
+    timeout: session
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-] returns to the prompt"
+  - type: "!sh -c 'printf SECOND; while :; do sleep 1; done'"
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - write: "\e[9;5u\x14\x14\x14"
+  - wait-gone: "Ctrl-] returns to the prompt"
+  - type: "/sessions"
+  - wait-screen: Active sessions
+  - type: "/kill bang-1"
+  - wait-screen: stopping shell bang-1
+  - type: "/kill bang-2"
+  - wait-screen: stopping shell bang-2
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PYEOF' || \
     fail "bang shells did not tile and cycle focus"

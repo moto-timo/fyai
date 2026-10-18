@@ -19,16 +19,23 @@ set -eu
 fyai_test_setup
 mock_start shell_session.json
 
-FYAI_PTY_INPUT="drive the shell" FYAI_PTY_NEEDLE="done." FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:   shell [lines]|wait-screen:● shell [lines]|"\
-"send:/status|wait-screen:Usage / total" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/snapshot.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
     --set shell/input_poll_ms=0 \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+snapshot: "${TEST_DIR}/snapshot.out"
+steps:
+  - type: drive the shell
+  - wait: done.
+    timeout: session
+  - wait-screen: "   shell [lines]"
+  - wait-screen: "● shell [lines]"
+  - type: "/status"
+  - wait-screen: Usage / total
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || fail "the session display is wrong"
 import re
@@ -123,13 +130,18 @@ mock_stop 6
 
 # The margin is the configured one.
 mock_start shell_session.json
-FYAI_PTY_INPUT="drive the shell" FYAI_PTY_NEEDLE="done." FYAI_PTY_TIMEOUT=30 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/margin.out" \
+pty_run "$TEST_DIR/margin.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set 'display/session_margin="[] "' \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: drive the shell
+  - wait: done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/margin.out" <<'EOF' || fail "the margin is not configurable"
 import re

@@ -13,11 +13,14 @@ done
 run_fyai checkout main
 assert_status 0
 
-FYAI_PTY_INPUT="/branch --all" \
-FYAI_PTY_NEEDLE="row20" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/branch-list.out" \
+pty_run "$TEST_DIR/branch-list.out" \
     "$FYAI_BIN" -k test-key --theme catppuccin:dark \
-    --set display/markdown=true -m mock-model -i
+    --set display/markdown=true -m mock-model -i <<'PTY'
+steps:
+  - type: "/branch --all"
+  - wait: row20
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/branch-list.out" <<'EOF' || \
     fail "long branch list did not reach the scrollback"

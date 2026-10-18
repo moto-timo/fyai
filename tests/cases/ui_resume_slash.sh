@@ -18,11 +18,15 @@ run_fyai -b newer --set api=chat-completions \
 assert_status 0
 
 # --- /resume NAME -----------------------------------------------------------
-FYAI_PTY_INPUT="/resume newer" \
-FYAI_PTY_NEEDLE="/resume newer" \
-FYAI_PTY_AFTER="send:say hello|wait-screen:Hello from the mock provider." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/name.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b main -i
+pty_run "$TEST_DIR/name.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b main -i <<'PTY'
+steps:
+  - type: "/resume newer"
+  - wait: "/resume newer"
+    timeout: session
+  - type: say hello
+  - wait-screen: Hello from the mock provider.
+PTY
 mock_stop 1
 
 run_fyai -b newer dump state
@@ -39,11 +43,22 @@ assert_state_absent "Hello from the mock provider." -b main dump state
 mock_start chat_basic.json
 run_fyai -b newer --set "api_url=$MOCK_URL/v1/chat/completions"
 assert_status 0
-FYAI_PTY_INPUT="/switch" \
-FYAI_PTY_NEEDLE="toggle foreign sessions" \
-FYAI_PTY_AFTER="wait-screen:toggle foreign sessions|raw:1b|wait-gone:toggle foreign sessions|send:/switch|wait-screen:fyai · newer|raw:0d|wait-gone:toggle foreign sessions|send:say hello|wait-screen:Hello from the mock provider." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/picker.out" \
-	"$FYAI_BIN" -k test-key -m mock-model -b main -i
+pty_run "$TEST_DIR/picker.out" \
+	"$FYAI_BIN" -k test-key -m mock-model -b main -i <<'PTY'
+steps:
+  - type: "/switch"
+  - wait: toggle foreign sessions
+    timeout: session
+  - wait-screen: toggle foreign sessions
+  - write: "\e"
+  - wait-gone: toggle foreign sessions
+  - type: "/switch"
+  - wait-screen: "fyai · newer"
+  - write: "\r"
+  - wait-gone: toggle foreign sessions
+  - type: say hello
+  - wait-screen: Hello from the mock provider.
+PTY
 mock_stop 1
 
 run_fyai -b newer dump state

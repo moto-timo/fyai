@@ -1,18 +1,15 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT
-# Verify fresh-frame waits, screen waits, frame counts, and child status
-# after PTY EOF.
+# Verify the PTY driver: fresh-frame waits, screen waits, frame counts, a
+# wait for a count, a file and the input row, the expansion of ${NAME}, and
+# the status of the child after PTY EOF.
 set -eu
 . "$(dirname "$0")/../harness.sh"
 fyai_test_setup_bare
 
-"$PYTHON" - "$TESTS_DIR" "$TEST_DIR" <<'PY' || fail "PTY driver regression"
-import os
-import subprocess
-import sys
-
-tests, scratch = sys.argv[1:]
-child = r'''
+# A program that reads two lines of input and then acts on each 'x' it reads,
+# as MODE says. Its exit status is STATUS.
+CHILD=$(cat <<'PY'
 import os, sys, time, tty
 tty.setraw(0)
 os.write(1, b'\x1b[?25h')
@@ -37,42 +34,106 @@ while not line.endswith(b'\n'):
             os.write(1, b'\x1b[?2026l')
         elif sys.argv[1] == 'frames':
             os.write(1, b'.\x1b[?2026l.\x1b[?2026l')
+        elif sys.argv[1] == 'echo':
+            os.write(1, b'PONG PONG\x1b[?2026l')
         continue
     line += ch
 for fd in (0, 1, 2):
     os.close(fd)
 time.sleep(0.1)
 os._exit(int(sys.argv[2]))
-'''
-
-release = os.path.join(scratch, 'release')
-for mode, status, after, error in (
-    ('fresh', 0, 'raw:78|wait-frame:Done.', None),
-    ('held', 0, 'raw:78|release:' + release + '|wait-frame:Done.', None),
-    ('stale', 0, 'raw:78|wait-frame:Done.', 'never contained'),
-    ('partial', 0, 'raw:78|wait-frame:Done.', 'never contained'),
-    # What is still on the screen, and how many frames were painted: a
-    # step that waits for either must read the screen and the frames, not
-    # the bytes that once carried them.
-    ('gone', 0, 'raw:78|wait-gone:Done.', None),
-    ('stays', 0, 'raw:78|wait-gone:Done.', 'never left the screen'),
-    ('frames', 0, 'raw:78|frame:2', None),
-    ('partial', 0, 'raw:78|frame:1', 'painted 0 of 1 frames'),
-    ('fresh', 7, '', 'exited with status 7'),
-):
-    env = dict(os.environ, FYAI_PTY_INPUT='hello', FYAI_PTY_NEEDLE='Done.',
-               FYAI_PTY_AFTER=after, FYAI_PTY_AFTER_PAUSE='0',
-               FYAI_PTY_AFTER_TIMEOUT='0.3', FYAI_PTY_TIMEOUT='3',
-               FYAI_TIMEOUT_SCALE='1')
-    result = subprocess.run(
-        [sys.executable, os.path.join(tests, 'pty_driver.py'),
-         os.path.join(scratch, mode + str(status) + '.out'),
-         sys.executable, '-c', child, mode, str(status), release],
-        env=env, capture_output=True, text=True, timeout=5)
-    if error is None:
-        assert result.returncode == 0, result.stderr
-    else:
-        assert result.returncode != 0 and error in result.stderr, result.stderr
 PY
+)
+export CHILD
+
+# check MODE STATUS ERROR < STEPS: run the child in MODE. ERROR is a text of
+# the report that the driver must make, or empty when the run must pass.
+check()
+{
+    local mode="$1" status="$2" error="$3" rc=0
+
+    {
+        cat <<'PTY'
+wait_timeout: 0.3
+timeout: 3
+steps:
+  - type: hello
+  - wait: Done.
+    timeout: session
+PTY
+        cat
+    } >"$TEST_DIR/$mode$status.yaml"
+    "$FYAI_BIN" __pty-driver "$TEST_DIR/$mode$status.yaml" \
+        "$TEST_DIR/$mode$status.out" "$PYTHON" -c "$CHILD" "$mode" "$status" \
+        "$TEST_DIR/release" 2>"$TEST_DIR/err" || rc=$?
+    if [ -z "$error" ]; then
+        [ "$rc" -eq 0 ] || { cat "$TEST_DIR/err" >&2; fail "$mode: the run failed"; }
+    else
+        [ "$rc" -ne 0 ] || fail "$mode: the run passed, expected: $error"
+        grep -q -F "$error" "$TEST_DIR/err" ||
+            { cat "$TEST_DIR/err" >&2; fail "$mode: not the expected report: $error"; }
+    fi
+}
+
+# A frame end after the text, since the last key.
+check fresh 0 '' <<'PTY'
+  - write: x
+  - wait-frame: Done.
+PTY
+check held 0 '' <<'PTY'
+  - write: x
+  - touch: "${TEST_DIR}/release"
+  - wait-frame: Done.
+PTY
+check stale 0 'never contained' <<'PTY'
+  - write: x
+  - wait-frame: Done.
+PTY
+check partial 0 'never contained' <<'PTY'
+  - write: x
+  - wait-frame: Done.
+PTY
+
+# What is still on the screen, and how many frames were painted: a step that
+# waits for either must read the screen and the frames, not the bytes that
+# once carried them.
+check gone 0 '' <<'PTY'
+  - write: x
+  - wait-gone: Done.
+PTY
+check stays 0 'never left the screen' <<'PTY'
+  - write: x
+  - wait-gone: Done.
+PTY
+check frames 0 '' <<'PTY'
+  - write: x
+  - frame: 2
+PTY
+check partial 0 'fewer than 1 frames' <<'PTY'
+  - write: x
+  - frame: 1
+PTY
+check fresh 7 'exited with status 7' <<'PTY'
+PTY
+
+# A count that is relative to the last key, a name from the environment, and
+# a script that names a step it does not know.
+check echo 0 '' <<'PTY'
+  - write: x
+  - wait-count: PONG
+    more: 2
+  - wait-screen: PONG PONG
+PTY
+check echo 0 "unknown key 'nonsense'" <<'PTY'
+  - nonsense: x
+PTY
+check echo 0 'is not set' <<'PTY'
+  - wait: "${PTYDRV_TEST_UNSET_NAME}"
+PTY
+check echo 0 '' <<'PTY'
+  - touch: "${TEST_DIR}/made"
+  - wait-file: "${TEST_DIR}/made"
+    equals: ""
+PTY
 
 pass

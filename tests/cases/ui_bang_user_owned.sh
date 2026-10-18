@@ -12,23 +12,33 @@ mock_start ui_bang_user_owned.json
 # seconds. A report made before the tile was granted its rows names the whole
 # terminal, so the case waits for the granted size. The status hint says that
 # a tile holds the keys: the notice of /zoom names Ctrl-] too.
-ZOOM_AFTER="wait-screen:READY|wait-screen:SIZE 4 98|wait-screen:Ctrl-] returns to the prompt|raw:1d|wait-gone:Ctrl-] returns to the prompt|"
-ZOOM_AFTER="${ZOOM_AFTER}send:try to close my shell|"
-ZOOM_AFTER="${ZOOM_AFTER}wait-screen:User shell ownership preserved.|"
-ZOOM_AFTER="${ZOOM_AFTER}send:/zoom bang-1|wait-screen:Ctrl-] returns to the prompt|"
-ZOOM_AFTER="${ZOOM_AFTER}send:echo SECOND-ZOOM|wait-screen:SECOND-ZOOM|"
-ZOOM_AFTER="${ZOOM_AFTER}raw:1d|wait-gone:Ctrl-] returns to the prompt"
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-FYAI_PTY_INPUT="!sh -c 'printf \"%s%s\\n\" REA DY; n=0; while :; do n=\$((n+1)); echo \"SIZE \$(stty size) #\$n\"; sleep 0.2; done'" \
-FYAI_PTY_NEEDLE="bang-1" \
-FYAI_PTY_AFTER="$ZOOM_AFTER" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/snapshot.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/work_max_rows=6 \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 30
+cols: 100
+snapshot: "${TEST_DIR}/snapshot.out"
+steps:
+  - type: "!sh -c 'printf \"%s%s\\n\" REA DY; n=0; while :; do n=$((n+1)); echo \"SIZE $(stty size) #$n\"; sleep 0.2; done'"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: READY
+  - wait-screen: SIZE 4 98
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - write: "\x1d"
+  - wait-gone: "Ctrl-] returns to the prompt"
+  - type: try to close my shell
+  - wait-screen: User shell ownership preserved.
+  - type: "/zoom bang-1"
+  - wait-screen: "Ctrl-] returns to the prompt"
+  - type: echo SECOND-ZOOM
+  - wait-screen: SECOND-ZOOM
+  - write: "\x1d"
+  - wait-gone: "Ctrl-] returns to the prompt"
+PTY
 
 "$PYTHON" - "$TEST_DIR/snapshot.out" "$TESTS_DIR" "$TEST_DIR/pty.out" <<'PYEOF' || \
     fail "bang shell ownership was not preserved"

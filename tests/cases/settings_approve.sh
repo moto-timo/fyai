@@ -13,16 +13,25 @@ assert_stdout_contains '"id": "p1"'
 
 mock_start settings_approve.json
 driver=0
-FYAI_PTY_COLS=100 FYAI_PTY_ROWS=40 FYAI_PTY_INPUT="/config approve p1" \
-FYAI_PTY_NEEDLE="Diff · made by fyai" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:+temperature: 0.5|wait-screen:1. Reject|raw:1b5b420d|wait-screen:Noted the approval." \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark --branch main \
     --set display/markdown=true --set display/stream=false \
     --set tools=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 40
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "/config approve p1"
+  - wait: "Diff · made by fyai"
+    timeout: session
+  - wait-screen: "+temperature: 0.5"
+  - wait-screen: "1. Reject"
+  - write: "\e[B\r"
+  - wait-screen: Noted the approval.
+PTY
     driver=$?
 if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out"; then
 	skip "this build has no page support"
@@ -45,16 +54,24 @@ assert_status 0
 assert_stdout_contains '"id": "p2"'
 mock_start settings_approve.json
 driver=0
-FYAI_PTY_COLS=100 FYAI_PTY_ROWS=40 FYAI_PTY_INPUT="/config approve p2" \
-FYAI_PTY_NEEDLE="Diff · made by fyai" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:1. Reject|raw:1b5b420d|wait-screen:config: proposal p2 is approved" \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark --branch main \
     --set display/markdown=true --set display/stream=false \
     --set tools=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 40
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "/config approve p2"
+  - wait: "Diff · made by fyai"
+    timeout: session
+  - wait-screen: "1. Reject"
+  - write: "\e[B\r"
+  - wait-screen: "config: proposal p2 is approved"
+PTY
     driver=$?
 if [ "$driver" -ne 0 ]; then
 	tail -c 2000 "$TEST_DIR/pty.out" >&2

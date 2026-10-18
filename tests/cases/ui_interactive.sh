@@ -6,11 +6,16 @@ set -eu
 fyai_test_setup
 mock_start chat_stream.json
 
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
     --set display/markdown=true --set display/stream=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+steps:
+  - type: hello
+  - wait: Streaming hello from the mock.
+    timeout: session
+PTY
 
 grep -qF "Streaming hello from the mock." "$TEST_DIR/pty.out" || \
     fail "assistant reply was not rendered in the PTY"
@@ -54,32 +59,48 @@ assert_request 0 'r["body"]["messages"][-1]["content"] == "hello"'
 mock_stop 1
 
 mock_start chat_stream.json
-cat >"$TEST_DIR/editor.sh" <<'EOF'
+# The case releases the editor when its screen shows that it runs. The path
+# is in the script: the editor does not get the environment of the case.
+cat >"$TEST_DIR/editor.sh" <<EOF
 #!/bin/sh
-sleep 1
-printf 'edited prompt' >"$1"
+printf 'EDITOR-RUNNING\n'
+while [ ! -e "$TEST_DIR/release-editor" ]; do
+    sleep 0.02
+done
+printf 'edited prompt' >"\$1"
 EOF
 chmod +x "$TEST_DIR/editor.sh"
 EDITOR="$TEST_DIR/editor.sh" \
-FYAI_PTY_INPUT="draft prompt" \
-FYAI_PTY_EDIT_INPUT=1 \
-FYAI_PTY_PROGRESS_TIMEOUT=3 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/edit-line.out" \
+pty_run "$TEST_DIR/edit-line.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
     --set display/markdown=true --set display/stream=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+steps:
+  - write: "draft prompt\a"
+  - wait: EDITOR-RUNNING
+    timeout: 3
+  - touch: "${TEST_DIR}/release-editor"
+  - wait: edited prompt
+    timeout: 3
+  - write: "\n"
+  - wait: Streaming hello from the mock.
+    timeout: session
+PTY
 assert_request 0 \
     'r["body"]["messages"][-1]["content"] == "edited prompt"'
 mock_stop 1
 
 EDITOR=false \
-FYAI_PTY_INPUT="/config edit" \
-FYAI_PTY_NEEDLE="editor exited unsuccessfully" \
-FYAI_PTY_EXIT_STATUS=1 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/error-pane.out" \
+pty_run "$TEST_DIR/error-pane.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
-    --set display/markdown=true -m mock-model -i
+    --set display/markdown=true -m mock-model -i <<'PTY'
+exit: {status: 1}
+steps:
+  - type: "/config edit"
+  - wait: editor exited unsuccessfully
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/error-pane.out" <<'EOF' || \
     fail "config editor failure was not rendered in a non-modal error pane"
@@ -94,11 +115,14 @@ if b"editor exited unsuccessfully" not in plain:
     raise SystemExit("error pane detail missing")
 EOF
 
-FYAI_PTY_INPUT="/status" \
-FYAI_PTY_NEEDLE="● status" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/status-pane.out" \
+pty_run "$TEST_DIR/status-pane.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
-    --set display/markdown=true -m mock-model -i
+    --set display/markdown=true -m mock-model -i <<'PTY'
+steps:
+  - type: "/status"
+  - wait: "● status"
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/status-pane.out" <<'EOF' || \
     fail "slash-command status was not rendered in a non-modal pane"
@@ -111,11 +135,14 @@ if "● status".encode() not in plain or b"Usage / total" not in plain:
     raise SystemExit("status pane content missing")
 EOF
 
-FYAI_PTY_INPUT="/config describe display" \
-FYAI_PTY_NEEDLE="tool_detail" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/config-scroll.out" \
+pty_run "$TEST_DIR/config-scroll.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
-    --set display/markdown=true -m mock-model -i
+    --set display/markdown=true -m mock-model -i <<'PTY'
+steps:
+  - type: "/config describe display"
+  - wait: tool_detail
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/config-scroll.out" <<'EOF' || \
     fail "config report was incorrectly rendered as a status pane"
@@ -130,27 +157,44 @@ if b"tool_detail" not in plain:
     raise SystemExit("config report did not reach terminal scrollback")
 EOF
 
+# The first reply holds its stream after the first event until the case has
+# seen the line it typed during the turn.
+rm -f "$TEST_DIR/release-first"
 mock_start chat_stream_queued_input.json
-FYAI_PTY_INPUT="first prompt" \
-FYAI_PTY_DURING_INPUT="queued prompt" \
-FYAI_PTY_DURING_DELAY="0.2" \
-FYAI_PTY_NEEDLE="Queued input completed." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/queued-input.out" \
+pty_run "$TEST_DIR/queued-input.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
     --set display/markdown=true --set display/stream=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+steps:
+  - type: first prompt
+  - wait-file: "${TEST_DIR}/served"
+    equals: "1"
+    timeout: 1.5
+  - write: "queued prompt\n"
+  - wait: queued prompt
+    timeout: 1.5
+  - wait-frame: queued prompt
+    from: start
+    timeout: session
+  - touch: "${TEST_DIR}/release-first"
+  - wait: Queued input completed.
+    timeout: session
+PTY
 assert_request 0 \
     'r["body"]["messages"][-1]["content"] == "first prompt"'
 assert_request 1 \
     'r["body"]["messages"][-1]["content"] == "queued prompt"'
 mock_stop 2
 
-FYAI_PTY_INPUT="/transcript all" \
-FYAI_PTY_NEEDLE="Queued input completed." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/transcript-order.out" \
+pty_run "$TEST_DIR/transcript-order.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
-    --set display/markdown=true -m mock-model -i
+    --set display/markdown=true -m mock-model -i <<'PTY'
+steps:
+  - type: "/transcript all"
+  - wait: Queued input completed.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/transcript-order.out" <<'EOF' || \
     fail "slash transcript did not preserve turn order"
@@ -180,18 +224,29 @@ if plain[user_end:assistant_start].count(b"\n") < 2:
     raise SystemExit("slash transcript omitted the bubble's bottom row")
 EOF
 
+rm -f "$TEST_DIR/release-first"
 mock_start chat_stream_queued_input.json
-FYAI_PTY_INPUT="first prompt" \
-FYAI_PTY_DURING_INPUT="unfinished typing" \
-FYAI_PTY_DURING_SUBMIT="0" \
-FYAI_PTY_CLEAR_BEFORE_EXIT="1" \
-FYAI_PTY_DURING_DELAY="0.2" \
-FYAI_PTY_NEEDLE="First streamed reply." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/typing-input.out" \
+pty_run "$TEST_DIR/typing-input.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
     --set display/markdown=true --set display/stream=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+exit: {clear: true}
+steps:
+  - type: first prompt
+  - wait-file: "${TEST_DIR}/served"
+    equals: "1"
+    timeout: 1.5
+  - write: "unfinished typing"
+  - wait: unfinished typing
+    timeout: 1.5
+  - wait-frame: unfinished typing
+    from: start
+    timeout: session
+  - touch: "${TEST_DIR}/release-first"
+  - wait: First streamed reply.
+    timeout: session
+PTY
 assert_request 0 \
     'r["body"]["messages"][-1]["content"] == "first prompt"'
 mock_stop 1
@@ -204,19 +259,32 @@ mock_start chat_stream_queued_recall.json
 # mid-stream whatever the echo latency is. With a short stream a late
 # echo flips the choreography to a third request the mock answers
 # with a 500, and the needle never comes.
-FYAI_PTY_INPUT="first prompt" \
-FYAI_PTY_DURING_INPUT="recalled prompt" \
-FYAI_PTY_DURING_DELAY="0.2" \
-FYAI_PTY_INTERRUPT_AFTER_DURING="1" \
-FYAI_PTY_SUBMIT_RECALLED="1" \
-FYAI_PTY_INTERRUPT_SETTLED_NEEDLE="interrupted" \
-FYAI_PTY_NEEDLE="Queued input completed." \
-FYAI_PTY_TIMEOUT=30 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/interrupt-recall.out" \
+pty_run "$TEST_DIR/interrupt-recall.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
     --set display/markdown=true --set display/stream=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: first prompt
+  - wait-file: "${TEST_DIR}/served"
+    equals: "1"
+  - write: "recalled prompt\n"
+  - wait: recalled prompt
+    timeout: 1.5
+  - write: "\e"
+  - wait-count: recalled prompt
+    more: 1
+    timeout: 1.5
+  - wait: interrupted
+    timeout: session
+  - wait-input: recalled prompt
+    timeout: session
+  - resubmit: recalled prompt
+    expect: Queued input completed.
+  - wait: Queued input completed.
+    timeout: session
+PTY
 assert_request 0 \
     'r["body"]["messages"][-1]["content"] == "first prompt"'
 assert_request 1 \
@@ -225,12 +293,15 @@ mock_stop 2
 
 mock_start chat_stream.json
 # Wait for the status row that marks session readiness.
-FYAI_PTY_INPUT="   " \
-FYAI_PTY_NEEDLE="mock-model" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/blank-input.out" \
+pty_run "$TEST_DIR/blank-input.out" \
     "$FYAI_BIN" -b main -k test-key --theme catppuccin:dark \
     --set display/markdown=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+steps:
+  - type: "   "
+  - wait: mock-model
+    timeout: session
+PTY
 mock_stop 0
 
 pass

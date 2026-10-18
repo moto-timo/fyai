@@ -7,17 +7,27 @@
 set -eu
 . "$(dirname "$0")/../harness.sh"
 
-# run STEPS: a shell tile that prints SIZED, then the steps.
+# run < STEPS: a shell tile that prints SIZED, then the steps.
 run()
 {
+    local steps
+
+    steps="$(cat)"
     fyai_test_setup
     driver=0
-    FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 \
-    FYAI_PTY_INPUT="!sh -c 'while :; do printf \"\\r\\033[KTILE %s %s%s \" \"\$(stty size)\" SIZ ED; sleep 0.2; done'" \
-    FYAI_PTY_NEEDLE="TILE" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="$1" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    {
+        cat <<'PTY'
+rows: 30
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!sh -c 'while :; do printf \"\\r\\033[KTILE %s %s%s \" \"$(stty size)\" SIZ ED; sleep 0.2; done'"
+  - wait: TILE
+    timeout: session
+PTY
+        printf '%s\n' "$steps"
+    } | pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true --set display/screen=fullscreen \
         --set display/work_controls=full \
@@ -32,7 +42,26 @@ run()
 }
 
 # The button takes the page, and the same button gives it back.
-run "wait-screen:SIZED|click:□|wait-screen:returns to the page|wait-gone:❯|click:□|wait-gone:returns to the page|wait-screen:❯|click:×|wait-gone:SIZED"
+run <<'PTY'
+  - wait-screen: SIZED
+  - click: "□"
+  - wait-screen: returns to the page
+  - wait-gone: "❯"
+  - click: "□"
+  - wait-gone: returns to the page
+  - wait-screen: "❯"
+  - click: "×"
+  - wait-gone: SIZED
+PTY
 # Ctrl-] gives the page back too.
-run "wait-screen:SIZED|click:□|wait-screen:returns to the page|raw:1d|wait-gone:returns to the page|wait-screen:❯|click:×|wait-gone:SIZED"
+run <<'PTY'
+  - wait-screen: SIZED
+  - click: "□"
+  - wait-screen: returns to the page
+  - write: "\x1d"
+  - wait-gone: returns to the page
+  - wait-screen: "❯"
+  - click: "×"
+  - wait-gone: SIZED
+PTY
 pass

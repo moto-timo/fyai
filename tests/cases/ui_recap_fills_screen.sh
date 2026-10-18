@@ -14,26 +14,45 @@ set_args() {
 	    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i)
 }
 
+# The exchanges only have to be stored, so the stream comes at once.
+"$PYTHON" - "$SCENARIOS_DIR/ui_reflow.json" "$TEST_DIR/reflow-fast.json" <<'PY'
+import json
+import sys
+
+scenario = json.load(open(sys.argv[1]))
+for step in scenario["steps"]:
+    step.pop("chunk_split", None)
+    step.pop("chunk_delay", None)
+with open(sys.argv[2], "w") as out:
+    json.dump(scenario, out)
+PY
+
 # Store more exchanges than one screen can hold.
 for _ in 1 2 3; do
-	mock_start ui_reflow.json
+	mock_start "$TEST_DIR/reflow-fast.json"
 	set_args
-	FYAI_PTY_INPUT="say it" \
-	FYAI_PTY_NEEDLE="Reflow streaming done." \
-	FYAI_PTY_TIMEOUT=40 \
-	"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/build.out" \
-	    "$FYAI_BIN" "${common_args[@]}"
+	pty_run "$TEST_DIR/build.out" \
+	    "$FYAI_BIN" "${common_args[@]}" <<'PTY'
+timeout: 40
+steps:
+  - type: say it
+  - wait: Reflow streaming done.
+    timeout: session
+PTY
 	mock_stop 1
 done
 
 # Open a session without submitting another turn.
 mock_start ui_reflow.json
 set_args
-FYAI_PTY_INPUT="   " \
-FYAI_PTY_NEEDLE="mock-model" \
-FYAI_PTY_TIMEOUT=40 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/opened.out" \
-    "$FYAI_BIN" "${common_args[@]}"
+pty_run "$TEST_DIR/opened.out" \
+    "$FYAI_BIN" "${common_args[@]}" <<'PTY'
+timeout: 40
+steps:
+  - type: "   "
+  - wait: mock-model
+    timeout: session
+PTY
 mock_stop 0
 
 "$PYTHON" - "$TEST_DIR/opened.out" <<'PY' || fail "the opening screen was not filled"

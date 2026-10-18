@@ -17,22 +17,36 @@ run_with()
     screen=inline
     [ "$renderer" = page ] && screen=fullscreen
     fyai_test_setup
-    FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
-    FYAI_PTY_INPUT="!sh -c 'printf \"%s-%s\\n\" PANE OUT; exec cat'" \
-    FYAI_PTY_NEEDLE="bang-1" FYAI_PTY_TIMEOUT=20 \
-    FYAI_PTY_AFTER="wait-screen:PANE-OUT|raw:1d|wait-gone:Ctrl-]|"\
-"wait-screen:▣ !1|click:▣|wait-gone:PANE-OUT|wait-screen:▢ !1|"\
-"click:▢|wait-screen:PANE-OUT|wait-screen:▣ !1|"\
-"send:/kill bang-1|wait-screen:stopping shell bang-1|wait-gone:!1" \
-    FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --theme dark \
         --set display/markdown=true \
         --set display/work_controls=zoom \
         --set "display/screen=$screen" \
         --set api=chat-completions \
         --set "api_url=http://127.0.0.1:9/v1/chat/completions" \
-        -m mock-model -i ||
+        -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "!sh -c 'printf \"%s-%s\\n\" PANE OUT; exec cat'"
+  - wait: bang-1
+    timeout: session
+  - wait-screen: PANE-OUT
+  - write: "\x1d"
+  - wait-gone: "Ctrl-]"
+  - wait-screen: "▣ !1"
+  - click: "▣"
+  - wait-gone: PANE-OUT
+  - wait-screen: "▢ !1"
+  - click: "▢"
+  - wait-screen: PANE-OUT
+  - wait-screen: "▣ !1"
+  - type: "/kill bang-1"
+  - wait-screen: stopping shell bang-1
+  - wait-gone: "!1"
+PTY
         fail "$renderer: the panel did not hide and show the pane"
     if [ "$renderer" = page ] &&
        grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out"; then

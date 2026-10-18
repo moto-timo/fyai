@@ -12,17 +12,51 @@ set -eu
 fyai_test_setup
 mock_start chat_basic_twice.json
 driver=0
-FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="Hello" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:Hello from the mock provider.|send:/help|wait-screen:□|click:□|wait-screen:Esc collapses|raw:1b|wait-gone:Esc collapses|wait-screen:□|click:×|wait-gone:□|wait-screen:≡1|click:≡1|wait-screen:□|raw:07|wait-screen:Esc collapses|raw:07|wait-gone:Esc collapses|wait-gone:□|send:/help|wait-screen:log · all · 2|click:□|wait-screen:Esc collapses|raw:6c|wait-screen:log · notices|raw:78|wait-gone:Esc collapses|wait-gone:≡|send:/theme zzz|wait-screen:invalid display.theme" \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/screen=fullscreen \
     --set 'display/keys={prompt: {Ctrl-G: fyai.messages.toggle}}' \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: first question
+  - wait: Hello
+    timeout: session
+  - wait-screen: Hello from the mock provider.
+  - type: "/help"
+  - wait-screen: "□"
+  - click: "□"
+  - wait-screen: Esc collapses
+  - write: "\e"
+  - wait-gone: Esc collapses
+  - wait-screen: "□"
+  - click: "×"
+  - wait-gone: "□"
+  - wait-screen: "≡1"
+  - click: "≡1"
+  - wait-screen: "□"
+  - write: "\a"
+  - wait-screen: Esc collapses
+  - write: "\a"
+  - wait-gone: Esc collapses
+  - wait-gone: "□"
+  - type: "/help"
+  - wait-screen: "log · all · 2"
+  - click: "□"
+  - wait-screen: Esc collapses
+  - write: "l"
+  - wait-screen: "log · notices"
+  - write: "x"
+  - wait-gone: Esc collapses
+  - wait-gone: "≡"
+  - type: "/theme zzz"
+  - wait-screen: invalid display.theme
+PTY
     driver=$?
 if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out" 2>/dev/null; then
     skip "this build has no page support"

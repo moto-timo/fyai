@@ -12,13 +12,17 @@ set -eu
 fyai_test_setup
 mock_start agent_progress.json
 
-FYAI_PTY_INPUT="count in a sub-agent" FYAI_PTY_NEEDLE="Delegated and done." \
-FYAI_PTY_TIMEOUT=40 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=responses --set shell/timeout_ms=40000 \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+timeout: 40
+steps:
+  - type: count in a sub-agent
+  - wait: Delegated and done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || fail "the sub-agent showed nothing while it ran"
 import os

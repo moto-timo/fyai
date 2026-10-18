@@ -17,15 +17,21 @@ session()
     mock_start chat_themed_markdown.json
     driver=0
     # The grounds are compared as RGB, which a 256-colour terminal cannot draw.
-    COLORTERM=truecolor FYAI_PTY_BACKGROUND=rgb:1e1e/1e1e/2e2e \
-    FYAI_PTY_ROWS=30 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="hello" \
-    FYAI_PTY_NEEDLE="Heading" FYAI_PTY_TIMEOUT=20 \
-    "$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+    COLORTERM=truecolor \
+    pty_run "$TEST_DIR/pty.out" \
         "$FYAI_BIN" -k test-key --color on --set display/markdown=true \
         --set display/theme=ember:dark --set "display/theme_ground=$1" \
         --set display/stream=false --set api=chat-completions \
-        --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i \
-        2>"$TEST_DIR/stderr" || driver=$?
+        --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' 2>"$TEST_DIR/stderr" || driver=$?
+rows: 30
+cols: 100
+timeout: 20
+background: "rgb:1e1e/1e1e/2e2e"
+steps:
+  - type: hello
+  - wait: Heading
+    timeout: session
+PTY
     mock_stop_quiet
     if grep -a -q "invalid display.theme 'ember:dark'\|needs a libfypalette" \
             "$TEST_DIR/pty.out" "$TEST_DIR/stderr"; then

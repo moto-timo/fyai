@@ -11,14 +11,17 @@ set -eu
 fyai_test_setup
 mock_start ui_shell_label.json
 
-FYAI_PTY_INPUT="run a labelled command that does not end" \
-FYAI_PTY_NEEDLE="Shell label round trip done." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=responses \
     --set shell/timeout_ms=60000 \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+steps:
+  - type: run a labelled command that does not end
+  - wait: Shell label round trip done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || fail "shell label is wrong"
 import re

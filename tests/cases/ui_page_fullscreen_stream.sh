@@ -9,18 +9,26 @@ FYAI_TMPDIR_BASE=/tmp
 fyai_test_setup
 mock_start chat_fullscreen_stream.json
 # Hold the stream across a PageUp event and observe two later status ticks.
-FYAI_PTY_ROWS=20 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="first question" \
-FYAI_PTY_NEEDLE="Streaming" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/activity.out" \
-FYAI_PTY_AFTER="wait-screen:Streaming begins here.|wait-screen: 1s|"\
-"raw:1b5b357e|wait-screen: 3s|snapshot|"\
-"release:$TEST_DIR/resume-stream|wait-screen:continues" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=true \
     --set display/screen=fullscreen \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 20
+cols: 100
+steps:
+  - type: first question
+  - wait: Streaming
+    timeout: session
+  - wait-screen: Streaming begins here.
+  - wait-screen: " 1s"
+  - write: "\e[5~"
+  - wait-screen: " 3s"
+  - snapshot: "${TEST_DIR}/activity.out"
+  - touch: "${TEST_DIR}/resume-stream"
+  - wait-screen: continues
+PTY
 
 if ! "$PYTHON" - "$TEST_DIR/activity.out" "$TESTS_DIR" <<'PY'
 import sys

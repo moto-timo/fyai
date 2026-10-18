@@ -7,14 +7,20 @@ set -eu
 fyai_test_setup
 mock_start agent_message_live.json
 
-FYAI_PTY_INPUT="start message test" FYAI_PTY_NEEDLE="MESSAGE SUBMITTED" \
-FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:agent_message ping1 queued|release:$TEST_DIR/release-child|wait-screen:REPORT RECEIVED" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: start message test
+  - wait: MESSAGE SUBMITTED
+    timeout: session
+  - wait-screen: agent_message ping1 queued
+  - touch: "${TEST_DIR}/release-child"
+  - wait-screen: REPORT RECEIVED
+PTY
 
 "$PYTHON" - "$TEST_DIR/requests.jsonl" <<'PYEOF' || fail "agent message did not submit"
 import json

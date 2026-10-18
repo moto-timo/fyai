@@ -6,21 +6,25 @@ set -eu
 fyai_test_setup
 mock_start ui_tools_parallel.json
 
-FYAI_PTY_INPUT="run both" \
-FYAI_PTY_PROGRESS_NEEDLE="parallel-early-a" \
-FYAI_PTY_PROGRESS_TIMEOUT="3" \
-FYAI_PTY_MID_NEEDLE=$'\033[32m●' \
-FYAI_PTY_MID_TIMEOUT="5" \
-FYAI_PTY_NEEDLE="Parallel interactive tools done." \
-FYAI_PTY_AFTER="send:/status|wait-screen:Usage / total" \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/snapshot.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
 	"$FYAI_BIN" -k test-key --theme dark \
 	--set display/markdown=true --set display/stream=false \
 	--set display/tool_preview_lines=5 --set tools=true \
 	--set api=chat-completions \
 	--set "api_url=$MOCK_URL/v1/chat/completions" \
-	-m mock-model -i
+	-m mock-model -i <<'PTY'
+snapshot: "${TEST_DIR}/snapshot.out"
+steps:
+  - type: run both
+  - wait: parallel-early-a
+    timeout: 3
+  - wait: "\e[32m●"
+    timeout: 5
+  - wait: Parallel interactive tools done.
+    timeout: session
+  - type: "/status"
+  - wait-screen: Usage / total
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
 	fail "parallel shell workbands did not update progressively"

@@ -10,16 +10,34 @@ set -eu
 fyai_test_setup
 mock_start ask_user_preview.json
 driver=0
-FYAI_PTY_COLS=100 FYAI_PTY_INPUT="ask me about the layout" \
-FYAI_PTY_NEEDLE="Which layout?" FYAI_PTY_TIMEOUT=20 \
-FYAI_PTY_AFTER="wait-screen:Preview · flat|wait-screen:main.c|raw:1b5b42|wait-screen:Preview · tree|wait-gone:main.c|wait-screen:│ Parser │|wait-screen:│ Emitter │|raw:1b5b42|wait-gone:Preview · tree|wait-gone:Emitter|raw:1b5b41|wait-screen:Preview · tree|raw:0d|wait-screen:Layout chosen." \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: ask me about the layout
+  - wait: "Which layout?"
+    timeout: session
+  - wait-screen: "Preview · flat"
+  - wait-screen: main.c
+  - write: "\e[B"
+  - wait-screen: "Preview · tree"
+  - wait-gone: main.c
+  - wait-screen: "│ Parser │"
+  - wait-screen: "│ Emitter │"
+  - write: "\e[B"
+  - wait-gone: "Preview · tree"
+  - wait-gone: Emitter
+  - write: "\e[A"
+  - wait-screen: "Preview · tree"
+  - write: "\r"
+  - wait-screen: Layout chosen.
+PTY
     driver=$?
 if grep -a -q "needs a libfytimui" "$TEST_DIR/pty.out"; then
     skip "this build has no page support"

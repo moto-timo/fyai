@@ -12,14 +12,25 @@ fyai_test_setup
 mock_start settings_review.json
 
 review_run() {
-	local input=$1 after=$2 rows=${3:-40} driver=0
+	local input=$1 rows=${2:-40} driver=0 steps
 
-	FYAI_PTY_COLS=100 FYAI_PTY_ROWS=$rows FYAI_PTY_INPUT="$input" \
-	FYAI_PTY_SNAPSHOT="$TEST_DIR/reply-screen.out" \
-	FYAI_PTY_NEEDLE="Proposal · written by the model" FYAI_PTY_TIMEOUT=20 \
-	FYAI_PTY_AFTER="$after" \
-	FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-	"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+	steps="$(cat)"
+
+	export input
+	export rows
+	{
+	    cat <<'PTY'
+rows: ${rows}
+cols: 100
+timeout: 20
+wait_timeout: 10
+steps:
+  - type: "${input}"
+  - wait: "Proposal · written by the model"
+    timeout: session
+PTY
+	    printf '%s\n' "$steps"
+	} | pty_run "$TEST_DIR/pty.out" \
 	    "$FYAI_BIN" -k test-key --theme dark --branch main \
 	    --set display/markdown=true --set display/stream=false \
 	    --set tools=true \
@@ -36,8 +47,18 @@ review_run() {
 }
 
 # The panel shows both parts; Down and Enter accept.
-review_run "make it warmer" \
-	"wait-screen:Diff · made by fyai|wait-screen:warmer|wait-screen:1. Reject|snapshot|raw:1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e1b5b367e|wait-screen:Review row 50|raw:1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e1b5b357e|wait-screen:system_prompt|raw:1b5b420d|wait-screen:Temperature changed."
+review_run "make it warmer" <<'PTY'
+  - wait-screen: "Diff · made by fyai"
+  - wait-screen: warmer
+  - wait-screen: "1. Reject"
+  - snapshot: "${TEST_DIR}/reply-screen.out"
+  - write: "\e[6~\e[6~\e[6~\e[6~\e[6~\e[6~\e[6~\e[6~"
+  - wait-screen: Review row 50
+  - write: "\e[5~\e[5~\e[5~\e[5~\e[5~\e[5~\e[5~\e[5~"
+  - wait-screen: system_prompt
+  - write: "\e[B\r"
+  - wait-screen: Temperature changed.
+PTY
 "$PYTHON" - "$TEST_DIR/reply-screen.out" "$TESTS_DIR" <<'PY' ||
 import sys
 
@@ -62,8 +83,33 @@ assert_status 0
 assert_stdout_contains '"c1"'
 
 # A typed reply rejects the change and reaches the model.
-review_run "warmer still" \
-	"wait-screen:+temperature: 1.5|click:Much warmer still.|raw:1b5b43|frame:1|raw:1b5b44|frame:1|raw:1b5b421b5b42|frame:1|raw:1b5b41|frame:1|raw:1b5b43|frame:1|raw:09|frame:1|raw:1b5b5a|frame:1|raw:09|frame:1|raw:746f6f207761726d203132|wait-screen:too warm 12|raw:1b5b447f|wait-screen:too warm 2|snapshot|raw:0d|wait-screen:Left as it is." 24
+review_run "warmer still" 24 <<'PTY'
+  - wait-screen: "+temperature: 1.5"
+  - click: Much warmer still.
+  - write: "\e[C"
+  - frame: 1
+  - write: "\e[D"
+  - frame: 1
+  - write: "\e[B\e[B"
+  - frame: 1
+  - write: "\e[A"
+  - frame: 1
+  - write: "\e[C"
+  - frame: 1
+  - write: "\t"
+  - frame: 1
+  - write: "\e[Z"
+  - frame: 1
+  - write: "\t"
+  - frame: 1
+  - write: "too warm 12"
+  - wait-screen: too warm 12
+  - write: "\e[D\x7f"
+  - wait-screen: too warm 2
+  - snapshot: "${TEST_DIR}/reply-screen.out"
+  - write: "\r"
+  - wait-screen: Left as it is.
+PTY
 
 "$PYTHON" - "$TEST_DIR/reply-screen.out" "$TESTS_DIR" <<'PY' ||
 import sys

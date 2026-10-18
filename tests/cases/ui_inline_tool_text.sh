@@ -11,20 +11,26 @@ set -eu
 fyai_test_setup
 mock_start ui_band_invocation_held.json
 
+export TMPDIR
 FYAI_TRACE="$TEST_DIR/trace.log" \
-FYAI_PTY_COLS=100 FYAI_PTY_INPUT="run it" \
-FYAI_PTY_NEEDLE="run it" \
-FYAI_PTY_AFTER="wait-screen:Building object 7|snapshot|release:$TMPDIR/band-release|wait-screen:Done." \
-FYAI_PTY_AFTER_PAUSE=0 \
-FYAI_PTY_SNAPSHOT="$TEST_DIR/live.out" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/tool_update_interval_ms=0 \
     --set display/tool_preview_lines=5 \
     --set "display/screen=${FYAI_INLINE_SCREEN:-fullscreen}" --set display/tool_display=inline \
     --set builtin_shell=true --set api=responses \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+cols: 100
+steps:
+  - type: run it
+  - wait: run it
+    timeout: session
+  - wait-screen: Building object 7
+  - snapshot: "${TEST_DIR}/live.out"
+  - touch: "${TMPDIR}/band-release"
+  - wait-screen: Done.
+PTY
 
 "$PYTHON" - "$TEST_DIR/live.out" "$TEST_DIR/pty.out" "$TESTS_DIR" <<'PY' || fail "the live output is not in the transcript"
 import sys

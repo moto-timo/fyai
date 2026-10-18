@@ -7,17 +7,23 @@ set -eu
 fyai_test_setup
 mock_start agent_recursive_progress.json
 
-FYAI_PTY_INPUT="delegate recursively" \
-FYAI_PTY_PROGRESS_NEEDLE="Agent progress" \
-FYAI_PTY_PROGRESS_TIMEOUT=8 \
-FYAI_PTY_DURING_INPUT="/branch attach main/agent:child/agent:grandchild" \
-FYAI_PTY_NEEDLE="NESTED_REPORT" \
-FYAI_PTY_AFTER="send:/branch detach|wait-screen:Recursive delegation complete." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
 	"$FYAI_BIN" -b main -k test-key --theme dark \
 	--set display/markdown=true --set display/stream=false \
 	--set tools=true --set api=responses \
-	--set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+	--set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+steps:
+  - type: delegate recursively
+  - wait: Agent progress
+    timeout: 8
+  - write: "/branch attach main/agent:child/agent:grandchild\n"
+  - wait: Agent progress
+    timeout: 8
+  - wait: NESTED_REPORT
+    timeout: session
+  - type: "/branch detach"
+  - wait-screen: Recursive delegation complete.
+PTY
 
 run_fyai branch show
 assert_status 0

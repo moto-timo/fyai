@@ -7,15 +7,24 @@ set -eu
 fyai_test_setup
 mock_start session_zoom.json
 
-FYAI_PTY_INPUT="open a shell" FYAI_PTY_NEEDLE="the shell is open." \
-FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER='send:/zoom box|wait:Ctrl-]|send:echo FROM-THE-USER|raw:1d|send:read it back|wait:read the session.' \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=chat-completions \
     --set shell/input_poll_ms=0 \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+timeout: 30
+steps:
+  - type: open a shell
+  - wait: the shell is open.
+    timeout: session
+  - type: "/zoom box"
+  - wait: "Ctrl-]"
+  - type: echo FROM-THE-USER
+  - write: "\x1d"
+  - type: read it back
+  - wait: read the session.
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PYEOF' || fail "the zoomed tile is wrong"
 import os

@@ -13,13 +13,20 @@ done
 # A short pane holds a part of the list. The page says how much it left out,
 # and the branch it drew last is on the screen: a drawing that overran the
 # pane would have been cut there.
-FYAI_PTY_ROWS=20 FYAI_PTY_COLS=60 \
-FYAI_PTY_INPUT="/branches" \
-FYAI_PTY_NEEDLE="gitgraph overview" \
-FYAI_PTY_AFTER="wait-screen: more|wait-screen:main/bravo-service|raw:1b|wait-gone:Esc close" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/fit.out" \
+pty_run "$TEST_DIR/fit.out" \
     "$FYAI_BIN" -b main -k test-key --theme dark \
     --set display/markdown=true --set display/branch_view=gitgraph \
-    --set display/diagram_charset=unicode -m mock-model -i
+    --set display/diagram_charset=unicode -m mock-model -i <<'PTY'
+rows: 20
+cols: 60
+steps:
+  - type: "/branches"
+  - wait: gitgraph overview
+    timeout: session
+  - wait-screen: " more"
+  - wait-screen: main/bravo-service
+  - write: "\e"
+  - wait-gone: Esc close
+PTY
 
 pass

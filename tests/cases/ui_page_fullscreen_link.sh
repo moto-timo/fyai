@@ -8,15 +8,20 @@ set -eu
 
 fyai_test_setup
 mock_start chat_fullscreen_link.json
-FYAI_PTY_ROWS=20 FYAI_PTY_COLS=100 FYAI_PTY_INPUT="give me a link" \
-FYAI_PTY_NEEDLE="LINK-END" \
-FYAI_PTY_AFTER="wait-screen:LINK-END" \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/screen=fullscreen \
     --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+rows: 20
+cols: 100
+steps:
+  - type: give me a link
+  - wait: LINK-END
+    timeout: session
+  - wait-screen: LINK-END
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" "$TESTS_DIR/scenarios/chat_fullscreen_link.json" <<'PY' ||
 import json

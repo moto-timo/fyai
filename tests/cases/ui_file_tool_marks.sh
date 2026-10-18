@@ -8,13 +8,16 @@ fyai_test_setup
 mock_start ui_file_tool_marks.json
 printf 'read marker\n' > input.txt
 
-FYAI_PTY_INPUT="read and write files" \
-FYAI_PTY_NEEDLE="File tool marks done." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=responses \
-    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i <<'PTY'
+steps:
+  - type: read and write files
+  - wait: File tool marks done.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || \
     fail "file tool activity marks are missing"

@@ -9,33 +9,44 @@
 set -eu
 . "$(dirname "$0")/../harness.sh"
 
-# An SGR mouse report of a wheel notch at one-based column $2 and row $3, as
-# hex: button 64 is a notch up and 65 a notch down.
-wheel()
-{
-    printf '\033[<%d;%d;%dM' "$1" "$2" "$3" | od -An -tx1 | tr -d ' \n'
-}
-
 fyai_test_setup
 mock_start ui_text_scroll.json
 
-FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
-FYAI_PTY_INPUT="print the lines" FYAI_PTY_NEEDLE="Print sixty lines" \
-FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:row-060|wait-screen:▴|"\
-"click:▴|wait-gone:row-060|wait-screen:row-055|"\
-"click:▾|wait-screen:row-060|"\
-"raw:$(wheel 64 10 9)|wait-gone:row-060|wait-screen:row-053|"\
-"raw:$(wheel 65 10 9)|wait-screen:row-060|"\
-"raw:$(wheel 64 10 9)|wait-gone:row-060|wait-screen:row-053|raw:78|wait-screen:row-060|raw:7f|"\
-"release:$PWD/band-release|wait-screen:done." \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/work_controls=full \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 30
+wait_timeout: 10
+steps:
+  - type: print the lines
+  - wait: Print sixty lines
+    timeout: session
+  - wait-screen: row-060
+  - wait-screen: "▴"
+  - click: "▴"
+  - wait-gone: row-060
+  - wait-screen: row-055
+  - click: "▾"
+  - wait-screen: row-060
+  - write: "\e[<64;10;9M"
+  - wait-gone: row-060
+  - wait-screen: row-053
+  - write: "\e[<65;10;9M"
+  - wait-screen: row-060
+  - write: "\e[<64;10;9M"
+  - wait-gone: row-060
+  - wait-screen: row-053
+  - write: "x"
+  - wait-screen: row-060
+  - write: "\x7f"
+  - touch: "${TEST_DIR}/band-release"
+  - wait-screen: done.
+PTY
     fail "the scroll bar of a tile of text did not move its rows"
 
 mock_stop 2
@@ -44,17 +55,24 @@ mock_stop 2
 fyai_test_setup
 mock_start ui_text_scroll.json
 
-FYAI_PTY_COLS=100 FYAI_PTY_ROWS=30 \
-FYAI_PTY_INPUT="print the lines" FYAI_PTY_NEEDLE="Print sixty lines" \
-FYAI_PTY_TIMEOUT=30 \
-FYAI_PTY_AFTER="wait-screen:row-060|release:$PWD/band-release|wait-screen:done." \
-FYAI_PTY_AFTER_PAUSE=0 FYAI_PTY_AFTER_TIMEOUT=10 \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/none.out" \
+pty_run "$TEST_DIR/none.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/work_controls=full --set display/tool_history_lines=0 \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i ||
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' ||
+rows: 30
+cols: 100
+timeout: 30
+wait_timeout: 10
+steps:
+  - type: print the lines
+  - wait: Print sixty lines
+    timeout: session
+  - wait-screen: row-060
+  - touch: "${TEST_DIR}/band-release"
+  - wait-screen: done.
+PTY
     fail "a band with no history did not finish"
 if grep -a -q "▴" "$TEST_DIR/none.out"; then
     fail "a band with no history drew a scroll bar"

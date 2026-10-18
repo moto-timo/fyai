@@ -7,16 +7,19 @@ set -eu
 fyai_test_setup
 mock_start agents_parallel.json
 
-FYAI_PTY_INPUT="delegate both halves" \
-FYAI_PTY_MID_NEEDLE="second half" \
-FYAI_PTY_MID_TIMEOUT="3" \
-FYAI_PTY_NEEDLE="Both sub-agents reported." \
-"$PYTHON" "$TESTS_DIR/pty_driver.py" "$TEST_DIR/pty.out" \
+pty_run "$TEST_DIR/pty.out" \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set display/work_min_tile_cols=60 \
     --set tools=true --set api=chat-completions \
-    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i
+    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY'
+steps:
+  - type: delegate both halves
+  - wait: second half
+    timeout: 3
+  - wait: Both sub-agents reported.
+    timeout: session
+PTY
 
 "$PYTHON" - "$TEST_DIR/pty.out" <<'PYEOF' || \
     fail "the work pane did not stack when a tile could not keep its width"
