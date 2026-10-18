@@ -84,6 +84,9 @@ fyai_test_cleanup() {
 			{ echo "--- stderr ---" >&2; cat "$TEST_DIR/stderr" >&2; }
 		[ -f "$TEST_DIR/requests.jsonl" ] && \
 			{ echo "--- requests ---" >&2; cat "$TEST_DIR/requests.jsonl" >&2; }
+		for cast in "$keep_dir"/recordings/*.cast; do
+			[ -f "$cast" ] && echo "recording: $cast" >&2
+		done
 		for cap in "$TEST_DIR"/pty.out "$TEST_DIR"/*.out; do
 			[ -f "$cap" ] || continue
 			case "$cap" in
@@ -141,15 +144,21 @@ fyai_test_signal() {
 # pty_run OUTPUT PROGRAM [ARGS...] < SCRIPT
 # Run PROGRAM on a pseudo-terminal as the YAML script on standard input says
 # (doc/pty-driver.md), and keep what it sent in OUTPUT. The driver is the
-# hidden verb of the binary under test. It keeps the trace variables to the
-# program: a trace of the driver would count it as a start of the program.
+# hidden verb of the binary under test. It records each run as an asciicast,
+# named after the case and the script: in $FYAI_CAST_DIR when that is set, else
+# in the sandbox, where a passing case removes it and a failing case keeps it
+# with the rest of the sandbox. It keeps the trace variables to the program: a
+# trace of the driver would count it as a start of the program.
 pty_run() {
-	local out="$1" script
+	local out="$1" script cast_dir
 	local -a keep=()
 
 	shift
 	script="$(mktemp "$TEST_DIR/pty-script.XXXXXX")" || return 1
 	cat >"$script" || return 1
+	cast_dir="${FYAI_CAST_DIR:-$TEST_DIR/recordings}"
+	mkdir -p "$cast_dir" || return 1
+	keep+=(--cast "$cast_dir/$(basename "$0" .sh)-${script##*/pty-script.}.cast")
 	[ -z "${FYAI_TRACE+x}" ] || keep+=(--env "FYAI_TRACE=$FYAI_TRACE")
 	[ -z "${FYAI_TRACE_LEVEL+x}" ] ||
 		keep+=(--env "FYAI_TRACE_LEVEL=$FYAI_TRACE_LEVEL")

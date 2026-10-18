@@ -136,4 +136,34 @@ check echo 0 '' <<'PTY'
     equals: ""
 PTY
 
+# The recording: a header, the output of the program, the keys, and a marker
+# for each step. It is for a person with `asciinema play`; it is no assertion.
+cat >"$TEST_DIR/cast.yaml" <<'PTY'
+timeout: 3
+steps:
+  - type: hello
+  - wait: Done.
+    timeout: session
+PTY
+"$FYAI_BIN" __pty-driver --cast "$TEST_DIR/run.cast" "$TEST_DIR/cast.yaml" \
+    "$TEST_DIR/cast.out" "$PYTHON" -c "$CHILD" fresh 0 "$TEST_DIR/release" ||
+    fail "the recorded run failed"
+"$PYTHON" - "$TEST_DIR/run.cast" <<'PY' || fail "the recording is not an asciicast"
+import json
+import os
+import sys
+
+lines = [json.loads(line) for line in open(sys.argv[1])]
+head, events = lines[0], lines[1:]
+assert head["version"] == 2 and head["width"] == 100, head
+assert oct(os.stat(sys.argv[1]).st_mode & 0o777) == "0o600"
+kinds = [e[1] for e in events]
+assert kinds[0] == "o" and "m" in kinds and "i" in kinds, kinds
+assert any(e[1] == "i" and e[2] == "hello" for e in events), events
+assert any(e[1] == "m" and e[2].startswith("step 2: wait") for e in events)
+assert any(e[1] == "o" and "Done." in e[2] for e in events)
+times = [e[0] for e in events]
+assert times == sorted(times), times
+PY
+
 pass
