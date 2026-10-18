@@ -128,6 +128,10 @@ initialize each generic field explicitly.
   that backends read.
 - `data/commands.yaml`: the definition of every verb and slash command.
 - `src/fyai_cmd.c`: the command registry, parser, dispatch, and presentation.
+- `src/fyai_image.h`, `tools/fyai_mkimage.c`: the prebuilt images of the
+  command definitions and the catalogue (`doc/embedded-images.md`). Load an
+  embedded document that is large with `fyai_image_load()` and keep the parse
+  of its text as the fallback.
 - `src/fyai_cmd_complete.c`, `src/fyai_cmd_help.c`: completion and help from
   the definitions.
 - `src/fyai_cmd_*.c`: the handlers of the commands, one file for each group.
