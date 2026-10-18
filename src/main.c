@@ -40,6 +40,11 @@
 #include "fyai_terminal.h"
 #include "fyai_prof.h"
 
+/*
+ * libcurl initialises itself, and OpenSSL with it, when the first handle is
+ * made. A verb that makes no request thus never pays for it. Handles are made
+ * on the thread of the event loop, so the implicit initialisation is safe.
+ */
 int main(int argc, char **argv)
 {
 	struct fyai_cfg cfg = { };
@@ -54,7 +59,6 @@ int main(int argc, char **argv)
 	/* 256MB of stack */
 	raise_stack(256LU << 20, argv);
 	fyai_reserve_arena_ranges();
-	curl_global_init(CURL_GLOBAL_DEFAULT);
 
 	/*
 	 * A Claude Agent SDK runs this program as its CLI. Its command line is
