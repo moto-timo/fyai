@@ -609,7 +609,7 @@ bool jsonrpc_conn_closed(const struct jsonrpc_conn *conn)
 bool jsonrpc_conn_has_output(const struct jsonrpc_conn *conn)
 {
 	return conn && conn->transport == JSONRPC_STDIO &&
-	       conn->tx_off < conn->tx.len;
+	       !conn->write_failed && conn->tx_off < conn->tx.len;
 }
 
 void jsonrpc_conn_defer(struct jsonrpc_conn *conn)

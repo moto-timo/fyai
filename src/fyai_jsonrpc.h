@@ -96,7 +96,7 @@ int jsonrpc_conn_send_frame(struct jsonrpc_conn *conn, fy_generic frame);
 void jsonrpc_conn_accept_batches(struct jsonrpc_conn *conn);
 bool jsonrpc_conn_in_batch(const struct jsonrpc_conn *conn);
 
-/* Return true while the connection has queued output. */
+/* Return true while the connection has queued output it can still write. */
 bool jsonrpc_conn_has_output(const struct jsonrpc_conn *conn);
 bool jsonrpc_conn_closed(const struct jsonrpc_conn *conn);
 
