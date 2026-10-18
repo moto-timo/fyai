@@ -106,7 +106,12 @@ def die(msg):
     raise SystemExit(msg)
 
 
-drain(3.0)
+# The session is ready once it draws its prompt.
+deadline = time.monotonic() + 20 * SCALE
+while time.monotonic() < deadline and "❯".encode() not in buf:
+    drain(0.2)
+if "❯".encode() not in buf:
+    die("the session never drew its prompt")
 if tagged():
     die("tagged processes existed before the run: %r" % tagged())
 
