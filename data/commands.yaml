@@ -538,6 +538,7 @@ commands:
       one provider.
     surfaces: [cli, session]
     handler: model
+    flags: [model-state]
     status: true
     while_busy: bare
     see_also: [config-paths]
@@ -637,7 +638,7 @@ commands:
       a concrete source.
     surfaces: [cli]
     handler: import
-    flags: [transient]
+    flags: [transient, model-state]
     see_also: [export]
     arguments:
       type: object
@@ -822,6 +823,7 @@ commands:
       store it in the configuration.
     surfaces: [cli, session]
     handler: api
+    flags: [model-state]
     while_busy: bare
     render:
       message:
@@ -878,7 +880,7 @@ commands:
       stored turns, the exchanges, or the ref log of the branch.
     surfaces: [cli, session]
     handler: list
-    flags: [transient]
+    flags: [transient, model-state]
     view: true
     while_busy: run
     arguments:

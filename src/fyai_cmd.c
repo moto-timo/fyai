@@ -1859,6 +1859,8 @@ static enum fyai_verb_flags def_verb_flags(fy_generic def, bool help)
 	fy_foreach(f, fy_get(def, "flags", fy_invalid)) {
 		if (fy_equal(f, "model"))
 			flags &= ~FYAIVF_NO_REQUESTS;
+		else if (fy_equal(f, "model-state"))
+			flags |= FYAIVF_MODEL_STATE;
 		else if (fy_equal(f, "no-storage"))
 			flags |= FYAIVF_NO_STORAGE;
 		else if (fy_equal(f, "storage-optional"))

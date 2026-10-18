@@ -575,6 +575,20 @@ fyai_cfg_makes_requests(struct fyai_cfg *cfg)
 	return !fyai_cfg_no_requests(cfg);
 }
 
+/*
+ * The run reads the model that the catalogue resolves: a verb that sends
+ * requests, or one that shows or replays the resolved model. Resolution
+ * parses the catalogue, so any other verb starts without it.
+ */
+static inline bool
+fyai_cfg_needs_model(struct fyai_cfg *cfg)
+{
+	const struct fyai_verb *v = fyai_cfg_verb(cfg);
+
+	return fyai_cfg_makes_requests(cfg) ||
+	       (v && (v->flags & FYAIVF_MODEL_STATE));
+}
+
 static inline bool
 fyai_cfg_no_storage(struct fyai_cfg *cfg)
 {

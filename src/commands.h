@@ -237,6 +237,7 @@ enum fyai_verb_flags {
 	FYAIVF_NO_REQUESTS	= FY_BIT(3),	/* does not make requests */
 	FYAIVF_NEEDS_TRANSIENT_BUILDER = FY_BIT(4),
 	FYAIVF_STORAGE_OPTIONAL	= FY_BIT(5),	/* storage only when it exists */
+	FYAIVF_MODEL_STATE	= FY_BIT(6),	/* reads the resolved model */
 };
 
 /* The properties of what an invocation runs, which setup reads. */

@@ -131,7 +131,8 @@ $defs:
       flags:
         type: array
         items:
-          enum: [model, no-storage, storage-optional, transient, interactive]
+          enum: [model, model-state, no-storage, storage-optional, transient,
+                 interactive]
       view: {type: boolean}
       ends_session: {type: boolean}
       status: {type: boolean}

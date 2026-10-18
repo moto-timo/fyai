@@ -2563,7 +2563,8 @@ void fyai_config_focus_bg_check(struct fyai_cfg *cfg)
 			 text_light ? "light" : "dark");
 }
 
-static int config_rederive_doc(struct fyai_ctx *ctx, fy_generic doc)
+static int config_rederive_doc(struct fyai_ctx *ctx, fy_generic doc,
+			       bool resolve)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
 
@@ -2583,6 +2584,8 @@ static int config_rederive_doc(struct fyai_ctx *ctx, fy_generic doc)
 	if (fyai_ui_active(ctx))
 		fyai_ui_config_changed(ctx);
 
+	if (!resolve)
+		return 0;
 	if (fyai_config_resolve_model(cfg))
 		return -1;
 	return fyai_config_messages_gate(cfg);
@@ -2600,7 +2603,7 @@ int fyai_config_rederive(struct fyai_ctx *ctx)
 	doc = fy_is_valid(ctx->arena_config) ?
 		ctx->arena_config : cfg->config_doc;
 	doc = config_merge(cfg->gb, doc, cfg->config_session);
-	return config_rederive_doc(ctx, doc);
+	return config_rederive_doc(ctx, doc, true);
 }
 
 static fy_generic config_schema_nearest(const char *path, const char *kw,
@@ -2864,7 +2867,7 @@ static int config_session_layer_check(struct fyai_ctx *ctx, fy_generic layer,
 	if (!adopt)
 		return 0;
 	cfg->config_session = layer;
-	return config_rederive_doc(ctx, doc);
+	return config_rederive_doc(ctx, doc, true);
 }
 
 int fyai_config_session_layer_adopt(struct fyai_ctx *ctx, fy_generic layer)
@@ -2923,7 +2926,9 @@ int fyai_config_adopt_arena(struct fyai_ctx *ctx)
 	 * and the session layer is above them. */
 	doc = config_merge(cfg->gb, ctx->arena_config, cfg->config_doc);
 	doc = config_merge(cfg->gb, doc, cfg->config_session);
-	if (config_rederive_doc(ctx, doc))
+	/* A run that does not read the model derives it when it changes the
+	 * configuration, at its commit. */
+	if (config_rederive_doc(ctx, doc, fyai_cfg_needs_model(cfg)))
 		return -1;
 	/* An explicit key is invocation state, not a member of the branch store. */
 	if (fy_is_mapping(cfg->reload_state)) {
@@ -3921,9 +3926,6 @@ int fyai_config_setup(struct fyai_cfg *cfg, int argc, char *argv[])
 		fyai_markdown_load_style(cfg);
 	fyai_config_focus_bg_check(cfg);
 
-	if (fyai_config_resolve_model(cfg))
-		goto err_out;
-
 	/* if no arena dir, use the default */
 	if (!cfg->arena_dir) {
 		def_arena_dir = fyai_default_arena_dir();
@@ -4018,6 +4020,10 @@ int fyai_config_setup(struct fyai_cfg *cfg, int argc, char *argv[])
 	 * dispatch so the verb flags are known); config verbs must be able
 	 * to inspect and fix such a config.
 	 */
+	/* Resolving the model parses the catalogue: only a run that reads it
+	 * pays for that. */
+	if (fyai_cfg_needs_model(cfg) && fyai_config_resolve_model(cfg))
+		goto err_out;
 	if (fyai_cfg_makes_requests(cfg) && fyai_config_messages_gate(cfg))
 		goto err_out;
 
