@@ -55,6 +55,17 @@ def settle(fd, pid):
         raise SystemExit("fyai never reached an interactive prompt")
 
 
+def read_until(fd, needle, seconds=15):
+    """Read the terminal until @needle appears; return what was read."""
+    end = time.monotonic() + seconds
+    seen = b""
+    while time.monotonic() < end and needle not in seen:
+        seen += drain(fd, 0.1)
+    if needle not in seen:
+        raise SystemExit("the terminal never showed %r" % needle)
+    return seen
+
+
 def wait_exit(fd, pid, seconds):
     """Read the terminal until the child ends: a pty holds 1 KiB on macOS."""
     end = time.monotonic() + seconds
@@ -79,7 +90,6 @@ pid, fd = spawn()
 try:
     settle(fd, pid)
     os.write(fd, b"\x03")
-    drain(fd, 0.5)
     status = wait_exit(fd, pid, 5)
     if status is None:
         raise SystemExit("Ctrl-C on an idle prompt did not end the session")
@@ -94,13 +104,15 @@ pid, fd = spawn()
 try:
     settle(fd, pid)
     os.write(fd, b"do not submit me")
-    drain(fd, 0.5)
+    read_until(fd, b"do not submit me")
     os.write(fd, b"\x03")
-    drain(fd, 0.5)
-    if wait_exit(fd, pid, 2) is not None:
+    # The session is alive after the line went if it takes more input.
+    os.write(fd, b"alive")
+    read_until(fd, b"alive")
+    if os.waitpid(pid, os.WNOHANG)[0]:
         raise SystemExit("Ctrl-C threw away a typed line and the session")
     os.write(fd, b"\x03")
-    drain(fd, 0.5)
+    os.write(fd, b"\x03")
     if wait_exit(fd, pid, 5) is None:
         raise SystemExit("Ctrl-C after the line was discarded did not exit")
 finally:
