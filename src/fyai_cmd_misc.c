@@ -34,6 +34,7 @@
 #include "fyai_merge.h"
 #include "fyai_builtin.h"
 #include "fyai_mock.h"
+#include "fyai_ptydrv.h"
 #include "fyai_secret.h"
 #include "fyai_storage.h"
 #include "fyai_view.h"
@@ -533,6 +534,41 @@ int fyai_cmd_mock_server(struct fyai_cmd_call *call, fy_generic *result)
 	*result = fy_invalid;
 	return fyai_mock_serve(call->ctx, call->gb, scenario, rundir ? rundir : ".",
 			       fyai_cmd_arg_bool(call, "log"));
+}
+
+/* A NULL-terminated vector of the strings of the array argument @name. */
+static char **cmd_arg_vector(struct fyai_cmd_call *call, const char *name)
+{
+	fy_generic list = fy_get(call->args, name, fy_seq_empty), item;
+	size_t n = fy_len(list), i;
+	char **vec = calloc(n + 1, sizeof(*vec));
+
+	if (!vec)
+		return NULL;
+	for (i = 0; i < n; i++) {
+		item = fy_get_at(list, i);
+		vec[i] = (char *)fy_gb_intern_string(call->gb,
+						     fy_castp(&item, ""));
+	}
+	return vec;
+}
+
+int fyai_cmd_pty_driver(struct fyai_cmd_call *call, fy_generic *result)
+{
+	char **argv = cmd_arg_vector(call, "program");
+	char **env = cmd_arg_vector(call, "env");
+	int rc = -1;
+
+	*result = fy_invalid;
+	fyai_error_check(call->ctx, argv && env, out, "pty: out of memory");
+	rc = fyai_ptydrv_run(call->ctx, call->gb,
+			     fyai_cmd_arg_str(call, "script"),
+			     fyai_cmd_arg_str(call, "output"), argv,
+			     (char *const *)env);
+out:
+	free(argv);
+	free(env);
+	return rc;
 }
 
 int fyai_cmd_check_builtins(struct fyai_cmd_call *call, fy_generic *result)

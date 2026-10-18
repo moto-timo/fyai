@@ -4157,6 +4157,50 @@ commands:
           x-fyai-positional: 1
           x-fyai-meta: RUNDIR
 
+  - command: __pty-driver
+    title: run a program on a pseudo-terminal as a script says
+    description: |
+      The PTY driver of the test suite. Run PROGRAM on a pseudo-terminal, play
+      the terminal for it, and do the steps of SCRIPT, a YAML file. Write all
+      the bytes that the program sent to OUTPUT. `--env` sets a variable for the
+      program only: the driver keeps its own environment, so a trace variable
+      that a case names reaches the program and not the driver. See
+      doc/pty-driver.md. It is not for a person.
+    surfaces: [cli]
+    handler: pty_driver
+    hidden: true
+    flags: [no-storage]
+    arguments:
+      type: object
+      additionalProperties: false
+      required: [script, output, program]
+      properties:
+        env:
+          type: array
+          items: {type: string}
+          description: set a variable in the environment of the program
+          x-fyai-long: env
+          x-fyai-repeat: true
+          x-fyai-meta: NAME=VALUE
+        script:
+          type: string
+          description: the script file
+          x-fyai-positional: 0
+          x-fyai-meta: SCRIPT
+        output:
+          type: string
+          description: the file that gets the bytes the program sent
+          x-fyai-positional: 1
+          x-fyai-meta: OUTPUT
+        program:
+          type: array
+          items: {type: string}
+          minItems: 1
+          description: the program and its arguments
+          x-fyai-positional: 2
+          x-fyai-rest: true
+          x-fyai-meta: PROGRAM
+
   - command: __complete
     title: list the completion candidates of a command line
     description: |

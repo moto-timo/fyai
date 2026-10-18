@@ -246,7 +246,7 @@ fyai_fy_dep(libfymermaid c44131c68a49f6de1ad1c083d7cb6576019bfa8a)
 fyai_fy_dep(libfytimui caa4c9389b1d4d081b11d5cae344da654ecc33e4)
 # libfyvterm: the terminal emulator behind the terminal view and the terminal
 # rendering tests.
-fyai_fy_dep(libfyvterm a76d4aa024bdcc90237e7d0dc71fe54a16f22702)
+fyai_fy_dep(libfyvterm 64d90bcbb5043bb1e7ebcc2c7ffd7e5d4300db9c)
 
 # Fetch and build a minimal libcurl from source as a static archive linked
 # straight into fyai: OpenSSL TLS + zlib only, with the curl CLI and the heavy
@@ -519,6 +519,8 @@ set(FYAI_SOURCES
     src/fyai_tool_registry.c
     src/fyai_monitor.c
     src/fyai_mock.c
+    src/fyai_ptydrv.c
+    src/fyai_ptyscr.c
     src/fyai_builtin.c
     src/fyai_tool_template.c
     src/fyai_turn.c

@@ -169,6 +169,7 @@ static const struct {
 	{ "view_cp",		fyai_cmd_view_cp },
 	{ "view_fs",		fyai_cmd_view_fs },
 	{ "mock_server",	fyai_cmd_mock_server },
+	{ "pty_driver",	fyai_cmd_pty_driver },
 	{ "check_builtins",	fyai_cmd_check_builtins },
 	{ "view_sync",		fyai_cmd_view_sync },
 	{ "view_mount",		fyai_cmd_view_mount },
