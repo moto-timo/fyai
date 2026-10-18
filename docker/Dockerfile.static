@@ -76,7 +76,7 @@ RUN if [ "$STATIC_MODE" = musl ]; then \
 # Build and install a static libfyaml (libfyaml.a + libfyaml.pc + headers). Pin
 # matches fyai's FetchContent libfyaml GIT_TAG; override with --build-arg.
 ARG LIBFYAML_REPO=https://github.com/pantoniou/libfyaml
-ARG LIBFYAML_REF=7678b6b1a12842fd764b985c37ba4db9bed510e9
+ARG LIBFYAML_REF=44809845f2ff5039fc1eba966526b87bdf1f0de1
 RUN git clone "$LIBFYAML_REPO" /libfyaml \
     && git -C /libfyaml checkout "$LIBFYAML_REF" \
     && if [ "$STATIC_MODE" = musl ]; then export CC=/opt/musl/bin/musl-gcc PKG_CONFIG_PATH=/opt/musl/lib/pkgconfig; fi \

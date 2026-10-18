@@ -213,7 +213,7 @@ if(NOT TARGET libfyaml::libfyaml)
     set(BUILD_TESTING OFF)
     FetchContent_Declare(libfyaml
         GIT_REPOSITORY https://github.com/pantoniou/libfyaml
-        GIT_TAG 7678b6b1a12842fd764b985c37ba4db9bed510e9
+        GIT_TAG 44809845f2ff5039fc1eba966526b87bdf1f0de1
     )
     FetchContent_MakeAvailable(libfyaml)
     set(BUILD_TESTING "${_FYAI_BUILD_TESTING}")
@@ -234,8 +234,8 @@ endif()
 # FYAI_STATIC_DEPS is on. libfypalette comes first: libfymd4c and
 # libfymermaid consume it.
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FyDeps.cmake)
-fyai_fy_dep(libfypalette 2bd76e849c5df1804c294bf92bb0aad9e3378d30)
-fyai_fy_dep(libfymd4c ef9dffa1f7f83a407026603f7b1562dd9b0b03a9)
+fyai_fy_dep(libfypalette 20db8800e89dac8f8f03dddaa528747c8ad99050)
+fyai_fy_dep(libfymd4c 07d428d9963b93d2e4a96f2a3ce2feb2470ec2d8)
 
 if(FYAI_STATIC_DEPS AND TARGET libfyaml::fyaml_static)
     set_target_properties(libfyaml::fyaml_static PROPERTIES
