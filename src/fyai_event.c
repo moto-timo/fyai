@@ -931,14 +931,15 @@ static enum fyai_event_action fyai_event_sleep_cb(const struct fyai_event *ev)
 	return FYAIEA_STOP;
 }
 
-int fyai_event_sleep(struct fyai_event_loop *el, fyai_event_ms_t ms)
+int fyai_event_sleep_until(struct fyai_event_loop *el, fyai_event_ms_t ms,
+			   const volatile bool *done)
 {
 	struct fyai_event_source *src = NULL;
 	int rc;
 
 	if (!el)
 		return -1;
-	if (ms <= 0)
+	if (ms <= 0 || (done && *done))
 		return 0;
 
 	/* A timer source rather than a bare run_until timeout. */
@@ -946,9 +947,14 @@ int fyai_event_sleep(struct fyai_event_loop *el, fyai_event_ms_t ms)
 	if (rc)
 		return -1;
 
-	rc = fyai_event_loop_run_until(el, NULL, ms);
+	rc = fyai_event_loop_run_until(el, done, ms);
 	fyai_event_source_remove(src);
 	return rc;
+}
+
+int fyai_event_sleep(struct fyai_event_loop *el, fyai_event_ms_t ms)
+{
+	return fyai_event_sleep_until(el, ms, NULL);
 }
 
 int fyai_event_add_signal(struct fyai_event_loop *el, int signo,

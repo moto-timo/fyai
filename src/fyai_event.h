@@ -113,6 +113,10 @@ int fyai_event_timer_disarm(struct fyai_event_source *src);
  * loop-aware replacement for sleep(3), which stalls the whole process. */
 int fyai_event_sleep(struct fyai_event_loop *el, fyai_event_ms_t ms);
 
+/* As fyai_event_sleep(), but return at once when *@done goes true. */
+int fyai_event_sleep_until(struct fyai_event_loop *el, fyai_event_ms_t ms,
+			   const volatile bool *done);
+
 typedef void (*fyai_event_defer_cb)(void *userdata);
 
 /* Run @cb once on the next loop iteration, before the loop blocks again. A

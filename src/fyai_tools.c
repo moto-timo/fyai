@@ -4329,8 +4329,9 @@ static char *fyai_shell_close_tool(struct fyai_ctx *ctx, fy_generic args,
 		/* Allow the program to exit before reporting its result. */
 		el = fyai_ctx_loop(ctx);
 		assert(el);
-		(void)fyai_event_sleep(el, force ? 100 :
-					       FYAI_TTY_CLOSE_WAIT_MS);
+		(void)fyai_event_sleep_until(el, force ? 100 :
+						    FYAI_TTY_CLOSE_WAIT_MS,
+					     &sess->exited);
 	}
 	*okp = true;
 	if (sess->exited)
