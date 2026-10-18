@@ -22,6 +22,7 @@
 #include "fyai_cmd.h"
 #include "fyai_cmd_int.h"
 #include "fyai_event.h"
+#include "fyai_image.h"
 #include "fyai_schema.h"
 #include "fyai_config.h"
 #include "fyai_sink.h"
@@ -34,6 +35,8 @@
 
 /* The embedded definitions, data/commands.yaml, and their schema. */
 #include "embedded_commands.inc"
+/* FYAI_IMAGE_COMMANDS[] - the image of the definitions. */
+#include "embedded_commands_image.inc"
 #include "embedded_command_schema.inc"
 
 static const struct {
@@ -383,7 +386,11 @@ fy_generic fyai_cmd_registry(void)
 		reg_fail("cannot create the command registry builder");
 		return fy_invalid;
 	}
-	reg_doc = reg_parse(FYAI_EMBEDDED_COMMANDS, FYAI_EMBEDDED_COMMANDS_LEN);
+	/* The image is the parse, made at build time; the text is the fallback. */
+	if (fyai_image_load(FYAI_IMAGE_COMMANDS, FYAI_IMAGE_COMMANDS_LEN,
+			    &reg_doc))
+		reg_doc = reg_parse(FYAI_EMBEDDED_COMMANDS,
+				    FYAI_EMBEDDED_COMMANDS_LEN);
 	if (!fy_is_mapping(reg_doc)) {
 		reg_doc = fy_invalid;
 		reg_fail("the command definitions do not parse");

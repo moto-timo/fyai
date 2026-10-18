@@ -368,6 +368,42 @@ fyai_embed(FYAI_EMBEDDED_SKILL_SCHEMA embedded_skill_schema.inc
 
 # Embed the command definitions and their schema (src/fyai_cmd.c).
 fyai_embed(FYAI_EMBEDDED_COMMANDS embedded_commands.inc data/commands.yaml)
+
+# Prebuilt images of the two large documents, which are parsed at every start
+# otherwise (src/fyai_image.h). fyai_mkimage runs on the build host, so a
+# cross build embeds empty images and parses the text.
+set(FYAI_IMAGE_INCS
+    "${CMAKE_CURRENT_BINARY_DIR}/embedded_commands_image.inc"
+    "${CMAKE_CURRENT_BINARY_DIR}/embedded_catalog_image.inc")
+if(CMAKE_CROSSCOMPILING)
+    foreach(_inc _sym IN ZIP_LISTS FYAI_IMAGE_INCS "FYAI_IMAGE_COMMANDS;FYAI_IMAGE_CATALOG")
+        file(WRITE "${_inc}"
+            "static unsigned char ${_sym}[1] = { 0 };\n"
+            "static const size_t ${_sym}_LEN = 0;\n")
+    endforeach()
+else()
+    add_executable(fyai_mkimage tools/fyai_mkimage.c)
+    target_compile_options(fyai_mkimage PRIVATE ${FYAI_C_DIALECT}
+        ${FYAI_C_WARNINGS})
+    target_compile_definitions(fyai_mkimage PRIVATE _GNU_SOURCE)
+    target_include_directories(fyai_mkimage PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(fyai_mkimage PRIVATE libfyaml::libfyaml)
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/embedded_commands_image.inc"
+        COMMAND fyai_mkimage "${CMAKE_CURRENT_SOURCE_DIR}/data/commands.yaml"
+            "${CMAKE_CURRENT_BINARY_DIR}/embedded_commands_image.inc"
+            FYAI_IMAGE_COMMANDS
+        DEPENDS fyai_mkimage "${CMAKE_CURRENT_SOURCE_DIR}/data/commands.yaml"
+        COMMENT "Building the image of the command definitions" VERBATIM)
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/embedded_catalog_image.inc"
+        COMMAND fyai_mkimage "${CMAKE_CURRENT_SOURCE_DIR}/data/catalog.yaml"
+            "${CMAKE_CURRENT_BINARY_DIR}/embedded_catalog_image.inc"
+            FYAI_IMAGE_CATALOG
+        DEPENDS fyai_mkimage "${CMAKE_CURRENT_SOURCE_DIR}/data/catalog.yaml"
+        COMMENT "Building the image of the catalogue" VERBATIM)
+endif()
 fyai_embed(FYAI_EMBEDDED_COMMAND_SCHEMA embedded_command_schema.inc
     data/command.schema.yaml)
 
@@ -528,6 +564,7 @@ install(PROGRAMS scripts/git-remote-fyai DESTINATION bin/)
 add_executable(fyai
     src/main.c
     ${FYAI_SOURCES}
+    ${FYAI_IMAGE_INCS}
 )
 # The embedded data is fixed by a build: check it one time here, not at every
 # start. A build for another machine cannot run fyai.
@@ -675,6 +712,7 @@ if(BUILD_TESTING)
 
     add_executable(fyai_test
         ${FYAI_SOURCES}
+        ${FYAI_IMAGE_INCS}
         ${FYAI_TEST_SOURCES}
         tests/fyai_test_registry.c
         tests/fyai_test_scratch.c

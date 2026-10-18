@@ -21,6 +21,7 @@
 #include "fyai_transport_boot.h"
 #include "fyai_sink.h"
 #include "fyai_catalog.h"
+#include "fyai_image.h"
 #include "fyai_config.h"
 #include "fyai_markdown.h"
 #include "fyai_schema.h"
@@ -32,6 +33,8 @@
 /* FYAI_EMBEDDED_CATALOG[] / FYAI_EMBEDDED_CATALOG_LEN - the vendored
  * data/catalog.yaml snapshot, generated at configure time. */
 #include "embedded_catalog.inc"
+/* FYAI_IMAGE_CATALOG[] - the image of the same document. */
+#include "embedded_catalog_image.inc"
 /* FYAI_EMBEDDED_CATALOG_SCHEMA[] - data/catalog.schema.yaml. */
 #include "embedded_catalog_schema.inc"
 
@@ -49,6 +52,10 @@ fy_generic fyai_catalog_effective(fy_generic arena_catalog,
 	if (fy_is_valid(arena_catalog))
 		return arena_catalog;
 	if (fy_is_valid(embedded_catalog))
+		return embedded_catalog;
+	/* The image is the parse, made at build time. Its arena is the binary. */
+	if (!fyai_image_load(FYAI_IMAGE_CATALOG, FYAI_IMAGE_CATALOG_LEN,
+			     &embedded_catalog))
 		return embedded_catalog;
 	/*
 	 * The parse is cached for the process, so it lives in a builder of its
