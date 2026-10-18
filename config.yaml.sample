@@ -258,6 +258,9 @@ display:
   tool_history_lines: 40
   # Minimum period between tool redraws; 0 redraws every update.
   tool_update_interval_ms: 33
+  # Interval at which an idle UI wakes to look for changes that no component
+  # announces. A longer one costs less CPU and shows such a change later.
+  idle_poll_ms: 16
   # Tool result detail: none, brief, default, or full.
   tool_detail: default
   transcript_system: false # Include system messages in transcript output.

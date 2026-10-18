@@ -3765,6 +3765,7 @@ static void ui_keys_configure(struct fyai_ctx *ctx)
 
 	(void)fytim_set_chord_timeout(ctx->ui->ft,
 				      (unsigned)ctx->cfg->chord_timeout_ms);
+	(void)fytim_set_idle_poll_ms(ctx->ui->ft, ctx->cfg->idle_poll_ms);
 	keys = fy_get(fy_get(ctx->cfg->config_doc, "display", fy_invalid),
 		      "keys", fy_invalid);
 	for (m = 0; m < sizeof modes / sizeof modes[0]; m++) {

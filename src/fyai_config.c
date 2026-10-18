@@ -845,6 +845,8 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 		cfg->tool_update_interval_ms =
 			fy_get(v, "tool_update_interval_ms",
 			       cfg->tool_update_interval_ms);
+		cfg->idle_poll_ms = fy_get(v, "idle_poll_ms",
+					   cfg->idle_poll_ms);
 		cfg->tool_detail = fy_get(v, "tool_detail", cfg->tool_detail);
 		cfg->markdown = apply_bool(v, "markdown", cfg->markdown);
 		cfg->stream = apply_bool(v, "stream", cfg->stream);
@@ -3018,6 +3020,7 @@ void fyai_config_set_defaults(struct fyai_cfg *cfg)
 	cfg->screen = DEFAULT_SCREEN;
 	cfg->recap_exchanges = DEFAULT_RECAP_EXCHANGES;
 	cfg->tool_update_interval_ms = DEFAULT_TOOL_UPDATE_INTERVAL_MS;
+	cfg->idle_poll_ms = 16;
 	cfg->tool_detail = DEFAULT_TOOL_DETAIL;
 	cfg->branch_on_conflict = DEFAULT_BRANCH_ON_CONFLICT;
 	cfg->transcript_system = false;

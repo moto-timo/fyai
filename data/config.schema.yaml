@@ -914,6 +914,16 @@ properties:
         description: >-
           Set the minimum interval between progressive tool-output redraws. Zero
           repaints every update.
+      idle_poll_ms:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 16
+        description: >-
+          Set the interval at which an idle terminal UI wakes to look for
+          changes that no component announces, such as the output of a
+          terminal session. A longer interval costs less CPU while idle and
+          shows such a change later.
       session_margin:
         x-fyai-model: review
         type: string

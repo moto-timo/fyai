@@ -298,6 +298,7 @@ struct fyai_cfg {
 	int tool_history_lines;		/* rows of a live tool tile to scroll back */
 	int recap_exchanges;		/* interactive history recap exchanges */
 	int tool_update_interval_ms;
+	int idle_poll_ms;
 	int retry_max_attempts;		/* provider attempts, 1 = no retry */
 	int retry_initial_delay_ms;	/* first backoff delay */
 	int retry_max_delay_ms;		/* ceiling on one backoff delay */
