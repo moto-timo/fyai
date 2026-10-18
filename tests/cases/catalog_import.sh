@@ -165,6 +165,11 @@ run_fyai --set display/stream=false -m cat-model --set reasoning/effort=high "he
 assert_status_nonzero
 assert_stderr_contains "not reasoning-capable"
 
+# a verb that sends no request starts with that configuration: it is how the
+# user fixes it
+run_fyai -m cat-model --set reasoning/effort=high branch list
+assert_status 0
+
 # unknown models skip catalogue validation entirely
 run_fyai -m not-in-catalog config effective
 assert_status 0
