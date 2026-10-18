@@ -27,6 +27,10 @@ def timeout_scale():
     return scale if scale > 0 else 1.0
 
 
+# The end of a synchronized update: the verb has drawn a frame.
+FRAME_END = b"\x1b[?2026l"
+
+
 def unescape(text):
     return text.encode("utf-8").decode("unicode_escape").encode("latin1")
 
@@ -82,7 +86,6 @@ def main():
     send2 = os.environ.get("FYAI_TERM_SEND2", "")
     send_gap = float(os.environ.get("FYAI_TERM_SEND_GAP", "0.3"))
     resize = os.environ.get("FYAI_TERM_RESIZE", "")
-    resize_delay = float(os.environ.get("FYAI_TERM_RESIZE_DELAY", "0"))
     timeout = float(os.environ.get("FYAI_TERM_TIMEOUT", "20")) * scale
 
     master, child = os.openpty()
@@ -111,47 +114,51 @@ def main():
         if wait:
             read_until(master, sink, wait, deadline)
         if resize:
-            if resize_delay:
-                drain(master, sink,
-                      min(deadline, time.monotonic() + resize_delay))
             r, c = (int(v) for v in resize.split("x"))
             fcntl.ioctl(master, termios.TIOCSWINSZ,
                         struct.pack("HHHH", r, c, 0, 0))
             resize_dims = (r, c)
             wait2_from = len(sink[0])
-            # Let the verb forward the new grid to the child before any
-            # quit key tears it down. Without this a slow runner processes
-            # the resize only after the program has exited, and the size
-            # report the case greps for never reaches the capture.
-            drain(master, sink, min(deadline, time.monotonic() + 1.0))
-        if send:
-            os.write(master, unescape(send))
-        if send2:
-            # A second keystroke, after a gap: a chord a person types is two
-            # keys, and the library reads a frame at a time.
-            drain(master, sink, min(deadline, time.monotonic() + send_gap))
-            os.write(master, unescape(send2))
-        if wait2:
-            # Re-assert the size while waiting: a resize the verb missed
-            # (slow or heavily loaded runner) is delivered again instead of
-            # failing the case on one lost SIGWINCH.
-            reassert = [time.monotonic()]
 
-            def reassert_size():
-                if not resize_dims:
-                    return
-                if time.monotonic() - reassert[0] < 1.0:
-                    return
-                fcntl.ioctl(master, termios.TIOCSWINSZ,
-                            struct.pack("HHHH", resize_dims[0],
-                                        resize_dims[1], 0, 0))
-                reassert[0] = time.monotonic()
+        # Re-assert the size while waiting: a resize the verb missed (slow or
+        # heavily loaded runner) is delivered again instead of failing the
+        # case on one lost SIGWINCH.
+        reassert = [time.monotonic()]
 
+        def reassert_size():
+            if not resize_dims:
+                return
+            if time.monotonic() - reassert[0] < 1.0:
+                return
+            fcntl.ioctl(master, termios.TIOCSWINSZ,
+                        struct.pack("HHHH", resize_dims[0],
+                                    resize_dims[1], 0, 0))
+            reassert[0] = time.monotonic()
+
+        def await_wait2():
             if not drain(master, sink, deadline,
                          stop=lambda: wait2 in sink[0][wait2_from:],
                          tick=reassert_size):
                 raise RuntimeError("the terminal never painted %r; tail=%r" %
                                    (wait2, sink[0][-2000:]))
+
+        # After a resize the report of the program says that the verb
+        # forwarded the new grid. The keys wait for it, or they would tear the
+        # program down before it reports the size.
+        if resize and wait2:
+            await_wait2()
+        if send:
+            os.write(master, unescape(send))
+        if send2:
+            # A second keystroke, after a frame: a chord a person types is
+            # two keys, and the library reads a frame at a time. The gap
+            # bounds the wait for a program that draws nothing.
+            frames = sink[0].count(FRAME_END)
+            drain(master, sink, min(deadline, time.monotonic() + send_gap),
+                  stop=lambda: sink[0].count(FRAME_END) > frames)
+            os.write(master, unescape(send2))
+        if wait2 and not resize:
+            await_wait2()
         while time.monotonic() < deadline:
             ready, _, _ = select.select([master], [], [], 0.1)
             if ready:
