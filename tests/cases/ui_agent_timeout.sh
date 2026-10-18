@@ -18,7 +18,7 @@ FYAI_PTY_NEEDLE="The sub-agent was stopped." \
     "$FYAI_BIN" -k test-key --theme dark \
     --set display/markdown=true --set display/stream=false \
     --set tools=true --set api=responses --set builtin_shell=true \
-    --set agent/spawn=fork --set agent/timeout_ms=1500 \
+    --set agent/spawn=fork --set agent/timeout_ms=100 \
     --set agent/hang_timeout_ms=1500 \
     --set "api_url=$MOCK_URL/v1/responses" -m mock-model -i
 

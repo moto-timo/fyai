@@ -18,7 +18,7 @@ run_fyai --set display/stream=false --set agent/timeout_ms=0 \
 	 -m mock-model "delegate a task that does not end"
 assert_status 0
 assert_stdout_contains "The sub-agent was stopped."
-assert_any_request "'agent hang timeout after 3000 ms' in json.dumps(r)"
+assert_any_request "'agent hang timeout after 1600 ms' in json.dumps(r)"
 
 mock_stop 3
 pass

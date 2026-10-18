@@ -12,7 +12,7 @@
             "id": "fc-agent-1",
             "call_id": "call-agent-1",
             "name": "agent",
-            "arguments": "{\"name\": \"x\", \"description\": \"x\", \"task\": \"x\", \"timeout\": 1500}",
+            "arguments": "{\"name\": \"x\", \"description\": \"x\", \"task\": \"x\", \"timeout\": 100}",
             "status": "completed"
           }
         ]
