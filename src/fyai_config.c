@@ -1316,6 +1316,10 @@ static fy_generic config_merge(struct fy_generic_builder *gb,
 		bval = fy_get(out, key, fy_invalid);
 		if (fy_is_mapping(bval) && fy_is_mapping(val))
 			val = config_merge(gb, bval, val);
+		/* A layer repeats most of what is below it: keep the object
+		 * that is there, and spare an assoc that copies the mapping. */
+		if (fy_is_valid(bval) && fy_equal(bval, val))
+			continue;
 		out = fy_assoc(gb, out, key, val);
 	}
 	return out;
