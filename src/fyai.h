@@ -275,6 +275,7 @@ struct fyai_cfg {
 	size_t terminal_input_len;
 	const char *markdown_rev_on[2];	/* reverse-card pair, [0] dark [1] light */
 	const char *markdown_rev_off[2];
+	unsigned markdown_rev_pending;	/* bit i: pair i is not probed yet */
 	const char *turn_separator;	/* history inter-turn break (markdown) */
 	const char *tool_separator;	/* rendered before a tool result (markdown) */
 	const char *section_separator;	/* reasoning -> answer break (live stream) */

@@ -897,11 +897,7 @@ static void markdown_load_style(struct fyai_cfg *cfg, const char *auto_variant)
 	}
 	memset(cfg->markdown_rev_on, 0, sizeof(cfg->markdown_rev_on));
 	memset(cfg->markdown_rev_off, 0, sizeof(cfg->markdown_rev_off));
-
-	/* Cache the theme's user-turn bubble pair for both backgrounds so
-	 * fyai_bubble_fence() can draw the card's own top/bottom rows. */
-	markdown_probe_reverse(cfg, 0, "dark");
-	markdown_probe_reverse(cfg, 1, "light");
+	cfg->markdown_rev_pending = 3;
 }
 
 void fyai_markdown_load_style(struct fyai_cfg *cfg)
@@ -1017,6 +1013,12 @@ bool markdown_reverse_pair(struct fyai_cfg *cfg, const char **on,
 	int i = (cfg->theme_variant &&
 		 !strcmp(cfg->theme_variant, "light")) ? 1 : 0;
 
+	/* The pair of the user-turn card is probed on first use: a renderer
+	 * is made for each, and most runs draw no card. */
+	if (cfg->markdown_rev_pending & (1u << i)) {
+		cfg->markdown_rev_pending &= ~(1u << i);
+		markdown_probe_reverse(cfg, i, i ? "light" : "dark");
+	}
 	if (!cfg->markdown_rev_on[i] || !*cfg->markdown_rev_on[i])
 		return false;
 	*on = cfg->markdown_rev_on[i];
