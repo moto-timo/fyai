@@ -46,6 +46,7 @@ FYAI_TEST_ENTRY(event, arm_failure_is_clean, event_arm_failure_is_clean)
 FYAI_TEST_ENTRY(event, fd_reregister_in_dispatch, event_fd_reregister_in_dispatch)
 FYAI_TEST_ENTRY(event, fork_child_abandons_loop, event_fork_child_abandons_loop)
 FYAI_TEST_ENTRY(event, idle_returns, event_idle_returns)
+FYAI_TEST_ENTRY(event, sleep_until_done, event_sleep_until_done)
 FYAI_TEST_ENTRY(event, done_flag, event_done_flag)
 FYAI_TEST_ENTRY(event, timeout, event_timeout)
 FYAI_TEST_ENTRY(event, timer_lost_registration, event_timer_lost_registration)
@@ -1979,6 +1980,53 @@ int event_fork_child_abandons_loop(void)
 	FYAI_TCHECK(!rc);
 
 	test_fork_child_abandons_loop();
+
+	fyai_diag_drain(&test_cfg.diag);
+	fyai_diag_cleanup(&test_cfg.diag);
+	fyai_event_pool_drain(&test_ctx);
+	return 0;
+}
+
+static void test_sleep_until_done(void)
+{
+	struct fyai_event_loop *el;
+	volatile bool done = false;
+	fyai_event_ms_t start;
+	int rc;
+
+	el = fyai_event_loop_create(&test_ctx);
+	FYAI_TCHECK(el);
+
+	/* The flag ends the sleep long before its bound. */
+	rc = fyai_event_defer(el, dcb_flag, (void *)&done);
+	FYAI_TCHECK(!rc);
+	start = fyai_event_now_ms();
+	rc = fyai_event_sleep_until(el, TEST_BOUND_MS, &done);
+	FYAI_TCHECK(!rc);
+	FYAI_TCHECK(done);
+	FYAI_TCHECK(fyai_event_now_ms() - start < TEST_BOUND_MS);
+
+	/* A flag that is set already spares the sleep. */
+	FYAI_TCHECK(!fyai_event_sleep_until(el, TEST_BOUND_MS, &done));
+
+	/* Nothing sets the flag: the bound ends the sleep. */
+	done = false;
+	rc = fyai_event_sleep_until(el, 5, &done);
+	FYAI_TCHECK(!rc);
+	FYAI_TCHECK(!done);
+
+	fyai_event_loop_destroy(el);
+	printf("ok - sleep until a flag\n");
+}
+
+int event_sleep_until_done(void)
+{
+	int rc;
+
+	rc = fyai_diag_setup(&test_cfg.diag);
+	FYAI_TCHECK(!rc);
+
+	test_sleep_until_done();
 
 	fyai_diag_drain(&test_cfg.diag);
 	fyai_diag_cleanup(&test_cfg.diag);
