@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -43,6 +44,7 @@
 #include "fyai_tools.h"
 #include <sys/ioctl.h>
 #include "fyai_terminal_view.h"
+#include "fyai_cast.h"
 #include "fyai_workpane.h"
 #include "utils.h"
 
@@ -91,6 +93,7 @@ struct ui_log_entry;
 struct fyai_ui {
 	struct fyai_ctx *ctx;
 	struct fytim *ft;
+	struct fyai_cast *cast;		/* $FYAI_CAST: the terminal output */
 	/* Right-side input-header panel shared by both renderers. */
 	char *panel;
 	int panel_cols;
@@ -2803,6 +2806,7 @@ static enum fyai_event_action ui_service(struct fyai_ui *ui)
 			/* Use one terminal snapshot for both dimensions. */
 			(void)terminal_window_size(ui->tty_fd, &rows, &width);
 			ui_apply_resize(ui, rows, width);
+			fyai_cast_resize(ui->cast, width, rows);
 			break;
 		}
 		case FYTIM_EVENT_REDRAW:
@@ -2998,6 +3002,50 @@ static void ui_adopt_probe(struct fyai_ctx *ctx, struct fyai_ui *ui,
 	ctx->cfg->terminal_input_len = 0;
 }
 
+/* The terminal library gives each run of bytes it writes to the recording. */
+static void ui_cast_tap(const void *data, size_t len, void *user)
+{
+	fyai_cast_output(user, data, len);
+}
+
+/*
+ * $FYAI_CAST names a file, or a directory that gets a file for this process,
+ * for an asciicast of what the terminal shows. It records a session of a
+ * person, thus it is a debug aid: the file holds the whole screen. The
+ * variable is removed so a program that this one starts does not record to the
+ * same file.
+ */
+static void ui_cast_open(struct fyai_ui *ui, int cols, int rows)
+{
+	const char *target = getenv("FYAI_CAST");
+	char path[4096];
+	struct stat st;
+	int n;
+
+	if (!target || !*target)
+		return;
+	n = snprintf(path, sizeof(path), "%s", target);
+	if (n >= 0 && (size_t)n < sizeof(path) &&
+	    !stat(target, &st) && S_ISDIR(st.st_mode))
+		n = snprintf(path, sizeof(path), "%s/fyai-%ld-%lld.cast", target,
+			     (long)getpid(), (long long)time(NULL));
+	if (n < 0 || (size_t)n >= sizeof(path)) {
+		fyai_warning(ui->ctx, "cast: the path of the recording is too long");
+		unsetenv("FYAI_CAST");
+		return;
+	}
+	unsetenv("FYAI_CAST");
+	ui->cast = fyai_cast_open(ui->ctx, path, cols, rows, "fyai");
+	if (ui->cast)
+		(void)fytim_set_output_tap(ui->ft, ui_cast_tap, ui->cast);
+}
+
+void fyai_ui_marker(struct fyai_ctx *ctx, const char *label)
+{
+	if (ctx && ctx->ui)
+		fyai_cast_marker(ctx->ui->cast, label);
+}
+
 int fyai_ui_open(struct fyai_ctx *ctx)
 {
 	const struct fypal_term *term;
@@ -3058,6 +3106,7 @@ int fyai_ui_open(struct fyai_ctx *ctx)
 		ctx->cfg->render_width = width > 1 ? width - 1 : 0;
 		/* Record the initial render width. */
 		ui->render_cols = ctx->cfg->render_width;
+		ui_cast_open(ui, width, height);
 	}
 	fyai_ui_config_reassert(ctx);
 	ui_page_configure(ui);
@@ -3192,6 +3241,7 @@ void fyai_ui_close(struct fyai_ctx *ctx)
 	}
 	fymd_set_glyph_width(NULL);
 	fytim_destroy(ui->ft);
+	fyai_cast_close(ui->cast);
 	fymd_renderer_destroy(ui->chrome_renderer);
 	if (ui->tty_fd >= 0)
 		close(ui->tty_fd);
@@ -4194,6 +4244,7 @@ static bool ui_interrupt(struct fyai_ctx *ctx, bool quit)
 
 bool fyai_ui_interrupt(struct fyai_ctx *ctx)
 {
+	fyai_ui_marker(ctx, "interrupt");
 	return ui_interrupt(ctx, true);
 }
 

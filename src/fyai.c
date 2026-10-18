@@ -2395,6 +2395,8 @@ fyai_turn_run_submit(struct fyai_ctx *ctx, fy_generic turn)
 	struct fyai_turn_run *run;
 	int rc;
 
+	fyai_ui_marker(ctx, "turn");
+
 	if (!fyai_credential_available(ctx)) {
 		fyai_error(ctx, "no API key or ChatGPT login is available");
 		return NULL;
