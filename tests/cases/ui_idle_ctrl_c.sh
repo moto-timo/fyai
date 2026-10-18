@@ -97,26 +97,25 @@ try:
         raise SystemExit("idle Ctrl-C exit was not clean: %r" % (status,))
 finally:
     kill(pid)
+EOF
 
 # 2. Ctrl-C with a half-typed line discards the line and keeps the session;
-#    a further Ctrl-C, now on an empty prompt, ends it.
-pid, fd = spawn()
-try:
-    settle(fd, pid)
-    os.write(fd, b"do not submit me")
-    read_until(fd, b"do not submit me")
-    os.write(fd, b"\x03")
-    # The session is alive after the line went if it takes more input.
-    os.write(fd, b"alive")
-    read_until(fd, b"alive")
-    if os.waitpid(pid, os.WNOHANG)[0]:
-        raise SystemExit("Ctrl-C threw away a typed line and the session")
-    os.write(fd, b"\x03")
-    os.write(fd, b"\x03")
-    if wait_exit(fd, pid, 5) is None:
-        raise SystemExit("Ctrl-C after the line was discarded did not exit")
-finally:
-    kill(pid)
-EOF
+#    a further Ctrl-C, now on an empty prompt, ends it. Each key waits for the
+#    state the one before it made: SIGINT is a flag, and two that arrive
+#    before the loop runs are one.
+pty_run "$TEST_DIR/discard.out" "$FYAI_BIN" -k test-key -i <<'PTY' ||
+timeout: 30
+steps:
+  - write: "do not submit me"
+  - wait-screen: "do not submit me"
+  - write: "\x03"
+  - wait-gone: "do not submit me"
+  - write: "alive"
+  - wait-screen: "alive"
+  - write: "\x03"
+  - wait-gone: "alive"
+  - write: "\x03"
+PTY
+	fail "Ctrl-C after the line was discarded did not exit"
 
 pass
