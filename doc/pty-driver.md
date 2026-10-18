@@ -6,7 +6,7 @@ for the program. It types the keys of a script and it waits for a state of the
 window between two keys. It never waits for a time.
 
 ```sh
-fyai __pty-driver [--env NAME=VALUE]... SCRIPT OUTPUT PROGRAM [ARG...]
+fyai __pty-driver [--env NAME=VALUE]... [--cast PATH] SCRIPT OUTPUT PROGRAM [ARG...]
 ```
 
 The driver writes all the bytes that the program sent to the file OUTPUT. It
@@ -17,6 +17,33 @@ cause and returns a non-zero status.
 `--env` sets a variable in the environment of the program only. The driver
 keeps its own environment. A case that sets `FYAI_TRACE` uses this option, so
 the trace does not count the driver as a start of the program.
+
+## The recording
+
+`--cast PATH` records the session in an asciicast v2 file. A person plays it
+with `asciinema play`. The file holds the header, the bytes that the program
+sent (`o` events), the keys and the replies of the driver (`i` events), the
+resizes (`r` events), and a marker (`m` event) at the start of each step, such
+as `step 7: wait-screen Auth / provider`. The markers show where a failed
+wait began.
+
+The file is for a person. It has times, thus two runs do not give the same
+file, and a case does not compare it. It holds all that the terminal showed.
+Only its owner can read it.
+
+`pty_run` records each run. The file is named after the case and a random
+suffix of the script, thus a case that runs the driver more than once has one
+file for each run. A case that fails keeps its sandbox, and the recordings are
+in its `recordings` directory; the log of the failure names them. CI uploads
+the kept sandbox with the other logs. A case that passes removes them.
+
+With `$FYAI_CAST_DIR` set to a directory, `pty_run` records there and not in the
+sandbox, and the files stay:
+
+```sh
+FYAI_CAST_DIR=/tmp/casts ctest --test-dir build -R case_ui_page_ask
+asciinema play /tmp/casts/ui_page_ask-AbC123.cast
+```
 
 The shell function `pty_run OUTPUT PROGRAM [ARG...]` of `tests/harness.sh` runs
 the driver. It reads the script from standard input:
