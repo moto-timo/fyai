@@ -4,10 +4,29 @@ set -eu
 . "$(dirname "$0")/../harness.sh"
 
 fyai_test_setup
-mock_start ui_responses_shell_parallel.json
+
+# Each command prints, waits until the case has seen its output on the
+# screen, and prints again. The case releases both by one file.
+"$PYTHON" - "$SCENARIOS_DIR/ui_responses_shell_parallel.json" \
+    "$TEST_DIR/shell-parallel.json" "$TEST_DIR/release-shells" <<'PY'
+import json
+import sys
+
+scenario = json.load(open(sys.argv[1]))
+for call in scenario["steps"][0]["response"]["output"]:
+    cmd = call["action"]["commands"][0]
+    for sleep in ("sleep 2", "sleep 3"):
+        cmd = cmd.replace(sleep, 'until [ -e "%s" ]; do sleep 0.02; done' %
+                          sys.argv[3])
+    call["action"]["commands"][0] = cmd
+with open(sys.argv[2], "w") as out:
+    json.dump(scenario, out)
+PY
+mock_start "$TEST_DIR/shell-parallel.json"
 
 FYAI_PTY_INPUT="run both" \
 FYAI_PTY_PROGRESS_NEEDLE="native-early-a" \
+FYAI_PTY_PROGRESS_RELEASE="$TEST_DIR/release-shells" \
 FYAI_PTY_PROGRESS_TIMEOUT="3" \
 FYAI_PTY_NEEDLE="Native interactive tools done." \
 FYAI_PTY_AFTER="send:/status|wait-screen:Usage / total" \
