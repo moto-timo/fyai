@@ -65,4 +65,14 @@ assert_stdout_contains "killed by signal 15"
 run_fyai tool shell '{"command":"true"}'
 assert_status 0
 
+# --- argument names ---------------------------------------------------------
+# "cmd" is the same argument as "command".
+run_fyai tool shell '{"cmd":"echo via-cmd"}'
+assert_status 0
+assert_stdout_contains "via-cmd"
+
+# A call with neither name returns an error, not an empty success.
+run_fyai tool shell '{"description":"no command"}'
+assert_stdout_contains 'needs a string argument "command"'
+
 pass
