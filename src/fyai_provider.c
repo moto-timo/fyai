@@ -17,6 +17,7 @@
 
 #include "fyai_provider.h"
 #include "fyai_cost.h"
+#include "fyai_media.h"
 #include "fyai_tool_spec.h"
 #include "fyai_tools.h"
 
@@ -796,24 +797,7 @@ fy_generic fyai_responses_input(struct fyai_ctx *ctx, fy_generic messages)
 
 fy_generic fyai_item_text(struct fyai_ctx *ctx, fy_generic item)
 {
-	fy_generic content, chunks;
-	fy_generic part;
-	fy_generic t;
-
-	content = fy_get(item, "content");
-	chunks = fy_seq_empty;
-	if (fy_is_string(content))
-		return content;
-
-	fy_foreach(part, content) {
-		t = fy_get(part, "type");
-
-		if (fy_not_equal(t, "output_text") && fy_not_equal(t, "text"))
-			continue;
-
-		chunks = fy_append(ctx->transient_gb, chunks, fy_get(part, "text", ""));
-	}
-	return fyai_join_strings(ctx->transient_gb, chunks);
+	return fyai_media_text(ctx->transient_gb, fy_get(item, "content"));
 }
 
 fy_generic fyai_chat_input(struct fyai_ctx *ctx, fy_generic messages)

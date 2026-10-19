@@ -443,3 +443,94 @@ int fyai_media_image_read(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 err:
 	return -1;
 }
+
+/*
+ * The canonical part. The bytes travel in it; the digest names them and the
+ * numbers describe them, so a reader can show an image without decoding it,
+ * and an estimate can count the reference instead of the pixels.
+ */
+fy_generic fyai_media_image_part(struct fy_generic_builder *gb,
+				 const struct fyai_media_image *image)
+{
+	fy_generic part;
+	const char *type_name;
+
+	if (!gb || !image)
+		return fy_invalid;
+	type_name = fyai_media_type_name(image->type);
+	if (!type_name || !image->digest[0])
+		return fy_invalid;
+
+	part = fy_mapping(gb,
+		"type", FYAI_MEDIA_PART_IMAGE,
+		"media_type", type_name,
+		"digest", image->digest,
+		"width", (long long)image->width,
+		"height", (long long)image->height,
+		"bytes", (long long)image->bytes);
+	if (fy_is_string(image->data))
+		part = fy_assoc(gb, part, "data", image->data);
+	if (fy_is_valid(part) && image->name && *image->name)
+		part = fy_assoc(gb, part, "name", image->name);
+	return part;
+}
+
+bool fyai_media_part_is_image(fy_generic part)
+{
+	return fy_equal(fy_get(part, "type", fy_invalid),
+			FYAI_MEDIA_PART_IMAGE);
+}
+
+bool fyai_media_content_has_images(fy_generic content)
+{
+	fy_generic part;
+
+	if (!fy_is_sequence(content))
+		return false;
+	fy_foreach(part, content) {
+		if (fyai_media_part_is_image(part))
+			return true;
+	}
+	return false;
+}
+
+fy_generic fyai_media_parts(struct fy_generic_builder *gb, fy_generic content)
+{
+	fy_generic out, part;
+
+	if (!gb)
+		return fy_invalid;
+	out = fy_seq_empty;
+	if (!fy_is_sequence(content))
+		return out;
+	fy_foreach(part, content) {
+		if (!fyai_media_part_is_image(part))
+			continue;
+		out = fy_append(gb, out, part);
+	}
+	return out;
+}
+
+/*
+ * A string content is its own text and is returned borrowed, so a caller that
+ * only wants to read it allocates nothing. Everything else is joined into
+ * @gb. A part that is not a text run contributes nothing: an image carries no
+ * words, and a provider-specific part is wire detail of another grammar.
+ */
+fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content)
+{
+	fy_generic chunks, part;
+
+	if (fy_is_string(content))
+		return content;
+	if (!gb)
+		return fy_invalid;
+	chunks = fy_seq_empty;
+	fy_foreach(part, content) {
+		if (!fy_any_equal(fy_get(part, "type"), FYAI_MEDIA_PART_TEXT,
+				  "output_text"))
+			continue;
+		chunks = fy_append(gb, chunks, fy_get(part, "text", ""));
+	}
+	return fyai_join_strings(gb, chunks);
+}

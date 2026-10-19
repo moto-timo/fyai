@@ -31,6 +31,7 @@
 #include "fyai_event_fmt.h"
 #include "fyai_tool_registry.h"
 #include "fyai_markdown.h"
+#include "fyai_media.h"
 #include "fyai_output.h"
 #include "fyai_provider.h"
 #include "fyai_sink.h"
@@ -516,25 +517,6 @@ err:
 	return -1;
 }
 
-static fy_generic fyai_export_item_text(struct fy_generic_builder *gb,
-						fy_generic message)
-{
-	fy_generic content, chunks, part, type;
-
-	content = fy_get(message, "content");
-	if (fy_is_string(content))
-		return content;
-	chunks = fy_seq_empty;
-	fy_foreach(part, content) {
-		type = fy_get(part, "type");
-		if (fy_not_equal(type, "output_text") &&
-		    fy_not_equal(type, "text"))
-			continue;
-		chunks = fy_append(gb, chunks, fy_get(part, "text", ""));
-	}
-	return fyai_join_strings(gb, chunks);
-}
-
 static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 				     const struct fyai_export_calls *calls,
 				     fy_generic messages)
@@ -622,7 +604,7 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 		if (fy_is_string(content))
 			text = fy_castp(&content, "");
 		else if (fy_equal(fy_get(message, "type"), "message")) {
-			content = fyai_export_item_text(gb, message);
+			content = fyai_media_text(gb, fy_get(message, "content"));
 			text = fy_castp(&content, "");
 		} else
 			text = "";
@@ -2480,12 +2462,10 @@ static void fyai_emit_native_item(struct fyai_ctx *ctx, FILE *mf,
 	const char *r;
 	const char *args_str;
 	fy_generic rv;
-	fy_generic content;
 	fy_generic args;
-	fy_generic part;
 	fy_generic out;
 	fy_generic m;
-	fy_generic t;
+	fy_generic text;
 
 	m = c->msg;
 
@@ -2527,18 +2507,8 @@ static void fyai_emit_native_item(struct fyai_ctx *ctx, FILE *mf,
 		return;
 	}
 	if (fy_equal(c->type, "message")) {
-		content = fy_get(m, "content");
-		if (fy_is_string(content)) {
-			fprintf(mf, "%s\n\n", fy_cast(content, ""));
-			return;
-		}
-		fy_foreach(part, content) {
-			t = fy_get(part, "type");
-			if (fy_not_equal(t, "output_text") && fy_not_equal(t, "text"))
-				continue;
-			fprintf(mf, "%s", fy_get(part, "text", ""));
-		}
-		fprintf(mf, "\n\n");
+		text = fyai_media_text(tgb, fy_get(m, "content"));
+		fprintf(mf, "%s\n\n", fy_castp(&text, ""));
 		return;
 	}
 }

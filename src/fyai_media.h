@@ -18,6 +18,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <libfyaml/libfyaml-generic.h>
+
 struct fyai_ctx;
 
 /* The media types fyai recognises, from the bytes themselves. */
@@ -91,5 +93,39 @@ int fyai_media_image_read(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 
 /* How many bytes of the head of a file are read to type it and size it. */
 #define FYAI_MEDIA_HEAD_MAX (256 * 1024)
+
+/* The part type of an image, and of a text run of a content sequence. */
+#define FYAI_MEDIA_PART_IMAGE	"image"
+#define FYAI_MEDIA_PART_TEXT	"text"
+
+/*
+ * A canonical message carries one image as a part of its content sequence
+ * (doc/media.md). Content readers use these helpers to extract text and image
+ * parts.
+ */
+
+/* The canonical part of @image, built in @gb; it holds @image->data. */
+fy_generic fyai_media_image_part(struct fy_generic_builder *gb,
+				 const struct fyai_media_image *image);
+
+/* Whether @part is an image part of a content sequence. */
+bool fyai_media_part_is_image(fy_generic part);
+
+/* Whether @content carries at least one image part. */
+bool fyai_media_content_has_images(fy_generic content);
+
+/*
+ * The image parts of @content, in order, built in @gb. A string content and
+ * a content with no image part give an empty sequence.
+ */
+fy_generic fyai_media_parts(struct fy_generic_builder *gb, fy_generic content);
+
+/*
+ * The text of @content, built in @gb: a string content itself, borrowed, or
+ * the joined text parts of a sequence. An image part and a provider-specific
+ * part contribute no text. Every reader that wants the words of a message and
+ * not its media uses this function.
+ */
+fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content);
 
 #endif
