@@ -621,6 +621,88 @@ static fy_generic wire_tool_text(struct fyai_ctx *ctx, fy_generic output)
 	return fy_value(ctx->transient_gb, text ? text : "");
 }
 
+/* The base64 bytes of one image, as the part of @api that carries them. */
+static fy_generic wire_image_part(struct fyai_ctx *ctx, fy_generic part,
+				  enum fyai_api_mode api)
+{
+	struct fy_generic_builder *gb = ctx->transient_gb;
+	const char *type;
+	fy_generic out;
+	char *data;
+
+	type = fy_get(part, "media_type", "");
+	switch (api) {
+	case FYAI_API_RESPONSES:
+		data = fyai_media_part_data_url(ctx, part);
+		if (!data)
+			return fy_invalid;
+		out = fy_mapping(gb, "type", "input_image",
+				 "image_url", fy_value(gb, data));
+		free(data);
+		return out;
+	case FYAI_API_CHAT_COMPLETIONS:
+		data = fyai_media_part_data_url(ctx, part);
+		if (!data)
+			return fy_invalid;
+		out = fy_mapping(gb, "type", "image_url",
+				 "image_url", fy_mapping(gb,
+						"url", fy_value(gb, data)));
+		free(data);
+		return out;
+	case FYAI_API_MESSAGES:
+		data = fyai_media_part_base64(ctx, part);
+		if (!data)
+			return fy_invalid;
+		out = fy_mapping(gb, "type", "image",
+				 "source", fy_mapping(gb,
+						"type", "base64",
+						"media_type", type,
+						"data", fy_value(gb, data)));
+		free(data);
+		return out;
+	default:
+		assert(0);
+		__builtin_unreachable();
+	}
+}
+
+/*
+ * Canonical content as the wire of @api takes it: the text runs under
+ * @text_type, and each image in the shape of the grammar. Content with no
+ * image part is returned borrowed, so a text-only message keeps the shape it
+ * always had and a stored provider block array is not rewritten.
+ */
+static fy_generic wire_content(struct fyai_ctx *ctx, fy_generic content,
+			       enum fyai_api_mode api, const char *text_type)
+{
+	struct fy_generic_builder *gb = ctx->transient_gb;
+	fy_generic out, part, wire;
+
+	if (!fyai_media_content_has_images(content))
+		return content;
+	if (!ctx->cfg->image_input_supported) {
+		fyai_error(ctx, "the model '%s' takes no image input",
+			   ctx->cfg->model ? ctx->cfg->model : "");
+		return fy_invalid;
+	}
+	out = fy_seq_empty;
+	fy_foreach(part, content) {
+		if (fyai_media_part_is_image(part)) {
+			wire = wire_image_part(ctx, part, api);
+			if (fy_is_invalid(wire))
+				return fy_invalid;
+			out = fy_append(gb, out, wire);
+			continue;
+		}
+		if (fy_not_equal(fy_get(part, "type"), FYAI_MEDIA_PART_TEXT))
+			continue;
+		out = fy_append(gb, out, fy_mapping(gb,
+					"type", text_type,
+					"text", fy_get(part, "text", "")));
+	}
+	return out;
+}
+
 static fy_generic fyai_shell_output_sanitized(struct fyai_ctx *ctx,
 					      fy_generic m)
 {
@@ -786,6 +868,11 @@ fy_generic fyai_responses_input(struct fyai_ctx *ctx, fy_generic messages)
 		if (fy_is_invalid(content) ||
 		    fy_is_null(content))
 			content = fy_value("");
+		content = wire_content(ctx, content, FYAI_API_RESPONSES,
+				       "input_text");
+		if (fy_is_invalid(content))
+			return provider_result(ctx, content,
+					       "could not build the Responses input");
 		tmp = fy_mapping("role", fy_is_string(role) ? role : fy_value("user"),
 				 "content", content);
 		input = fy_append(ctx->transient_gb, input, tmp);
@@ -808,6 +895,7 @@ fy_generic fyai_chat_input(struct fyai_ctx *ctx, fy_generic messages)
 	size_t i, count;
 	fy_generic m, call, function;
 	fy_generic type;
+	fy_generic content;
 	const char *cmd;
 	const char *args;
 	bool is_call;
@@ -886,6 +974,14 @@ fy_generic fyai_chat_input(struct fyai_ctx *ctx, fy_generic messages)
 		if (fy_equal(fy_get(m, "role"), "tool") && fy_is_mapping(fy_get(m, "content", fy_invalid)))
 			m = fy_assoc(ctx->transient_gb, m, "content",
 				     wire_tool_text(ctx, fy_get(m, "content", fy_invalid)));
+		if (fyai_media_content_has_images(fy_get(m, "content"))) {
+			content = wire_content(ctx, fy_get(m, "content"),
+					       FYAI_API_CHAT_COMPLETIONS, "text");
+			if (fy_is_invalid(content))
+				return provider_result(ctx, content,
+						       "could not build the Chat input");
+			m = fy_assoc(ctx->transient_gb, m, "content", content);
+		}
 		if (fy_is_valid(fy_get(m, "acp_message_id", fy_invalid)))
 			m = fy_mapping("role", fy_get(m, "role", "user"),
 				       "content", fy_get(m, "content", ""));
@@ -956,7 +1052,9 @@ fy_generic fyai_messages_blocks(struct fyai_ctx *ctx, fy_generic messages)
 	fy_generic m, tool_calls, tc, fn, content, input, output;
 	fy_generic type, role;
 	fy_generic tmp;
+	fy_generic blocks, block;
 	const char *cmd, *text;
+	const char *role_name;
 
 	fy_foreach(m, messages) {
 		type = fy_get(m, "type");
@@ -1065,6 +1163,19 @@ fy_generic fyai_messages_blocks(struct fyai_ctx *ctx, fy_generic messages)
 		if (fy_is_invalid(content) ||
 		    fy_is_null(content))
 			content = fy_value("");
+		if (fyai_media_content_has_images(content)) {
+			blocks = wire_content(ctx, content, FYAI_API_MESSAGES,
+					      "text");
+			if (fy_is_invalid(blocks))
+				return provider_result(ctx, blocks,
+					"could not build the Messages input");
+			role_name = fy_is_string(role) ? fy_castp(&role, "") :
+						       "user";
+			fy_foreach(block, blocks)
+				out = messages_append_block(ctx, out, role_name,
+							    block);
+			continue;
+		}
 		if (fy_is_sequence(content)) {
 			out = fy_append(gb, out,
 					fy_mapping("role", fy_is_string(role) ?

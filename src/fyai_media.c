@@ -24,6 +24,7 @@
 #include <libfyaml/libfyaml-blake3.h>
 
 #include "fyai.h"
+#include "fyai_auth_util.h"
 #include "fyai_media.h"
 #include "fyai_diag.h"
 #include "utils.h"
@@ -641,4 +642,55 @@ int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 	free(base);
 	close(fd);
 	return rc;
+}
+
+bool fyai_media_part_has_bytes(fy_generic part)
+{
+	fy_generic data;
+
+	if (!fyai_media_part_is_image(part))
+		return false;
+	data = fy_get(part, "data", fy_invalid);
+	return fy_is_string(data) && !fy_empty(data);
+}
+
+char *fyai_media_part_base64(struct fyai_ctx *ctx, fy_generic part)
+{
+	fy_generic_sized_string raw;
+	fy_generic data;
+	char *out;
+
+	media_check(ctx, fyai_media_part_is_image(part), err,
+		    "the part is not an image");
+	media_check(ctx, fyai_media_part_has_bytes(part), err,
+		    "an image part carries no bytes");
+	data = fy_get(part, "data", fy_invalid);
+	raw = fy_castp(&data, fy_szstr_empty);
+	out = fyai_base64_encode((const unsigned char *)raw.data, raw.size);
+	media_check(ctx, out, err, "could not encode the image bytes");
+	return out;
+
+err:
+	return NULL;
+}
+
+char *fyai_media_part_data_url(struct fyai_ctx *ctx, fy_generic part)
+{
+	const char *type;
+	char *b64, *out;
+	int rc;
+
+	type = fy_get(part, "media_type", "");
+	if (!*type) {
+		fyai_error(ctx, "an image part names no media type");
+		return NULL;
+	}
+	b64 = fyai_media_part_base64(ctx, part);
+	if (!b64)
+		return NULL;
+	rc = asprintf(&out, "data:%s;base64,%s", type, b64);
+	free(b64);
+	if (rc < 0)
+		return NULL;
+	return out;
 }

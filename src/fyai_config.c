@@ -3367,6 +3367,10 @@ int fyai_config_resolve_model(struct fyai_cfg *cfg)
 	cat_ep = fyai_catalog_endpoint(cat_prov, cfg->api_mode);
 	cfg->shell_tool_supported = fy_get(fy_get(cat_ep, "capabilities"),
 					   "shell_tool_supported", false);
+	/* Image input is a model modality, independent of the provider. */
+	cfg->image_input_supported = fy_is_valid(cat_model) &&
+		config_contains(fy_get(cat_model, "modalities", fy_seq_empty),
+				fy_value("image"));
 	cfg->web_search_supported =
 		fyai_catalog_endpoint_has_hosted_tool(cat_ep, "web_search");
 	cfg->response_compaction_supported =

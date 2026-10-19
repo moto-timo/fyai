@@ -234,6 +234,8 @@ struct fyai_cfg {
 	bool web_search_notice_emitted;
 	/* The endpoint implements the OpenAI-specific /responses/compact route. */
 	bool response_compaction_supported;
+	/* Derived from the selected model's modalities; not persisted. */
+	bool image_input_supported;
 	bool model_explicit;
 	/*
 	 * Set when the key was supplied explicitly (--api-key or a config

@@ -207,6 +207,29 @@ int fyai_auth_store_delete(struct fyai_ctx *ctx, const char *name)
 	return -1;
 }
 
+/*
+ * Standard base64 with padding, which is what a data URL and an Anthropic
+ * image source carry. The base64url form below drops the padding and
+ * renames two characters, so the two are separate functions of one encoder.
+ */
+char *fyai_base64_encode(const unsigned char *data, size_t len)
+{
+	size_t cap = 4 * ((len + 2) / 3) + 1;
+	char *out;
+	int n;
+
+	out = malloc(cap);
+	if (!out)
+		return NULL;
+	n = EVP_EncodeBlock((unsigned char *)out, data, (int)len);
+	if (n < 0) {
+		free(out);
+		return NULL;
+	}
+	out[n] = '\0';
+	return out;
+}
+
 char *fyai_base64url_encode(const unsigned char *data, size_t len)
 {
 	size_t cap = 4 * ((len + 2) / 3) + 1;

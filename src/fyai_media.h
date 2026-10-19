@@ -128,6 +128,19 @@ fy_generic fyai_media_parts(struct fy_generic_builder *gb, fy_generic content);
  */
 fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content);
 
+/* Whether @part is an image part that carries its bytes. */
+bool fyai_media_part_has_bytes(fy_generic part);
+
+/*
+ * The bytes of the image that @part carries, base64 encoded, or NULL with a
+ * cause when the part has none. A grammar takes the bytes at the request
+ * boundary and stores nothing of them, so a conversation that gained an image
+ * on one grammar continues on another.
+ */
+char *fyai_media_part_base64(struct fyai_ctx *ctx, fy_generic part);
+/* The same bytes as a data URL, which two grammars carry the image in. */
+char *fyai_media_part_data_url(struct fyai_ctx *ctx, fy_generic part);
+
 /*
  * The attachments of one invocation. They wait in the context and the next
  * user message takes them, so a line typed after an attachment sends it, and
