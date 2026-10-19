@@ -27,6 +27,7 @@ FYAI_TEST_ENTRY(media, sniff_types, media_sniff_types)
 FYAI_TEST_ENTRY(media, dimensions, media_dimensions)
 FYAI_TEST_ENTRY(media, type_names, media_type_names)
 FYAI_TEST_ENTRY(media, content_parts, media_content_parts)
+FYAI_TEST_ENTRY(media, content_references, media_content_references)
 FYAI_TEST_ENTRY(media, image_roundtrip, media_image_roundtrip)
 FYAI_TEST_ENTRY(media, image_limits, media_image_limits)
 FYAI_TEST_ENTRY(media, pending_message, media_pending_message)
@@ -218,6 +219,66 @@ int media_content_parts(void)
 	text = fyai_media_text(gb, fy_null);
 	FYAI_TCHECK(fy_is_string(text) && fy_empty(text));
 	FYAI_TCHECK(!fyai_media_content_has_images(fy_null));
+
+	free(image.name);
+	fy_generic_builder_destroy(gb);
+	return 0;
+}
+
+/*
+ * The row a transcript shows and an export writes: the alt text describes the
+ * image from the reference alone, and the link names the image by digest. The
+ * same helper answers for a content and for the pending set of a message.
+ */
+int media_content_references(void)
+{
+	struct fy_generic_builder_cfg gb_cfg = {
+		.flags = FYGBCF_SCOPE_LEADER,
+	};
+	struct fyai_media_image image;
+	struct fy_generic_builder *gb;
+	fy_generic content, part, text, row;
+	const char *s;
+
+	gb = fy_generic_builder_create(&gb_cfg);
+	FYAI_TCHECK(gb);
+
+	memset(&image, 0, sizeof(image));
+	image.type = FYAI_MEDIA_TYPE_PNG;
+	image.width = 1024;
+	image.height = 768;
+	image.bytes = 98304;
+	strcpy(image.digest, "0123456789abcdef0123456789abcdef"
+			     "0123456789abcdef0123456789abcdef");
+	image.name = strdup("screenshot");
+	FYAI_TCHECK(image.name);
+	part = fyai_media_image_part(gb, &image);
+	FYAI_TCHECK(fy_is_valid(part));
+
+	row = fyai_media_part_reference(gb, part);
+	s = fy_castp(&row, "");
+	FYAI_TCHECK(!strcmp(s, "![image: PNG 1024x768, 96 KiB]"
+			    "(fyai-media:0123456789abcdef0123456789abcdef"
+			    "0123456789abcdef0123456789abcdef)"));
+
+	/* The text run comes first, and each image follows it on its own line. */
+	content = fy_sequence(gb,
+		fy_mapping(gb, "type", "text", "text", "look at this"),
+		part);
+	text = fyai_media_text_references(gb, content);
+	s = fy_castp(&text, "");
+	FYAI_TCHECK(!strcmp(s, "look at this\n\n![image: PNG 1024x768, 96 KiB]"
+			    "(fyai-media:0123456789abcdef0123456789abcdef"
+			    "0123456789abcdef0123456789abcdef)"));
+
+	/* A content with no image is its plain text, with no row. */
+	text = fyai_media_text_references(gb, fy_value("plain words"));
+	s = fy_castp(&text, "");
+	FYAI_TCHECK(!strcmp(s, "plain words"));
+
+	/* A part that is not an image has no row. */
+	FYAI_TCHECK(!fy_is_valid(fyai_media_part_reference(gb,
+			fy_mapping(gb, "type", "text", "text", "hello"))));
 
 	free(image.name);
 	fy_generic_builder_destroy(gb);
