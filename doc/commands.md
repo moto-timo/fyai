@@ -624,19 +624,23 @@ branch.
 
 ## fyai list
 
-list providers, models, turns, exchanges, or the ref log
+list providers, models, turns, exchanges, the ref log, or live work
 
 **Usage:** `fyai list [--full] [--raw] [WHAT]`
 
 List the configured providers, the models of the catalogue, the
 stored turns, the exchanges, or the ref log of the branch.
 
+In a session, `sessions` lists the live shells and sub-agents, and
+`shells`, `agents`, `waits`, `monitors`, `questions` and `messages`
+list one kind of live work. A verb has no live work and lists none.
+
 
 ### Arguments
 
 | Argument | Description |
 | --- | --- |
-| `WHAT` | what to list (providers, models, turns, exchanges, reflog); default providers |
+| `WHAT` | what to list (providers, models, turns, exchanges, reflog, sessions, shells, agents, waits, monitors, questions, messages); default providers |
 
 ### Options
 
@@ -3577,19 +3581,23 @@ branch.
 
 ## /list
 
-list providers, models, turns, exchanges, or the ref log
+list providers, models, turns, exchanges, the ref log, or live work
 
 **Usage:** `/list [--full] [WHAT]`
 
 List the configured providers, the models of the catalogue, the
 stored turns, the exchanges, or the ref log of the branch.
 
+In a session, `sessions` lists the live shells and sub-agents, and
+`shells`, `agents`, `waits`, `monitors`, `questions` and `messages`
+list one kind of live work. A verb has no live work and lists none.
+
 
 ### Arguments
 
 | Argument | Description |
 | --- | --- |
-| `WHAT` | what to list (providers, models, turns, exchanges, reflog); default providers |
+| `WHAT` | what to list (providers, models, turns, exchanges, reflog, sessions, shells, agents, waits, monitors, questions, messages); default providers |
 
 ### Options
 
