@@ -236,16 +236,16 @@ properties:
       Configure reasoning for supported models. The setting maps to the
       Responses API `reasoning: { effort, summary }` and to Chat
       Completions `reasoning_effort` (summary is Responses-only). Default
-      is unset (no reasoning requested) - there is no valid enum value for
-      "off", so the whole key is normally absent rather than null.
+      is unset (no reasoning requested). `none` also sends no reasoning
+      field; it overrides a value set at a lower layer.
     properties:
       effort:
         type: string
-        enum: [minimal, low, medium, high]
+        enum: [none, minimal, low, medium, high]
         description: Set the reasoning effort for supported models.
       summary:
         type: string
-        enum: [auto, concise, detailed]
+        enum: [none, auto, concise, detailed]
         description: Set the reasoning summary detail for Responses requests.
   tools:
     x-fyai-model: review
@@ -597,11 +597,11 @@ properties:
               properties:
                 effort:
                   type: string
-                  enum: [minimal, low, medium, high]
+                  enum: [none, minimal, low, medium, high]
                   description: Set the reasoning effort for this persona.
                 summary:
                   type: string
-                  enum: [auto, concise, detailed]
+                  enum: [none, auto, concise, detailed]
                   description: Set the reasoning summary verbosity for this persona.
       spawn:
         type: string

@@ -681,15 +681,20 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 			fyai_cfg_error(cfg, "reasoning must be a mapping");
 			return -1;
 		}
-		if (CONFIG_VALIDATE_ENUM(cfg, v, "effort",
+		if (CONFIG_VALIDATE_ENUM(cfg, v, "effort", "none",
 					 "minimal", "low", "medium", "high") ||
-		    CONFIG_VALIDATE_ENUM(cfg, v, "summary",
+		    CONFIG_VALIDATE_ENUM(cfg, v, "summary", "none",
 					 "auto", "concise", "detailed"))
 			return -1;
+		/* "none" requests no reasoning field: it equals an empty value. */
 		cfg->reasoning_effort = fy_get(v, "effort",
 					       cfg->reasoning_effort);
+		if (cfg->reasoning_effort && !strcmp(cfg->reasoning_effort, "none"))
+			cfg->reasoning_effort = NULL;
 		cfg->reasoning_summary = fy_get(v, "summary",
 						cfg->reasoning_summary);
+		if (cfg->reasoning_summary && !strcmp(cfg->reasoning_summary, "none"))
+			cfg->reasoning_summary = NULL;
 	}
 
 	v = fy_get(root, "api");
@@ -1953,17 +1958,17 @@ static fy_generic config_validate_report_shallow(struct fyai_cfg *cfg,
 
 		e = fy_get(v, "effort");
 		if (!fy_is_invalid(e) &&
-		    !config_contains(fy_sequence("minimal", "low",
+		    !config_contains(fy_sequence("none", "minimal", "low",
 						 "medium", "high"), e))
 			problems = config_problem_add(cfg->gb, problems,
-				"invalid reasoning.effort '%s' (minimal|low|medium|high)",
+				"invalid reasoning.effort '%s' (none|minimal|low|medium|high)",
 				fy_str(e));
 		s = fy_get(v, "summary");
 		if (!fy_is_invalid(s) &&
-		    !config_contains(fy_sequence("auto", "concise",
+		    !config_contains(fy_sequence("none", "auto", "concise",
 						 "detailed"), s))
 			problems = config_problem_add(cfg->gb, problems,
-				"invalid reasoning.summary '%s' (auto|concise|detailed)",
+				"invalid reasoning.summary '%s' (none|auto|concise|detailed)",
 				fy_str(s));
 	}
 
