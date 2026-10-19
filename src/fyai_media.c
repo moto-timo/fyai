@@ -568,6 +568,11 @@ fy_generic fyai_media_take_pending(struct fyai_ctx *ctx)
 /* Whether the next user message can take one more attachment. */
 static int media_attach_check(struct fyai_ctx *ctx)
 {
+	/* A pinned root reads one published state: it adds no message state. */
+	if (ctx->cfg->root_pinned) {
+		fyai_error(ctx, "a pinned root is read-only: it takes no attachment");
+		return -1;
+	}
 	if (ctx->cfg->media_max_per_message > 0 &&
 	    (int)fy_len(ctx->media_pending) >= ctx->cfg->media_max_per_message) {
 		fyai_error(ctx, "a message takes at most %d attachments",
