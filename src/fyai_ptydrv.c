@@ -204,14 +204,6 @@ struct driver {
 	bool snapshot_taken;
 };
 
-static double now_sec(void)
-{
-	struct timespec ts;
-
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
-}
-
 /*
  * How much longer every deadline waits. A deadline is a guess about a machine:
  * a sanitized build, or a suite run with many jobs at once, takes several
@@ -530,11 +522,11 @@ typedef bool (*pred_fn)(struct driver *d, struct step_wait *w);
 static bool wait_until(struct driver *d, pred_fn pred, struct step_wait *w,
 		       double deadline)
 {
-	double reassert = now_sec(), t, left;
+	double reassert = fyai_monotonic_sec(), t, left;
 	int ms;
 
 	while (!pred(d, w)) {
-		t = now_sec();
+		t = fyai_monotonic_sec();
 		if (t >= deadline)
 			break;
 		if (d->resized && t - reassert >= REASSERT_SEC) {
@@ -752,7 +744,7 @@ static double step_deadline(const struct driver *d, const struct step *st)
 {
 	if (st->session)
 		return d->session_end;
-	return now_sec() + (st->timeout >= 0 ? st->timeout : d->wait_sec);
+	return fyai_monotonic_sec() + (st->timeout >= 0 ? st->timeout : d->wait_sec);
 }
 
 /* Name a step on the timeline of the recording. */
@@ -1578,8 +1570,8 @@ static void session_kill(struct driver *d)
 	/* SIGTERM first: fyai ends the sessions it serves. A process that does
 	 * not end by the deadline is killed. */
 	kill(d->pid, SIGTERM);
-	until = now_sec() + TERM_GRACE_SEC * d->scale;
-	while (now_sec() < until) {
+	until = fyai_monotonic_sec() + TERM_GRACE_SEC * d->scale;
+	while (fyai_monotonic_sec() < until) {
 		done = waitpid(d->pid, &status, WNOHANG);
 		if (done) {
 			d->reaped = true;
@@ -1614,7 +1606,7 @@ static int session_exit(struct driver *d)
 	}
 	fyai_cast_input(d->cast, "/exit\n", 6);
 	write_quiet(d->master, "/exit\n", 6);
-	while (now_sec() < d->session_end) {
+	while (fyai_monotonic_sec() < d->session_end) {
 		if (!d->eof)
 			pump(d, POLL_MS);
 		else
@@ -1646,7 +1638,7 @@ static int session_run(struct driver *d)
 	size_t i;
 	int rc;
 
-	d->session_end = now_sec() + d->session_sec;
+	d->session_end = fyai_monotonic_sec() + d->session_sec;
 	rc = 0;
 	{
 		struct step ready = { .text = d->ready, .session = true,

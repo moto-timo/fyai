@@ -23,6 +23,7 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 
@@ -120,42 +121,61 @@ size_t fyai_utf8_length(const char *s)
 	return len;
 }
 
+ssize_t fyai_utf8_scan(const unsigned char *p, size_t n)
+{
+	unsigned char lo = 0x80, hi = 0xbf;
+	size_t len, i;
+
+	if (p[0] < 0x80)
+		return 1;
+	if (p[0] >= 0xc2 && p[0] <= 0xdf)
+		len = 2;
+	else if (p[0] >= 0xe0 && p[0] <= 0xef)
+		len = 3;
+	else if (p[0] >= 0xf0 && p[0] <= 0xf4)
+		len = 4;
+	else
+		return 0;
+	/* The second byte excludes overlong forms, surrogates and > U+10FFFF. */
+	if (p[0] == 0xe0)
+		lo = 0xa0;
+	else if (p[0] == 0xed)
+		hi = 0x9f;
+	else if (p[0] == 0xf0)
+		lo = 0x90;
+	else if (p[0] == 0xf4)
+		hi = 0x8f;
+	for (i = 1; i < len && i < n; i++) {
+		if (p[i] < lo || p[i] > hi)
+			return 0;
+		lo = 0x80;
+		hi = 0xbf;
+	}
+	return n < len ? -1 : (ssize_t)len;
+}
+
+double fyai_monotonic_sec(void)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+}
+
 bool data_is_wire_text(const char *data, size_t len)
 {
 	const unsigned char *p = (const unsigned char *)data;
-	unsigned int cp;
-	size_t i, n;
+	ssize_t n;
+	size_t i;
 
-	for (i = 0; i < len; i += n) {
-		if (p[i] < 0x80) {
-			n = 1;
-			cp = p[i];
-		} else if (p[i] >= 0xc2 && p[i] <= 0xdf) {
-			n = 2;
-			cp = p[i] & 0x1f;
-		} else if (p[i] >= 0xe0 && p[i] <= 0xef) {
-			n = 3;
-			cp = p[i] & 0x0f;
-		} else if (p[i] >= 0xf0 && p[i] <= 0xf4) {
-			n = 4;
-			cp = p[i] & 0x07;
-		} else {
+	for (i = 0; i < len; i += (size_t)n) {
+		n = fyai_utf8_scan(p + i, len - i);
+		if (n <= 0)
 			return false;
-		}
-		if (i + n > len)
+		if (n == 1 && p[i] < 0x20 && p[i] != '\t' && p[i] != '\n' &&
+		    p[i] != '\r')
 			return false;
-		for (size_t k = 1; k < n; k++) {
-			if ((p[i + k] & 0xc0) != 0x80)
-				return false;
-			cp = (cp << 6) | (p[i + k] & 0x3f);
-		}
-		if ((n == 2 && cp < 0x80) || (n == 3 && cp < 0x800) ||
-		    (n == 4 && cp < 0x10000) ||
-		    (cp >= 0xd800 && cp <= 0xdfff) || cp > 0x10ffff)
-			return false;
-		if (n == 1 && cp < 0x20 && cp != '\t' && cp != '\n' && cp != '\r')
-			return false;
-		if (n == 1 && cp == 0x7f)
+		if (n == 1 && p[i] == 0x7f)
 			return false;
 	}
 	return true;

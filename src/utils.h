@@ -163,6 +163,16 @@ bool data_is_binary(const char *data, size_t len);
 /* True when JSON can carry @data unchanged as UTF-8 text. */
 bool data_is_wire_text(const char *data, size_t len);
 
+/*
+ * Scan the UTF-8 character at @p, which has @n >= 1 bytes. Return its length,
+ * 0 when the bytes are not a valid character, or -1 when the @n bytes are
+ * the start of a valid character that needs more bytes.
+ */
+ssize_t fyai_utf8_scan(const unsigned char *p, size_t n);
+
+/* Seconds of the monotonic clock. */
+double fyai_monotonic_sec(void);
+
 /* The number of code points of the valid UTF-8 string @s. */
 size_t fyai_utf8_length(const char *s);
 
