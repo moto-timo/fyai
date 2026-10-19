@@ -543,6 +543,9 @@ struct fyai_cfg {
 	 * (batch/non-interactive use). */
 	const char *answers[10];	/* maximum 10 answers */
 	size_t answer_count;
+	/* Images that the first message of this invocation carries. */
+	const char *images[8];
+	size_t image_count;
 
 	/*
 	 * Repeatable --set/--get/--delete config operations, applied in order

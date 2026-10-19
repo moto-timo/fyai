@@ -3130,6 +3130,7 @@ enum {
 	OPT_SANDBOX = 256,
 	OPT_NEW,
 	OPT_ANSWER,
+	OPT_IMAGE,
 	OPT_COLOR,
 	OPT_THEME,
 	OPT_SET,
@@ -3162,6 +3163,7 @@ static const struct option long_options[] = {
 	{ "interactive", no_argument, NULL, 'i' },
 	{ "debug", no_argument, NULL, 'd' },
 	{ "answer", required_argument, NULL, OPT_ANSWER },
+	{ "image", required_argument, NULL, OPT_IMAGE },
 	{ "set", required_argument, NULL, OPT_SET },
 	{ "get", required_argument, NULL, OPT_GET },
 	{ "delete", required_argument, NULL, OPT_DELETE },
@@ -3741,6 +3743,15 @@ static int config_parse_cli_options(struct fyai_cfg *cfg, int argc, char *argv[]
 				return -1;
 			}
 			cfg->answers[cfg->answer_count++] =
+				fy_gb_intern_string(cfg->gb, optarg);
+			break;
+		case OPT_IMAGE:
+			if (cfg->image_count >= ARRAY_SIZE(cfg->images)) {
+				fyai_cfg_error(cfg, "too many images, max %zu",
+					ARRAY_SIZE(cfg->images));
+				return -1;
+			}
+			cfg->images[cfg->image_count++] =
 				fy_gb_intern_string(cfg->gb, optarg);
 			break;
 		case OPT_SET:

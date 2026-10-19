@@ -28,6 +28,7 @@ Do not edit; run `ninja docs-commands` to write it again.
 | `--theme THEME` | Markdown theme |
 | `-i`, `--interactive` | interactive prompt loop |
 | `--answer TEXT` | supply an ask_user answer in advance |
+| `--image PATH` | attach an image from a file to the prompt |
 | `-d`, `--debug` | increase the debug verbosity |
 
 # Verbs

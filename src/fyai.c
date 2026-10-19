@@ -2858,6 +2858,7 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	struct timespec t_setup;
 	fy_generic skill_msg;
 	char *instr;
+	size_t i;
 	int rc;
 
 	fyai_prof_stamp(&t_setup);
@@ -2906,6 +2907,16 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	if (!fyai_cfg_no_storage(cfg) &&
 	    !(fyai_cfg_storage_optional(cfg) && access(cfg->arena_dir, F_OK))) {
 		if (fyai_setup_storage(ctx))
+			goto err;
+	}
+	/*
+	 * The images that --image names wait for the first message, so both
+	 * the prompt of a verb and the first line of a session carry them.
+	 * They are attached here, after the arena is open: the bytes are
+	 * published beside that arena.
+	 */
+	for (i = 0; i < cfg->image_count; i++) {
+		if (fyai_media_attach_path(ctx, cfg->images[i], NULL, NULL))
 			goto err;
 	}
 

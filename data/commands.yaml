@@ -122,6 +122,13 @@ global:
         description: supply an ask_user answer in advance
         x-fyai-repeat: true
         x-fyai-meta: TEXT
+      image:
+        type: array
+        items: {type: string}
+        description: attach an image from a file to the prompt
+        x-fyai-repeat: true
+        x-fyai-meta: PATH
+        x-fyai-complete: file
       debug:
         type: boolean
         description: increase the debug verbosity
