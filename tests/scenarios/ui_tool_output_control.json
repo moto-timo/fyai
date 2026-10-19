@@ -1,0 +1,51 @@
+{
+ "steps": [
+  {
+   "response": {
+    "id": "c1",
+    "object": "chat.completion",
+    "created": 1,
+    "model": "mock-model",
+    "choices": [
+     {
+      "index": 0,
+      "message": {
+       "role": "assistant",
+       "content": null,
+       "tool_calls": [
+        {
+         "id": "t1",
+         "type": "function",
+         "function": {
+          "name": "exec_command",
+          "arguments": "{\"command\": \"printf 'line1\\\\n\\\\033P+q524742\\\\033\\\\\\\\\\\\033[?4m\\\\033[0mcard-model\\\\r\\\\r\\\\rwhat is this?\\\\nline3\\\\n'\", \"description\": \"emit\"}"
+         }
+        }
+       ]
+      },
+      "finish_reason": "tool_calls"
+     }
+    ]
+   }
+  },
+  {
+   "response": {
+    "id": "c2",
+    "object": "chat.completion",
+    "created": 2,
+    "model": "mock-model",
+    "choices": [
+     {
+      "index": 0,
+      "message": {
+       "role": "assistant",
+       "content": "FYAI_DONE_MARK",
+       "tool_calls": null
+      },
+      "finish_reason": "stop"
+     }
+    ]
+   }
+  }
+ ]
+}
