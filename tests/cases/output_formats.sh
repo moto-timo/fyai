@@ -36,6 +36,17 @@ check_json '"model" in d and "api" in d' api
 check_json 'isinstance(d, list) and d and "name" in d[0]' catalog list
 check_json '"models" in d and "providers" in d' catalog show
 
+# The image verbs answer with a document too: the waiting set, the image that
+# was attached, and the count that was dropped.
+check_json 'isinstance(d, list)' image list
+printf '\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00\x04\x00\x00\x00\x03\x00\x08\x06\x00\x00\x00' \
+	>"$TEST_DIR/shot.png"
+check_json 'd["media_type"] == "image/png" and d["pending"]' \
+	image add "$TEST_DIR/shot.png"
+# An attachment waits in one invocation, so a later one has nothing to drop;
+# the document still names the count it answered with.
+check_json 'set(d) == {"count"}' image clear
+
 run_fyai branch show main --output yaml
 assert_status 0
 assert_stdout_contains "branch: main"
