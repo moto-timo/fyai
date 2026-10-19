@@ -158,6 +158,9 @@ initialize each generic field explicitly.
 - `src/fyai_branch.c`: branch storage, references, and root selection.
 - `src/fyai_merge.c`: branch merge and rebase.
 - `src/fyai_catalog.c`: provider and model catalogue.
+- `src/fyai_media.c`: attachments that a message carries, their bytes, and
+  the clipboard helper (`doc/media.md`). `fyai_image.*` is something else:
+  the prebuilt embedded YAML images.
 - `src/fyai_skill.c`: branch-stored skills and the `skill` tool.
 - `src/fyai_settings.c`: the `settings` tool, which reads, selects and
   exports the configuration by the `x-fyai-model` access of each key, and
@@ -284,6 +287,35 @@ a slash table entry, or a hand-written parser.
 - A value that the process caches, such as a parsed embedded schema, lives
   in a builder of its own, never in the builder of the first caller: a handler
   releases its builder when the call ends.
+
+## Attachments
+
+An attachment is binary data that a model reads as media, not as text. Images
+are PNG, JPEG, GIF, and WebP; `doc/media.md` is the design.
+
+- The bytes are a binary string generic in the image part, `data`, so they
+  are in the arena with the message. Keep no copy of them outside it.
+- A message `content` is a string when it holds text only, and a sequence of
+  parts when it carries an image: `{type: text, text}` and
+  `{type: image, media_type, digest, width, height, bytes, data, name}`.
+- Emit YAML that can hold an image part with `FYOPEF_BINARY_BASE64`, so the
+  bytes are `!!binary`; JSON escapes them. Do not encode them by hand.
+- Do not walk `content` to find the words. Use `fyai_media_text()` for the
+  text and `fyai_media_parts()` for the images; those two keep the sequence
+  form in one place.
+- A wire form is derived at the request boundary in `src/fyai_provider.c`,
+  as every other canonical item is. Nothing wire-shaped is stored, so a
+  conversation can continue on another grammar.
+- Image input is a model property: `image_input_supported` is derived from
+  `image` in the model's `modalities`. Do not infer it from the provider name
+  or require an endpoint capability flag.
+- An attachment enters only where the user names it: `/image add`,
+  `/image paste`, or `--image`. A path typed in a line is text.
+- `fyai_make_user_message()` takes the attachments that wait; a message the
+  program writes uses `fyai_make_instruction_message()`, so an attachment
+  never leaves with a sub-agent instruction.
+- No terminal escape reads a clipboard, so `fyai_media_attach_clipboard()`
+  runs a helper. It is a sanitized child with a time limit.
 
 ## Persistent state and branches
 
