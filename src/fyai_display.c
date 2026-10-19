@@ -603,8 +603,14 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 		content = fy_get(message, "content", fy_invalid);
 		if (fy_is_string(content))
 			text = fy_castp(&content, "");
-		else if (fy_equal(fy_get(message, "type"), "message")) {
-			content = fyai_media_text(gb, fy_get(message, "content"));
+		else if (fy_equal(fy_get(message, "type"), "message") ||
+			 fyai_media_content_has_images(content)) {
+			/*
+			 * The words of the message, then one reference line per
+			 * attachment: an export does not carry the bytes, and it
+			 * names each image by its digest.
+			 */
+			content = fyai_media_text_references(gb, content);
 			text = fy_castp(&content, "");
 		} else
 			text = "";
@@ -2507,7 +2513,7 @@ static void fyai_emit_native_item(struct fyai_ctx *ctx, FILE *mf,
 		return;
 	}
 	if (fy_equal(c->type, "message")) {
-		text = fyai_media_text(tgb, fy_get(m, "content"));
+		text = fyai_media_text_references(tgb, fy_get(m, "content"));
 		fprintf(mf, "%s\n\n", fy_castp(&text, ""));
 		return;
 	}
@@ -2519,7 +2525,7 @@ static void fyai_emit_message_md(struct fyai_ctx *ctx, FILE *mf,
 				 int preview_lines, const char *result_lang,
 				 bool thinking)
 {
-	fy_generic part, origin;
+	fy_generic part, origin, rowtext;
 	const char *text;
 	char *s;
 
@@ -2528,6 +2534,21 @@ static void fyai_emit_message_md(struct fyai_ctx *ctx, FILE *mf,
 	if (c->is_native) {
 		fyai_emit_native_item(ctx, mf, tgb, c, preview_lines, result_lang,
 				      thinking);
+		return;
+	}
+
+	/*
+	 * A content sequence that carries an image has no string content, so it
+	 * is shown as its text and the reference rows of its attachments.
+	 */
+	if (fyai_media_content_has_images(c->content)) {
+		rowtext = fyai_media_text_references(tgb, c->content);
+		text = fy_castp(&rowtext, "");
+		if (fy_equal(c->role, "user")) {
+			fyai_emit_blockquote(mf, text);
+			fputs("\n\n", mf);
+		} else
+			fprintf(mf, "%s\n\n", text);
 		return;
 	}
 
@@ -5159,8 +5180,18 @@ static void fyai_print_card(struct fyai_ctx *ctx, const char *line, bool live)
 
 void fyai_echo_user_turn(struct fyai_ctx *ctx, const char *line)
 {
-	if (ctx && ctx->cfg->markdown && ctx->stdout_tty)
-		fyai_print_user_turn(ctx, line, true);
+	char *shown;
+
+	if (!ctx || !ctx->cfg->markdown || !ctx->stdout_tty)
+		return;
+	/*
+	 * The card shows the attachment rows beside the words that carry them.
+	 * The parts are still pending here: they wait for the message this line
+	 * is about to become.
+	 */
+	shown = fyai_media_pending_display(ctx, line);
+	fyai_print_user_turn(ctx, shown ? shown : line, true);
+	free(shown);
 }
 
 int fyai_render_display_output(struct fyai_ctx *ctx, const char *tag,

@@ -1574,12 +1574,16 @@ fy_generic fyai_turn_append_event(struct fyai_ctx *ctx, fy_generic turn,
 static int fyai_turn_run_append_user(struct fyai_turn_run *run, const char *text)
 {
 	struct fyai_ctx *ctx = run->ctx;
+	char *shown;
 
+	shown = fyai_media_pending_display(ctx, text);
 	run->turn = fyai_turn_append(ctx, run->turn,
 		fy_sequence(fyai_make_user_message(ctx, text)));
 	if (fy_is_valid(run->turn))
 		run->turn = fyai_output_record(ctx, run->turn,
-					       FYAI_OUTPUT_USER, text);
+					       FYAI_OUTPUT_USER,
+					       shown ? shown : text);
+	free(shown);
 	return fy_is_valid(run->turn) ? 0 : -1;
 }
 
@@ -3677,12 +3681,17 @@ static fy_generic fyai_interactive_append_user_turn(struct fyai_ctx *ctx,
 {
 	fy_generic turn, message;
 	const char *text;
+	char *shown;
 
+	shown = fyai_media_pending_display(ctx, line);
 	message = fyai_skill_user_message(ctx, fyai_ctx_transient_gb(ctx), line);
 	text = fy_is_string(message) ? fy_castp(&message, line) : line;
 	turn = fyai_turn_append(ctx, ctx->last_message,
 			fy_sequence(fyai_make_user_message(ctx, text)));
-	return fyai_output_record(ctx, turn, FYAI_OUTPUT_USER, line);
+	turn = fyai_output_record(ctx, turn, FYAI_OUTPUT_USER,
+				  shown ? shown : line);
+	free(shown);
+	return turn;
 }
 
 static int

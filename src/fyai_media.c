@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -537,6 +538,78 @@ fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content)
 	return fyai_join_strings(gb, chunks);
 }
 
+/* "PNG": the subtype of @media_type, upper case, for the alt text. */
+static void media_type_label(char *buf, size_t sz, const char *media_type)
+{
+	const char *slash;
+	size_t i;
+
+	slash = media_type ? strrchr(media_type, '/') : NULL;
+	if (slash && slash[1])
+		media_type = slash + 1;
+	if (!media_type)
+		media_type = "";
+	for (i = 0; media_type[i] && i + 1 < sz; i++)
+		buf[i] = (char)toupper((unsigned char)media_type[i]);
+	buf[i] = '\0';
+}
+
+/* "29 B", "96 KiB", "4.0 MiB": a size a person reads, not a byte count. */
+static void media_size_label(char *buf, size_t sz, long long bytes)
+{
+	if (bytes < 1024)
+		snprintf(buf, sz, "%lld B", bytes);
+	else if (bytes < 1024 * 1024)
+		snprintf(buf, sz, "%lld KiB", (bytes + 512) / 1024);
+	else
+		snprintf(buf, sz, "%.1f MiB", (double)bytes / (1024.0 * 1024.0));
+}
+
+fy_generic fyai_media_part_reference(struct fy_generic_builder *gb,
+				     fy_generic part)
+{
+	char type[32], size[32];
+	const char *mt, *dg;
+	long long width, height, bytes;
+
+	if (!gb || !fyai_media_part_is_image(part))
+		return fy_invalid;
+	mt = fy_get(part, "media_type", "");
+	dg = fy_get(part, "digest", "");
+	width = fy_get(part, "width", 0LL);
+	height = fy_get(part, "height", 0LL);
+	bytes = fy_get(part, "bytes", 0LL);
+	media_type_label(type, sizeof(type), mt);
+	media_size_label(size, sizeof(size), bytes);
+	return fy_stringf(gb, "![image: %s %lldx%lld, %s](fyai-media:%s)",
+			  type, width, height, size, dg);
+}
+
+fy_generic fyai_media_text_references(struct fy_generic_builder *gb,
+				      fy_generic content)
+{
+	fy_generic text, parts, part, chunks;
+	const char *s;
+
+	if (!fyai_media_content_has_images(content))
+		return fyai_media_text(gb, content);
+	if (!gb)
+		return fy_invalid;
+	text = fyai_media_text(gb, content);
+	chunks = fy_seq_empty;
+	s = fy_castp(&text, "");
+	if (s && *s)
+		chunks = fy_append(gb, chunks, text);
+	parts = fyai_media_parts(gb, content);
+	fy_foreach(part, parts) {
+		if (!fy_empty(chunks))
+			chunks = fy_append(gb, chunks, fy_value(gb, "\n\n"));
+		chunks = fy_append(gb, chunks,
+				   fyai_media_part_reference(gb, part));
+	}
+	return fyai_join_strings(gb, chunks);
+}
+
 /* Whether the next user message carries an attachment. */
 bool fyai_media_pending_any(const struct fyai_ctx *ctx)
 {
@@ -563,6 +636,25 @@ fy_generic fyai_media_take_pending(struct fyai_ctx *ctx)
 	pending = ctx->media_pending;
 	ctx->media_pending = fy_seq_empty;
 	return fy_is_sequence(pending) ? pending : fy_seq_empty;
+}
+
+char *fyai_media_pending_display(struct fyai_ctx *ctx, const char *text)
+{
+	struct fy_generic_builder *gb;
+	fy_generic content, shown, part;
+	const char *s;
+
+	if (!fyai_media_pending_any(ctx) || (gb = fyai_ctx_transient_gb(ctx)) == NULL)
+		return NULL;
+	content = fy_seq_empty;
+	content = fy_append(gb, content,
+			    fy_mapping(gb, "type", FYAI_MEDIA_PART_TEXT,
+				       "text", fy_value(gb, text ? text : "")));
+	fy_foreach(part, ctx->media_pending)
+		content = fy_append(gb, content, part);
+	shown = fyai_media_text_references(gb, content);
+	s = fy_castp(&shown, "");
+	return s ? strdup(s) : NULL;
 }
 
 /* Whether the next user message can take one more attachment. */

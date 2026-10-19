@@ -128,6 +128,24 @@ fy_generic fyai_media_parts(struct fy_generic_builder *gb, fy_generic content);
  */
 fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content);
 
+/*
+ * The Markdown reference that names @part: the row the transcript shows and
+ * the line the prose of an export writes for an attachment. The digest is the
+ * hook a later reader resolves; the alt text describes the image without
+ * reading its bytes.
+ */
+fy_generic fyai_media_part_reference(struct fy_generic_builder *gb,
+				     fy_generic part);
+
+/*
+ * The text of @content with one reference line after it for each image,
+ * built in @gb. This is what a reader that cannot draw an attachment shows,
+ * and what an export writes: the words of the message, then the images it
+ * names.
+ */
+fy_generic fyai_media_text_references(struct fy_generic_builder *gb,
+				      fy_generic content);
+
 /* Whether @part is an image part that carries its bytes. */
 bool fyai_media_part_has_bytes(fy_generic part);
 
@@ -153,6 +171,14 @@ bool fyai_media_pending_any(const struct fyai_ctx *ctx);
 void fyai_media_pending_clear(struct fyai_ctx *ctx);
 /* Take the pending image parts, and clear them. */
 fy_generic fyai_media_take_pending(struct fyai_ctx *ctx);
+
+/*
+ * @text with one reference row after it for each pending attachment: what the
+ * user card shows, and what the stored output records so an offline view says
+ * the same thing. The result is malloc'd, or NULL when nothing is pending and
+ * the caller should show @text itself.
+ */
+char *fyai_media_pending_display(struct fyai_ctx *ctx, const char *text);
 
 /*
  * Copy the bytes of @fd, or the file at @path, and add them to the next
