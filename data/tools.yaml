@@ -114,7 +114,8 @@
       header per file, then "@@ -old,count +new,count @@" hunks whose rows start with a space
       (context), "-" (removed) or "+" (added). Use /dev/null as the old path to add a file and as
       the new path to delete one. Line numbers are advisory; hunks are matched by their context. A
-      Codex-style *** Begin Patch / *** End Patch envelope is also accepted.
+      Codex-style *** Begin Patch / *** End Patch envelope is also accepted, with
+      *** Add File, *** Update File and *** Delete File rows or with a unified diff inside.
     parameters:
       type: object
       properties:

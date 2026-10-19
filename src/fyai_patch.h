@@ -2,16 +2,21 @@
 #ifndef FYAI_PATCH_H
 #define FYAI_PATCH_H
 
+#include <stdbool.h>
+
 struct fyai_ctx;
 
 char *fyai_apply_patch_text_ctx(struct fyai_ctx *ctx, const char *patch);
 /* Make the missing directories above @path. Return 0, or -1 with errno set. */
 int fyai_patch_ensure_parent_dir(const char *path);
 char *fyai_apply_patch_text(const char *patch);
+/* True when @patch is a unified diff, also inside a "*** Begin Patch" envelope. */
+bool fyai_patch_is_unified(const char *patch);
 /*
  * Convert an envelope to a unified diff for display. Call this before patch
  * application. Return NULL for a unified diff or a conversion error.
  */
+
 char *fyai_patch_to_unified(const char *patch);
 char *fyai_patch_to_unified_ctx(struct fyai_ctx *ctx, const char *patch);
 

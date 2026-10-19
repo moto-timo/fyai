@@ -1131,7 +1131,6 @@ static char *patch_ops_commit(struct patch_op *ops)
 	return NULL;
 }
 
-static bool patch_is_unified(const char *patch);
 
 /* Convert an envelope before the patch changes the target files. */
 
@@ -1331,7 +1330,7 @@ char *fyai_patch_to_unified_ctx(struct fyai_ctx *ctx, const char *patch)
 	bool have_line;
 	int rc = -1;
 
-	if (!patch || patch_is_unified(patch))
+	if (!patch || fyai_patch_is_unified(patch))
 		return NULL;
 	if (!patch_next_line(&r, &line))
 		return NULL;
@@ -1665,29 +1664,46 @@ out:
 	return err;
 }
 
-/* Detect a unified diff before an envelope marker. */
-static bool patch_is_unified(const char *patch)
+/*
+ * Detect a unified diff. An envelope whose first row after "*** Begin Patch"
+ * is a unified-diff header holds a unified diff: models mix the two forms.
+ * The marker rows then fall outside any hunk, and the parser skips them.
+ */
+static bool patch_is_unified_row(const struct patch_line *line)
+{
+	return (line->len >= 4 && !strncmp(line->p, "--- ", 4)) ||
+	       (line->len >= 3 && !strncmp(line->p, "@@ ", 3)) ||
+	       (line->len >= 11 && !strncmp(line->p, "diff --git ", 11));
+}
+
+bool fyai_patch_is_unified(const char *patch)
 {
 	struct patch_reader r = { .p = patch };
 	struct patch_line line;
 	char *ltrim;
-	bool unified;
+	bool unified, begin;
 
 	unified = false;
+	begin = false;
 	while (patch_next_line(&r, &line)) {
 		ltrim = patch_line_trim_dup(&line);
 		if (!ltrim)
 			return false;
-		if (!strcmp(ltrim, "*** Begin Patch")) {
+		if (!begin && !strcmp(ltrim, "*** Begin Patch")) {
 			free(ltrim);
-			return false;
+			if (unified)
+				return false;
+			begin = true;
+			continue;
 		}
 		free(ltrim);
+		if (begin && !line.len)
+			continue;
+		if (begin)
+			return patch_is_unified_row(&line);
 		if (unified)
 			continue;
-		unified = (line.len >= 4 && !strncmp(line.p, "--- ", 4)) ||
-			  (line.len >= 3 && !strncmp(line.p, "@@ ", 3)) ||
-			  (line.len >= 11 && !strncmp(line.p, "diff --git ", 11));
+		unified = patch_is_unified_row(&line);
 	}
 	return unified;
 }
@@ -1706,7 +1722,7 @@ char *fyai_apply_patch_text_ctx(struct fyai_ctx *ctx, const char *patch)
 	size_t changed;
 	bool have_line;
 
-	if (patch && patch_is_unified(patch))
+	if (patch && fyai_patch_is_unified(patch))
 		return apply_unified_patch(ctx, patch);
 
 	/* codex-rs tolerates leading/trailing whitespace around every "*** "
@@ -1782,7 +1798,11 @@ char *fyai_apply_patch_text_ctx(struct fyai_ctx *ctx, const char *patch)
 		} else {
 			free(ltrim);
 			patch_ops_free(ops);
-			return patch_err("expected file operation");
+			return patch_err("expected file operation\n"
+					 "start a row with \"*** Add File: PATH\", "
+					 "\"*** Update File: PATH\" or "
+					 "\"*** Delete File: PATH\", or send a "
+					 "unified diff without the envelope");
 		}
 		if (err) {
 			free(path);

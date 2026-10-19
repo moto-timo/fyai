@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "fyai_patch.h"
 #include "fyai_cost.h"
 #include "fyai_branch.h"
 #include "fyai_diff.h"
@@ -1540,28 +1541,6 @@ static char *patch_unified_path(const char *spec, bool *absent)
 	return path;
 }
 
-/* Detect a unified diff before an envelope marker. */
-static bool patch_text_is_unified(const char *patch)
-{
-	const char *p;
-	const char *nl;
-	size_t len;
-	bool unified;
-
-	unified = false;
-	for (p = patch; p && *p; p = nl ? nl + 1 : NULL) {
-		nl = strchr(p, '\n');
-		len = nl ? (size_t)(nl - p) : strlen(p);
-		if (len >= 15 && !strncmp(p, "*** Begin Patch", 15))
-			return false;
-		if (!unified)
-			unified = (len >= 4 && !strncmp(p, "--- ", 4)) ||
-				  (len >= 3 && !strncmp(p, "@@ ", 3)) ||
-				  (len >= 11 && !strncmp(p, "diff --git ", 11));
-	}
-	return unified;
-}
-
 /*
  * Read one file section for each "--- "/"+++ " header pair. Keep hunk headers
  * for gutter line numbers. Omit file headers because the title has the path.
@@ -1692,7 +1671,7 @@ static int patch_walk(struct fyai_ctx *ctx, const char *patch, void *user,
 	in_upd = false;
 	rc = 0;
 
-	if (patch && patch_text_is_unified(patch))
+	if (patch && fyai_patch_is_unified(patch))
 		return patch_walk_unified(ctx, patch, user, fn);
 
 	for (p = patch; p && *p && !rc; p = nl ? nl + 1 : NULL) {
