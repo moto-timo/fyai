@@ -1704,7 +1704,7 @@ static fy_generic config_doc_sync_derived_api(struct fy_generic_builder *gb,
 
 	mode = FYAI_API_RESPONSES;
 	cat_ep = fy_invalid;
-	for (i = 0; i < 3 && fy_is_invalid(cat_ep); i++) {
+	for (i = 0; i < FYAI_API_COUNT && fy_is_invalid(cat_ep); i++) {
 		cat_ep = fyai_catalog_endpoint(cat_prov, (enum fyai_api_mode)i);
 		if (fy_is_valid(cat_ep))
 			mode = (enum fyai_api_mode)i;
@@ -3179,6 +3179,48 @@ const char *fyai_config_provider_env_key(struct fy_generic_builder *gb,
 }
 
 /* Resolve the model offering, provider, wire id, and derived endpoint. */
+/*
+ * A change of `api` alone leaves the URL of the old grammar. When the stored
+ * URL is the catalogue URL of another grammar of the provider, the user did
+ * not choose it: keep the grammar and derive the URL from it. Keep any other
+ * URL, such as a proxy.
+ */
+static void config_api_url_follow_grammar(struct fyai_cfg *cfg,
+					  fy_generic cat_prov)
+{
+	fy_generic ep, want;
+	const char *root, *url;
+	int i;
+
+	ep = fyai_catalog_endpoint(cat_prov, cfg->api_mode);
+	if (fy_is_invalid(ep))
+		return;
+	root = fy_get(cat_prov, "root_url", "");
+	url = fy_get(ep, "endpoint", "");
+	want = fy_stringf(cfg->gb, "%s%s", root, url);
+	if (fy_equal(want, cfg->api_url))
+		return;
+	for (i = 0; i < FYAI_API_COUNT; i++) {
+		if (i == (int)cfg->api_mode)
+			continue;
+		ep = fyai_catalog_endpoint(cat_prov, (enum fyai_api_mode)i);
+		if (fy_is_invalid(ep))
+			continue;
+		if (!fy_equal(fy_stringf(cfg->gb, "%s%s", root,
+					 fy_get(ep, "endpoint", "")),
+			      cfg->api_url))
+			continue;
+		fyai_cfg_notice(cfg, "api_url %s is the endpoint of %s, not of %s; using %s",
+				cfg->api_url,
+				fyai_api_to_string((enum fyai_api_mode)i),
+				fyai_api_to_string(cfg->api_mode),
+				fy_castp(&want, ""));
+		cfg->api_url = fy_gb_intern_string(cfg->gb,
+						   fy_castp(&want, ""));
+		return;
+	}
+}
+
 static int config_resolve_catalog_model(struct fyai_cfg *cfg,
 					fy_generic catalog,
 					fy_generic *cat_provp)
@@ -3231,7 +3273,7 @@ static int config_resolve_catalog_model(struct fyai_cfg *cfg,
 		    fy_is_valid(cat_prov)) {
 			/* provider does not speak the current grammar: take
 			 * the first one it offers that fyai supports */
-			for (i = 0; i < 3 && fy_is_invalid(cat_ep); i++) {
+			for (i = 0; i < FYAI_API_COUNT && fy_is_invalid(cat_ep); i++) {
 				cat_ep = fyai_catalog_endpoint(cat_prov,
 						(enum fyai_api_mode)i);
 				if (fy_is_valid(cat_ep))
@@ -3243,6 +3285,9 @@ static int config_resolve_catalog_model(struct fyai_cfg *cfg,
 					fy_sprintfa("%s%s",
 						fy_get(cat_prov, "root_url", ""),
 						fy_get(cat_ep, "endpoint", "")));
+	}
+	else if (fy_is_valid(cat_prov)) {
+		config_api_url_follow_grammar(cfg, cat_prov);
 	}
 	*cat_provp = cat_prov;
 	return 0;

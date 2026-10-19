@@ -197,6 +197,9 @@ enum fyai_api_mode {
 	FYAI_API_MESSAGES,
 };
 
+/* The number of grammars. Keep it outside the enum: a switch need not name it. */
+#define FYAI_API_COUNT (FYAI_API_MESSAGES + 1)
+
 struct fypal_ctx;
 
 struct fyai_cfg {
