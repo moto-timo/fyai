@@ -554,6 +554,7 @@ set(FYAI_SOURCES
     src/fyai_cmd_help.c
     src/fyai_cmd_mcp.c
     src/fyai_cmd_session.c
+    src/fyai_cmd_media.c
     src/fyai_cmd_skill.c
     src/fyai_cmd_page.c
     src/fyai_cmd_misc.c

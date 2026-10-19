@@ -3041,6 +3041,113 @@ standard output as it stands.
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 
+## fyai image
+
+attach an image to the next message
+
+**Usage:** `fyai image {add|clear|list|paste} ...`
+
+Attach an image to the next message the model reads. An attachment is
+sent whole, so it is bounded by `media/max_bytes`, and one message
+carries at most `media/max_per_message` of them. The message holds
+the bytes, so they are kept in the arena with the conversation.
+
+A path is never taken from what you type in a line: an image enters
+only through `image add`, through `image paste`, or through an option
+that names it.
+
+
+### Commands
+
+| Command | Description |
+| --- | --- |
+| `add` | attach an image from a file |
+| `clear` | drop the images that wait for the next message |
+| `list` | list the images that wait for the next message |
+| `paste` | attach the image in the clipboard |
+
+## fyai image add
+
+attach an image from a file
+
+**Usage:** `fyai image add [--media-type TYPE] [--name NAME] PATH`
+
+Attach the image in PATH to the next message. The type is read from
+the bytes; a stated type that does not match them is an error.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `PATH` | the file that holds the image |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--media-type TYPE` | the type of the image; read from the bytes when not given |
+| `--name NAME` | what to call the image; the file name when not given |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+### Examples
+
+    fyai image add shot.png
+
+attach shot.png to the next message
+
+
+## fyai image paste
+
+attach the image in the clipboard
+
+**Usage:** `fyai image paste [--name NAME]`
+
+Attach the image held in the system clipboard to the next message.
+No escape sequence reads a clipboard, so this runs a helper: set
+`media/clipboard_command`, else `wl-paste`, `xclip`, `xsel`, or
+`pngpaste` is used.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--name NAME` | what to call the image |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai image clear
+
+drop the images that wait for the next message
+
+**Usage:** `fyai image clear`
+
+Drop every attachment that waits for the next message.
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai image list
+
+list the images that wait for the next message
+
+**Usage:** `fyai image list`
+
+List the attachments that the next message carries.
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
 ## fyai agent
 
 run one sub-agent on a task
@@ -5827,6 +5934,109 @@ Stop the live shell session or sub-agent NAME.
 | Argument | Description |
 | --- | --- |
 | `NAME` | the session or sub-agent |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /image
+
+attach an image to the next message
+
+**Usage:** `/image {add|clear|list|paste} ...`
+
+Attach an image to the next message the model reads. An attachment is
+sent whole, so it is bounded by `media/max_bytes`, and one message
+carries at most `media/max_per_message` of them. The message holds
+the bytes, so they are kept in the arena with the conversation.
+
+A path is never taken from what you type in a line: an image enters
+only through `image add`, through `image paste`, or through an option
+that names it.
+
+
+### Commands
+
+| Command | Description |
+| --- | --- |
+| `add` | attach an image from a file |
+| `clear` | drop the images that wait for the next message |
+| `list` | list the images that wait for the next message |
+| `paste` | attach the image in the clipboard |
+
+## /image add
+
+attach an image from a file
+
+**Usage:** `/image add [--media-type TYPE] [--name NAME] PATH`
+
+Attach the image in PATH to the next message. The type is read from
+the bytes; a stated type that does not match them is an error.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `PATH` | the file that holds the image |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--media-type TYPE` | the type of the image; read from the bytes when not given |
+| `--name NAME` | what to call the image; the file name when not given |
+| `-h`, `--help` | show this help |
+
+### Examples
+
+    /image add shot.png
+
+attach shot.png to the next message
+
+
+## /image paste
+
+attach the image in the clipboard
+
+**Usage:** `/image paste [--name NAME]`
+
+Attach the image held in the system clipboard to the next message.
+No escape sequence reads a clipboard, so this runs a helper: set
+`media/clipboard_command`, else `wl-paste`, `xclip`, `xsel`, or
+`pngpaste` is used.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--name NAME` | what to call the image |
+| `-h`, `--help` | show this help |
+
+## /image clear
+
+drop the images that wait for the next message
+
+**Usage:** `/image clear`
+
+Drop every attachment that waits for the next message.
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /image list
+
+list the images that wait for the next message
+
+**Usage:** `/image list`
+
+List the attachments that the next message carries.
 
 ### Options
 
