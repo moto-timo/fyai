@@ -106,6 +106,37 @@ const char *fyai_tool_call_name(struct fyai_ctx *ctx, fy_generic tool_call)
 		fy_gb_intern_string(ctx->transient_gb, fy_cast(v, "")));
 }
 
+/*
+ * The shell tool takes its command as "command". Codex calls it "cmd", and
+ * models that learned that name send it. Treat it as the same argument.
+ */
+static fy_generic fyai_tool_args_normalize(struct fy_generic_builder *gb,
+					   const char *name, fy_generic args)
+{
+	fy_generic cmd;
+
+	if (!name || strcmp(fyai_tool_name_canonical(name), "shell") ||
+	    !fy_is_mapping(args) || fy_is_valid(fy_get(args, "command",
+						       fy_invalid)))
+		return args;
+	cmd = fy_get(args, "cmd", fy_invalid);
+	if (!fy_is_string(cmd))
+		return args;
+	args = fy_assoc(gb, args, "command", cmd);
+	return fy_disassoc(gb, args, "cmd");
+}
+
+/* True when a call of the shell tool names no command to run. */
+static bool fyai_shell_args_lack_command(const char *name, fy_generic args)
+{
+	return name && !strcmp(fyai_tool_name_canonical(name), "shell") &&
+	       fy_is_mapping(args) &&
+	       !fy_is_string(fy_get(args, "command", fy_invalid));
+}
+
+#define FYAI_SHELL_NO_COMMAND \
+	"tool error: the shell tool needs a string argument \"command\""
+
 fy_generic fyai_tool_call_args(struct fyai_ctx *ctx, fy_generic tool_call)
 {
 	const char *args_text;
@@ -123,7 +154,9 @@ fy_generic fyai_tool_call_args(struct fyai_ctx *ctx, fy_generic tool_call)
 		assert(0);
 		__builtin_unreachable();
 	}
-	return parse_json_string(fyai_ctx_transient_gb(ctx), args_text);
+	return fyai_tool_args_normalize(fyai_ctx_transient_gb(ctx),
+		fyai_tool_call_name(ctx, tool_call),
+		parse_json_string(fyai_ctx_transient_gb(ctx), args_text));
 }
 
 const char *fyai_tool_call_id(struct fyai_ctx *ctx, fy_generic tool_call)
@@ -516,7 +549,8 @@ void fyai_print_tool_call(struct fyai_ctx *ctx, fy_generic tool_call,
 			break;
 		}
 
-		args = parse_json_string(ctx->transient_gb, args_text);
+		args = fyai_tool_args_normalize(ctx->transient_gb, name,
+			parse_json_string(ctx->transient_gb, args_text));
 		command = fy_get(args, "command", "");
 	} else {
 		command = "";
@@ -1831,7 +1865,8 @@ fy_generic fyai_execute_tool_call(struct fyai_ctx *ctx,
 		__builtin_unreachable();
 		break;
 	}
-	args = parse_json_string(ctx->transient_gb, args_text);
+	args = fyai_tool_args_normalize(ctx->transient_gb, name,
+		parse_json_string(ctx->transient_gb, args_text));
 	if (fy_is_invalid(args))
 		return fy_value(ctx->transient_gb, "tool error: invalid JSON arguments");
 	if (!fyai_skill_tool_allowed(ctx, fyai_tool_name_canonical(name)))
@@ -2250,6 +2285,9 @@ fy_generic fyai_tool_run_one(struct fyai_ctx *ctx, const char *name,
 	if (!def || (!def->run && !def->run_text))
 		return fy_gb_internalize(ctx->transient_gb,
 				fy_stringf("tool error: unknown tool %s", name));
+	args = fyai_tool_args_normalize(ctx->transient_gb, name, args);
+	if (fyai_shell_args_lack_command(name, args))
+		return fy_value(ctx->transient_gb, FYAI_SHELL_NO_COMMAND);
 	if (def->run)
 		return def->run(ctx, args, okp);
 
@@ -6249,9 +6287,15 @@ struct fyai_tool_job *fyai_tool_job_submit(struct fyai_ctx *ctx,
 				 "unsupported API mode for tool submission");
 	}
 	args = native_call ? tool_call :
-		parse_json_string(ctx->transient_gb, args_text);
+		fyai_tool_args_normalize(ctx->transient_gb, name,
+			parse_json_string(ctx->transient_gb, args_text));
 	fyai_error_check(ctx, fy_is_valid(args), err,
 			 "invalid tool call arguments");
+	if (!native_call && fyai_shell_args_lack_command(name, args)) {
+		fyai_tool_submit_error_set(ctx, "%s", FYAI_SHELL_NO_COMMAND);
+		fyai_tool_submit_check(ctx, false, err,
+				       "the shell call names no command");
+	}
 	if (fyai_agent_delegated(ctx)) {
 		char *header;
 
