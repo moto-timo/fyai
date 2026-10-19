@@ -17,6 +17,8 @@
 #include <unistd.h>
 
 #include "fyai_media.h"
+#include "fyai.h"
+#include "fyai_turn.h"
 #include "fyai_test.h"
 #include "fyai_test_registry.h"
 #include "fyai_test_scratch.h"
@@ -27,6 +29,7 @@ FYAI_TEST_ENTRY(media, type_names, media_type_names)
 FYAI_TEST_ENTRY(media, content_parts, media_content_parts)
 FYAI_TEST_ENTRY(media, image_roundtrip, media_image_roundtrip)
 FYAI_TEST_ENTRY(media, image_limits, media_image_limits)
+FYAI_TEST_ENTRY(media, pending_message, media_pending_message)
 
 /*
  * Headers of each type, with the size in them: PNG 1024x768, JPEG 640x480,
@@ -236,6 +239,20 @@ static int media_scratch_image(const char *tag, const void *data, size_t len)
 	return fd;
 }
 
+/* Write the bytes of @data to the scratch file @path. */
+static int media_scratch_write(const char *path, const void *data, size_t len)
+{
+	ssize_t wrote;
+	int fd, rc;
+
+	fd = open(path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+	FYAI_TCHECK(fd >= 0);
+	wrote = write(fd, data, len);
+	rc = wrote == (ssize_t)len ? 0 : -1;
+	close(fd);
+	return rc;
+}
+
 int media_image_roundtrip(void)
 {
 	struct fy_generic_builder *gb;
@@ -305,6 +322,90 @@ int media_image_limits(void)
 	fy_generic_builder_destroy(gb);
 	return 0;
 }
+/*
+ * An attachment waits in the context and the next user message carries it, as
+ * a text run and an image part. The message after it is text only, because an
+ * attachment travels with one message.
+ */
+int media_pending_message(void)
+{
+	struct fy_generic_builder_cfg gb_cfg = {
+		.flags = FYGBCF_SCOPE_LEADER,
+	};
+	struct fyai_cfg cfg;
+	struct fyai_ctx ctx;
+	fy_generic msg, content, text, part;
+	const char *path;
+	int rc;
+
+	path = fyai_test_scratch_file("media-pending-png", ".png");
+	FYAI_TCHECK(path);
+	rc = media_scratch_write(path, png_head, sizeof(png_head));
+	FYAI_TCHECK(!rc);
+
+	memset(&cfg, 0, sizeof(cfg));
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.cfg = &cfg;
+	ctx.gb = ctx.transient_gb = ctx.durable_gb =
+		fy_generic_builder_create(&gb_cfg);
+	FYAI_TCHECK(ctx.gb);
+	cfg.gb = ctx.gb;
+	cfg.media_max_bytes = 1024 * 1024;
+	cfg.media_max_per_message = 2;
+	ctx.media_pending = fy_seq_empty;
+
+	rc = fyai_media_attach_path(&ctx, path, NULL, "shot");
+	FYAI_TCHECK(!rc);
+	FYAI_TCHECK(fyai_media_pending_any(&ctx));
+
+	msg = fyai_make_user_message(&ctx, "what is wrong here?");
+	FYAI_TCHECK(fy_is_mapping(msg));
+	FYAI_TCHECK(fy_equal(fy_get(msg, "role"), "user"));
+	content = fy_get(msg, "content");
+	FYAI_TCHECK(fy_is_sequence(content) && fy_len(content) == 2);
+	FYAI_TCHECK(fy_equal(fy_get_at_path(content, 0, "type"), "text"));
+	FYAI_TCHECK(fy_equal(fy_get_at_path(content, 0, "text"),
+			     "what is wrong here?"));
+	FYAI_TCHECK(fyai_media_part_is_image(fy_get_at(content, 1)));
+	FYAI_TCHECK(fy_equal(fy_get_at_path(content, 1, "media_type"),
+			     "image/png"));
+	part = fy_get_at(content, 1);
+	FYAI_TCHECK(fy_get(part, "width", 0LL) == 1024);
+	FYAI_TCHECK(fy_equal(fy_get_at_path(content, 1, "name"), "shot"));
+
+	/* The readers in the rest of the program still see the words. */
+	text = fyai_media_text(ctx.gb, content);
+	FYAI_TCHECK(fy_equal(text, "what is wrong here?"));
+	FYAI_TCHECK(fyai_media_content_has_images(content));
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+
+	/* The next message carries no attachment. */
+	msg = fyai_make_user_message(&ctx, "and now?");
+	FYAI_TCHECK(fy_is_string(fy_get(msg, "content")));
+
+	/* An image with no words makes one part, not an empty text run. */
+	rc = fyai_media_attach_path(&ctx, path, "image/png", "again");
+	FYAI_TCHECK(!rc);
+	msg = fyai_make_user_message(&ctx, "");
+	content = fy_get(msg, "content");
+	FYAI_TCHECK(fy_is_sequence(content) && fy_len(content) == 1);
+	FYAI_TCHECK(fyai_media_part_is_image(fy_get_at(content, 0)));
+
+	/* Two are allowed, a third is refused with a cause. */
+	rc = fyai_media_attach_path(&ctx, path, NULL, NULL);
+	FYAI_TCHECK(!rc);
+	rc = fyai_media_attach_path(&ctx, path, NULL, NULL);
+	FYAI_TCHECK(!rc);
+	rc = fyai_media_attach_path(&ctx, path, NULL, NULL);
+	FYAI_TCHECK(rc < 0);
+	FYAI_TCHECK(fy_len(ctx.media_pending) == 2);
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+	fyai_media_pending_clear(&ctx);
+
+	fy_generic_builder_destroy(ctx.gb);
+	return 0;
+}
+
 #else
 int media_image_roundtrip(void)
 {
@@ -312,6 +413,11 @@ int media_image_roundtrip(void)
 }
 
 int media_image_limits(void)
+{
+	return 0;
+}
+
+int media_pending_message(void)
 {
 	return 0;
 }

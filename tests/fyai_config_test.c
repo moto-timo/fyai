@@ -595,6 +595,7 @@ int config_model_access(void)
 		"agent/hang_timeout_ms", "agent/timeout_kill",
 		"agent/max_live_agents", "agent/max_branch_depth",
 		"max_tool_iterations", "model_access",
+		"media/max_bytes", "media/max_per_message",
 	};
 	/* Keys that hide the work of the model or draw chrome it chose:
 	 * changed only after the user approves. */
