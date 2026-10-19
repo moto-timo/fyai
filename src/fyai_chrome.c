@@ -7,6 +7,7 @@
 
 #define FYAI_MODULE FYAIEM_DISPLAY
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -121,49 +122,67 @@ static char *chrome_buttons(struct fyai_ctx *ctx)
 	return out.data;
 }
 
+/* True when @p opens a UI Markdown tag. Other angle brackets are text. */
+static bool chrome_tag_at(const char *p, const char *end)
+{
+	p++;
+	if (p < end && *p == '/')
+		p++;
+	return end - p >= 3 && !strncmp(p, "fy-", 3);
+}
+
+/* An underscore between two letters or digits is text, not emphasis. */
+static bool chrome_intraword(const char *s, const char *p, const char *end)
+{
+	return p > s && p + 1 < end && isalnum((unsigned char)p[-1]) &&
+	       isalnum((unsigned char)p[1]);
+}
+
 /*
- * The columns that the text of the UI Markdown @s takes on a row: no tag, no
- * SGR sequence and no emphasis marker counts. With @plain, the text itself
- * goes to @plain, and a codepoint that would take it past @max columns ends
- * it. Returns the columns.
+ * Count the columns that the UI Markdown @s takes on a row. Tags, SGR
+ * sequences and emphasis markers take none. With @out, copy the source of @s,
+ * markup included, until a codepoint would pass @max columns. Return the
+ * columns.
  */
-static int chrome_markup_cols(const char *s, struct response_buffer *plain,
-			      int max)
+int fyai_chrome_markup_cols(const char *s, struct response_buffer *out,
+			    int max)
 {
 	unsigned int cp, prev = 0;
 	size_t n, len = s ? strlen(s) : 0;
 	int cols = 0, w;
-	const char *p = s, *end = s + len;
+	const char *p = s, *end = s + len, *start;
 
 	while (p && p < end) {
-		if (*p == '<') {
+		start = p;
+		if (*p == '<' && chrome_tag_at(p, end)) {
 			while (p < end && *p != '>')
 				p++;
 			p += p < end;
-			continue;
-		}
-		if (*p == '\x1b') {
+		} else if (*p == '\x1b') {
 			for (p++; p < end && !(*p >= '@' && *p <= '~' &&
 					       p[-1] != '\x1b'); p++)
 				;
 			p += p < end;
-			continue;
-		}
-		if (*p == '*' || *p == '`' || *p == '_' || *p == '\\') {
+		} else if (*p == '*' || *p == '`' || *p == '\\' ||
+			   (*p == '_' && !chrome_intraword(s, p, end))) {
 			p++;
-			continue;
+		} else {
+			/* A byte that is not UTF-8 takes one column. */
+			n = fymd_utf8_decode(p, (size_t)(end - p), &cp);
+			if (!n) {
+				n = 1;
+				cp = 0xfffd;
+			}
+			w = fymd_cp_width_next(prev, cp);
+			if (out && cols + w > max)
+				break;
+			cols += w;
+			prev = cp;
+			p += n;
 		}
-		n = fymd_utf8_decode(p, (size_t)(end - p), &cp);
-		if (!n)
+		if (out && response_buffer_append_data(out, start,
+						       (size_t)(p - start)))
 			break;
-		w = fymd_cp_width_next(prev, cp);
-		if (plain && cols + w > max)
-			break;
-		if (plain && response_buffer_append_data(plain, p, n))
-			break;
-		cols += w;
-		prev = cp;
-		p += n;
 	}
 	return cols;
 }
@@ -211,11 +230,11 @@ int fyai_chrome_update(struct fyai_ctx *ctx, struct fytim_surface *sf,
 	 */
 	granted = fyai_ui_surface_granted_cols(ctx, sf);
 	room = granted - markdown_gutter_cols(ctx->cfg) - 1 -
-	       chrome_markup_cols(spec->right, NULL, 0) -
-	       chrome_markup_cols(buttons, NULL, 0) - 1;
+	       fyai_chrome_markup_cols(spec->right, NULL, 0) -
+	       fyai_chrome_markup_cols(buttons, NULL, 0) - 1;
 	if (granted > 0 && room > 1 &&
-	    chrome_markup_cols(spec->title, NULL, 0) > room) {
-		(void)chrome_markup_cols(spec->title, &cut, room - 1);
+	    fyai_chrome_markup_cols(spec->title, NULL, 0) > room) {
+		(void)fyai_chrome_markup_cols(spec->title, &cut, room - 1);
 		if (!response_buffer_append(&cut, "\xe2\x80\xa6"))
 			short_title = cut.data;
 	}

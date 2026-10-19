@@ -160,6 +160,14 @@ int fyai_chrome_panel(struct fyai_ctx *ctx, struct response_buffer *out,
 		      int messages, enum fyai_error_type level,
 		      struct fyai_chrome_panel_info *info);
 
+/*
+ * Count the columns that the UI Markdown @s takes on a row. Tags, SGR
+ * sequences and emphasis markers take none. With @out, copy the source of @s,
+ * markup included, up to @max columns.
+ */
+int fyai_chrome_markup_cols(const char *s, struct response_buffer *out,
+			    int max);
+
 /* Map "none" to absent chrome; an empty string stays a rule. */
 const char *fyai_chrome_text(const char *v);
 
