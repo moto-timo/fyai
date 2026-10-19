@@ -483,6 +483,7 @@ set(FYAI_SOURCES
     src/fyai_asks.c
     src/fyai_todo.c
     src/fyai_skill.c
+    src/fyai_media.c
     src/fyai_branch.c
     src/fyai_merge.c
     src/fyai_diff.c
