@@ -1,0 +1,42 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "resp_ctx_1",
+        "object": "response",
+        "model": "img-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "message",
+            "id": "msg_ctx_1",
+            "role": "assistant",
+            "content": [
+              { "type": "output_text", "text": "Same answer." }
+            ]
+          }
+        ],
+        "usage": { "input_tokens": 12, "output_tokens": 3, "total_tokens": 15 }
+      }
+    },
+    {
+      "response": {
+        "id": "resp_ctx_2",
+        "object": "response",
+        "model": "img-model",
+        "status": "completed",
+        "output": [
+          {
+            "type": "message",
+            "id": "msg_ctx_2",
+            "role": "assistant",
+            "content": [
+              { "type": "output_text", "text": "Same answer." }
+            ]
+          }
+        ],
+        "usage": { "input_tokens": 12, "output_tokens": 3, "total_tokens": 15 }
+      }
+    }
+  ]
+}
