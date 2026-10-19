@@ -973,8 +973,6 @@ commands:
         description: Print the root handle.
         handler: root
         flags: [transient]
-        render:
-          document: flow
         arguments:
           type: object
           additionalProperties: false
