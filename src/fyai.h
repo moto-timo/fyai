@@ -96,6 +96,8 @@ static inline fy_generic fyai_generic_or_null(fy_generic v)
  */
 #define DEFAULT_MEDIA_MAX_BYTES (4 * 1024 * 1024)
 #define DEFAULT_MEDIA_MAX_PER_MESSAGE 8
+/* How long a clipboard helper may run before the read is refused. */
+#define DEFAULT_MEDIA_CLIPBOARD_TIMEOUT_MS 5000
 /* The bytes/4 rule the context estimator uses, in one place. */
 #define FYAI_BYTES_PER_TOKEN 4
 /* Default rendered rows of a tool result shown in the display view. */
@@ -323,6 +325,9 @@ struct fyai_cfg {
 	/* Attachments a message may carry, and the size of one (0 = no bound). */
 	long long media_max_bytes;
 	int media_max_per_message;
+	/* The program that reads an image out of the clipboard, or NULL. */
+	const char *media_clipboard_command;
+	int media_clipboard_timeout_ms;
 	int shell_max_output_tokens;	/* default shell output cap (0 = none) */
 	int shell_hard_max_output_tokens; /* cap on a model-requested size */
 	int shell_session_timeout_ms;	/* idle limit of a named session */

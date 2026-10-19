@@ -473,6 +473,23 @@ properties:
         default: 8
         description: >-
           Limit the images one message carries. 0 removes the bound.
+      clipboard_command:
+        x-fyai-model: hidden
+        type: string
+        default: ""
+        description: >-
+          Read the clipboard with this program instead of the helper that is
+          found. The program writes one image to standard output and takes an
+          optional argument that names the type it must produce.
+      clipboard_timeout_ms:
+        x-fyai-model: read
+        type: integer
+        minimum: 0
+        default: 5000
+        description: >-
+          Limit the time that the clipboard helper may run. A helper that
+          waits for a clipboard no program fills would otherwise hold the
+          scene. 0 removes the limit.
   agent:
     x-fyai-model: read
     type: object

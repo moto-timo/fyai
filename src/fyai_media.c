@@ -615,6 +615,26 @@ int fyai_media_attach_fd(struct fyai_ctx *ctx, int fd, const char *declared,
 	return media_attach_image(ctx, &image);
 }
 
+/* Add @len bytes at @data to the next user message. */
+static int media_attach_bytes(struct fyai_ctx *ctx, const void *data,
+			      size_t len, const char *name)
+{
+	struct fyai_media_image image;
+	uint64_t max_bytes;
+
+	if (media_attach_check(ctx))
+		return -1;
+	max_bytes = media_max_bytes(ctx);
+	if (max_bytes && len > max_bytes) {
+		fyai_error(ctx, "the attachment holds %zu bytes, more than the "
+			   "%llu byte limit", len, (unsigned long long)max_bytes);
+		return -1;
+	}
+	if (fyai_media_image_bytes(ctx, ctx->gb, data, len, NULL, name, &image))
+		return -1;
+	return media_attach_image(ctx, &image);
+}
+
 /* Add the file at @path to the next user message. */
 int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 			   const char *declared, const char *name)
@@ -693,4 +713,115 @@ char *fyai_media_part_data_url(struct fyai_ctx *ctx, fy_generic part)
 	if (rc < 0)
 		return NULL;
 	return out;
+}
+
+/*
+ * The helpers that read a clipboard, in the order they are tried. Each takes
+ * the type it must produce; a Wayland session has the first two, an X11
+ * session the next two, and macOS the last. Nothing here reads a clipboard
+ * itself: a terminal escape writes to one, and no reply carries its bytes.
+ */
+static const struct media_clipboard_cmd {
+	const char *prog;		/* the program, or NULL for a custom one */
+	const char *args;		/* what it takes to produce a PNG */
+	const char *needs;		/* an environment variable that names it */
+} media_clipboard_cmds[] = {
+	{ "wl-paste", "--no-newline --type image/png", "WAYLAND_DISPLAY" },
+	{ "wl-paste", "--no-newline --type image/bmp", "WAYLAND_DISPLAY" },
+	{ "xclip", "-selection clipboard -t image/png -o", "DISPLAY" },
+	{ "xsel", "--clipboard --output", "DISPLAY" },
+	{ "pngpaste", "-", NULL },
+};
+
+/*
+ * Run one helper and attach what it wrote. A helper that
+ * wrote nothing reports why, so the caller can name each attempt.
+ */
+static int media_clipboard_try(struct fyai_ctx *ctx, const char *command,
+			       const char *what, char *why, size_t whysz)
+{
+	static const char *const env_keep[] = {
+		"DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XAUTHORITY", NULL,
+	};
+	struct shell_command_opts opts = { .env_keep = env_keep };
+	struct shell_command_result result;
+	int rc = -1;
+	size_t len;
+
+	opts.timeout_ms = ctx->cfg->media_clipboard_timeout_ms > 0 ?
+			  (unsigned int)ctx->cfg->media_clipboard_timeout_ms : 0;
+	if (run_shell_command_capture_cb(ctx, command, &result, NULL, NULL,
+					 NULL, &opts)) {
+		snprintf(why, whysz, "%s could not run", what);
+		shell_command_result_cleanup(&result);
+		return -1;
+	}
+	len = result.stdout_len;
+	if (result.timed_out) {
+		snprintf(why, whysz, "%s took longer than %d ms", what,
+			 ctx->cfg->media_clipboard_timeout_ms);
+		goto out;
+	}
+	if (!len) {
+		snprintf(why, whysz, "%s wrote nothing", what);
+		goto out;
+	}
+	rc = media_attach_bytes(ctx, result.stdout_data, len, "clipboard");
+	if (rc)
+		snprintf(why, whysz, "%s did not write an image", what);
+out:
+	shell_command_result_cleanup(&result);
+	return rc;
+}
+
+/*
+ * A configured clipboard command replaces helper detection. Otherwise, try
+ * each helper available for the display and report the cause of each failure.
+ */
+int fyai_media_attach_clipboard(struct fyai_ctx *ctx)
+{
+	const struct media_clipboard_cmd *cmd;
+	char attempts[512] = "";
+	char why[192];
+	char *line = NULL;
+	const char *env;
+	size_t used = 0;
+	int rc;
+
+	env = ctx->cfg->media_clipboard_command;
+	if (env && *env)
+		return media_clipboard_try(ctx, env, "the clipboard command",
+					   why, sizeof(why)) ?
+		       fyai_error(ctx, "%s", why), -1 : 0;
+
+	for (cmd = media_clipboard_cmds;
+	     cmd < media_clipboard_cmds +
+		   sizeof(media_clipboard_cmds) / sizeof(media_clipboard_cmds[0]);
+	     cmd++) {
+		/* A helper of a display server that is not running cannot work. */
+		if (cmd->needs && !getenv(cmd->needs))
+			continue;
+		rc = asprintf(&line, "%s %s", cmd->prog, cmd->args);
+		if (rc < 0)
+			break;
+		why[0] = '\0';
+		rc = media_clipboard_try(ctx, line, cmd->prog, why, sizeof(why));
+		free(line);
+		line = NULL;
+		if (!rc)
+			return 0;
+		/* The first error of each attempt is dropped: the summary below
+		 * says what each helper did, which is what a user can act on. */
+		fyai_diag_reset(fyai_ctx_diag(ctx));
+		if (used < sizeof(attempts)) {
+			rc = snprintf(attempts + used, sizeof(attempts) - used,
+				      "%s%s: %s", used ? "; " : "",
+				      cmd->prog, why);
+			if (rc > 0)
+				used += (size_t)rc;
+		}
+	}
+	fyai_error(ctx, "could not read an image from the clipboard%s%s",
+		   used ? "; " : "", attempts);
+	return -1;
 }

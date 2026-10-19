@@ -530,6 +530,11 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 	cfg->media_max_bytes = fy_get(media, "max_bytes", cfg->media_max_bytes);
 	cfg->media_max_per_message = fy_get(media, "max_per_message",
 					    cfg->media_max_per_message);
+	cfg->media_clipboard_command = fy_get(media, "clipboard_command",
+					      cfg->media_clipboard_command ?
+					      cfg->media_clipboard_command : "");
+	cfg->media_clipboard_timeout_ms = fy_get(media, "clipboard_timeout_ms",
+						 cfg->media_clipboard_timeout_ms);
 	cfg->catalog_update_command = fy_get(fy_get(root, "catalog_update"),
 				"command", cfg->catalog_update_command ?
 					   cfg->catalog_update_command : "");
@@ -2987,6 +2992,8 @@ void fyai_config_set_defaults(struct fyai_cfg *cfg)
 	cfg->read_hard_max_bytes = DEFAULT_READ_HARD_MAX_BYTES;
 	cfg->media_max_bytes = DEFAULT_MEDIA_MAX_BYTES;
 	cfg->media_max_per_message = DEFAULT_MEDIA_MAX_PER_MESSAGE;
+	cfg->media_clipboard_command = "";
+	cfg->media_clipboard_timeout_ms = DEFAULT_MEDIA_CLIPBOARD_TIMEOUT_MS;
 	cfg->shell_max_output_tokens = DEFAULT_SHELL_MAX_OUTPUT_TOKENS;
 	cfg->shell_tty = false;
 	cfg->shell_shell = "";

@@ -123,10 +123,15 @@ read:
 
 # Images that a message carries. max_bytes limits one attachment: a larger
 # image is refused with a cause and is not scaled down. max_per_message
-# limits how many one message carries. Zero removes a limit.
+# limits how many one message carries. clipboard_command replaces the helper
+# that /image paste finds, and must write one image to standard output;
+# clipboard_timeout_ms limits how long that helper may run. Zero removes a
+# limit.
 media:
   max_bytes: 4194304
   max_per_message: 8
+  clipboard_command: ""
+  clipboard_timeout_ms: 5000
 
 # Sub-agent advisory limits, in milliseconds. timeout_ms applies when neither
 # the call nor persona sets one; max_timeout_ms caps a model-supplied limit.

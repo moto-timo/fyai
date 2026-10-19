@@ -164,4 +164,12 @@ int fyai_media_attach_fd(struct fyai_ctx *ctx, int fd, const char *declared,
 int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 			   const char *declared, const char *name);
 
+/*
+ * Read the system clipboard as an image and add it to the next user message.
+ * No terminal escape can read a clipboard, so this runs a helper program.
+ * media/clipboard_command names one; otherwise the helpers this system has
+ * are tried in turn, and a failure names what was tried and why each failed.
+ */
+int fyai_media_attach_clipboard(struct fyai_ctx *ctx);
+
 #endif
