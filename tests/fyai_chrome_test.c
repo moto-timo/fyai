@@ -8,6 +8,7 @@
 #define FYAI_MODULE FYAIEM_DISPLAY
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "fyai.h"
@@ -23,6 +24,7 @@ FYAI_TEST_ENTRY(chrome, a_tile_of_text_has_no_bar, chrome_text)
 FYAI_TEST_ENTRY(chrome, a_tool_exchange_scrolls, chrome_tool_text)
 FYAI_TEST_ENTRY(chrome, the_bar_follows_the_rows_it_shows, chrome_bar)
 FYAI_TEST_ENTRY(chrome, a_row_divides_into_margin_bar_and_body, chrome_frame)
+FYAI_TEST_ENTRY(chrome, a_cut_title_keeps_its_text, chrome_cut)
 
 static int failures;
 
@@ -178,5 +180,32 @@ int chrome_bar(void)
 	for (i = 1; i < 4; i++)
 		expect_part("short content", fyai_chrome_bar_part(3, 0, 5, 5, true, i),
 			    FYAI_CHROME_BAR_THUMB);
+	return failures;
+}
+
+static void expect_cut(const char *src, int max, const char *want)
+{
+	struct response_buffer cut = {};
+
+	(void)fyai_chrome_markup_cols(src, &cut, max);
+	if (!strcmp(cut.data ? cut.data : "", want)) {
+		free(cut.data);
+		return;
+	}
+	fprintf(stderr, "FAIL cut of \"%s\"\n  got:  \"%s\"\n  want: \"%s\"\n",
+		src, cut.data ? cut.data : "", want);
+	failures++;
+	free(cut.data);
+}
+
+int chrome_cut(void)
+{
+	failures = 0;
+	/* Underscores, a lone angle bracket and a bad byte stay in the cut. */
+	expect_cut("Read fy_seq_empty definition", 14, "Read fy_seq_em");
+	expect_cut("a < b and c > d", 9, "a < b and");
+	expect_cut("**shell** [x_y]", 9, "**shell** [x_");
+	expect_cut("ab\xff" "cd", 3, "ab\xff");
+	expect_cut("<fy-act id=\"a\">label</fy-act>", 3, "<fy-act id=\"a\">lab");
 	return failures;
 }
