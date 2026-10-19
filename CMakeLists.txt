@@ -213,7 +213,7 @@ if(NOT TARGET libfyaml::libfyaml)
     set(BUILD_TESTING OFF)
     FetchContent_Declare(libfyaml
         GIT_REPOSITORY https://github.com/pantoniou/libfyaml
-        GIT_TAG 44809845f2ff5039fc1eba966526b87bdf1f0de1
+        GIT_TAG 08eca6a6df1f9d08c1a84b3d02cd3b476e2adec7
     )
     FetchContent_MakeAvailable(libfyaml)
     set(BUILD_TESTING "${_FYAI_BUILD_TESTING}")
@@ -235,14 +235,14 @@ endif()
 # libfymermaid consume it.
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FyDeps.cmake)
 fyai_fy_dep(libfypalette 20db8800e89dac8f8f03dddaa528747c8ad99050)
-fyai_fy_dep(libfymd4c 07d428d9963b93d2e4a96f2a3ce2feb2470ec2d8)
+fyai_fy_dep(libfymd4c 2d28b3119a03c6fcff9efd7c120400c416e52023)
 
 if(FYAI_STATIC_DEPS AND TARGET libfyaml::fyaml_static)
     set_target_properties(libfyaml::fyaml_static PROPERTIES
         INTERFACE_LINK_LIBRARIES "Threads::Threads;m")
 endif()
 
-fyai_fy_dep(libfymermaid c44131c68a49f6de1ad1c083d7cb6576019bfa8a)
+fyai_fy_dep(libfymermaid 9026f951a862c795c54f9f6710ecae4b874e2610)
 fyai_fy_dep(libfytimui da011b9871b2a4097330ae1e191facc55548ae63)
 # libfyvterm: the terminal emulator behind the terminal view and the terminal
 # rendering tests.
