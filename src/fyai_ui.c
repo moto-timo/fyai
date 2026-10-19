@@ -321,7 +321,7 @@ static int ui_tool_render(struct fyai_ui *ui, const char *first_margin,
 {
 	struct response_buffer head = {0};
 	struct response_buffer out = {0};
-	const char *body;
+	const char *body, *title;
 	size_t body_len;
 	size_t title_len;
 	int preview;
@@ -330,11 +330,11 @@ static int ui_tool_render(struct fyai_ui *ui, const char *first_margin,
 
 	if (!ui->tool_band && !ui->tool_inline)
 		return 0;
-	title_len = ui->tool_title ? strlen(ui->tool_title) : 0;
+	title = ui->tool_title && *ui->tool_title ? ui->tool_title : "tool";
+	title_len = strlen(title);
 	/* Render the failure mark and cause in the shared title row. */
-	if (markdown_render_tool_head(ui->ctx->cfg,
-			ui->tool_title ? ui->tool_title : "shell",
-			title_len ? title_len : 5, ui->tool_error,
+	if (markdown_render_tool_head(ui->ctx->cfg, title, title_len,
+			ui->tool_error,
 			first_margin, markdown_gutter_blank(ui->ctx->cfg), &head))
 		goto out;
 	if (ui->tool_command &&
