@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include "fyai_provider.h"
+#include "fyai_media.h"
 #include "fyai_turn.h"
 
 static fy_generic fyai_turn_meta_set(struct fyai_ctx *ctx, fy_generic turn,
@@ -377,11 +378,38 @@ fy_generic fyai_append_assistant_response(struct fyai_ctx *ctx,
 	return fyai_turn_attach_tokens(ctx, turn);
 }
 
+/*
+ * The user's own line, with the attachments it carries. The pending parts are
+ * taken here, so an attachment travels with one message and not with every
+ * message after it. A run of text is a part of the sequence only when it has
+ * words: a provider rejects an empty text block beside an image.
+ */
 fy_generic fyai_make_user_message(struct fyai_ctx *ctx, const char *text)
 {
-	return fy_mapping(ctx->gb,
-		"role", "user",
-		"content", text);
+	fy_generic images, content;
+
+	images = fyai_media_take_pending(ctx);
+	if (fy_empty(images))
+		return fy_mapping(ctx->gb, "role", "user", "content", text);
+
+	content = fy_seq_empty;
+	if (!fy_str_empty(text))
+		content = fy_sequence(ctx->gb,
+			fy_mapping(ctx->gb, "type", FYAI_MEDIA_PART_TEXT,
+				   "text", text));
+	content = fy_concat(ctx->gb, content, images);
+	return fy_mapping(ctx->gb, "role", "user", "content", content);
+}
+
+/*
+ * A user-role message that the program wrote: a sub-agent instruction, a
+ * replayed prompt, a protocol message. It never carries an attachment of the
+ * user's, which would otherwise leave with the next instruction to a
+ * sub-agent.
+ */
+fy_generic fyai_make_instruction_message(struct fyai_ctx *ctx, const char *text)
+{
+	return fy_mapping(ctx->gb, "role", "user", "content", text);
 }
 
 fy_generic fyai_make_agent_message(struct fyai_ctx *ctx, const char *text,

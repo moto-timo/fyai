@@ -676,7 +676,7 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	/* Add a persona to a fork as a user instruction. */
 	if (fork_mode && !revive) {
 		ctx->last_message = fyai_turn_append(ctx, ctx->last_message,
-			fy_sequence(fyai_make_user_message(ctx,
+			fy_sequence(fyai_make_instruction_message(ctx,
 					cfg->system_prompt)));
 		ctx->last_message = fyai_output_record(ctx, ctx->last_message,
 			FYAI_OUTPUT_USER, cfg->system_prompt);
@@ -702,7 +702,7 @@ fy_generic fyai_agent_run(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	}
 	task = fy_castp(&task_v, "");
 	ctx->last_message = fyai_turn_append(ctx, ctx->last_message,
-		fy_sequence(fyai_make_user_message(ctx, task)));
+		fy_sequence(fyai_make_instruction_message(ctx, task)));
 	ctx->last_message = fyai_output_record(ctx, ctx->last_message,
 		FYAI_OUTPUT_USER, task);
 	fyai_prof_stamp(&t_intern);

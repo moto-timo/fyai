@@ -87,7 +87,10 @@ fy_generic fyai_turn_messages_since(struct fyai_ctx *ctx, fy_generic turn,
 fy_generic fyai_append_assistant_response(struct fyai_ctx *ctx,
 					  fy_generic turn,
 					  fy_generic response_doc);
+/* The user's line, with the attachments that wait for it. */
 fy_generic fyai_make_user_message(struct fyai_ctx *ctx, const char *text);
+/* A user-role message that the program wrote, which carries no attachment. */
+fy_generic fyai_make_instruction_message(struct fyai_ctx *ctx, const char *text);
 fy_generic fyai_make_agent_message(struct fyai_ctx *ctx, const char *text,
 				   const char *from, long long execution,
 				   const char *id, const char *reply_to);

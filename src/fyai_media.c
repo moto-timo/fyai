@@ -23,6 +23,7 @@
 
 #include <libfyaml/libfyaml-blake3.h>
 
+#include "fyai.h"
 #include "fyai_media.h"
 #include "fyai_diag.h"
 #include "utils.h"
@@ -533,4 +534,111 @@ fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content)
 		chunks = fy_append(gb, chunks, fy_get(part, "text", ""));
 	}
 	return fyai_join_strings(gb, chunks);
+}
+
+/* Whether the next user message carries an attachment. */
+bool fyai_media_pending_any(const struct fyai_ctx *ctx)
+{
+	return ctx && !fy_empty(ctx->media_pending);
+}
+
+void fyai_media_pending_clear(struct fyai_ctx *ctx)
+{
+	if (ctx)
+		ctx->media_pending = fy_seq_empty;
+}
+
+/*
+ * Take the pending attachments, which the next user message carries, and
+ * clear them: an attachment travels with one message, not with every message
+ * after it.
+ */
+fy_generic fyai_media_take_pending(struct fyai_ctx *ctx)
+{
+	fy_generic pending;
+
+	if (!ctx)
+		return fy_seq_empty;
+	pending = ctx->media_pending;
+	ctx->media_pending = fy_seq_empty;
+	return fy_is_sequence(pending) ? pending : fy_seq_empty;
+}
+
+/* Whether the next user message can take one more attachment. */
+static int media_attach_check(struct fyai_ctx *ctx)
+{
+	if (ctx->cfg->media_max_per_message > 0 &&
+	    (int)fy_len(ctx->media_pending) >= ctx->cfg->media_max_per_message) {
+		fyai_error(ctx, "a message takes at most %d attachments",
+			   ctx->cfg->media_max_per_message);
+		return -1;
+	}
+	return 0;
+}
+
+static uint64_t media_max_bytes(const struct fyai_ctx *ctx)
+{
+	return ctx->cfg->media_max_bytes > 0 ?
+	       (uint64_t)ctx->cfg->media_max_bytes : 0;
+}
+
+/*
+ * Add @image to the next user message. The part is built in ctx->gb, which
+ * holds the bytes, so it lives as long as the message that takes it.
+ */
+static int media_attach_image(struct fyai_ctx *ctx,
+			      struct fyai_media_image *image)
+{
+	fy_generic part;
+
+	part = fyai_media_image_part(ctx->gb, image);
+	fyai_media_image_release(image);
+	if (!fy_is_valid(part)) {
+		fyai_error(ctx, "could not record the attachment");
+		return -1;
+	}
+	ctx->media_pending = fy_append(ctx->gb, ctx->media_pending, part);
+	return 0;
+}
+
+int fyai_media_attach_fd(struct fyai_ctx *ctx, int fd, const char *declared,
+			 const char *name)
+{
+	struct fyai_media_image image;
+
+	if (media_attach_check(ctx))
+		return -1;
+	if (fyai_media_image_read(ctx, ctx->gb, fd, media_max_bytes(ctx),
+				  declared, name, &image))
+		return -1;
+	return media_attach_image(ctx, &image);
+}
+
+/* Add the file at @path to the next user message. */
+int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
+			   const char *declared, const char *name)
+{
+	char *base = NULL;
+	const char *leaf;
+	int fd, rc;
+
+	if (!path || !*path) {
+		fyai_error(ctx, "an attachment needs a path");
+		return -1;
+	}
+	fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
+		fyai_error(ctx, "could not open '%s': %s", path, strerror(errno));
+		return -1;
+	}
+	if (!name || !*name) {
+		leaf = strrchr(path, '/');
+		leaf = leaf ? leaf + 1 : path;
+		if (*leaf)
+			base = strdup(leaf);
+	}
+	rc = fyai_media_attach_fd(ctx, fd, declared, base ? base : name);
+	free(base);
+	close(fd);
+	return rc;
 }

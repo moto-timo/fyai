@@ -423,7 +423,7 @@ void fyai_config_sandbox_lockdown(struct fyai_cfg *cfg)
 int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 {
 	fy_generic v, sb, tbv, shell, retry, secret_ref, zoom_rows, preview_width;
-	fy_generic rtype, rname;
+	fy_generic rtype, rname, media;
 
 	if (fy_is_invalid(root))
 		return 0;
@@ -526,6 +526,10 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 	cfg->shell_login = apply_bool(shell, "login", cfg->shell_login);
 	cfg->shell_tty_rows = fy_get(shell, "tty_rows", cfg->shell_tty_rows);
 	cfg->shell_tty_cols = fy_get(shell, "tty_cols", cfg->shell_tty_cols);
+	media = fy_get(root, "media");
+	cfg->media_max_bytes = fy_get(media, "max_bytes", cfg->media_max_bytes);
+	cfg->media_max_per_message = fy_get(media, "max_per_message",
+					    cfg->media_max_per_message);
 	cfg->catalog_update_command = fy_get(fy_get(root, "catalog_update"),
 				"command", cfg->catalog_update_command ?
 					   cfg->catalog_update_command : "");
@@ -2981,6 +2985,8 @@ void fyai_config_set_defaults(struct fyai_cfg *cfg)
 	cfg->shell_max_timeout_ms = DEFAULT_SHELL_MAX_TIMEOUT_MS;
 	cfg->read_max_bytes = DEFAULT_READ_MAX_BYTES;
 	cfg->read_hard_max_bytes = DEFAULT_READ_HARD_MAX_BYTES;
+	cfg->media_max_bytes = DEFAULT_MEDIA_MAX_BYTES;
+	cfg->media_max_per_message = DEFAULT_MEDIA_MAX_PER_MESSAGE;
 	cfg->shell_max_output_tokens = DEFAULT_SHELL_MAX_OUTPUT_TOKENS;
 	cfg->shell_tty = false;
 	cfg->shell_shell = "";

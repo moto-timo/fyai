@@ -121,6 +121,13 @@ read:
   max_bytes: 262144
   hard_max_bytes: 4194304
 
+# Images that a message carries. max_bytes limits one attachment: a larger
+# image is refused with a cause and is not scaled down. max_per_message
+# limits how many one message carries. Zero removes a limit.
+media:
+  max_bytes: 4194304
+  max_per_message: 8
+
 # Sub-agent advisory limits, in milliseconds. timeout_ms applies when neither
 # the call nor persona sets one; max_timeout_ms caps a model-supplied limit.
 # A completed agent reports whether it exceeded the advisory limit.

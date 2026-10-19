@@ -128,4 +128,27 @@ fy_generic fyai_media_parts(struct fy_generic_builder *gb, fy_generic content);
  */
 fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content);
 
+/*
+ * The attachments of one invocation. They wait in the context and the next
+ * user message takes them, so a line typed after an attachment sends it, and
+ * a line typed later does not send it again.
+ */
+
+/* Whether the next user message carries an attachment. */
+bool fyai_media_pending_any(const struct fyai_ctx *ctx);
+/* Drop the attachments that no message took. */
+void fyai_media_pending_clear(struct fyai_ctx *ctx);
+/* Take the pending image parts, and clear them. */
+fy_generic fyai_media_take_pending(struct fyai_ctx *ctx);
+
+/*
+ * Copy the bytes of @fd, or the file at @path, and add them to the next
+ * user message. @declared is the type the caller states, or NULL; @name is
+ * what the image is called, or NULL to take the file name.
+ */
+int fyai_media_attach_fd(struct fyai_ctx *ctx, int fd, const char *declared,
+			 const char *name);
+int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
+			   const char *declared, const char *name);
+
 #endif

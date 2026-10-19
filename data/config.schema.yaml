@@ -453,6 +453,26 @@ properties:
         description: >-
           Limit read_file bytes requested by the model. 0 removes the
           bound.
+  media:
+    x-fyai-model: read
+    type: object
+    additionalProperties: false
+    description: Configure the images that a message carries.
+    properties:
+      max_bytes:
+        type: integer
+        minimum: 0
+        default: 4194304
+        description: >-
+          Limit the size of one attachment. A larger image is refused with a
+          cause; it is not scaled down, because that needs a codec. 0 removes
+          the bound.
+      max_per_message:
+        type: integer
+        minimum: 0
+        default: 8
+        description: >-
+          Limit the images one message carries. 0 removes the bound.
   agent:
     x-fyai-model: read
     type: object

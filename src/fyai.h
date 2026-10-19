@@ -24,6 +24,7 @@
 #include "commands.h"
 #include "fyai_auth.h"
 #include "fyai_diag.h"
+#include "fyai_media.h"
 
 struct fyai_fenced_stream;	/* live progressive shell output (fyai_markdown.h) */
 struct fyai_ui;
@@ -88,6 +89,13 @@ static inline fy_generic fyai_generic_or_null(fy_generic v)
 #define DEFAULT_SHELL_SESSION_TIMEOUT_MS 900000
 #define DEFAULT_SHELL_INPUT_POLL_MS 400
 #define DEFAULT_SHELL_HARD_MAX_OUTPUT_TOKENS 200000
+/*
+ * An attachment is sent whole and counted against the context of every
+ * request that carries it, so its size and its number in one message are
+ * both bounded.
+ */
+#define DEFAULT_MEDIA_MAX_BYTES (4 * 1024 * 1024)
+#define DEFAULT_MEDIA_MAX_PER_MESSAGE 8
 /* The bytes/4 rule the context estimator uses, in one place. */
 #define FYAI_BYTES_PER_TOKEN 4
 /* Default rendered rows of a tool result shown in the display view. */
@@ -310,6 +318,9 @@ struct fyai_cfg {
 	int shell_max_timeout_ms;	/* cap on a model-requested limit */
 	int read_max_bytes;		/* default read_file cap (0 = none) */
 	int read_hard_max_bytes;	/* cap on a model-requested size */
+	/* Attachments a message may carry, and the size of one (0 = no bound). */
+	long long media_max_bytes;
+	int media_max_per_message;
 	int shell_max_output_tokens;	/* default shell output cap (0 = none) */
 	int shell_hard_max_output_tokens; /* cap on a model-requested size */
 	int shell_session_timeout_ms;	/* idle limit of a named session */
@@ -943,6 +954,11 @@ struct fyai_ctx {
 	 * not be resolved. The model loop retries that step from local history. */
 	bool response_chain_linked;
 	bool response_chain_miss;
+	/*
+	 * The attachments that the next user message takes, as canonical image
+	 * parts that hold their bytes, built in @gb.
+	 */
+	fy_generic media_pending;
 };
 
 /* Give a chunk of answer text to the observer of the context. */

@@ -5422,6 +5422,9 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	ctx->last_token_extents = fy_invalid;
 	ctx->response_chain_linked = false;
 	ctx->response_chain_miss = false;
+	/* The attachments wait for the next line of the parent, not of this
+	 * child; the store stays open to read the bytes of the branch. */
+	ctx->media_pending = fy_seq_empty;
 	ctx->dump_fd = -1;	/* the parent closes its diagnostic copy */
 }
 

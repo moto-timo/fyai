@@ -2452,7 +2452,7 @@ static int sdk_add_user(struct sdk_server *srv, const char *text)
 	fy_generic user, turn;
 	int rc;
 
-	user = fyai_make_user_message(ctx, text);
+	user = fyai_make_instruction_message(ctx, text);
 	turn = fyai_turn_append(ctx, ctx->last_message, fy_sequence(gb, user));
 	turn = fyai_output_record(ctx, turn, FYAI_OUTPUT_USER, text);
 	fyai_error_check(ctx, fy_is_valid(turn), err,

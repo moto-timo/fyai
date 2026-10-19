@@ -794,7 +794,7 @@ int fyai_replay_view(struct fyai_ctx *ctx, bool ignore_compact)
 			continue;
 		}
 		turn = fyai_turn_append(ctx, ctx->last_message,
-			fy_sequence(fyai_make_user_message(ctx,
+			fy_sequence(fyai_make_instruction_message(ctx,
 				fy_castp(&rp.items[i].prompt, ""))));
 		fyai_error_check(ctx, fy_is_valid(turn), out,
 				 "replay: cannot build the user turn");

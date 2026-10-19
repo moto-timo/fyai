@@ -1567,7 +1567,7 @@ fy_generic fyai_turn_append_event(struct fyai_ctx *ctx, fy_generic turn,
 		return fyai_output_record(ctx, turn, FYAI_OUTPUT_AGENT, display);
 	}
 	turn = fyai_turn_append(ctx, turn,
-		fy_sequence(fyai_make_user_message(ctx, input->text)));
+		fy_sequence(fyai_make_instruction_message(ctx, input->text)));
 	return fyai_output_record(ctx, turn, FYAI_OUTPUT_USER, input->text);
 }
 
@@ -2897,6 +2897,7 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	ctx->project_state = fy_invalid;
 	ctx->tool_changes = fy_seq_empty;
 	ctx->last_token_extents = fy_invalid;
+	ctx->media_pending = fy_seq_empty;
 	if (fyai_signals_open(ctx))
 		goto err;
 

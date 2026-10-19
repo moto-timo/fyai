@@ -980,7 +980,7 @@ static int acp_worker_turn(struct acp_worker *worker)
 	if (fyai_setup_transient_builder(ctx))
 		return -1;
 	gb = fyai_ctx_transient_gb(ctx);
-	user = fyai_make_user_message(ctx, worker->text);
+	user = fyai_make_instruction_message(ctx, worker->text);
 	user = fy_assoc(gb, user, "acp_message_id", worker->message_id);
 	user = fy_assoc(gb, user, "acp_content", worker->content);
 	turn = fyai_turn_append(ctx, ctx->last_message, fy_sequence(gb, user));

@@ -907,6 +907,9 @@ static long long session_est_bytes(fy_generic v)
 		for (i = 0; i < n; i++) {
 			key = fy_generic_mapping_get_at_key(v, i);
 			s = fy_castp(&key, "");
+			/* An image counts as its reference, not its bytes. */
+			if (fyai_media_part_is_image(v) && !strcmp(s, "data"))
+				continue;
 			sum += 4 + (long long)strlen(s) +
 			       session_est_bytes(
 					fy_generic_mapping_get_at_value(v, i));
