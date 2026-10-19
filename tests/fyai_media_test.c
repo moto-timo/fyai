@@ -30,6 +30,7 @@ FYAI_TEST_ENTRY(media, content_parts, media_content_parts)
 FYAI_TEST_ENTRY(media, image_roundtrip, media_image_roundtrip)
 FYAI_TEST_ENTRY(media, image_limits, media_image_limits)
 FYAI_TEST_ENTRY(media, pending_message, media_pending_message)
+FYAI_TEST_ENTRY(media, pinned_root, media_pinned_root)
 
 /*
  * Headers of each type, with the size in them: PNG 1024x768, JPEG 640x480,
@@ -406,6 +407,46 @@ int media_pending_message(void)
 	return 0;
 }
 
+/*
+ * A pinned root reads one published state, so a message that takes an
+ * attachment would be a write. The attachment is refused before it is read.
+ */
+int media_pinned_root(void)
+{
+	struct fy_generic_builder_cfg gb_cfg = {
+		.flags = FYGBCF_SCOPE_LEADER,
+	};
+	struct fyai_cfg cfg;
+	struct fyai_ctx ctx;
+	const char *path;
+	int rc;
+
+	path = fyai_test_scratch_file("media-pinned-png", ".png");
+	FYAI_TCHECK(path);
+	rc = media_scratch_write(path, png_head, sizeof(png_head));
+	FYAI_TCHECK(!rc);
+
+	memset(&cfg, 0, sizeof(cfg));
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.gb = ctx.transient_gb = ctx.durable_gb =
+		fy_generic_builder_create(&gb_cfg);
+	FYAI_TCHECK(ctx.gb);
+	cfg.gb = ctx.gb;
+	cfg.root_pinned = true;
+	cfg.media_max_bytes = 1024 * 1024;
+	cfg.media_max_per_message = 4;
+	ctx.cfg = &cfg;
+	ctx.media_pending = fy_seq_empty;
+
+	rc = fyai_media_attach_path(&ctx, path, NULL, "shot");
+	FYAI_TCHECK(rc < 0);
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+	fy_generic_builder_destroy(ctx.gb);
+	return 0;
+}
+
 #else
 int media_image_roundtrip(void)
 {
@@ -418,6 +459,11 @@ int media_image_limits(void)
 }
 
 int media_pending_message(void)
+{
+	return 0;
+}
+
+int media_pinned_root(void)
 {
 	return 0;
 }
