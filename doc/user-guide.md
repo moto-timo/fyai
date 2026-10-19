@@ -571,6 +571,9 @@ fyai config edit
 fyai config import path/to/config.yaml
 ```
 
+The value `none` of `reasoning/effort` and `reasoning/summary` sends no
+reasoning field in the request. It overrides a value from a lower layer.
+
 Slash paths address nested keys. Values are parsed as YAML values rather than untyped strings.
 
 Global operations apply before the selected verb or prompt:
@@ -1349,8 +1352,8 @@ remaining settings below are session-only.
 
 | Setting | Values |
 | --- | --- |
-| `/reasoning-effort`, `/effort` | `minimal`, `low`, `medium`, `high` |
-| `/reasoning-summary`, `/summary` | `auto`, `concise`, `detailed` |
+| `/reasoning-effort`, `/effort` | `none`, `minimal`, `low`, `medium`, `high` |
+| `/reasoning-summary`, `/summary` | `none`, `auto`, `concise`, `detailed` |
 | `/temperature` | floating-point value |
 | `/theme` | embedded theme with optional `:auto`, `:dark`, or `:light` |
 | `/tool-detail` | `none`, `brief`, `default`, `full` |
