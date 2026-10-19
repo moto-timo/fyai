@@ -1,0 +1,50 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "resp_img_1",
+        "object": "response",
+        "model": "gpt-5.4-mini",
+        "status": "completed",
+        "output": [
+          {
+            "type": "message",
+            "id": "msg_img_1",
+            "role": "assistant",
+            "content": [
+              { "type": "output_text", "text": "Saw the image under Responses." }
+            ]
+          }
+        ],
+        "usage": { "input_tokens": 12, "output_tokens": 7, "total_tokens": 19 }
+      }
+    },
+    {
+      "response": {
+        "id": "chatcmpl-img-2",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "gpt-5.4-mini",
+        "choices": [
+          {
+            "index": 0,
+            "message": { "role": "assistant", "content": "Saw the image under Chat Completions." },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": { "prompt_tokens": 20, "completion_tokens": 8, "total_tokens": 28 }
+      }
+    },
+    {
+      "response": {
+        "id": "msg_img_3",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-fable-5.1",
+        "content": [ { "type": "text", "text": "Saw the image under Messages." } ],
+        "stop_reason": "end_turn",
+        "usage": { "input_tokens": 20, "output_tokens": 8 }
+      }
+    }
+  ]
+}
