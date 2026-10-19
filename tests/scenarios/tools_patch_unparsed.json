@@ -18,7 +18,7 @@
                   "type": "function",
                   "function": {
                     "name": "apply_patch",
-                    "arguments": "{\"patch\": \"*** Begin Patch\\n--- a/hello.c\\n+++ b/hello.c\\n@@\\n int main(void)\\n*** End Patch\"}"
+                    "arguments": "{\"patch\": \"*** Begin Patch\\nchange hello.c\\n*** End Patch\"}"
                   }
                 }
               ]
