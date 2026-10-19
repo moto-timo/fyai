@@ -22,6 +22,7 @@
 #include "fyai_cmd.h"
 #include "fyai_cmd_int.h"
 #include "fyai_agents.h"
+#include "fyai_asks.h"
 #include "fyai_branch.h"
 #include "fyai_config.h"
 #include "fyai_display.h"
@@ -31,6 +32,8 @@
 #include "fyai_auth.h"
 #include "fyai_catalog.h"
 #include "fyai_log.h"
+#include "fyai_monitor.h"
+#include "fyai_wait.h"
 #include "fyai_merge.h"
 #include "fyai_builtin.h"
 #include "fyai_mock.h"
@@ -339,10 +342,45 @@ static fy_generic list_renderopts(struct fy_generic_builder *gb,
 							  "align", "left"),
 				"display_name", fy_mapping(gb, "name",
 							   "Display")));
+	if (!strcmp(what, "sessions") || !strcmp(what, "shells") ||
+	    !strcmp(what, "agents") || !strcmp(what, "waits") ||
+	    !strcmp(what, "monitors") || !strcmp(what, "questions") ||
+	    !strcmp(what, "messages"))
+		return fy_mapping(gb, "empty", "none");
 	return fy_mapping(gb, "empty", "no providers configured",
 		"keys", fy_sequence(gb, "name", "models"),
 		"columns", fy_mapping(gb,
 			"name", fy_mapping(gb, "name", "Provider")));
+}
+
+/* The rows of the live work of @what, or fy_invalid when @what is not live. */
+static fy_generic list_live(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
+			    const char *what)
+{
+	fy_generic rows, row, kind;
+	bool shells;
+
+	if (!strcmp(what, "waits"))
+		return fyai_waits_rows(ctx, gb);
+	if (!strcmp(what, "monitors"))
+		return fyai_monitors_rows(ctx, gb);
+	if (!strcmp(what, "questions"))
+		return fy_concat(gb, fyai_asks_rows(ctx, gb),
+				 fyai_agents_parent_ask_rows(ctx, gb));
+	if (!strcmp(what, "messages"))
+		return fyai_agents_message_rows(ctx, gb);
+	if (!strcmp(what, "sessions"))
+		return fyai_tools_sessions_data(ctx, gb);
+	if (strcmp(what, "shells") && strcmp(what, "agents"))
+		return fy_invalid;
+	shells = !strcmp(what, "shells");
+	rows = fy_sequence(gb);
+	fy_foreach(row, fyai_tools_sessions_data(ctx, gb)) {
+		kind = fy_get(row, "kind", fy_invalid);
+		if (shells == fy_equal(kind, "shell"))
+			rows = fy_append(gb, rows, row);
+	}
+	return rows;
 }
 
 int fyai_cmd_list(struct fyai_cmd_call *call, fy_generic *result)
@@ -350,8 +388,9 @@ int fyai_cmd_list(struct fyai_cmd_call *call, fy_generic *result)
 	struct fyai_ctx *ctx = call->ctx;
 	const char *what = fyai_cmd_arg_str(call, "what");
 	bool full = fyai_cmd_arg_bool(call, "full");
-	fy_generic rows;
+	fy_generic rows, live;
 
+	live = list_live(ctx, call->gb, what);
 	if (!strcmp(what, "models"))
 		rows = ctx->cfg->auth_mode == FYAI_AUTH_CHATGPT ?
 		       fyai_auth_models(ctx, call->gb, full) :
@@ -362,6 +401,8 @@ int fyai_cmd_list(struct fyai_cmd_call *call, fy_generic *result)
 		rows = fyai_list_exchanges_data(ctx, call->gb);
 	else if (!strcmp(what, "reflog"))
 		rows = fyai_list_reflog_data(ctx, call->gb);
+	else if (fy_is_valid(live))
+		rows = live;
 	else
 		rows = list_providers(call);
 	fyai_error_check(ctx, fy_is_valid(rows), err, "list: cannot build "

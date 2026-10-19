@@ -874,10 +874,14 @@ commands:
           x-fyai-surfaces: [cli]
 
   - command: list
-    title: list providers, models, turns, exchanges, or the ref log
+    title: list providers, models, turns, exchanges, the ref log, or live work
     description: |
       List the configured providers, the models of the catalogue, the
       stored turns, the exchanges, or the ref log of the branch.
+
+      In a session, `sessions` lists the live shells and sub-agents, and
+      `shells`, `agents`, `waits`, `monitors`, `questions` and `messages`
+      list one kind of live work. A verb has no live work and lists none.
     surfaces: [cli, session]
     handler: list
     flags: [transient, model-state]
@@ -889,7 +893,8 @@ commands:
       properties:
         what:
           type: string
-          enum: [providers, models, turns, exchanges, reflog]
+          enum: [providers, models, turns, exchanges, reflog, sessions,
+                 shells, agents, waits, monitors, questions, messages]
           default: providers
           description: what to list
           x-fyai-positional: 0
