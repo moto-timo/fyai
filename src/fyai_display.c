@@ -1910,6 +1910,7 @@ struct patch_emit_ctx {
 	FILE *mf;
 	struct fyai_md_blocks *blocks;
 	bool titles_only;
+	size_t ops;
 };
 
 /* Emit one file operation into the tool-call Markdown. */
@@ -1919,6 +1920,7 @@ static int patch_emit_op(void *user, struct patch_op_view *op)
 	FILE *mf = ctx->mf;
 	size_t block_start;
 
+	ctx->ops++;
 	fprintf(mf, "%s\n\n", op->title ? op->title : "**patch**");
 	if (!op->body.len || ctx->titles_only)
 		return 0;
@@ -1945,6 +1947,9 @@ static void fyai_emit_patch(struct fyai_ctx *ctx, FILE *mf, const char *patch,
 	struct patch_emit_ctx emit_ctx = { .mf = mf, .blocks = blocks, .titles_only = titles_only };
 
 	(void)patch_walk(ctx, patch, &emit_ctx, patch_emit_op);
+	/* A patch that does not parse still has a title row. */
+	if (!emit_ctx.ops)
+		fprintf(mf, "**patch**\n\n");
 }
 
 /*
