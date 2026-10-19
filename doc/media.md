@@ -161,11 +161,21 @@ text describes it:
 ![image: PNG 1024x768, 96 KiB](fyai-media:ab12...)
 ```
 
-The renderer prints the alt text today, so the row reads as a summary. The
-`fyai-media:` scheme is the one hook a later renderer resolves to bytes and
-draws through the graphics protocol the terminal probe reports (kitty, iTerm2,
-or sixel). Nothing else changes when that is added: the stored transcript
-already holds the description and the digest.
+`fyai_media_text_references()` produces that row for every reader that shows a
+message to a person: the user card as it is drawn, the stored output so an
+offline view says the same, and `fyai export`. The renderer prints the alt text
+today, so the row reads as a summary. The `fyai-media:` scheme is the one hook
+a later renderer resolves to bytes and draws through the graphics protocol the
+terminal probe reports (kitty, iTerm2, or sixel). Nothing else changes when
+that is added: the stored transcript already holds the description and the
+digest, and the transcript output keeps the row because it is recorded with
+the line.
+
+The card draws the row so it stands out of the words: bold, and in the `ref`
+colour of a palette theme. `fyai_media_rows_styled()` wraps a whole row in
+`**<fy-role name="ref">...</fy-role>**` just before the card renders it as UI
+Markdown, after the words are escaped so they cannot place tags of their own.
+What is stored and exported keeps the plain row.
 
 The model never sees this string. It receives the native image part, and the
 text of the message as the user typed it.

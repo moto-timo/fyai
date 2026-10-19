@@ -121,6 +121,28 @@ An unanswered call has no `result` key. Parallel calls use separate
 directives. Import creates new call IDs and restores each result in the next
 stored turn.
 
+## Attachments
+
+A message that carries an image exports its text and one Markdown row for each
+image, in the order the parts appear:
+
+```md
+## User
+
+what is wrong in this screenshot?
+
+![image: PNG 1024x768, 96 KiB](fyai-media:ab12...)
+```
+
+The document does not carry the bytes. The link names the image by its
+digest, and the alt text describes it from the reference alone: type, pixel
+size, and stored size. An import of the document keeps the words and the
+summary row, and the message that results reads as text.
+
+The row is ordinary message text, not a directive, so a document that gains
+or loses one never changes its structure. See `doc/media.md` for the canonical
+part.
+
 ## Compaction
 
 The export records a compaction operation and its instructions. It does not

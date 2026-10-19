@@ -303,6 +303,10 @@ are PNG, JPEG, GIF, and WebP; `doc/media.md` is the design.
 - Do not walk `content` to find the words. Use `fyai_media_text()` for the
   text and `fyai_media_parts()` for the images; those two keep the sequence
   form in one place.
+- What a person reads uses `fyai_media_text_references()`: the text, then one
+  Markdown row per image, `![image: PNG 1024x768, 96 KiB](fyai-media:DIGEST)`.
+  The transcript card, the offline views, and the export all take it from
+  there, so the row reads the same everywhere. The model never sees it.
 - A wire form is derived at the request boundary in `src/fyai_provider.c`,
   as every other canonical item is. Nothing wire-shaped is stored, so a
   conversation can continue on another grammar.

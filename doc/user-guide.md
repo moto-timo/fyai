@@ -135,6 +135,36 @@ fyai
 fyai -i
 ```
 
+### Attaching an image
+
+A message can carry an image beside its text. There are three ways to attach
+one, and each is explicit: a path typed into a message is never attached by
+itself.
+
+```sh
+fyai --image shot.png "what is wrong in this screenshot?"
+
+fyai -i
+> /image add shot.png       # or: /image paste, from the system clipboard
+> what is wrong in this screenshot?
+```
+
+An attachment waits for the next message and travels with that message only:
+a line typed later does not send it again. `/image list` shows what is
+waiting, and `/image clear` drops it.
+
+The bytes are kept in the message, in the arena, and the transcript names
+them by digest. They are encoded when a request is built, so a conversation
+that gained an image on one API continues on another. The model must read
+images: `fyai model` and the note that `/image add` prints say whether the
+selected model takes one. The limits are 4 MiB per image and 8 per
+message; nothing is downscaled.
+
+`/image paste` runs a clipboard helper (`wl-paste`, `xclip`, `xsel`, or
+`pngpaste`), because no terminal escape can read a clipboard. Set
+`media/clipboard_command` to a program of your own if the search does not find
+one. The full design is in `doc/media.md`.
+
 ### Sessions
 
 An interactive invocation that names no branch starts a **new session**. It
