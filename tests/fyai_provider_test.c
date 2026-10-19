@@ -8,13 +8,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "fyai.h"
 #include "fyai_provider.h"
 #include "fyai_cost.h"
+#include "fyai_media.h"
+#include "fyai_turn.h"
 #include "utils.h"
 
 #include "fyai_test_registry.h"
+#include "fyai_test_scratch.h"
 
 FYAI_TEST_ENTRY(provider, responses_input, provider_responses_input)
 FYAI_TEST_ENTRY(provider, chat_input, provider_chat_input)
@@ -31,6 +36,7 @@ FYAI_TEST_ENTRY(provider, token_extents, provider_token_extents)
 FYAI_TEST_ENTRY(provider, messages_response, provider_messages_response)
 FYAI_TEST_ENTRY(provider, tool_calls_strip_user_owned, provider_tool_calls_strip_user_owned)
 FYAI_TEST_ENTRY(provider, native_web_search_tools, provider_native_web_search_tools)
+FYAI_TEST_ENTRY(provider, image_input, provider_image_input)
 
 static struct fyai_cfg test_cfg;
 static struct fyai_ctx test_ctx;
@@ -654,6 +660,7 @@ static int provider_run(void (*testfn)(void))
 	test_ctx.durable_gb = test_ctx.transient_gb;
 	test_cfg.gb = test_ctx.transient_gb;
 	test_ctx.tools_spec = fy_invalid;
+	test_ctx.media_pending = fy_seq_empty;
 
 	testfn();
 
@@ -923,3 +930,100 @@ int provider_native_web_search_tools(void)
 {
 	return provider_run(test_native_web_search_tools);
 }
+
+#ifdef __linux__
+/* A PNG header: the signature and an IHDR that states 1024x768. */
+static const unsigned char provider_png[] = {
+	0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n',
+	0x00, 0x00, 0x00, 0x0d, 'I', 'H', 'D', 'R',
+	0x00, 0x00, 0x04, 0x00,	/* width 1024 */
+	0x00, 0x00, 0x03, 0x00,	/* height 768 */
+	0x08, 0x06, 0x00, 0x00, 0x00,
+};
+
+/*
+ * One message that carries an image, as each grammar takes it. Nothing of the
+ * wire form is stored: the canonical message holds the bytes and each grammar
+ * encodes them here.
+ */
+static void test_image_input(void)
+{
+	fy_generic messages, out;
+	const char *text, *path;
+	ssize_t wrote;
+	int fd;
+
+	path = fyai_test_scratch_file("provider-image-png", ".png");
+	fd = open(path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+	if (fd < 0)
+		exit(1);
+	wrote = write(fd, provider_png, sizeof(provider_png));
+	if (wrote != (ssize_t)sizeof(provider_png))
+		exit(1);
+	close(fd);
+
+	test_cfg.media_max_bytes = 1024 * 1024;
+	test_cfg.media_max_per_message = 4;
+	test_cfg.image_input_supported = true;
+
+	if (fyai_media_attach_path(&test_ctx, path, NULL, "shot")) {
+		fprintf(stderr, "image: could not attach the fixture\n");
+		exit(1);
+	}
+	messages = fy_sequence(test_ctx.gb,
+			fyai_make_user_message(&test_ctx, "what is wrong here?"));
+
+	/* The canonical message holds the bytes themselves, not base64. */
+	text = emit(messages);
+	expect_contains("image canonical", text, "\"type\": \"image\"");
+	expect_contains("image canonical", text, "\"media_type\": \"image/png\"");
+	expect_contains("image canonical", text, "\"data\": \"\\uDC89PNG");
+	expect_absent("image canonical", text, "base64");
+
+	test_cfg.api_mode = FYAI_API_RESPONSES;
+	out = fyai_responses_input(&test_ctx, messages);
+	text = emit(out);
+	expect_contains("image responses", text, "\"type\": \"input_image\"");
+	expect_contains("image responses", text,
+			"\"image_url\": \"data:image/png;base64,iVBORw0KGgo");
+	expect_contains("image responses", text, "\"type\": \"input_text\"");
+	expect_contains("image responses", text, "what is wrong here?");
+	expect_absent("image responses", text, "\"type\": \"image\"");
+
+	out = fyai_chat_input(&test_ctx, messages);
+	text = emit(out);
+	expect_contains("image chat", text, "\"type\": \"image_url\"");
+	expect_contains("image chat", text,
+			"\"url\": \"data:image/png;base64,iVBORw0KGgo");
+	expect_contains("image chat", text, "\"type\": \"text\"");
+
+	out = fyai_messages_input(&test_ctx, messages);
+	text = emit(out);
+	expect_contains("image messages", text, "\"type\": \"image\"");
+	expect_contains("image messages", text, "\"type\": \"base64\"");
+	expect_contains("image messages", text, "\"media_type\": \"image/png\"");
+	expect_contains("image messages", text,
+			"\"data\": \"iVBORw0KGgo");
+	expect_contains("image messages", text, "\"type\": \"text\"");
+
+	/* A model without the image modality rejects the request. */
+	test_cfg.image_input_supported = false;
+	out = fyai_responses_input(&test_ctx, messages);
+	if (fy_is_valid(out)) {
+		fprintf(stderr, "image: a model without image input took one\n");
+		exit(1);
+	}
+	test_cfg.image_input_supported = true;
+
+}
+
+int provider_image_input(void)
+{
+	return provider_run(test_image_input);
+}
+#else
+int provider_image_input(void)
+{
+	return 0;
+}
+#endif
