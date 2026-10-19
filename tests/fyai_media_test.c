@@ -24,6 +24,7 @@
 FYAI_TEST_ENTRY(media, sniff_types, media_sniff_types)
 FYAI_TEST_ENTRY(media, dimensions, media_dimensions)
 FYAI_TEST_ENTRY(media, type_names, media_type_names)
+FYAI_TEST_ENTRY(media, content_parts, media_content_parts)
 FYAI_TEST_ENTRY(media, image_roundtrip, media_image_roundtrip)
 FYAI_TEST_ENTRY(media, image_limits, media_image_limits)
 
@@ -140,6 +141,82 @@ int media_type_names(void)
 	FYAI_TCHECK(fyai_media_type_parse(NULL) == FYAI_MEDIA_TYPE_UNKNOWN);
 	FYAI_TCHECK(fyai_media_type_is_image(FYAI_MEDIA_TYPE_GIF));
 	FYAI_TCHECK(!fyai_media_type_is_image(FYAI_MEDIA_TYPE_UNKNOWN));
+	return 0;
+}
+
+/* A canonical image part keeps the reference and the numbers a reader shows. */
+int media_content_parts(void)
+{
+	struct fy_generic_builder_cfg gb_cfg = {
+		.flags = FYGBCF_SCOPE_LEADER,
+	};
+	struct fyai_media_image image;
+	struct fy_generic_builder *gb;
+	fy_generic content, part, text, images;
+	const char *s;
+
+	gb = fy_generic_builder_create(&gb_cfg);
+	FYAI_TCHECK(gb);
+
+	memset(&image, 0, sizeof(image));
+	image.type = FYAI_MEDIA_TYPE_PNG;
+	image.width = 1024;
+	image.height = 768;
+	image.bytes = 98304;
+	strcpy(image.digest, "0123456789abcdef0123456789abcdef"
+			     "0123456789abcdef0123456789abcdef");
+	image.name = strdup("screenshot");
+	FYAI_TCHECK(image.name);
+
+	part = fyai_media_image_part(gb, &image);
+	FYAI_TCHECK(fy_is_mapping(part));
+	FYAI_TCHECK(fyai_media_part_is_image(part));
+	s = fy_get(part, "media_type", "");
+	FYAI_TCHECK(!strcmp(s, "image/png"));
+	s = fy_get(part, "digest", "");
+	FYAI_TCHECK(!strcmp(s, image.digest));
+	FYAI_TCHECK(fy_get(part, "width", 0LL) == 1024);
+	FYAI_TCHECK(fy_get(part, "height", 0LL) == 768);
+	FYAI_TCHECK(fy_get(part, "bytes", 0LL) == 98304);
+	s = fy_get(part, "name", "");
+	FYAI_TCHECK(!strcmp(s, "screenshot"));
+
+	/* A text run and a foreign part are not images. */
+	FYAI_TCHECK(!fyai_media_part_is_image(
+			fy_mapping(gb, "type", "text", "text", "hello")));
+	FYAI_TCHECK(!fyai_media_part_is_image(
+			fy_mapping(gb, "type", "tool_result")));
+	FYAI_TCHECK(!fyai_media_part_is_image(fy_invalid));
+	FYAI_TCHECK(!fyai_media_part_is_image(fy_value("hi")));
+
+	/* A string content is its own text, and carries no image. */
+	content = fy_value("plain words");
+	text = fyai_media_text(gb, content);
+	s = fy_castp(&text, "");
+	FYAI_TCHECK(!strcmp(s, "plain words"));
+	FYAI_TCHECK(!fyai_media_content_has_images(content));
+	FYAI_TCHECK(fy_empty(fyai_media_parts(gb, content)));
+
+	/* A sequence gives its text runs joined, and its image parts in order. */
+	content = fy_sequence(gb,
+		fy_mapping(gb, "type", "text", "text", "look at this"),
+		part,
+		fy_mapping(gb, "type", "text", "text", ": done"));
+	FYAI_TCHECK(fyai_media_content_has_images(content));
+	text = fyai_media_text(gb, content);
+	s = fy_castp(&text, "");
+	FYAI_TCHECK(!strcmp(s, "look at this: done"));
+	images = fyai_media_parts(gb, content);
+	FYAI_TCHECK(fy_is_sequence(images) && fy_len(images) == 1);
+	FYAI_TCHECK(fy_equal(fy_get_at(images, 0), part));
+
+	/* A null content has no text and no image. */
+	text = fyai_media_text(gb, fy_null);
+	FYAI_TCHECK(fy_is_string(text) && fy_empty(text));
+	FYAI_TCHECK(!fyai_media_content_has_images(fy_null));
+
+	free(image.name);
+	fy_generic_builder_destroy(gb);
 	return 0;
 }
 
