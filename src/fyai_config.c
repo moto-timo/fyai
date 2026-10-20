@@ -745,6 +745,8 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 					      cfg->user_card_fence);
 		cfg->prompt_marker = fy_gb_intern_string(cfg->gb,
 			fy_get(v, "prompt", cfg->prompt_marker));
+		cfg->prompt_busy = fy_gb_intern_string(cfg->gb,
+			fy_get(v, "prompt_busy", cfg->prompt_busy));
 		cfg->prompt_top = fy_gb_intern_string(cfg->gb,
 			fy_get(v, "prompt_top", cfg->prompt_top));
 		cfg->prompt_bottom = fy_gb_intern_string(cfg->gb,
@@ -3083,6 +3085,7 @@ void fyai_config_set_defaults(struct fyai_cfg *cfg)
 	cfg->tool_group_fence = DEFAULT_TOOL_GROUP_FENCE;
 	cfg->user_card_fence = DEFAULT_USER_CARD_FENCE;
 	cfg->prompt_marker = "";	/* empty => built-in prompt marker */
+	cfg->prompt_busy = "";		/* empty => theme glyph, else an ellipsis */
 	cfg->prompt_top = "";		/* empty => built-in location row */
 	cfg->prompt_bottom = "";	/* empty => DEFAULT_PROMPT_BOTTOM banner */
 	cfg->branch_view = "tree";

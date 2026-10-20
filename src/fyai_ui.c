@@ -28,6 +28,7 @@
 #include "fyai_diag.h"
 #include "fyai_display.h"
 #include "fyai_event.h"
+#include "fyai_marker.h"
 #include "fyai_markdown.h"
 #include "fyai_sink.h"
 #include "fyai_session.h"
@@ -108,6 +109,8 @@ struct fyai_ui {
 	volatile bool ready;
 	bool quit;
 	bool busy;
+	/* The marker is an ellipsis while a line would not be taken at once. */
+	bool marker_busy;
 	fyai_event_ms_t busy_since_ms;
 	long long busy_shown_s;
 	bool activity_paused;
@@ -1296,6 +1299,53 @@ static bool ui_tile_ground(const struct fyai_ctx *ctx, bool focused,
 static int ui_glyph_width(unsigned int base)
 {
 	return fytim_glyph_width(base);
+}
+
+/* The prompt marker of the configuration, e.g. an arrow and a blank. */
+static const char *ui_ready_marker(const struct fyai_ui *ui)
+{
+	const char *marker = ui->ctx->cfg->prompt_marker;
+
+	return marker && *marker ? marker : "\u276f ";
+}
+
+/* The glyph of the busy marker: the setting, else the theme, else NULL. */
+static const char *ui_busy_glyph(const struct fyai_ui *ui)
+{
+	const struct fyai_cfg *cfg = ui->ctx->cfg;
+
+	if (cfg->prompt_busy && *cfg->prompt_busy)
+		return cfg->prompt_busy;
+	return markdown_glyph(cfg, "prompt.busy", NULL);
+}
+
+/*
+ * The marker says whether a line is taken at once: the configured one when
+ * the session is idle or a question waits for its answer, the busy glyph while
+ * a turn runs or lines wait, padded to the same columns so the input does not
+ * move. @force sets it even when the state is the same.
+ */
+static void ui_marker_update(struct fyai_ui *ui, bool force)
+{
+	bool busy = (ui->busy && !ui->questions) || ui->head ||
+		    ui->editor_request;
+	char *marker;
+
+	if (!ui->ft || (!force && busy == ui->marker_busy))
+		return;
+	ui->marker_busy = busy;
+	if (!busy) {
+		(void)fytim_set_marker(ui->ft, ui_ready_marker(ui));
+		return;
+	}
+	marker = fyai_marker_busy(ui_ready_marker(ui), ui_busy_glyph(ui),
+				  ui_glyph_width);
+	if (!marker) {
+		fyai_warning(ui->ctx, "cannot draw the busy prompt marker");
+		return;
+	}
+	(void)fytim_set_marker(ui->ft, marker);
+	free(marker);
 }
 
 /*
@@ -2728,6 +2778,7 @@ static enum fyai_event_action ui_service(struct fyai_ui *ui)
 	/* Update layout state before reconciliation. */
 	fyai_workpane_reconcile(ui->ctx->workpane);
 	ui_page_update(ui);
+	ui_marker_update(ui, false);
 	if (fytim_pump(ui->ft) != FYTIM_OK)
 		return FYAIEA_ABORT;
 	/* Apply grants through each tile owner. */
@@ -3122,8 +3173,7 @@ int fyai_ui_open(struct fyai_ctx *ctx)
 		goto fail;
 	/* Wake provider-bound turns when the terminal size changes. */
 	(void)fyai_terminal_winch_open(ctx);
-	(void)fytim_set_marker(ui->ft, ctx->cfg->prompt_marker &&
-			       *ctx->cfg->prompt_marker ? ctx->cfg->prompt_marker : "❯ ");
+	ui_marker_update(ui, true);
 	(void)fytim_history_set_max_len(ui->ft, 1000);
 	(void)fytim_set_complete_fn(ui->ft, ui_complete_cb, ctx);
 	ui_completion_configure(ctx);
@@ -3159,9 +3209,7 @@ void fyai_ui_config_changed(struct fyai_ctx *ctx)
 
 	if (!ui || !ui->ft)
 		return;
-	(void)fytim_set_marker(ui->ft, ctx->cfg->prompt_marker &&
-			       *ctx->cfg->prompt_marker ?
-			       ctx->cfg->prompt_marker : "❯ ");
+	ui_marker_update(ui, true);
 	(void)fyai_ui_update_prompt_style(ctx);
 	ui_completion_configure(ctx);
 	ui_keys_configure(ctx);

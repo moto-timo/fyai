@@ -1382,6 +1382,14 @@ properties:
         description: >-
           Set the interactive prompt marker. Empty uses the built-in ("  > " with
           markdown, "> " otherwise). May carry SGR colour escapes.
+      prompt_busy:
+        x-fyai-model: review
+        type: string
+        default: ""
+        description: >-
+          Set the glyph of the busy prompt marker. Empty uses the prompt.busy
+          glyph of the theme, else an ellipsis (U+2026). The marker keeps the
+          columns of the prompt marker.
       branch_view:
         type: string
         enum: [tree, gitgraph]

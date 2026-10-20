@@ -297,6 +297,7 @@ struct fyai_cfg {
 	int tool_group_fence;		/* blank rows around a tool exchange */
 	int user_card_fence;		/* blank rows after the user card */
 	const char *prompt_marker;	/* interactive prompt marker (SGR ok) */
+	const char *prompt_busy;	/* glyph of the busy prompt marker; "" => theme */
 	const char *prompt_top;		/* REPL bubble top row template (SGR ok) */
 	const char *prompt_bottom;	/* REPL bubble bottom {key} template (SGR ok) */
 	const char *branch_view;

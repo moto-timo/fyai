@@ -602,7 +602,8 @@ int config_model_access(void)
 	static const char *const reviewed[] = {
 		"display/tool_detail", "display/tool_preview_lines",
 		"display/notice_output", "display/thinking", "view/ignore",
-		"view/gitignore", "display/prompt", "display/prompt_top",
+		"view/gitignore", "display/prompt", "display/prompt_busy",
+		"display/prompt_top",
 		"display/prompt_bottom", "display/session_margin",
 		"display/keys", "display/keys/prompt", "system_prompt",
 		"parallel_tool_calls_prompt", "agent/personas",

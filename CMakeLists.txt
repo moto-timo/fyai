@@ -491,6 +491,7 @@ set(FYAI_SOURCES
     src/fyai_log.c
     src/fyai_markdown.c
     src/fyai_chrome.c
+    src/fyai_marker.c
     src/fyai_ui.c
     src/fyai_workpane.c
     src/fyai_page.c
