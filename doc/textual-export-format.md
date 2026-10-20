@@ -134,13 +134,40 @@ what is wrong in this screenshot?
 ![image: PNG 1024x768, 96 KiB](fyai-media:ab12...)
 ```
 
-The document does not carry the bytes. The link names the image by its
-digest, and the alt text describes it from the reference alone: type, pixel
-size, and stored size. An import of the document keeps the words and the
-summary row, and the message that results reads as text.
+The row is for the reader. The alt text describes the image: type, pixel
+size, and stored size; the link names it by digest.
 
-The row is ordinary message text, not a directive, so a document that gains
-or loses one never changes its structure. See `doc/media.md` for the canonical
+The document carries the bytes too. The directive of such a message holds its
+whole `content` sequence, the text parts and the image parts, and each image
+part holds its bytes as `!!binary` base64, in lines of the width of the
+directive:
+
+```md
+<!-- meta:yaml
+kind: message
+role: user
+content:
+- type: text
+  text: what is wrong in this screenshot?
+- type: image
+  media_type: image/png
+  digest: ab12...
+  width: 1024
+  height: 768
+  bytes: 98304
+  data: !!binary |
+    iVBORw0KGgoAAAANSUhEUgAABAAAAAMACAYAAACHnrXM4/qRqL/W7YSbssng946lvNPqgZiv
+    ...
+  name: screenshot.png
+-->
+```
+
+Import takes the content from the directive and not from the prose that follows
+it. Each image part is made again from its bytes: the type, the size and the
+digest must be those that the bytes give, a part without bytes is an error,
+and the limits of `media/max_bytes` and `media/max_per_message` hold. The
+document is therefore enough to restore the image in another arena, with no
+access to the file it was read from. See `doc/media.md` for the canonical
 part.
 
 ## Compaction

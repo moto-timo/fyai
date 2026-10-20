@@ -300,6 +300,9 @@ are PNG, JPEG, GIF, and WebP; `doc/media.md` is the design.
   `{type: image, media_type, digest, width, height, bytes, data, name}`.
 - Emit YAML that can hold an image part with `FYOPEF_BINARY_BASE64`, so the
   bytes are `!!binary`; JSON escapes them. Do not encode them by hand.
+- An export writes the content of a message with an image into its
+  directive, bytes included; an import rebuilds each image part from the
+  bytes with `fyai_media_import_content()`.
 - Do not walk `content` to find the words. Use `fyai_media_text()` for the
   text and `fyai_media_parts()` for the images; those two keep the sequence
   form in one place.
