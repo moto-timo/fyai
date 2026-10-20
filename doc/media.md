@@ -37,7 +37,13 @@ comes before it. The ways in are:
   is attached, in a session and in a one-shot prompt alike. Two mentions of
   one file attach it twice, and each counts against `media/max_per_message`.
   Only a line that the user typed has mentions: a prompt that starts with `/`
-  names a command and has none, and neither has the task of a sub-agent;
+  names a command and has none, and neither has the task of a sub-agent.
+  Tab completes the word that ends the line, when it starts with `@`:
+  `look at @sh` to `look at @shot.png `. The names are listed in order, and
+  a blank, a backslash or a quote in one is escaped, not quoted. A directory
+  ends with `/` and takes no blank, so that a second Tab goes on inside it.
+  A `!` line is a command of the shell and completes no path, and a name
+  that does not fit the buffer of the completion is left out;
 - `/attach PATH`, which takes a file by what it holds as `@PATH` does;
 - `/image add PATH` and `/image paste`, for an image; or
 - the `--image PATH` option of an invocation.

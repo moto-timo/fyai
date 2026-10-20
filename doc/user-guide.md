@@ -152,8 +152,9 @@ fyai -i
 ```
 
 A path with blanks is quoted, `@"my shot.png"`, or escapes them,
-`@my\ shot.png`; `\@` and `@@` are a literal `@`. A text file of at most
-256 KiB, or `media/max_bytes` when that is smaller, goes
+`@my\ shot.png`; `\@` and `@@` are a literal `@`. Tab completes the path
+after `@`, as it does after `/attach`, `~/` too. A `!` line completes no path.
+A text file of at most 256 KiB, or `media/max_bytes` when that is smaller, goes
 to the model as its text, and the transcript shows one row for it. A file that
 is neither an image nor text is refused. A line with a mention that cannot
 attach is not sent, in a session and in a prompt on the command line alike:
