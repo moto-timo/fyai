@@ -43,6 +43,12 @@ printf '\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00\x04\x00\x00\x00\x03\x00\x0
 	>"$TEST_DIR/shot.png"
 check_json 'd["media_type"] == "image/png" and d["pending"]' \
 	image add "$TEST_DIR/shot.png"
+# attach answers for an image and for a text file; pending is a JSON boolean.
+printf 'one\ntwo\n' >"$TEST_DIR/notes.txt"
+check_json 'd["media_type"] == "image/png" and d["pending"] is True' \
+	attach "$TEST_DIR/shot.png"
+check_json 'd["lines"] == 2 and d["size"] == "2 lines, 8 B" and d["pending"] is True' \
+	attach "$TEST_DIR/notes.txt"
 # An attachment waits in one invocation, so a later one has nothing to drop;
 # the document still names the count it answered with.
 check_json 'set(d) == {"count"}' image clear

@@ -34,6 +34,7 @@ FYAI_TEST_ENTRY(media, image_limits, media_image_limits)
 FYAI_TEST_ENTRY(media, import_content, media_import_content)
 FYAI_TEST_ENTRY(media, pending_message, media_pending_message)
 FYAI_TEST_ENTRY(media, pinned_root, media_pinned_root)
+FYAI_TEST_ENTRY(media, mentions, media_mentions)
 
 /*
  * Headers of each type, with the size in them: PNG 1024x768, JPEG 640x480,
@@ -333,7 +334,7 @@ int media_import_content(void)
 	struct fyai_media_image image;
 	struct fyai_cfg cfg;
 	struct fyai_ctx ctx;
-	fy_generic part, ref, content, emitted, parsed, out, data;
+	fy_generic part, ref, content, emitted, parsed, out, data, file;
 	fy_generic_sized_string raw;
 	char *text;
 	int rc;
@@ -380,6 +381,17 @@ int media_import_content(void)
 	raw = fy_castp(&data, fy_szstr_empty);
 	FYAI_TCHECK(raw.size == sizeof(png_head));
 	FYAI_TCHECK(!memcmp(raw.data, png_head, sizeof(png_head)));
+
+	/*
+	 * A file part holds its text in the part, as a text part does: an
+	 * export writes it into the directive, and an import keeps it as it is.
+	 */
+	file = fy_mapping(ctx.gb, "type", "text",
+			  "text", "File: a.txt\n```\nx\n```", "file", "a.txt",
+			  "bytes", 2LL, "lines", 1LL);
+	out = fyai_media_import_content(&ctx, ctx.gb, fy_sequence(ctx.gb, file));
+	FYAI_TCHECK(fy_is_sequence(out) && fy_equal(fy_get_at(out, 0), file));
+	FYAI_TCHECK(fyai_media_part_is_file(fy_get_at(out, 0)));
 
 	/* A digest that is not the digest of the bytes. */
 	out = fyai_media_import_content(&ctx, ctx.gb, fy_sequence(ctx.gb,
@@ -614,6 +626,7 @@ int media_pinned_root(void)
 	struct fyai_cfg cfg;
 	struct fyai_ctx ctx;
 	const char *path;
+	char line[1024];
 	int rc;
 
 	path = fyai_test_scratch_file("media-pinned-png", ".png");
@@ -637,12 +650,186 @@ int media_pinned_root(void)
 	FYAI_TCHECK(rc < 0);
 	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
 
+	/* a mention is an attachment too */
+	snprintf(line, sizeof(line), "see @%s", path);
+	FYAI_TCHECK(fyai_media_take_mentions(&ctx, line) < 0);
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+
 	fyai_diag_reset(fyai_ctx_diag(&ctx));
 	fy_generic_builder_destroy(ctx.gb);
 	return 0;
 }
 
+/*
+ * Take the mentions of @line with $HOME set to @home. It checks nothing in
+ * between, so $HOME is restored on every path out.
+ */
+static int media_mentions_at_home(struct fyai_ctx *ctx, const char *home,
+				  char *line)
+{
+	const char *old = getenv("HOME");
+	char *saved = old ? strdup(old) : NULL;
+	int rc;
+
+	setenv("HOME", home, 1);
+	rc = fyai_media_take_mentions(ctx, line);
+	if (saved)
+		setenv("HOME", saved, 1);
+	else
+		unsetenv("HOME");
+	free(saved);
+	return rc;
+}
+
+/*
+ * @PATH mentions attach their files and leave the paths in the line: a text
+ * file as a file part, an image as an image part. On an error nothing stays
+ * attached. "\@" and "@@" are a literal "@", and @WORD of no file is text.
+ */
+int media_mentions(void)
+{
+	struct fy_generic_builder_cfg gb_cfg = {
+		.flags = FYGBCF_SCOPE_LEADER,
+	};
+	struct fyai_cfg cfg;
+	struct fyai_ctx ctx;
+	char line[2048], want[2048], notes[512], shot[512], blob[512];
+	char fenced[512], empty[512];
+	const char *dir;
+	char *styled;
+	fy_generic part, content, text;
+
+	dir = fyai_test_scratch_dir("media-mentions");
+	FYAI_TCHECK(dir);
+	snprintf(notes, sizeof(notes), "%s/notes.txt", dir);
+	snprintf(shot, sizeof(shot), "%s/my shot.png", dir);
+	snprintf(blob, sizeof(blob), "%s/blob.bin", dir);
+	FYAI_TCHECK(!media_scratch_write(notes, "a\nb\n", 4));
+	FYAI_TCHECK(!media_scratch_write(shot, png_head, sizeof(png_head)));
+	FYAI_TCHECK(!media_scratch_write(blob, "\x00\x01\x02", 3));
+	snprintf(fenced, sizeof(fenced), "%s/fenced.txt", dir);
+	snprintf(empty, sizeof(empty), "%s/empty.txt", dir);
+	FYAI_TCHECK(!media_scratch_write(fenced, "x\n```\ny\n", 8));
+	FYAI_TCHECK(!media_scratch_write(empty, "", 0));
+
+	memset(&cfg, 0, sizeof(cfg));
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.cfg = &cfg;
+	ctx.gb = ctx.transient_gb = ctx.durable_gb =
+		fy_generic_builder_create(&gb_cfg);
+	FYAI_TCHECK(ctx.gb);
+	cfg.gb = ctx.gb;
+	cfg.media_max_bytes = 1024 * 1024;
+	cfg.media_max_per_message = 8;
+	ctx.media_pending = fy_seq_empty;
+	FYAI_TCHECK(!fyai_diag_setup(&cfg.diag));
+
+	/* a text file and a quoted image path with a blank */
+	snprintf(line, sizeof(line), "see @%s and @\"%s\"", notes, shot);
+	snprintf(want, sizeof(want), "see %s and %s", notes, shot);
+	FYAI_TCHECK(!fyai_media_take_mentions(&ctx, line));
+	FYAI_TCHECK(!strcmp(line, want));
+	FYAI_TCHECK(fy_len(ctx.media_pending) == 2);
+	part = fy_get_at(ctx.media_pending, 0);
+	FYAI_TCHECK(fyai_media_part_is_file(part));
+	FYAI_TCHECK(fy_get(part, "lines", 0LL) == 2 && fy_get(part, "bytes", 0LL) == 4);
+	FYAI_TCHECK(fyai_media_part_is_image(fy_get_at(ctx.media_pending, 1)));
+
+	/* the readers: the words, what the model reads, and the row */
+	content = fy_sequence(ctx.gb,
+		fy_mapping(ctx.gb, "type", "text", "text", "hi"), part);
+	FYAI_TCHECK(fy_equal(fyai_media_text(ctx.gb, content), "hi"));
+	text = fyai_media_model_text(ctx.gb, content);
+	FYAI_TCHECK(strstr(fy_castp(&text, ""), "hi\n\nFile: "));
+	FYAI_TCHECK(strstr(fy_castp(&text, ""), "\n```\na\nb\n```"));
+	text = fyai_media_text_references(ctx.gb, content);
+	FYAI_TCHECK(strstr(fy_castp(&text, ""), "hi\n\n[file: "));
+	FYAI_TCHECK(strstr(fy_castp(&text, ""), ", 2 lines, 4 B]"));
+	styled = fyai_media_rows_styled("[file: x, 1 line, 3 B]");
+	FYAI_TCHECK(styled && !strcmp(styled,
+		"**<fy-role name=\"ref\">[file: x, 1 line, 3 B]</fy-role>**"));
+	free(styled);
+	fyai_media_pending_clear(&ctx);
+
+	/* the second mention fails: neither file stays attached */
+	snprintf(line, sizeof(line), "x @%s @\"%s/none.txt\"", notes, dir);
+	FYAI_TCHECK(fyai_media_take_mentions(&ctx, line) < 0);
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+	snprintf(line, sizeof(line), "x @%s", blob);
+	FYAI_TCHECK(fyai_media_take_mentions(&ctx, line) < 0);
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	/* literal "@", and words that name no file */
+	snprintf(line, sizeof(line), "\\@a @@b c@d @nofile");
+	FYAI_TCHECK(!fyai_media_take_mentions(&ctx, line));
+	FYAI_TCHECK(!strcmp(line, "@a @b c@d @nofile"));
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+
+	/* ~/ is the home directory, and the row keeps the path as typed */
+	snprintf(line, sizeof(line), "@~/notes.txt");
+	FYAI_TCHECK(!media_mentions_at_home(&ctx, dir, line));
+	FYAI_TCHECK(!strcmp(line, "~/notes.txt"));
+	part = fy_get_at(ctx.media_pending, 0);
+	FYAI_TCHECK(fy_equal(fy_get(part, "file"), "~/notes.txt"));
+	fyai_media_pending_clear(&ctx);
+
+	/* a text that holds a fence is wrapped in a longer one */
+	snprintf(line, sizeof(line), "@%s", fenced);
+	FYAI_TCHECK(!fyai_media_take_mentions(&ctx, line));
+	part = fy_get_at(ctx.media_pending, 0);
+	text = fy_get(part, "text", fy_invalid);
+	snprintf(want, sizeof(want), "File: %s\n````\nx\n```\ny\n````", fenced);
+	FYAI_TCHECK(!strcmp(fy_castp(&text, ""), want));
+	fyai_media_pending_clear(&ctx);
+
+	/* the same file twice is two parts, and each counts against the limit */
+	snprintf(line, sizeof(line), "@%s @%s", notes, notes);
+	FYAI_TCHECK(!fyai_media_take_mentions(&ctx, line));
+	FYAI_TCHECK(fy_len(ctx.media_pending) == 2);
+	fyai_media_pending_clear(&ctx);
+	cfg.media_max_per_message = 1;
+	snprintf(line, sizeof(line), "@%s @%s", notes, notes);
+	FYAI_TCHECK(fyai_media_take_mentions(&ctx, line) < 0);
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+	cfg.media_max_per_message = 8;
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	/* an empty file is a part of no lines */
+	snprintf(line, sizeof(line), "@%s", empty);
+	FYAI_TCHECK(!fyai_media_take_mentions(&ctx, line));
+	part = fy_get_at(ctx.media_pending, 0);
+	FYAI_TCHECK(fy_get(part, "lines", -1LL) == 0 && fy_get(part, "bytes", -1LL) == 0);
+	fyai_media_pending_clear(&ctx);
+
+	/* media/max_bytes lowers the limit of a text file */
+	cfg.media_max_bytes = 3;
+	snprintf(line, sizeof(line), "@%s", notes);
+	FYAI_TCHECK(fyai_media_take_mentions(&ctx, line) < 0);
+	cfg.media_max_bytes = 1024 * 1024;
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	/* a quote that does not close is text, an empty quote is an error */
+	snprintf(line, sizeof(line), "what does @\" mean?");
+	FYAI_TCHECK(!fyai_media_take_mentions(&ctx, line));
+	FYAI_TCHECK(!strcmp(line, "what does @\" mean?"));
+	FYAI_TCHECK(!fyai_media_pending_any(&ctx));
+	snprintf(line, sizeof(line), "see @\"\"");
+	FYAI_TCHECK(fyai_media_take_mentions(&ctx, line) < 0);
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	fyai_media_pending_clear(&ctx);
+	fyai_diag_cleanup(&cfg.diag);
+	fy_generic_builder_destroy(ctx.gb);
+	return 0;
+}
+
 #else
+int media_mentions(void)
+{
+	return 0;
+}
+
 int media_image_roundtrip(void)
 {
 	return 0;
