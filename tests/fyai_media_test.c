@@ -28,6 +28,7 @@ FYAI_TEST_ENTRY(media, dimensions, media_dimensions)
 FYAI_TEST_ENTRY(media, type_names, media_type_names)
 FYAI_TEST_ENTRY(media, content_parts, media_content_parts)
 FYAI_TEST_ENTRY(media, content_references, media_content_references)
+FYAI_TEST_ENTRY(media, rows_styled, media_rows_styled)
 FYAI_TEST_ENTRY(media, image_roundtrip, media_image_roundtrip)
 FYAI_TEST_ENTRY(media, image_limits, media_image_limits)
 FYAI_TEST_ENTRY(media, pending_message, media_pending_message)
@@ -282,6 +283,39 @@ int media_content_references(void)
 
 	free(image.name);
 	fy_generic_builder_destroy(gb);
+	return 0;
+}
+
+/*
+ * On a card, a whole reference row is bold and in the ref role; a row inside
+ * other words, or a link that is not an attachment, is left as it is.
+ */
+int media_rows_styled(void)
+{
+	static const struct {
+		const char *in;
+		const char *out;
+	} cases[] = {
+		{ "look\n![image: PNG 1x1, 29 B](fyai-media:ab)",
+		  "look\n**<fy-role name=\"ref\">![image: PNG 1x1, 29 B](fyai-media:ab)</fy-role>**" },
+		{ "![image: GIF 2x2, 1 KiB](fyai-media:cd)\n",
+		  "**<fy-role name=\"ref\">![image: GIF 2x2, 1 KiB](fyai-media:cd)</fy-role>**\n" },
+		{ "![image: a picture](https://example.com/a.png)",
+		  "![image: a picture](https://example.com/a.png)" },
+		{ "see ![image: PNG 1x1, 29 B](fyai-media:ab) here",
+		  "see ![image: PNG 1x1, 29 B](fyai-media:ab) here" },
+		{ "", "" },
+	};
+	char *out;
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(cases); i++) {
+		out = fyai_media_rows_styled(cases[i].in);
+		FYAI_TCHECK(out);
+		FYAI_TCHECK(!strcmp(out, cases[i].out));
+		free(out);
+	}
+	FYAI_TCHECK(!fyai_media_rows_styled(NULL));
 	return 0;
 }
 

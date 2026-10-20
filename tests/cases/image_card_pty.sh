@@ -49,6 +49,14 @@ steps:
   - type: "/exit"
 PTY
 
+# The card shows the row in bold, so an attachment stands out of the words.
+"$PYTHON" - "$TEST_DIR/pty.out" <<'EOF' || fail "the attachment row is not bold"
+import re, sys
+data = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
+if not re.search(r"\x1b\[1m(\x1b\[[0-9;]*m)*image: PNG 1024x768", data):
+    raise SystemExit("no bold row in the capture")
+EOF
+
 # The row is the alt text and the digest; the model got the native part.
 assert_request 0 'any(p.get("type") == "input_text" and p.get("text") == "what is this?" for p in r["body"]["input"][-1]["content"] if isinstance(p, dict))'
 assert_request 0 'any(p.get("type") == "input_image" for p in r["body"]["input"][-1]["content"] if isinstance(p, dict))'
