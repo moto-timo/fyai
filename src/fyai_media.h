@@ -258,6 +258,19 @@ int fyai_media_attach_file(struct fyai_ctx *ctx, const char *path, bool quiet,
 			   fy_generic *partp);
 
 /*
+ * Take the @PATH mentions of @line, which a user typed. Each one names a file
+ * that is attached as fyai_media_attach_file() does, and the path stays in
+ * the line: "look at @shot.png" becomes "look at shot.png". A mention starts
+ * the line or follows a blank, so "a@b.com" is text. A path with blanks is
+ * quoted, @"my shot.png" or @'my shot.png', or escapes them, @my\ shot.png.
+ * "\@" and "@@" are a literal "@". A bare @WORD that names no file stays as
+ * typed; a quoted or escaped one is an error, and so is an empty one. A quote
+ * that does not close makes no mention: the "@" is text. @line is rewritten
+ * in place. Return 0, or -1 with a cause, and then nothing is attached.
+ */
+int fyai_media_take_mentions(struct fyai_ctx *ctx, char *line);
+
+/*
  * Read the system clipboard as an image and add it to the next user message.
  * No terminal escape can read a clipboard, so this runs a helper program.
  * media/clipboard_command names one; otherwise the helpers this system has

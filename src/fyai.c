@@ -1311,8 +1311,8 @@ void fyai_model_step_destroy(struct fyai_model_step *step)
 }
 
 /* Asynchronous turn state. */
-static void fyai_interactive_prepare_user_line(struct fyai_ctx *ctx,
-					       const char *histfile, char *line);
+static int fyai_interactive_prepare_user_line(struct fyai_ctx *ctx,
+					      const char *histfile, char *line);
 
 static bool fyai_interactive_is_user_line(const char *line)
 {
@@ -1624,7 +1624,11 @@ static int fyai_turn_run_take_pending_user(struct fyai_turn_run *run)
 		line = fyai_ui_take_line(ctx);
 		fyai_error_check(ctx, line, err,
 				 "could not take pending input");
-		fyai_interactive_prepare_user_line(ctx, run->histfile, line);
+		if (fyai_interactive_prepare_user_line(ctx, run->histfile,
+						       line)) {
+			free(line);
+			continue;
+		}
 		rc = fyai_turn_run_append_user(run, line);
 		free(line);
 		fyai_error_check(ctx, !rc, err,
@@ -2861,6 +2865,7 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 {
 	struct timespec t_setup;
 	fy_generic skill_msg;
+	char *prompt = NULL, *shown = NULL;
 	char *instr;
 	size_t i;
 	int rc;
@@ -3005,20 +3010,36 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	}
 
 	if (cfg->prompt && *cfg->prompt) {
+		prompt = strdup(cfg->prompt);
+		fyai_error_check(ctx, prompt, err, "out of memory");
+		/*
+		 * The @PATH mentions attach only in the prompt the user typed:
+		 * the task of a sub-agent is not a line of the user, and an
+		 * attachment never leaves with the instruction of one. A prompt
+		 * that starts with "/" names a command and has none.
+		 */
+		if (cfg->cmd.run == FYAI_RUN_PROMPT && !cfg->agent_child &&
+		    !cfg->agent_rpc && !cfg->tool_exec && prompt[0] != '/' &&
+		    fyai_media_take_mentions(ctx, prompt))
+			goto err;
 		/* A prompt "/NAME ARGS" that names a skill runs the skill. */
 		skill_msg = fyai_skill_user_message(ctx,
-				fyai_ctx_transient_gb(ctx), cfg->prompt);
+				fyai_ctx_transient_gb(ctx), prompt);
 		fyai_error_check(ctx, fy_is_string(skill_msg) ||
-				 !fyai_skill_exec_line(cfg->prompt), err,
+				 !fyai_skill_exec_line(prompt), err,
 				 "no enabled skill for '%s' on branch '%s'",
-				 cfg->prompt, fyai_ctx_branch(ctx));
+				 prompt, fyai_ctx_branch(ctx));
+		shown = fyai_media_pending_display(ctx, prompt);
 		ctx->last_message = fyai_turn_append(ctx, ctx->last_message,
 			fy_sequence(fyai_make_user_message(ctx,
 				fy_is_string(skill_msg) ?
-				fy_castp(&skill_msg, cfg->prompt) :
-				cfg->prompt)));
+				fy_castp(&skill_msg, prompt) : prompt)));
 		ctx->last_message = fyai_output_record(ctx, ctx->last_message,
-			FYAI_OUTPUT_USER, cfg->prompt);
+			FYAI_OUTPUT_USER, shown ? shown : prompt);
+		free(shown);
+		shown = NULL;
+		free(prompt);
+		prompt = NULL;
 	}
 
 	/* intern all to durable */
@@ -3039,6 +3060,8 @@ err:
 	 * the caller with the partially-initialized ctx - every field it touches
 	 * is either NULL (memset above) or a live handle fyai_cleanup() guards.
 	 */
+	free(shown);
+	free(prompt);
 	return -1;
 }
 
@@ -3660,15 +3683,24 @@ out:
 	return rc;
 }
 
-/* Normalize and display a normal interactive user line. */
-static void fyai_interactive_prepare_user_line(struct fyai_ctx *ctx,
-					       const char *histfile, char *line)
+/*
+ * Normalize and display a normal interactive user line. Its @PATH mentions
+ * attach their files; -1 when one cannot, and then the line is not sent. The
+ * history keeps the line as typed, so it can be fixed and sent again.
+ */
+static int fyai_interactive_prepare_user_line(struct fyai_ctx *ctx,
+					      const char *histfile, char *line)
 {
 	if (line[0] == '/' && line[1] == '/')
 		memmove(line, line + 1, strlen(line));
 	fyai_ui_history_save(ctx, histfile, line);
+	if (fyai_media_take_mentions(ctx, line)) {
+		fyai_ui_diag_drain(ctx, "error");
+		return -1;
+	}
 	fyai_echo_user_turn(ctx, line);
 	fyai_ui_drain_output(ctx);
+	return 0;
 }
 
 /*
@@ -3710,7 +3742,8 @@ fyai_interactive_start_line(struct fyai_ctx *ctx, const char *histfile,
 		fyai_ui_diag_drain(ctx, "error");
 		return 0;
 	}
-	fyai_interactive_prepare_user_line(ctx, histfile, line);
+	if (fyai_interactive_prepare_user_line(ctx, histfile, line))
+		return 0;
 	rc = fyai_setup_transient_builder(ctx);
 	fyai_error_check(ctx, !rc, err,
 			 "could not create transient turn storage");
@@ -4311,7 +4344,11 @@ int fyai_prompt_interactive(struct fyai_ctx *ctx)
 			line = NULL;
 			continue;
 		}
-		fyai_interactive_prepare_user_line(ctx, histfile, line);
+		if (fyai_interactive_prepare_user_line(ctx, histfile, line)) {
+			free(line);
+			line = NULL;
+			continue;
+		}
 
 		rc = fyai_setup_transient_builder(ctx);
 		assert(!rc);

@@ -1135,6 +1135,108 @@ out:
 	return rc;
 }
 
+/*
+ * The path of the mention at @s, just after the "@", unquoted and unescaped
+ * into @out. *@endp is where the mention ends, *@explicitp says it was quoted
+ * or escaped. -1 for a quote that does not close: the "@" is then text.
+ */
+static int media_mention_path(const char *s, char *out, const char **endp,
+			      bool *explicitp)
+{
+	char quote = 0;
+	size_t o = 0;
+
+	*explicitp = false;
+	if (*s == '"' || *s == '\'') {
+		quote = *s++;
+		*explicitp = true;
+	}
+	while (*s) {
+		if (quote && *s == quote) {
+			s++;
+			break;
+		}
+		if (!quote && isspace((unsigned char)*s))
+			break;
+		if (*s == '\\' && s[1] && quote != '\'') {
+			*explicitp = true;
+			s++;
+		}
+		out[o++] = *s++;
+		if (quote && !*s)
+			return -1;
+	}
+	out[o] = '\0';
+	*endp = s;
+	return 0;
+}
+
+int fyai_media_take_mentions(struct fyai_ctx *ctx, char *line)
+{
+	fy_generic saved;
+	const char *end;
+	char *path = NULL;
+	size_t i, o, len, plen;
+	bool explicit, mention;
+	int rc = -1, got;
+
+	if (!line || !strchr(line, '@'))
+		return 0;
+	len = strlen(line);
+	path = malloc(len + 1);
+	if (!path) {
+		fyai_error(ctx, "out of memory");
+		return -1;
+	}
+	saved = ctx->media_pending;
+	/*
+	 * The line is rewritten in place. The write cursor @o never passes the
+	 * read cursor @i, so the lookahead of line[i + 1] stays valid.
+	 */
+	for (i = o = 0; i < len; ) {
+		/* "\@" and "@@" are a literal "@" */
+		if ((line[i] == '\\' || line[i] == '@') && line[i + 1] == '@') {
+			line[o++] = '@';
+			i += 2;
+			continue;
+		}
+		mention = line[i] == '@' &&
+			  (i == 0 || isspace((unsigned char)line[i - 1])) &&
+			  line[i + 1] && !isspace((unsigned char)line[i + 1]);
+		/* a quote that does not close is no mention: the "@" is text */
+		if (!mention ||
+		    media_mention_path(line + i + 1, path, &end, &explicit)) {
+			line[o++] = line[i++];
+			continue;
+		}
+		if (!*path) {
+			fyai_error(ctx, "the mention '%.*s' names no path",
+				   (int)(end - (line + i)), line + i);
+			goto out;
+		}
+		/* a bare @WORD that names no file is text */
+		got = fyai_media_attach_file(ctx, path, !explicit, NULL);
+		if (got < 0)
+			goto out;
+		if (got > 0) {
+			line[o++] = line[i++];
+			continue;
+		}
+		/* the path stays in the words, without its quoting */
+		plen = strlen(path);
+		memmove(line + o, path, plen);
+		o += plen;
+		i = (size_t)(end - line);
+	}
+	line[o] = '\0';
+	rc = 0;
+out:
+	if (rc)
+		ctx->media_pending = saved;
+	free(path);
+	return rc;
+}
+
 bool fyai_media_part_has_bytes(fy_generic part)
 {
 	fy_generic data;
