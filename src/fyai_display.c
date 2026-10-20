@@ -521,7 +521,7 @@ static int fyai_export_message(struct fyai_ctx *ctx, FILE *fp,
 	 * bytes included, so an import needs nothing but the document. The
 	 * bytes are !!binary lines that fit the width; the prose names them.
 	 */
-	if (fyai_media_content_has_images(content)) {
+	if (fyai_media_content_has_attachments(content)) {
 		fy_foreach(part, content) {
 			fyai_error_check(ctx, !fyai_media_part_is_image(part) ||
 					 fyai_media_part_has_bytes(part), err,
@@ -634,7 +634,7 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 		if (fy_is_string(content))
 			text = fy_castp(&content, "");
 		else if (fy_equal(fy_get(message, "type"), "message") ||
-			 fyai_media_content_has_images(content)) {
+			 fyai_media_content_has_attachments(content)) {
 			/*
 			 * The words of the message, then one reference line per
 			 * attachment; the bytes are in the directive.
@@ -2571,7 +2571,7 @@ static void fyai_emit_message_md(struct fyai_ctx *ctx, FILE *mf,
 	 * A content sequence that carries an image has no string content, so it
 	 * is shown as its text and the reference rows of its attachments.
 	 */
-	if (fyai_media_content_has_images(c->content)) {
+	if (fyai_media_content_has_attachments(c->content)) {
 		rowtext = fyai_media_text_references(tgb, c->content);
 		text = fy_castp(&rowtext, "");
 		if (fy_equal(c->role, "user")) {

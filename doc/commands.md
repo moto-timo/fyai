@@ -3051,7 +3051,9 @@ attach an image to the next message
 Attach an image to the next message the model reads. An attachment is
 sent whole, so it is bounded by `media/max_bytes`, and one message
 carries at most `media/max_per_message` of them. The message holds
-the bytes, so they are kept in the arena with the conversation.
+the bytes, so they are kept in the arena with the conversation. A path
+that starts with `~/` is under the home directory, here and wherever
+a command takes the path of an attachment.
 
 A path is never taken from what you type in a line: an image enters
 only through `image add`, through `image paste`, or through an option
@@ -5951,7 +5953,9 @@ attach an image to the next message
 Attach an image to the next message the model reads. An attachment is
 sent whole, so it is bounded by `media/max_bytes`, and one message
 carries at most `media/max_per_message` of them. The message holds
-the bytes, so they are kept in the arena with the conversation.
+the bytes, so they are kept in the arena with the conversation. A path
+that starts with `~/` is under the home directory, here and wherever
+a command takes the path of an attachment.
 
 A path is never taken from what you type in a line: an image enters
 only through `image add`, through `image paste`, or through an option

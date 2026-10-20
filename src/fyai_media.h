@@ -115,6 +115,30 @@ bool fyai_media_part_is_image(fy_generic part);
 bool fyai_media_content_has_images(fy_generic content);
 
 /*
+ * The most bytes of a text file that a message carries inline. A smaller
+ * media/max_bytes lowers it.
+ */
+#define FYAI_MEDIA_TEXT_MAX	(256 * 1024)
+
+/*
+ * Whether @part is the text of a file the user attached: a text part with
+ * the name of the file, {type: text, text, file, bytes, lines}.
+ */
+bool fyai_media_part_is_file(fy_generic part);
+/* Whether @content carries a file part. */
+bool fyai_media_content_has_files(fy_generic content);
+/* Whether @content carries an image or a file part. */
+bool fyai_media_content_has_attachments(fy_generic content);
+
+/*
+ * What the model reads of @content, built in @gb: its words, then the text of
+ * each file part, e.g. "File: notes.txt" over a fenced block. A string
+ * content is returned borrowed.
+ */
+fy_generic fyai_media_model_text(struct fy_generic_builder *gb,
+				 fy_generic content);
+
+/*
  * The image parts of @content, in order, built in @gb. A string content and
  * a content with no image part give an empty sequence.
  */
@@ -122,17 +146,24 @@ fy_generic fyai_media_parts(struct fy_generic_builder *gb, fy_generic content);
 
 /*
  * The text of @content, built in @gb: a string content itself, borrowed, or
- * the joined text parts of a sequence. An image part and a provider-specific
- * part contribute no text. Every reader that wants the words of a message and
- * not its media uses this function.
+ * the joined text parts of a sequence. An image part, a file part and a
+ * provider-specific part contribute no text. Every reader that wants the
+ * words of a message and not its media uses this function.
+ *
+ * This is not what a provider sends: the model also reads the text of each
+ * file part. A reader that wants what the model reads uses
+ * fyai_media_model_text().
  */
 fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content);
+
+/* "12 lines, 340 B" or "1 line, 2 B": the size of a file part for a person. */
+void fyai_media_file_size(char *buf, size_t sz, fy_generic part);
 
 /*
  * The Markdown reference that names @part: the row the transcript shows and
  * the line the prose of an export writes for an attachment. The digest is the
  * hook a later reader resolves; the alt text describes the image without
- * reading its bytes.
+ * reading its bytes. A file part is "[file: NAME, 12 lines, 340 B]".
  */
 fy_generic fyai_media_part_reference(struct fy_generic_builder *gb,
 				     fy_generic part);
@@ -208,6 +239,23 @@ int fyai_media_attach_fd(struct fyai_ctx *ctx, int fd, const char *declared,
 			 const char *name);
 int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 			   const char *declared, const char *name);
+
+/* @path with a leading "~" or "~/" taken from $HOME, malloc'd, or NULL. */
+char *fyai_media_path(const char *path);
+
+/*
+ * Add the file at @path to the next user message by what it holds: an image
+ * as an image part, a UTF-8 text file of at most FYAI_MEDIA_TEXT_MAX bytes as
+ * a file part that the model reads inline. Any other file is refused with a
+ * cause. One open of the file decides the type, the size and the bytes.
+ * @partp, when not NULL, gets the part that was added.
+ *
+ * With @quiet, a path that names no regular file adds nothing, reports
+ * nothing and returns 1, so that the caller can take the word as text.
+ * Otherwise 0, or -1 with a cause.
+ */
+int fyai_media_attach_file(struct fyai_ctx *ctx, const char *path, bool quiet,
+			   fy_generic *partp);
 
 /*
  * Read the system clipboard as an image and add it to the next user message.

@@ -28,6 +28,7 @@
 #include "fyai_auth_util.h"
 #include "fyai_media.h"
 #include "fyai_diag.h"
+#include "fyai_session.h"
 #include "utils.h"
 
 /*
@@ -380,14 +381,17 @@ out:
 	return -1;
 }
 
-/* Read @len bytes of @fd from its start, owned by the caller, or NULL. */
+/*
+ * Read @len bytes of @fd from its start, owned by the caller, or NULL. A
+ * @len of 0 is an empty file: the buffer has a byte, so a NULL is a failure.
+ */
 static unsigned char *media_read_all(struct fyai_ctx *ctx, int fd, size_t len)
 {
 	unsigned char *buf;
 	size_t done = 0;
 	ssize_t got;
 
-	buf = malloc(len);
+	buf = malloc(len ? len : 1);
 	media_check(ctx, buf, err, "could not allocate %zu bytes for an "
 		    "attachment", len);
 	while (done < len) {
@@ -497,6 +501,31 @@ bool fyai_media_content_has_images(fy_generic content)
 	return false;
 }
 
+bool fyai_media_part_is_file(fy_generic part)
+{
+	return fy_equal(fy_get(part, "type", fy_invalid), FYAI_MEDIA_PART_TEXT) &&
+	       fy_is_string(fy_get(part, "file", fy_invalid));
+}
+
+bool fyai_media_content_has_files(fy_generic content)
+{
+	fy_generic part;
+
+	if (!fy_is_sequence(content))
+		return false;
+	fy_foreach(part, content) {
+		if (fyai_media_part_is_file(part))
+			return true;
+	}
+	return false;
+}
+
+bool fyai_media_content_has_attachments(fy_generic content)
+{
+	return fyai_media_content_has_images(content) ||
+	       fyai_media_content_has_files(content);
+}
+
 fy_generic fyai_media_parts(struct fy_generic_builder *gb, fy_generic content)
 {
 	fy_generic out, part;
@@ -531,8 +560,31 @@ fy_generic fyai_media_text(struct fy_generic_builder *gb, fy_generic content)
 	chunks = fy_seq_empty;
 	fy_foreach(part, content) {
 		if (!fy_any_equal(fy_get(part, "type"), FYAI_MEDIA_PART_TEXT,
-				  "output_text"))
+				  "output_text") || fyai_media_part_is_file(part))
 			continue;
+		chunks = fy_append(gb, chunks, fy_get(part, "text", ""));
+	}
+	return fyai_join_strings(gb, chunks);
+}
+
+fy_generic fyai_media_model_text(struct fy_generic_builder *gb,
+				 fy_generic content)
+{
+	fy_generic chunks, part, text;
+	const char *s;
+
+	if (!fyai_media_content_has_files(content))
+		return fyai_media_text(gb, content);
+	text = fyai_media_text(gb, content);
+	s = fy_castp(&text, "");
+	chunks = fy_seq_empty;
+	if (s && *s)
+		chunks = fy_append(gb, chunks, text);
+	fy_foreach(part, content) {
+		if (!fyai_media_part_is_file(part))
+			continue;
+		if (!fy_empty(chunks))
+			chunks = fy_append(gb, chunks, fy_value(gb, "\n\n"));
 		chunks = fy_append(gb, chunks, fy_get(part, "text", ""));
 	}
 	return fyai_join_strings(gb, chunks);
@@ -565,13 +617,37 @@ static void media_size_label(char *buf, size_t sz, long long bytes)
 		snprintf(buf, sz, "%.1f MiB", (double)bytes / (1024.0 * 1024.0));
 }
 
+void fyai_media_file_size(char *buf, size_t sz, fy_generic part)
+{
+	char size[32];
+	long long lines = fy_get(part, "lines", 0LL);
+
+	media_size_label(size, sizeof(size), fy_get(part, "bytes", 0LL));
+	snprintf(buf, sz, "%lld line%s, %s", lines, lines == 1 ? "" : "s", size);
+}
+
 fy_generic fyai_media_part_reference(struct fy_generic_builder *gb,
 				     fy_generic part)
 {
-	char type[32], size[32];
+	char type[32], size[48];
 	const char *mt, *dg;
 	long long width, height, bytes;
+	fy_generic file;
+	char *name;
 
+	if (gb && fyai_media_part_is_file(part)) {
+		file = fy_get(part, "file");
+		name = fyai_prompt_literal(fy_castp(&file, ""));
+		if (!name) {
+			fyai_warning(NULL, "could not escape the name of a file "
+				     "part, so its row is left out");
+			return fy_invalid;
+		}
+		fyai_media_file_size(size, sizeof(size), part);
+		file = fy_stringf(gb, "[file: %s, %s]", name, size);
+		free(name);
+		return file;
+	}
 	if (!gb || !fyai_media_part_is_image(part))
 		return fy_invalid;
 	mt = fy_get(part, "media_type", "");
@@ -588,10 +664,10 @@ fy_generic fyai_media_part_reference(struct fy_generic_builder *gb,
 fy_generic fyai_media_text_references(struct fy_generic_builder *gb,
 				      fy_generic content)
 {
-	fy_generic text, parts, part, chunks;
+	fy_generic text, part, chunks;
 	const char *s;
 
-	if (!fyai_media_content_has_images(content))
+	if (!fyai_media_content_has_attachments(content))
 		return fyai_media_text(gb, content);
 	if (!gb)
 		return fy_invalid;
@@ -600,8 +676,10 @@ fy_generic fyai_media_text_references(struct fy_generic_builder *gb,
 	s = fy_castp(&text, "");
 	if (s && *s)
 		chunks = fy_append(gb, chunks, text);
-	parts = fyai_media_parts(gb, content);
-	fy_foreach(part, parts) {
+	fy_foreach(part, content) {
+		if (!fyai_media_part_is_image(part) &&
+		    !fyai_media_part_is_file(part))
+			continue;
 		if (!fy_empty(chunks))
 			chunks = fy_append(gb, chunks, fy_value(gb, "\n\n"));
 		chunks = fy_append(gb, chunks,
@@ -624,8 +702,12 @@ static bool media_line_is_row(const char *line, size_t len)
 {
 	static const char head[] = "![image: ";
 	static const char hook[] = "](fyai-media:";
+	static const char file[] = "[file: ";
 	const char *s;
 
+	if (len > sizeof(file) - 1 && !memcmp(line, file, sizeof(file) - 1) &&
+	    line[len - 1] == ']')
+		return true;
 	if (len < sizeof(head) - 1 || memcmp(line, head, sizeof(head) - 1) ||
 	    line[len - 1] != ')')
 		return false;
@@ -798,11 +880,28 @@ static int media_attach_bytes(struct fyai_ctx *ctx, const void *data,
 	return media_attach_image(ctx, &image);
 }
 
+char *fyai_media_path(const char *path)
+{
+	const char *home;
+	char *out;
+
+	if (!path)
+		return NULL;
+	if (path[0] != '~' || (path[1] && path[1] != '/'))
+		return strdup(path);
+	home = getenv("HOME");
+	if (!home || !*home)
+		return strdup(path);
+	if (asprintf(&out, "%s%s", home, path + 1) < 0)
+		return NULL;
+	return out;
+}
+
 /* Add the file at @path to the next user message. */
 int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 			   const char *declared, const char *name)
 {
-	char *base = NULL;
+	char *base = NULL, *full;
 	const char *leaf;
 	int fd, rc;
 
@@ -810,7 +909,13 @@ int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 		fyai_error(ctx, "an attachment needs a path");
 		return -1;
 	}
-	fd = open(path, O_RDONLY | O_CLOEXEC);
+	full = fyai_media_path(path);
+	if (!full) {
+		fyai_error(ctx, "could not expand '%s'", path);
+		return -1;
+	}
+	fd = open(full, O_RDONLY | O_CLOEXEC);
+	free(full);
 	if (fd < 0) {
 		fyai_error(ctx, "could not open '%s': %s", path, strerror(errno));
 		return -1;
@@ -823,6 +928,209 @@ int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 	}
 	rc = fyai_media_attach_fd(ctx, fd, declared, base ? base : name);
 	free(base);
+	close(fd);
+	return rc;
+}
+
+/*
+ * Whether @len bytes at @p are text: UTF-8, with no control character other
+ * than the blanks of text (tab, newline, vertical tab, form feed and carriage
+ * return). A binary file seldom passes: it holds a NUL or another control.
+ */
+static bool media_is_text(const unsigned char *p, size_t len)
+{
+	size_t i = 0, n, k;
+	unsigned int cp, min;
+
+	while (i < len) {
+		if (p[i] < 0x80) {
+			if ((p[i] < 0x20 && (p[i] < 0x09 || p[i] > 0x0d)) ||
+			    p[i] == 0x7f)
+				return false;
+			i++;
+			continue;
+		}
+		if ((p[i] & 0xe0) == 0xc0) {
+			n = 1; cp = p[i] & 0x1f; min = 0x80;
+		} else if ((p[i] & 0xf0) == 0xe0) {
+			n = 2; cp = p[i] & 0x0f; min = 0x800;
+		} else if ((p[i] & 0xf8) == 0xf0) {
+			n = 3; cp = p[i] & 0x07; min = 0x10000;
+		} else {
+			return false;
+		}
+		for (k = 1; k <= n; k++) {
+			if (i + k >= len || (p[i + k] & 0xc0) != 0x80)
+				return false;
+			cp = cp << 6 | (p[i + k] & 0x3f);
+		}
+		if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))
+			return false;
+		i += n + 1;
+	}
+	return true;
+}
+
+/*
+ * The text of a file as a message carries it: "File: PATH", then the bytes in
+ * a fence longer than any run of backticks in them.
+ */
+static char *media_file_block(const char *path, const char *data, size_t len)
+{
+	struct response_buffer out = {};
+	size_t run = 0, longest = 0, i, fence;
+	int rc;
+
+	for (i = 0; i < len; i++) {
+		run = data[i] == '`' ? run + 1 : 0;
+		if (run > longest)
+			longest = run;
+	}
+	fence = longest >= 3 ? longest + 1 : 3;
+	rc = response_buffer_append(&out, "File: ") ||
+	     response_buffer_append(&out, path) ||
+	     response_buffer_append(&out, "\n");
+	for (i = 0; !rc && i < fence; i++)
+		rc = response_buffer_append_data(&out, "`", 1);
+	rc = rc || response_buffer_append(&out, "\n") ||
+	     response_buffer_append_data(&out, data, len);
+	if (!rc && len && data[len - 1] != '\n')
+		rc = response_buffer_append(&out, "\n");
+	for (i = 0; !rc && i < fence; i++)
+		rc = response_buffer_append_data(&out, "`", 1);
+	if (rc) {
+		free(out.data);
+		return NULL;
+	}
+	return out.data;
+}
+
+/*
+ * The most bytes of a text file that a message carries: FYAI_MEDIA_TEXT_MAX,
+ * or media/max_bytes when that is smaller.
+ */
+static uint64_t media_text_max(const struct fyai_ctx *ctx)
+{
+	uint64_t max_bytes = media_max_bytes(ctx);
+
+	return max_bytes && max_bytes < FYAI_MEDIA_TEXT_MAX ?
+	       max_bytes : FYAI_MEDIA_TEXT_MAX;
+}
+
+/* Add the text file open as @fd, which @path names, as a file part. */
+static int media_attach_text(struct fyai_ctx *ctx, const char *path, int fd,
+			     uint64_t size)
+{
+	unsigned char *data;
+	char *block;
+	fy_generic part;
+	long long lines = 0;
+	uint64_t max = media_text_max(ctx);
+	size_t i;
+
+	if (size > max) {
+		fyai_error(ctx, "'%s' holds %llu bytes, more than the %llu bytes of "
+			   "text a message carries", path,
+			   (unsigned long long)size, (unsigned long long)max);
+		return -1;
+	}
+	data = media_read_all(ctx, fd, (size_t)size);
+	if (!data)
+		return -1;
+	if (!media_is_text(data, (size_t)size)) {
+		fyai_error(ctx, "'%s' is neither an image nor a text file", path);
+		free(data);
+		return -1;
+	}
+	for (i = 0; i < size; i++)
+		lines += data[i] == '\n';
+	if (size && data[size - 1] != '\n')
+		lines++;
+	block = media_file_block(path, (const char *)data, (size_t)size);
+	free(data);
+	if (!block) {
+		fyai_error(ctx, "could not attach '%s'", path);
+		return -1;
+	}
+	part = fy_mapping(ctx->gb,
+		"type", FYAI_MEDIA_PART_TEXT,
+		"text", fy_value(ctx->gb, block),
+		"file", fy_value(ctx->gb, path),
+		"bytes", (long long)size,
+		"lines", lines);
+	free(block);
+	if (!fy_is_valid(part)) {
+		fyai_error(ctx, "could not record '%s'", path);
+		return -1;
+	}
+	ctx->media_pending = fy_append(ctx->gb, ctx->media_pending, part);
+	return 0;
+}
+
+/* The part that the last attachment added, or fy_invalid. */
+static fy_generic media_last_part(const struct fyai_ctx *ctx)
+{
+	size_t n = fy_len(ctx->media_pending);
+
+	return n ? fy_get_at(ctx->media_pending, n - 1) : fy_invalid;
+}
+
+int fyai_media_attach_file(struct fyai_ctx *ctx, const char *path, bool quiet,
+			   fy_generic *partp)
+{
+	unsigned char head[16];
+	enum fyai_media_type type;
+	struct stat st;
+	const char *leaf;
+	char *full;
+	ssize_t got;
+	int fd, rc = -1;
+
+	if (!path || !*path) {
+		fyai_error(ctx, "an attachment needs a path");
+		return -1;
+	}
+	full = fyai_media_path(path);
+	if (!full) {
+		fyai_error(ctx, "could not expand '%s'", path);
+		return -1;
+	}
+	/* Not blocking: a FIFO that nobody writes must not hold the line. */
+	fd = open(full, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+	free(full);
+	if (fd < 0) {
+		/* a word that names nothing is not a file */
+		if (quiet && (errno == ENOENT || errno == ENOTDIR ||
+			      errno == ENAMETOOLONG))
+			return 1;
+		fyai_error(ctx, "could not open '%s': %s", path, strerror(errno));
+		return -1;
+	}
+	if (fstat(fd, &st) || !S_ISREG(st.st_mode)) {
+		if (quiet) {
+			rc = 1;
+			goto out;
+		}
+		fyai_error(ctx, "'%s' is not a regular file", path);
+		goto out;
+	}
+	if (media_attach_check(ctx))
+		goto out;
+	/*
+	 * One open decides the type, the size and the bytes. The magic bytes
+	 * say an image; the rest of the bytes say text.
+	 */
+	got = pread(fd, head, sizeof(head), 0);
+	if (got > 0 && !fyai_media_sniff(head, (size_t)got, &type)) {
+		leaf = strrchr(path, '/');
+		leaf = leaf ? leaf + 1 : path;
+		rc = fyai_media_attach_fd(ctx, fd, NULL, *leaf ? leaf : NULL);
+	} else {
+		rc = media_attach_text(ctx, path, fd, (uint64_t)st.st_size);
+	}
+	if (!rc && partp)
+		*partp = media_last_part(ctx);
+out:
 	close(fd);
 	return rc;
 }

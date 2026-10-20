@@ -114,6 +114,16 @@ int fyai_cmd_image_list(struct fyai_cmd_call *call, fy_generic *result)
 
 	out = fy_seq_empty;
 	fy_foreach(part, ctx->media_pending) {
+		/* a text file: its lines in place of a pixel size */
+		if (fyai_media_part_is_file(part)) {
+			out = fy_append(call->gb, out, fy_mapping(call->gb,
+				"media_type", "text/plain",
+				"size", fy_sprintfa("%lld lines",
+						    fy_get(part, "lines", 0LL)),
+				"bytes", fy_get(part, "bytes", 0LL),
+				"name", fy_get(part, "file", "")));
+			continue;
+		}
 		width = fy_get(part, "width", 0LL);
 		height = fy_get(part, "height", 0LL);
 		out = fy_append(call->gb, out, fy_mapping(call->gb,

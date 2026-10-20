@@ -678,8 +678,10 @@ static fy_generic wire_content(struct fyai_ctx *ctx, fy_generic content,
 	struct fy_generic_builder *gb = ctx->transient_gb;
 	fy_generic out, part, wire;
 
+	/* Files without images are text: the words, then each file. */
 	if (!fyai_media_content_has_images(content))
-		return content;
+		return fyai_media_content_has_files(content) ?
+		       fyai_media_model_text(gb, content) : content;
 	if (!ctx->cfg->image_input_supported) {
 		fyai_error(ctx, "the model '%s' takes no image input",
 			   ctx->cfg->model ? ctx->cfg->model : "");
@@ -882,6 +884,11 @@ fy_generic fyai_responses_input(struct fyai_ctx *ctx, fy_generic messages)
 	return provider_result(ctx, input, "could not build the Responses input");
 }
 
+/*
+ * The words of a native message item. Such an item is the output of a model:
+ * it carries no file part, which only a message of the user does, and
+ * wire_content() builds that one.
+ */
 fy_generic fyai_item_text(struct fyai_ctx *ctx, fy_generic item)
 {
 	return fyai_media_text(ctx->transient_gb, fy_get(item, "content"));
@@ -974,7 +981,7 @@ fy_generic fyai_chat_input(struct fyai_ctx *ctx, fy_generic messages)
 		if (fy_equal(fy_get(m, "role"), "tool") && fy_is_mapping(fy_get(m, "content", fy_invalid)))
 			m = fy_assoc(ctx->transient_gb, m, "content",
 				     wire_tool_text(ctx, fy_get(m, "content", fy_invalid)));
-		if (fyai_media_content_has_images(fy_get(m, "content"))) {
+		if (fyai_media_content_has_attachments(fy_get(m, "content"))) {
 			content = wire_content(ctx, fy_get(m, "content"),
 					       FYAI_API_CHAT_COMPLETIONS, "text");
 			if (fy_is_invalid(content))
@@ -1163,6 +1170,10 @@ fy_generic fyai_messages_blocks(struct fyai_ctx *ctx, fy_generic messages)
 		if (fy_is_invalid(content) ||
 		    fy_is_null(content))
 			content = fy_value("");
+		/* Files without images are the text of one block. */
+		if (!fyai_media_content_has_images(content) &&
+		    fyai_media_content_has_files(content))
+			content = fyai_media_model_text(gb, content);
 		if (fyai_media_content_has_images(content)) {
 			blocks = wire_content(ctx, content, FYAI_API_MESSAGES,
 					      "text");
