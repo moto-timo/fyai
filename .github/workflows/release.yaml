@@ -18,7 +18,7 @@ env:
   # Pinned to the same libfyaml revision fyai's CMakeLists fetches, so the
   # statically-linked archive matches what a normal build would pull in.
   LIBFYAML_REPO: https://github.com/pantoniou/libfyaml
-  LIBFYAML_REF: 08eca6a6df1f9d08c1a84b3d02cd3b476e2adec7
+  LIBFYAML_REF: d312d213f50fb3fff46bd745488e605138b9d4d1
 
 jobs:
   build:

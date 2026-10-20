@@ -213,7 +213,7 @@ if(NOT TARGET libfyaml::libfyaml)
     set(BUILD_TESTING OFF)
     FetchContent_Declare(libfyaml
         GIT_REPOSITORY https://github.com/pantoniou/libfyaml
-        GIT_TAG 08eca6a6df1f9d08c1a84b3d02cd3b476e2adec7
+        GIT_TAG d312d213f50fb3fff46bd745488e605138b9d4d1
     )
     FetchContent_MakeAvailable(libfyaml)
     set(BUILD_TESTING "${_FYAI_BUILD_TESTING}")
@@ -235,7 +235,7 @@ endif()
 # libfymermaid consume it.
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FyDeps.cmake)
 fyai_fy_dep(libfypalette 20db8800e89dac8f8f03dddaa528747c8ad99050)
-fyai_fy_dep(libfymd4c 2d28b3119a03c6fcff9efd7c120400c416e52023)
+fyai_fy_dep(libfymd4c 4157eb39ce62880a7a45111de91e14ceb1c2e39d)
 
 if(FYAI_STATIC_DEPS AND TARGET libfyaml::fyaml_static)
     set_target_properties(libfyaml::fyaml_static PROPERTIES
