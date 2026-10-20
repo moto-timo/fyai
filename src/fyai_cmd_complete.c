@@ -31,6 +31,7 @@
 #include "fyai_sink.h"
 #include "fyai_ui.h"
 #include "utils.h"
+#include "fyai_media.h"
 
 #define FYAI_MODULE FYAIEM_UNKNOWN
 
@@ -336,6 +337,7 @@ static void kind_files(struct complete_req *r, bool dirs)
 	char dir[1024];
 	const char *slash;
 	struct dirent *de;
+	char *full;
 	DIR *d;
 
 	r->directives |= dirs ? FYAI_CMD_COMPLETE_DIRS : FYAI_CMD_COMPLETE_FILES;
@@ -345,7 +347,10 @@ static void kind_files(struct complete_req *r, bool dirs)
 	snprintf(dir, sizeof(dir), "%.*s", slash ?
 		 (int)(slash - r->partial + 1) : 1,
 		 slash ? r->partial : ".");
-	d = opendir(dir);
+	/* ~/ is read under the home directory; the candidates keep it */
+	full = fyai_media_path(dir);
+	d = opendir(full ? full : dir);
+	free(full);
 	if (!d)
 		return;
 	while ((de = readdir(d))) {

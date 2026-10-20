@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <alloca.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <signal.h>
 #include <stddef.h>
@@ -51,6 +52,7 @@
 #include "fyai_render.h"
 #include "fyai_log.h"
 #include "fyai_markdown.h"
+#include "fyai_media.h"
 #include "fyai_output.h"
 #include "fyai_provider.h"
 #include "fyai_branch.h"
@@ -2009,13 +2011,131 @@ static void session_complete_add(void *arg, const char *value,
 					description);
 }
 
+/*
+ * Complete the @PATH that ends @buf: each entry of its directory that starts
+ * with what is typed, e.g. "see @no" gives "see @notes.txt ". Only the word
+ * that ends the line is completed, and only when it starts with "@". A path
+ * is read from the working directory of the process, as the mention parser
+ * reads it, and ~/ is the home directory and stays in the line.
+ *
+ * A name is escaped for the parser: blank, backslash and both quotes get a
+ * backslash. The parser needs only the blank and the backslash outside of a
+ * quote; the set is wider on purpose, so that a name is also safe inside a
+ * quote that the user types later. A file takes a trailing blank, which ends
+ * the mention. A directory ends with "/" and takes none, so a second Tab goes
+ * on inside it. A candidate that does not fit the buffers is left out.
+ */
+static void session_complete_mention(const char *buf,
+				     struct fytim_completions *lc)
+{
+	char path[PATH_MAX], label[PATH_MAX + 2], esc[2 * PATH_MAX];
+	char *typed, *line, *full;
+	struct dirent **names, *de;
+	struct stat st;
+	const char *s, *base;
+	char dir[PATH_MAX], entry[PATH_MAX];
+	size_t at, n, i, blen, dlen, cap;
+	bool isdir;
+	int len, count, k;
+
+	/* the word at the end of the line, after its last blank */
+	at = 0;
+	for (s = buf; *s; s++) {
+		if (*s == '\\' && s[1]) {
+			s++;
+			continue;
+		}
+		if (isspace((unsigned char)*s))
+			at = (size_t)(s - buf) + 1;
+	}
+	if (buf[at] != '@' || buf[at + 1] == '@')
+		return;
+	/* what is typed of the path, unescaped */
+	n = strlen(buf + at + 1);
+	typed = malloc(n + 1);
+	if (!typed)
+		return;
+	for (i = 0, s = buf + at + 1; *s; s++) {
+		if ((*s == '"' || *s == '\'') && s == buf + at + 1)
+			continue;
+		if (*s == '\\' && s[1])
+			s++;
+		typed[i++] = *s;
+	}
+	typed[i] = '\0';
+	base = strrchr(typed, '/');
+	base = base ? base + 1 : typed;
+	dlen = (size_t)(base - typed);
+	blen = strlen(base);
+	len = snprintf(dir, sizeof(dir), "%.*s", (int)dlen, typed);
+	if (len < 0 || (size_t)len >= sizeof(dir))
+		goto out_typed;
+	full = fyai_media_path(*dir ? dir : ".");
+	/* in the order of the names, so that the popup is the same each time */
+	count = full ? scandir(full, &names, NULL, alphasort) : -1;
+	if (count < 0)
+		goto out_full;
+	cap = at + sizeof(esc) + 3;
+	line = malloc(cap);
+	if (!line)
+		goto out_names;
+	(void)fytim_completion_set_anchor(lc, at);
+	for (k = 0; k < count; k++) {
+		de = names[k];
+		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+			continue;
+		if (de->d_name[0] == '.' && base[0] != '.')
+			continue;
+		if (strncmp(de->d_name, base, blen))
+			continue;
+		len = snprintf(entry, sizeof(entry), "%s/%s", full, de->d_name);
+		if (len < 0 || (size_t)len >= sizeof(entry))
+			continue;
+		isdir = !stat(entry, &st) && S_ISDIR(st.st_mode);
+		len = snprintf(path, sizeof(path), "%s%s%s", dir, de->d_name,
+			       isdir ? "/" : "");
+		if (len < 0 || (size_t)len >= sizeof(path))
+			continue;
+		for (i = 0, s = path; *s; s++) {
+			if (isspace((unsigned char)*s) || *s == '\\' ||
+			    *s == '"' || *s == '\'')
+				esc[i++] = '\\';
+			esc[i++] = *s;
+		}
+		esc[i] = '\0';
+		len = snprintf(line, cap, "%.*s@%s%s", (int)at, buf, esc,
+			       isdir ? "" : " ");
+		if (len < 0 || (size_t)len >= cap)
+			continue;
+		snprintf(label, sizeof(label), "@%s", path);
+		(void)fytim_completion_add_item(lc, line, label,
+						isdir ? "directory" : NULL);
+	}
+	free(line);
+out_names:
+	for (k = 0; k < count; k++)
+		free(names[k]);
+	free(names);
+out_full:
+	free(full);
+out_typed:
+	free(typed);
+}
+
 void fyai_session_completion(struct fyai_ctx *ctx, const char *buf,
 				     struct fytim_completions *lc)
 {
 	struct session_complete sc;
 
-	if (!ctx || buf[0] != '/')
+	if (!ctx)
 		return;
+	/* A "!" line is a command of the shell: its "@" names no fyai path. */
+	if (buf[0] == '!')
+		return;
+	if (buf[0] != '/') {
+		session_complete_mention(buf, lc);
+		return;
+	}
 	sc.lc = lc;
 	sc.word = fyai_cmd_session_word(buf);
 	(void)fytim_completion_set_anchor(lc, sc.word);
