@@ -3,7 +3,7 @@
 # binding names any value. fyai decides every flag.
 type: object
 additionalProperties: false
-required: [input, ask, screen, tail, transcript, popup, note, log, glyphs, todo, layout, pane, header, prompt, status]
+required: [input, ask, screen, tail, transcript, popup, note, pending, log, glyphs, todo, layout, pane, header, prompt, status]
 properties:
   layout:
     type: object
@@ -132,6 +132,14 @@ properties:
     properties:
       shown: { description: A short result stands above the status., type: boolean }
       rows: { description: Rows of the short result., type: integer }
+  pending:
+    type: object
+    additionalProperties: false
+    required: [shown, source, rows]
+    properties:
+      shown: { description: Lines typed while a turn runs wait for the prompt., type: boolean }
+      source: { description: The UI Markdown of the waiting lines., type: string }
+      rows: { description: Rows of the waiting lines., type: integer }
   todo:
     type: object
     additionalProperties: false

@@ -117,6 +117,11 @@ pages:
     - if: pane.above
       page: pane
 
+    # The lines typed while a turn runs, on top of the input area: they
+    # wait for the prompt under them.
+    - if: pending.shown
+      page: pending
+
     # The header row under a blank row, which go before the rules when the
     # page is too tall.
     - if: header.shown
@@ -425,6 +430,11 @@ pages:
       markup: pane.grid_source
     - if: pane.slot
       slot: { id: pane, rows: "{pane.rows}" }
+
+  # The lines that wait for the prompt, under a blank row.
+  pending:
+    - blank: true
+    - markup: pending.source
 
   # The todo list of the branch, above the prompt with the work pane.
   todos:

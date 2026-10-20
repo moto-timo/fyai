@@ -328,6 +328,9 @@ int fyai_page_chrome_rows(const struct fyai_page_state *st)
 		rows++;
 	if (st->ask)
 		rows += page_ask_rows(st->ask);
+	/* The waiting lines stand on top of the input area, under a blank row. */
+	if (st->pending_rows > 0)
+		rows += st->pending_rows + 1;
 	/* The todo panel stands above the prompt with the work pane. */
 	rows += st->note_nlines;
 	if (st->log_title && st->log_rows > 0)
@@ -335,9 +338,25 @@ int fyai_page_chrome_rows(const struct fyai_page_state *st)
 	return rows + (st->todo_shown ? st->todo_rows + 2 : 0);
 }
 
+int fyai_page_pending_budget(const struct fyai_page_state *st, int height)
+{
+	struct fyai_page_state base;
+	int left, third;
+
+	if (!st || height <= 0)
+		return 0;
+	base = *st;
+	base.pending_rows = 0;
+	left = height - fyai_page_chrome_rows(&base);
+	third = height / 3;
+	if (left > third)
+		left = third;
+	return left > 0 ? left : 0;
+}
+
 void fyai_page_fit(struct fyai_page_state *st, int height)
 {
-	int left, todo_rows;
+	int left, todo_rows, budget;
 
 	if (!st || height <= 0)
 		return;
@@ -366,6 +385,13 @@ void fyai_page_fit(struct fyai_page_state *st, int height)
 		left = height / 3 - 1;
 		if (st->log_rows > left)
 			st->log_rows = left > 0 ? left : 0;
+	}
+	/* The waiting lines never take the input: the owner of the source drops
+	 * the oldest lines to the rows granted here. */
+	if (st->pending_rows > 0) {
+		budget = fyai_page_pending_budget(st, height);
+		if (st->pending_rows + 1 > budget)
+			st->pending_rows = budget > 1 ? budget - 1 : 0;
 	}
 	/* Keep the input visible when the branch list exceeds its space. */
 	if (st->todo_shown) {
@@ -871,6 +897,10 @@ fy_generic fyai_page_state_generic(struct fy_generic_builder *gb,
 		"note", fy_mapping(gb,
 			"shown", (bool)(st->note_nlines > 0),
 			"rows", st->note_nlines),
+		"pending", fy_mapping(gb,
+			"shown", (_Bool)(st->pending_rows > 0),
+			"source", page_str(st->pending_source),
+			"rows", st->pending_rows),
 		"glyphs", fy_mapping(gb,
 			"expand", st->glyph_expand ? st->glyph_expand :
 				  "\xe2\x96\xa1",

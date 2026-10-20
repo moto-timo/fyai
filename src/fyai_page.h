@@ -142,6 +142,15 @@ struct fyai_page_state {
 	/* The rows @todo_source takes, and whether the panel is shown. */
 	int todo_rows;
 	bool todo_shown;
+	/*
+	 * The lines the user typed while a turn runs, which wait for the
+	 * prompt and stand on top of the input area. UI Markdown, borrowed for
+	 * the frame; NULL when none waits. @pending_rows is what it takes;
+	 * fyai_page_fit() lowers it to fyai_page_pending_budget(), and the
+	 * owner of the source then shows the newest lines that fit.
+	 */
+	const char *pending_source;
+	int pending_rows;
 	int pane_rows;
 	bool pane_below;
 	int prompt_rows;
@@ -220,6 +229,13 @@ struct fyai_page_tile {
 /* Rows the chrome of @st takes: the header, the prompt block, the status
  * rows and the cap row. */
 int fyai_page_chrome_rows(const struct fyai_page_state *st);
+
+/*
+ * The rows the waiting lines of @st may take at @height, with the blank row
+ * above them: at most a third of the page, and never a row of the other
+ * chrome. A budget of one row or less leaves no room for a line.
+ */
+int fyai_page_pending_budget(const struct fyai_page_state *st, int height);
 
 /*
  * Fit @st to @height rows, as the band stack does: the chrome keeps its rows,

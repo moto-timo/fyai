@@ -204,6 +204,16 @@ struct fyai_ui {
 	int todo_rows;
 	int todo_cols;
 	bool todo_shown;
+	/*
+	 * The lines typed while a turn runs, as UI Markdown on top of the
+	 * input area of the page, or NULL; the rows they take at @pending_cols.
+	 */
+	char *pending_source;
+	size_t pending_count;
+	int pending_rows;
+	int pending_cols;
+	/* The newest lines that fit the rows the page grants, or NULL. */
+	char *pending_fit;
 	/* The entry the todo panel was built from, to see it change. */
 	fy_generic_value todo_entry;
 	/* The rendered preview of the option under the cursor of a question. */
@@ -459,6 +469,49 @@ out:
 	return rc;
 }
 
+/*
+ * The waiting lines for the page: a dot, **pending** and the count of all
+ * the lines, then each line from the @skip-th under it after a small arrow.
+ *
+ * The page needs the "\" hard break between the rows, which
+ * page_append_text() removes together with the line breaks and the SGR of a
+ * text. The text of a line is the user's, thus fyai_prompt_literal() escapes
+ * every ASCII punctuation character of it: no Markdown construct and no fy-*
+ * tag of the line is acted on. The tags around it are fyai's own.
+ *
+ * The page draws the lines itself, on top of the input area. A notice tile,
+ * which the band stack uses for the same lines, is moved aside by a side
+ * column, and the lines belong to the input area.
+ */
+static char *ui_pending_source(const struct fyai_ui *ui, size_t count,
+			       size_t skip)
+{
+	struct response_buffer out = {};
+	const struct ui_line *line;
+	char *literal;
+	size_t i = 0;
+	int rc;
+
+	rc = response_buffer_append(&out, fy_sprintfa(
+		"<fy-role name=\"chrome\">\u25cf</fy-role> **pending** (%zu)",
+		count));
+	for (line = ui->head; !rc && line; line = line->next, i++) {
+		if (i < skip)
+			continue;
+		literal = fyai_prompt_literal(line->text);
+		rc = !literal ||
+		     response_buffer_append(&out,
+				"\\\n<fy-space n=\"2\"/>\u203a ") ||
+		     response_buffer_append(&out, literal);
+		free(literal);
+	}
+	if (rc) {
+		free(out.data);
+		return NULL;
+	}
+	return out.data;
+}
+
 static void ui_pending_refresh(struct fyai_ui *ui)
 {
 	static const char line_prefix[] = "\n  › ";
@@ -466,7 +519,7 @@ static void ui_pending_refresh(struct fyai_ui *ui)
 	const char *mark;
 	const char *off;
 	const char *header;
-	char *buf, *p;
+	char *buf, *p, *source;
 	size_t len = 0, text_len, count = 0;
 
 	for (line = ui->head; line; line = line->next) {
@@ -475,6 +528,27 @@ static void ui_pending_refresh(struct fyai_ui *ui)
 			return;
 		len += sizeof(line_prefix) - 1 + text_len;
 		count++;
+	}
+	/* The page draws the lines on top of the input area. */
+	if (ui->page) {
+		source = count ? ui_pending_source(ui, count, 0) : NULL;
+		if (count && !source)
+			fyai_warning(ui->ctx, "cannot show the pending lines");
+		ui_band_close(ui, &ui->pending_band);
+		/* A take of a line that changes nothing needs no frame. */
+		if (source && ui->pending_source &&
+		    !strcmp(source, ui->pending_source)) {
+			free(source);
+			return;
+		}
+		if (!source && !ui->pending_source)
+			return;
+		free(ui->pending_source);
+		ui->pending_source = source;
+		ui->pending_count = source ? count : 0;
+		ui->pending_cols = 0;
+		ui->frame_pending = true;
+		return;
 	}
 	if (!count) {
 		ui_band_close(ui, &ui->pending_band);
@@ -578,8 +652,11 @@ static void ui_note_clear(struct fyai_ui *ui)
 	ui->frame_pending = true;
 }
 
-/* Bound the rows a todo source can wrap to at @cols columns. */
-static int ui_todo_rows(const char *text, int cols)
+/*
+ * Bound the rows that UI Markdown of the chrome, a todo or a pending source,
+ * can wrap to at @cols columns.
+ */
+static int ui_markup_rows(const char *text, int cols)
 {
 	int rows = 0;
 	const char *line, *end;
@@ -2235,6 +2312,45 @@ static const char *ui_hint_fit(const char *hint, int cols, char *buf,
 	return buf;
 }
 
+/*
+ * Keep the waiting lines to the rows the page may give them: the count row
+ * and the newest lines that fit, the oldest lines going first.
+ */
+static void ui_pending_fit(struct fyai_ui *ui, struct fyai_page_state *st,
+			   int cols, int rows)
+{
+	char *source;
+	size_t skip;
+	int budget, n;
+
+	free(ui->pending_fit);
+	ui->pending_fit = NULL;
+	if (!ui->pending_source || st->pending_rows <= 0)
+		return;
+	budget = fyai_page_pending_budget(st, rows);
+	if (st->pending_rows + 1 <= budget)
+		return;
+	st->pending_source = NULL;
+	st->pending_rows = 0;
+	if (budget < 2)
+		return;
+	for (skip = 1; skip <= ui->pending_count; skip++) {
+		source = ui_pending_source(ui, ui->pending_count, skip);
+		if (!source) {
+			fyai_warning(ui->ctx, "cannot show the pending lines");
+			return;
+		}
+		n = ui_markup_rows(source, cols);
+		if (n + 1 <= budget) {
+			ui->pending_fit = source;
+			st->pending_source = source;
+			st->pending_rows = n;
+			return;
+		}
+		free(source);
+	}
+}
+
 static void ui_page_update(struct fyai_ui *ui)
 {
 	struct fyai_ctx *ctx = ui->ctx;
@@ -2445,9 +2561,15 @@ static void ui_page_update(struct fyai_ui *ui)
 		ui->frame_pending = true;
 	}
 	if (ui->todo_source && ui->todo_cols != cols) {
-		ui->todo_rows = ui_todo_rows(ui->todo_source, cols);
+		ui->todo_rows = ui_markup_rows(ui->todo_source, cols);
 		ui->todo_cols = cols;
 	}
+	if (ui->pending_source && ui->pending_cols != cols) {
+		ui->pending_rows = ui_markup_rows(ui->pending_source, cols);
+		ui->pending_cols = cols;
+	}
+	st.pending_source = ui->pending_source;
+	st.pending_rows = ui->pending_source ? ui->pending_rows : 0;
 	st.todo_source = ui->todo_source;
 	st.todo_rows = ui->todo_rows;
 	st.todo_shown = ui->todo_shown &&
@@ -2467,6 +2589,7 @@ static void ui_page_update(struct fyai_ui *ui)
 			st.log_rows = 1;
 	}
 	st.fullscreen = ui->fullscreen;
+	ui_pending_fit(ui, &st, cols, rows);
 	fyai_page_fit(&st, rows);
 	rc = fyai_page_fit_document(ui->page, &st, cols, rows);
 	fyai_error_check(ctx, !rc, err_page, "cannot fit the page document");
@@ -3274,6 +3397,8 @@ void fyai_ui_close(struct fyai_ctx *ctx)
 	ui_popup_close(ui);
 	ui_note_clear(ui);
 	free(ui->todo_source);
+	free(ui->pending_source);
+	free(ui->pending_fit);
 	free(ui->pane_grid.data);
 	free(ui->stream_rows.data);
 	free(ui->pane_out.data);
