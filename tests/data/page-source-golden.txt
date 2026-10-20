@@ -53,7 +53,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -119,7 +123,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -202,7 +210,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -262,7 +274,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -328,7 +344,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -414,7 +434,11 @@ STATUS line
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -493,7 +517,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -543,7 +571,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -661,7 +693,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -733,7 +769,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -816,7 +856,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -852,7 +896,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1021,7 +1069,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1162,7 +1214,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1355,7 +1411,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -1461,7 +1521,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1507,7 +1571,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1584,7 +1652,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1646,7 +1718,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1767,7 +1843,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1913,7 +1993,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -1951,7 +2035,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2067,7 +2155,11 @@ HINT <b>x</b>
 === case 48
 <fy-tight>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -2145,7 +2237,11 @@ HINT <b>x</b>
 === case 50
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2211,7 +2307,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -2251,7 +2351,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2297,7 +2401,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2370,7 +2478,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2424,7 +2536,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2570,7 +2686,11 @@ CAP <fy-fill/>
 === case 59
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2761,7 +2881,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2809,7 +2933,11 @@ HINT <b>x</b>
 === case 64
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2843,7 +2971,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2911,7 +3043,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -2971,7 +3107,11 @@ CAP <fy-fill/>
 === case 67
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -3005,7 +3145,11 @@ CAP <fy-fill/>
 === case 68
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -3215,7 +3359,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -3262,7 +3410,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -3415,7 +3567,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -3597,7 +3753,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -3656,7 +3816,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -3715,7 +3879,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (1 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (1 more)
 
 <fy-space n="4"/><fy-role name="chrome">← back · or type an answer</fy-role>
 
@@ -3837,7 +4005,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4141,7 +4313,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4259,7 +4435,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4305,7 +4485,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4556,7 +4740,11 @@ STATUS line
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4651,7 +4839,11 @@ STATUS line
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4719,7 +4911,11 @@ HINT <b>x</b>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4747,7 +4943,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (1 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 3)</fy-role>  (1 more)
 
 <fy-grid rows="fit" cols="32,*" gap="1">
 <fy-cell row="0" col="0">
@@ -4864,7 +5064,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4927,7 +5131,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -4973,7 +5181,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5063,7 +5275,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5081,7 +5297,11 @@ STATUS line
 === case 114
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5148,7 +5368,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5240,7 +5464,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5332,7 +5560,11 @@ STATUS line
 === case 121
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5485,7 +5717,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5568,7 +5804,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5600,7 +5840,11 @@ CAP <fy-fill/>
 === case 127
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5717,7 +5961,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5756,7 +6004,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5820,7 +6072,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5872,7 +6128,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -5983,7 +6243,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -6029,7 +6293,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -6093,7 +6361,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -6294,7 +6566,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -6486,7 +6762,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -6566,7 +6846,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -6714,7 +6998,11 @@ STATUS line
 === case 150
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -6974,7 +7262,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7057,7 +7349,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7114,7 +7410,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7166,7 +7466,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7343,7 +7647,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>Scope <h>  Proceed <now>?  (2 more)
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -7429,7 +7737,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7495,7 +7807,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 3)</fy-role>  (2 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (2 of 3)</fy-role>  (2 more)
 
 <fy-grid rows="fit" cols="32,*" gap="1">
 <fy-cell row="0" col="0">
@@ -7617,7 +7933,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7681,7 +8001,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7733,7 +8057,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7850,7 +8178,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -7906,7 +8238,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-space n="2"/>Review  Send these answers?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>Review  Send these answers?
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. [ ] Yes <b></fy-act><fy-fill/></fy-role>
 
@@ -8022,7 +8358,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8277,7 +8617,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8339,7 +8683,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8443,7 +8791,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8523,7 +8875,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8678,7 +9034,11 @@ CAP <fy-fill/>
 === case 198
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8716,7 +9076,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8808,7 +9172,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8844,7 +9212,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8955,7 +9327,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -8993,7 +9369,11 @@ STATUS line
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9033,7 +9413,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9098,7 +9482,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9130,7 +9518,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9172,7 +9564,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9230,7 +9626,11 @@ HINT <b>x</b>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9409,7 +9809,11 @@ HINT <b>x</b>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9459,7 +9863,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9485,7 +9893,11 @@ HINT <b>x</b>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9537,7 +9949,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9585,7 +10001,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9634,7 +10054,11 @@ HINT <b>x</b>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9654,7 +10078,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9754,7 +10182,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -9958,7 +10390,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10027,7 +10463,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10111,7 +10551,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10238,7 +10682,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10274,7 +10722,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>  (2 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>Scope <h>  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>  (2 more)
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -10372,7 +10824,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10422,7 +10878,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. [ ] Yes <b></fy-act><fy-fill/></fy-role>
 
@@ -10460,7 +10920,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10518,7 +10982,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10570,7 +11038,11 @@ CAP <fy-fill/>
 === case 247
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10749,7 +11221,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -10816,7 +11292,11 @@ CAP <fy-fill/>
 === case 251
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11047,7 +11527,11 @@ CAP <fy-fill/>
 === case 257
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11105,7 +11589,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11144,7 +11632,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11226,7 +11718,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11284,7 +11780,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11376,7 +11876,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11471,7 +11975,11 @@ HINT <b>x</b>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11578,7 +12086,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11708,7 +12220,11 @@ CAP <fy-fill/>
 === case 275
 <fy-tight>
 
-<fy-slot id="note" height="2"/>
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-slot id="note" height="2"/>
 
 <fy-drop order="1">
 
@@ -11785,7 +12301,11 @@ STATUS line
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -11831,7 +12351,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12015,7 +12539,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12166,7 +12694,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12207,7 +12739,11 @@ CAP <fy-fill/>
 === case 288
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12257,7 +12793,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-slot id="note" height="1"/>
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-slot id="note" height="1"/>
 
 <fy-drop order="1">
 
@@ -12418,7 +12958,11 @@ CAP <fy-fill/>
 === case 296
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12465,7 +13009,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12544,7 +13092,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (2 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (2 more)
 
 <fy-space n="2"/><fy-role name="select.bar">▌</fy-role><fy-role name="select.row"><fy-space/><fy-act id="ask.choose:1" role="select.label">1. [ ] Yes <b></fy-act><fy-fill/></fy-role>
 
@@ -12586,7 +13138,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12610,7 +13166,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12778,7 +13338,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12871,7 +13435,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -12985,7 +13553,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -13325,6 +13897,10 @@ STATUS line
 
 <fy-space/>
 
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space/>
+
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
@@ -13436,7 +14012,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -13530,7 +14110,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -13737,7 +14321,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -13799,7 +14387,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -13845,7 +14437,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -13915,7 +14511,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>  (1 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (2 of 2)</fy-role>  (1 more)
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -13937,7 +14537,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -13979,7 +14583,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14053,7 +14661,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14117,7 +14729,11 @@ STATUS line
 === case 337
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14166,7 +14782,11 @@ STATUS line
 === case 339
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14210,7 +14830,11 @@ STATUS line
 === case 340
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14400,7 +15024,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14514,7 +15142,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (3 of 3)</fy-role>  (2 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (3 of 3)</fy-role>  (2 more)
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -14563,7 +15195,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14615,7 +15251,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14653,7 +15293,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14699,7 +15343,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14783,7 +15431,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14904,7 +15556,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14966,7 +15622,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -14990,7 +15650,11 @@ STATUS line
 
 <fy-slot id="tail" height="2"/>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. [ ] Yes <b></fy-act>
 
@@ -15038,7 +15702,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15132,7 +15800,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15203,7 +15875,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?
 
 <fy-space n="4"/><fy-act id="ask.choose:1" role="select.label">1. [ ] Yes <b></fy-act>
 
@@ -15241,7 +15917,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15283,7 +15963,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15350,7 +16034,11 @@ CAP <fy-fill/>
 === case 368
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15424,7 +16112,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15718,7 +16410,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15837,7 +16533,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -15919,7 +16619,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16011,7 +16715,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16201,7 +16909,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16299,7 +17011,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16461,7 +17177,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16491,7 +17211,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16540,7 +17264,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16634,7 +17362,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16728,7 +17460,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16796,7 +17532,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -16964,7 +17704,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17032,7 +17776,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17097,7 +17845,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17160,7 +17912,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17258,7 +18014,11 @@ CAP <fy-fill/>
 === case 409
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17540,7 +18300,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17576,7 +18340,11 @@ CAP <fy-fill/>
 === case 418
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17751,7 +18519,11 @@ STATUS line
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="1">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="1">
 
 <fy-slot id="completion" height="1"/>
 
@@ -17809,7 +18581,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17861,7 +18637,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -17944,7 +18724,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -18052,7 +18836,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (1 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (1 more)
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -18194,7 +18982,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -18290,7 +19082,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -18497,7 +19293,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -18553,7 +19353,11 @@ CAP <fy-fill/>
 === case 441
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -18601,7 +19405,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -18885,7 +19693,11 @@ STATUS line
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -18919,7 +19731,11 @@ STATUS line
 === case 454
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -19074,7 +19890,11 @@ STATUS line
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -19165,7 +19985,11 @@ HINT <b>x</b>
 === case 459
 <fy-tight>
 
-<fy-space n="2"/>[1mReview[22m  Send these answers?
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mReview[22m  Send these answers?
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -19258,7 +20082,11 @@ HINT <b>x</b>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -19325,7 +20153,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -19484,7 +20316,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -19514,7 +20350,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -19584,7 +20424,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?<fy-role name="chrome">  (1 of 2)</fy-role>
 
 <fy-space n="4"/><fy-role name="chrome">asked by main/agent:x</fy-role>
 
@@ -19626,7 +20470,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-slot id="note" height="1"/>
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-slot id="note" height="1"/>
 
 <fy-drop order="1">
 
@@ -19716,7 +20564,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -19770,7 +20622,11 @@ HINT <b>x</b>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20006,7 +20862,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20042,7 +20902,11 @@ HINT <b>x</b>
 === case 481
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20189,7 +21053,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20295,7 +21163,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20451,7 +21323,11 @@ HINT <b>x</b>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20548,7 +21424,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20773,7 +21653,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20838,7 +21722,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20872,7 +21760,11 @@ HINT <b>x</b>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -20993,7 +21885,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21033,7 +21929,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21120,7 +22020,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21186,7 +22090,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21400,7 +22308,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21452,7 +22364,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21650,7 +22566,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21715,7 +22635,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21747,7 +22671,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21848,7 +22776,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -21896,7 +22828,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22023,7 +22959,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22065,7 +23005,11 @@ CAP <fy-fill/>
 === case 529
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22194,7 +23138,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22216,7 +23164,11 @@ CAP <fy-fill/>
 === case 532
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22414,7 +23366,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22438,7 +23394,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22480,7 +23440,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22672,7 +23636,11 @@ CAP <fy-fill/>
 === case 542
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22939,7 +23907,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -22999,7 +23971,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23033,7 +24009,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23142,7 +24122,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23227,7 +24211,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23391,7 +24379,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23444,7 +24436,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23526,7 +24522,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23688,7 +24688,11 @@ STATUS line
 - [ ] Second task
 </fy-drop>
 
-<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (1 more)
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-space n="2"/>[1mScope <h>[22m  Proceed <now>?  (1 more)
 
 <fy-grid rows="fit" cols="32,*" gap="1">
 <fy-cell row="0" col="0">
@@ -23810,7 +24814,11 @@ STATUS line
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23854,7 +24862,11 @@ STATUS line
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23953,7 +24965,11 @@ STATUS line
 === case 570
 <fy-tight>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -23996,7 +25012,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24044,7 +25064,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24140,7 +25164,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24260,7 +25288,11 @@ CAP <fy-fill/>
 
 <fy-slot id="tail" height="2"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24437,7 +25469,11 @@ CAP <fy-fill/>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24625,7 +25661,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24681,7 +25721,11 @@ CAP <fy-fill/>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24718,7 +25762,11 @@ CAP <fy-fill/>
 <fy-grid rows="3" cols="*">
 </fy-grid>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24754,7 +25802,11 @@ HINT <b>x</b>
 
 <fy-slot id="transcript" height="20"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24812,7 +25864,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -24956,7 +26012,11 @@ HINT <b>x</b>
 - [ ] Second task
 </fy-drop>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 
@@ -25051,7 +26111,11 @@ CAP <fy-fill/>
 
 <fy-slot id="pane" height="3"/>
 
-<fy-drop order="2">
+<fy-space/>
+
+<fy-role name="chrome">●</fy-role> **pending** (2)\
+<fy-space n="2"/>› one\
+<fy-space n="2"/>› two<fy-drop order="2">
 
 <fy-space/>
 

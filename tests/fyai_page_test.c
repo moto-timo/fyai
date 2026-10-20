@@ -43,6 +43,8 @@ FYAI_TEST_ENTRY(page, status_drops_first, page_status_drops_first)
 FYAI_TEST_ENTRY(page, blank_activity_is_not_code, page_blank_activity_is_not_code)
 FYAI_TEST_ENTRY(page, cap_stands_over_the_pane, page_cap_stands_over_the_pane)
 FYAI_TEST_ENTRY(page, todo_stands_over_the_prompt, page_todo_stands_over_the_prompt)
+FYAI_TEST_ENTRY(page, pending_stands_over_the_input, page_pending_stands_over_the_input)
+FYAI_TEST_ENTRY(page, pending_is_bounded, page_pending_is_bounded)
 FYAI_TEST_ENTRY(page, prompt_card_takes_the_rules, page_prompt_card_takes_the_rules)
 FYAI_TEST_ENTRY(page, chrome_keeps_the_margins, page_chrome_keeps_the_margins)
 FYAI_TEST_ENTRY(page, fit_gives_the_chrome_its_rows, page_fit_gives_the_chrome_its_rows)
@@ -154,6 +156,11 @@ static void page_golden_state(unsigned i, struct fyai_page_state *st)
 	static const char *const todos[] = {
 		NULL, "- [>] First <b>task</b>\n- [ ] Second task\n",
 	};
+	static const char *const pendings[] = {
+		NULL, "<fy-role name=\"chrome\">\xe2\x97\x8f</fy-role> **pending** (2)\\\n"
+		"<fy-space n=\"2\"/>\xe2\x80\xba one\\\n"
+		"<fy-space n=\"2\"/>\xe2\x80\xba two",
+	};
 
 	memset(st, 0, sizeof(*st));
 	st->prompt_rows = (int)page_golden_pick(i, 0, 3);
@@ -183,6 +190,8 @@ static void page_golden_state(unsigned i, struct fyai_page_state *st)
 	st->todo_source = todos[page_golden_pick(i, 29, 2)];
 	st->todo_rows = st->todo_source ? 2 : 0;
 	st->todo_shown = st->todo_source != NULL;
+	st->pending_source = pendings[page_golden_pick(i, 31, 2)];
+	st->pending_rows = st->pending_source ? 3 : 0;
 	st->input_mode = modes[page_golden_pick(i, 17, 3)];
 	if (st->input_mode) {
 		memset(&ask, 0, sizeof(ask));
@@ -736,6 +745,79 @@ static int page_todo_stands_over_the_prompt_run(void)
 	return 0;
 }
 
+/* The waiting lines stand under a blank row, right above the header. */
+static int page_pending_stands_over_the_input_run(void)
+{
+	struct response_buffer out = {0};
+	struct fyai_page_state st = page_state();
+	const char *p;
+	int rc;
+
+	st.pending_source = "PENDMARK";
+	st.pending_rows = 1;
+	rc = fyai_page_source(&st, &out);
+	FYAI_TCHECK(!rc);
+	p = after(out.data, "PENDMARK");
+	p = after(p, "<fy-slot id=\"header\" height=\"1\"/>");
+	FYAI_TCHECK(p != NULL);
+	free(out.data);
+
+	/* no rows, nothing is drawn */
+	out = (struct response_buffer){0};
+	st.pending_rows = 0;
+	rc = fyai_page_source(&st, &out);
+	FYAI_TCHECK(!rc);
+	FYAI_TCHECK(!strstr(out.data, "PENDMARK"));
+	free(out.data);
+	return 0;
+}
+
+/* The block takes a third of the page at most, and never a row of the input
+ * area or of the rest of the chrome. */
+static int page_pending_is_bounded_run(void)
+{
+	struct fyai_page_state plain = page_state();
+	struct fyai_page_state st = page_state();
+	int chrome = fyai_page_chrome_rows(&plain);
+
+	st.pending_source = "PENDMARK";
+	st.pending_rows = 2;
+	FYAI_TCHECK(fyai_page_pending_budget(&st, 24) == 8);
+	fyai_page_fit(&st, 24);
+	FYAI_TCHECK(st.pending_rows == 2);
+
+	/* a long queue keeps the count row and the lines that fit */
+	st.pending_rows = 40;
+	fyai_page_fit(&st, 24);
+	FYAI_TCHECK(st.pending_rows == 7);
+	FYAI_TCHECK(fyai_page_chrome_rows(&st) <= 24);
+
+	/* a page that the chrome fills leaves the block no row */
+	st.pending_rows = 40;
+	FYAI_TCHECK(fyai_page_pending_budget(&st, chrome) == 0);
+	fyai_page_fit(&st, chrome);
+	FYAI_TCHECK(st.pending_rows == 0);
+
+	/* the count row and a line need the blank row, too */
+	st.pending_rows = 40;
+	FYAI_TCHECK(fyai_page_pending_budget(&st, chrome + 2) == 2);
+	fyai_page_fit(&st, chrome + 2);
+	FYAI_TCHECK(st.pending_rows == 1);
+	FYAI_TCHECK(fyai_page_chrome_rows(&st) == chrome + 2);
+
+	/* the other chrome is not taken for it: a todo list keeps its rows */
+	st = page_state();
+	st.todo_source = "- [>] First task\n";
+	st.todo_rows = 2;
+	st.todo_shown = true;
+	st.pending_source = "PENDMARK";
+	st.pending_rows = 40;
+	fyai_page_fit(&st, 24);
+	FYAI_TCHECK(st.todo_shown);
+	FYAI_TCHECK(fyai_page_chrome_rows(&st) <= 24);
+	return 0;
+}
+
 /* A prompt on a card is one slot two rows taller, with no rules. */
 static int page_prompt_card_takes_the_rules_run(void)
 {
@@ -987,6 +1069,16 @@ int page_view_follows_the_presentation(void)
 int page_todo_stands_over_the_prompt(void)
 {
 	return page_todo_stands_over_the_prompt_run();
+}
+
+int page_pending_stands_over_the_input(void)
+{
+	return page_pending_stands_over_the_input_run();
+}
+
+int page_pending_is_bounded(void)
+{
+	return page_pending_is_bounded_run();
 }
 
 int page_prompt_card_takes_the_rules(void)
