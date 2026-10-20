@@ -1398,7 +1398,8 @@ void emit_generic_to_stdout_anchored(struct fyai_ctx *ctx, const char *label,
 			FYOPEF_MODE_YAML_1_2 |
 			FYOPEF_STYLE_PRETTY |
 			FYOPEF_WIDTH_INF |
-			FYOPEF_OUTPUT_COMMENTS;
+			FYOPEF_OUTPUT_COMMENTS |
+			FYOPEF_BINARY_BASE64;
 	} else {
 		flags = FYOPEF_DISABLE_DIRECTORY |
 			FYOPEF_MODE_JSON |

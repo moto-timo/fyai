@@ -1519,7 +1519,8 @@ static int present_machine(struct fyai_cmd_call *call, fy_generic value)
 	const char *text;
 	struct fyai_sink *sink = call->ctx->sink;
 
-	flags = FYOPEF_DISABLE_DIRECTORY | FYOPEF_WIDTH_INF;
+	flags = FYOPEF_DISABLE_DIRECTORY | FYOPEF_WIDTH_INF |
+		FYOPEF_BINARY_BASE64;
 	if (call->format == FYAI_CMD_OUT_JSON)
 		flags |= FYOPEF_MODE_JSON | FYOPEF_STYLE_COMPACT;
 	else
@@ -1604,7 +1605,7 @@ static int present_document(struct fyai_cmd_call *call, fy_generic value,
 	if (!fy_is_mapping(value) && !fy_is_sequence(value))
 		flow = true;
 	flags = FYOPEF_DISABLE_DIRECTORY | FYOPEF_MODE_YAML_1_2 |
-		FYOPEF_WIDTH_INF;
+		FYOPEF_WIDTH_INF | FYOPEF_BINARY_BASE64;
 	flags |= flow ? FYOPEF_STYLE_ONELINE : FYOPEF_STYLE_PRETTY;
 	emitted = fy_emit(call->gb, value, flags, NULL);
 	fyai_error_check(call->ctx, fy_is_string(emitted), err,

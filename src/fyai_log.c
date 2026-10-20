@@ -208,7 +208,8 @@ int fyai_log_generic(struct fyai_ctx *ctx, const char *name, fy_generic doc)
 		FYOPEF_OUTPUT_TYPE_STRING |
 		FYOPEF_MODE_YAML_1_2 |
 		FYOPEF_STYLE_PRETTY |
-		FYOPEF_WIDTH_INF, &out);
+		FYOPEF_WIDTH_INF |
+		FYOPEF_BINARY_BASE64, &out);
 	if (fy_is_invalid(emitted))
 		goto out;
 	out = fy_castp(&emitted, "");

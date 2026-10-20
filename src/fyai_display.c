@@ -4717,7 +4717,8 @@ int fyai_dump_view(struct fyai_ctx *ctx)
 	(void)fy_emit(tgb, out,
 		FYOPEF_DISABLE_DIRECTORY | FYOPEF_OUTPUT_TYPE_STDOUT |
 		FYOPEF_MODE_YAML_1_2 | FYOPEF_STYLE_PRETTY |
-		FYOPEF_WIDTH_INF | FYOPEF_OUTPUT_COMMENTS, NULL);
+		FYOPEF_WIDTH_INF | FYOPEF_OUTPUT_COMMENTS |
+		FYOPEF_BINARY_BASE64, NULL);
 	(void)fyai_result(ctx, "\n");
 
 	rc = 0;
