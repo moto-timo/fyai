@@ -94,6 +94,7 @@ run_set
 
 "$PYTHON" - "$CAPTURES/above-prompt.out" "$CAPTURES/below-prompt.out" \
     "$CAPTURES/set.out" "$TESTS_DIR" <<'PY' || fail "work_position did not move the pane"
+import re
 import sys
 
 sys.path.insert(0, sys.argv[4])
@@ -104,7 +105,11 @@ def where(path):
     marker = "[50%] Building object 5"
     rows = rows_at(path, marker.encode())
     band = [i for i, r in enumerate(rows) if marker in r]
-    prompt = [i for i, r in enumerate(rows) if "PROMPTMARK" in r]
+    # while the build runs the marker is "\u2026", the busy one, padded to
+    # the columns of the configured one; it starts the row after the edge
+    prompt = [i for i, r in enumerate(rows)
+              if "PROMPTMARK" in r or
+              re.match("^[ \u258c]{0,3}\u2026( |$)", r)]
     if not band:
         raise SystemExit("no live band on screen in %s" % path)
     if not prompt:

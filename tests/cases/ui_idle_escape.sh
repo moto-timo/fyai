@@ -21,9 +21,11 @@ rows: 40
 cols: 100
 steps:
   - type: first question
-  # the frame of the answer is whole before the keys of the next step
+  # the frame of the answer is whole, and its marker is an ellipsis while
+  # the turn runs; the arrow comes back when a line is taken at once
   - wait-frame: banana
     timeout: session
+  - wait-screen: "\u276f"
   - write: "not sent"
   - wait-screen: not sent
   - write: "\e\x00"

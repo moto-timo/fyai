@@ -51,8 +51,11 @@ if not typed:
 
 # The prompt stays while the tile owns input: it is where the user goes back
 # to, and a row that is there but not lit says so without moving anything.
+# While the tool runs its marker is "\u2026", not "\u276f", and it starts
+# the row of the prompt after the edge.
 def has_prompt(disp):
-    return any("\u276f" in row for row in disp)
+    return any("\u276f" in row or
+               re.match("^[ \u258c]{0,3}\u2026( |$)", row) for row in disp)
 
 if not has_prompt(shown[0]):
     raise SystemExit("no prompt before the zoom")
