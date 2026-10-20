@@ -857,6 +857,80 @@ err:
 	return NULL;
 }
 
+/*
+ * The text parts are kept as they are; the image parts are made again from
+ * their bytes, and the metadata the export wrote must be what the bytes say.
+ */
+fy_generic fyai_media_import_content(struct fyai_ctx *ctx,
+				     struct fy_generic_builder *gb,
+				     fy_generic content)
+{
+	static const char *const fields[] = {
+		"media_type", "digest", "width", "height", "bytes",
+	};
+	struct fyai_media_image image;
+	fy_generic out, part, canonical, data, name;
+	fy_generic_sized_string raw;
+	long long limit;
+	size_t count, i;
+	int rc;
+
+	limit = ctx->cfg->media_max_bytes;
+	out = fy_seq_empty;
+	count = 0;
+	media_check(ctx, fy_is_sequence(content), err,
+		    "import: the content of a message is not a sequence");
+	fy_foreach(part, content) {
+		media_check(ctx, fy_is_mapping(part), err,
+			    "import: a content part is not a mapping");
+		if (fy_equal(fy_get(part, "type"), FYAI_MEDIA_PART_TEXT)) {
+			media_check(ctx, fy_is_string(fy_get(part, "text")), err,
+				    "import: a text part has no text");
+			out = fy_append(gb, out, part);
+			continue;
+		}
+		media_check(ctx, fyai_media_part_is_image(part), err,
+			    "import: a content part is neither text nor an "
+			    "image");
+		count++;
+		media_check(ctx, ctx->cfg->media_max_per_message <= 0 ||
+			    count <= (size_t)ctx->cfg->media_max_per_message,
+			    err, "import: a message takes at most %d attachments",
+			    ctx->cfg->media_max_per_message);
+		media_check(ctx, fyai_media_part_has_bytes(part), err,
+			    "import: an image part carries no bytes");
+		data = fy_get(part, "data");
+		raw = fy_castp(&data, fy_szstr_empty);
+		media_check(ctx, limit <= 0 || raw.size <= (uint64_t)limit, err,
+			    "import: an image holds %zu bytes, more than the "
+			    "%lld byte limit", raw.size, limit);
+		name = fy_get(part, "name", fy_invalid);
+		media_check(ctx, fy_is_invalid(name) || fy_is_string(name), err,
+			    "import: the name of an image is not a string");
+		rc = fyai_media_image_bytes(ctx, gb, raw.data, raw.size,
+					    fy_get(part, "media_type", ""),
+					    fy_is_string(name) ?
+						fy_castp(&name, "") : NULL,
+					    &image);
+		if (rc)
+			goto err;
+		canonical = fyai_media_image_part(gb, &image);
+		fyai_media_image_release(&image);
+		media_check(ctx, fy_is_valid(canonical), err,
+			    "import: could not record an image");
+		for (i = 0; i < sizeof(fields) / sizeof(fields[0]); i++)
+			media_check(ctx, fy_equal(fy_get(part, fields[i]),
+						  fy_get(canonical, fields[i])),
+				    err, "import: the %s of an image does not "
+				    "match its bytes", fields[i]);
+		out = fy_append(gb, out, canonical);
+	}
+	return out;
+
+err:
+	return fy_invalid;
+}
+
 char *fyai_media_part_data_url(struct fyai_ctx *ctx, fy_generic part)
 {
 	const char *type;

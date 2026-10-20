@@ -284,14 +284,15 @@ err:
 }
 
 /* Emit a YAML directive. */
-static int fyai_export_directive(struct fyai_ctx *ctx, FILE *fp,
-				 fy_generic map)
+static int fyai_export_directive_flags(struct fyai_ctx *ctx, FILE *fp,
+				       fy_generic map,
+				       enum fy_op_emit_flags flags)
 {
 	struct fy_generic_builder *gb = ctx->transient_gb;
 	fy_generic_sized_string text;
 	fy_generic emitted;
 
-	emitted = fy_gb_emit(gb, map, FYAI_YAML_EMIT_FLAGS, NULL);
+	emitted = fy_gb_emit(gb, map, flags, NULL);
 	fyai_error_check(ctx, fy_is_valid(emitted), err,
 			 "export: cannot format a directive");
 	text = fy_castp(&emitted, fy_szstr_empty);
@@ -303,6 +304,12 @@ static int fyai_export_directive(struct fyai_ctx *ctx, FILE *fp,
 	return 0;
 err:
 	return -1;
+}
+
+static int fyai_export_directive(struct fyai_ctx *ctx, FILE *fp,
+				 fy_generic map)
+{
+	return fyai_export_directive_flags(ctx, fp, map, FYAI_YAML_EMIT_FLAGS);
 }
 
 /* Flatten a configuration into slash paths. */
@@ -499,13 +506,32 @@ static const char *fyai_export_turn_heading(const char *role)
 }
 
 static int fyai_export_message(struct fyai_ctx *ctx, FILE *fp,
-			       const char *role, const char *text)
+			       const char *role, const char *text,
+			       fy_generic content)
 {
 	struct fy_generic_builder *gb = ctx->transient_gb;
+	enum fy_op_emit_flags flags;
+	fy_generic directive, part;
 	int rc;
 
-	rc = fyai_export_directive(ctx, fp,
-		fy_mapping(gb, "kind", "message", "role", role));
+	directive = fy_mapping(gb, "kind", "message", "role", role);
+	flags = FYAI_YAML_EMIT_FLAGS;
+	/*
+	 * The directive carries the whole content of a message with an image,
+	 * bytes included, so an import needs nothing but the document. The
+	 * bytes are !!binary lines that fit the width; the prose names them.
+	 */
+	if (fyai_media_content_has_images(content)) {
+		fy_foreach(part, content) {
+			fyai_error_check(ctx, !fyai_media_part_is_image(part) ||
+					 fyai_media_part_has_bytes(part), err,
+					 "export: an image part carries no bytes");
+		}
+		directive = fy_assoc(gb, directive, "content", content);
+		flags = (flags & ~FYOPEF_WIDTH(FYOPEF_WIDTH_MASK)) |
+			FYOPEF_WIDTH_80;
+	}
+	rc = fyai_export_directive_flags(ctx, fp, directive, flags);
 	fyai_error_check(ctx, !rc, err, "export: cannot write a message");
 	fprintf(fp, "## %s\n\n", fyai_export_turn_heading(role));
 	fyai_export_body(fp, text);
@@ -531,7 +557,8 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 	fy_foreach(message, messages) {
 		if (fy_equal(fy_get(message, "type"), "function_call")) {
 			if (!assistant_open) {
-				rc = fyai_export_message(ctx, fp, "assistant", "");
+				rc = fyai_export_message(ctx, fp, "assistant", "",
+							 fy_invalid);
 				fyai_error_check(ctx, !rc, err,
 						 "export: cannot write a message");
 				assistant_open = true;
@@ -548,7 +575,8 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 		}
 		if (fy_equal(fy_get(message, "type"), "shell_call")) {
 			if (!assistant_open) {
-				rc = fyai_export_message(ctx, fp, "assistant", "");
+				rc = fyai_export_message(ctx, fp, "assistant", "",
+							 fy_invalid);
 				fyai_error_check(ctx, !rc, err,
 						 "export: cannot write a message");
 				assistant_open = true;
@@ -571,7 +599,8 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 			content = fy_get(message, "content", fy_invalid);
 			if (fy_is_string(content) && *fy_castp(&content, "")) {
 				rc = fyai_export_message(ctx, fp, role_text,
-						      fy_castp(&content, ""));
+						      fy_castp(&content, ""),
+						      fy_invalid);
 				fyai_error_check(ctx, !rc, err,
 						 "export: cannot write a message");
 				assistant_open = true;
@@ -579,7 +608,8 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 			calls_in_message = fy_get(message, "tool_calls");
 			if (fy_is_sequence(calls_in_message)) {
 				if (!assistant_open) {
-					rc = fyai_export_message(ctx, fp, role_text, "");
+					rc = fyai_export_message(ctx, fp, role_text,
+								 "", fy_invalid);
 					fyai_error_check(ctx, !rc, err,
 							 "export: cannot write a message");
 					assistant_open = true;
@@ -607,8 +637,7 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 			 fyai_media_content_has_images(content)) {
 			/*
 			 * The words of the message, then one reference line per
-			 * attachment: an export does not carry the bytes, and it
-			 * names each image by its digest.
+			 * attachment; the bytes are in the directive.
 			 */
 			content = fyai_media_text_references(gb, content);
 			text = fy_castp(&content, "");
@@ -617,7 +646,8 @@ static int fyai_export_turn_messages(struct fyai_ctx *ctx, FILE *fp,
 		if (fy_not_equal(role, "tool_call") && fy_not_equal(role, "item") &&
 		    !(assistant_open && fy_equal(role, "assistant") &&
 		      fy_is_invalid(fy_get(message, "type")))) {
-			rc = fyai_export_message(ctx, fp, role_text, text);
+			rc = fyai_export_message(ctx, fp, role_text, text,
+						 fy_get(message, "content"));
 			fyai_error_check(ctx, !rc, err,
 					 "export: cannot write a message");
 			if (fy_equal(role, "assistant"))

@@ -334,6 +334,7 @@ static int fyai_import_parse(struct fyai_import *im, char *text)
 	fy_generic directive;
 	fy_generic kind;
 	fy_generic update;
+	fy_generic content;
 	char *line;
 	char *next;
 	char *close;
@@ -466,6 +467,24 @@ static int fyai_import_parse(struct fyai_import *im, char *text)
 			fyai_error_check(ctx, fy_is_string(kind), err,
 					 "import: a message has no role");
 			role = fy_castp(&kind, "");
+			/*
+			 * A message with an image carries its content in the
+			 * directive; the prose after it is for the reader.
+			 */
+			content = fy_get(directive, "content", fy_invalid);
+			if (fy_is_valid(content)) {
+				content = fyai_media_import_content(ctx, im->gb,
+								    content);
+				fyai_error_check(ctx, fy_is_valid(content), err,
+						 "import: cannot read the content "
+						 "of a message");
+				rc = fyai_import_message_add(im, turn,
+					fy_mapping(im->gb, "role", role,
+						   "content", content));
+				fyai_error_check(ctx, !rc, err,
+						 "import: out of memory");
+				continue;
+			}
 			pending_body = true;
 			continue;
 		}

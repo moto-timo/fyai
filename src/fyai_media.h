@@ -169,6 +169,16 @@ char *fyai_media_part_base64(struct fyai_ctx *ctx, fy_generic part);
 char *fyai_media_part_data_url(struct fyai_ctx *ctx, fy_generic part);
 
 /*
+ * The content sequence of an imported message, rebuilt in @gb. Each image
+ * part must carry its bytes, and its type, size and digest must be those of
+ * the bytes; the parts are made again from the bytes, so an import keeps
+ * nothing that the bytes do not prove. fy_invalid with a cause otherwise.
+ */
+fy_generic fyai_media_import_content(struct fyai_ctx *ctx,
+				     struct fy_generic_builder *gb,
+				     fy_generic content);
+
+/*
  * The attachments of one invocation. They wait in the context and the next
  * user message takes them, so a line typed after an attachment sends it, and
  * a line typed later does not send it again.
