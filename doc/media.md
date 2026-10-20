@@ -12,19 +12,47 @@ place, `enum fyai_media_type` (`src/fyai_media.h`). A model reads an
 attachment as an image part only when its catalogue entry lists the image
 modality; see *Capability* below.
 
-Attachments are added explicitly. A typed line is text, whatever it names: a
-path in the line is a path, not an upload. The two ways in are:
+A text file is an attachment too: a UTF-8 file of at most 256 KiB, or
+`media/max_bytes` when that is smaller, with no control character other than
+tab, newline, vertical tab, form feed and carriage return. A NUL byte or an
+escape sequence makes a file binary. Its text goes to the model after the
+words of the message, as `File: PATH` over a fenced block, and the transcript
+shows one row for it, `[file: PATH, 12 lines, 340 B]`. The row keeps no bytes:
+the model reads the text of the part. An empty file is a part of no lines. Any
+other file is refused. The type is read from the bytes of one open of the
+file: the magic bytes of an image, then whether the rest is text. Mapping more
+types, e.g. through `file --mime-type`, is a later step.
 
-- `/image add PATH` and `/image paste`, or
+Attachments are added explicitly. A path in a typed line is text unless `@`
+comes before it. The ways in are:
+
+- `@PATH` in a typed line, e.g. `look at @shot.png`. The path stays in the
+  words, without the `@`. A path with blanks is quoted, `@"my shot.png"` or
+  `@'my shot.png'`, or escapes them, `@my\ shot.png`. `\@` and `@@` are a
+  literal `@`. A mention starts the line or follows a blank, so `a@b.com` is
+  text, and a bare `@WORD` that names no file stays as typed. A quote that
+  does not close makes no mention, so `what does @" mean?` is text. A quoted
+  or escaped path that names no file is an error, and so is an empty one
+  (`@""`) or a file of another kind: the line is not sent, and nothing of it
+  is attached, in a session and in a one-shot prompt alike. Two mentions of
+  one file attach it twice, and each counts against `media/max_per_message`.
+  Only a line that the user typed has mentions: a prompt that starts with `/`
+  names a command and has none, and neither has the task of a sub-agent;
+- `/attach PATH`, which takes a file by what it holds as `@PATH` does;
+- `/image add PATH` and `/image paste`, for an image; or
 - the `--image PATH` option of an invocation.
 
-`/image list` shows what waits and `/image clear` drops it.
+A path that starts with `~/` is under the home directory. `/image list` shows
+what waits, a text file among the images, and `/image clear` drops it.
 
 ## Storage
 
 The bytes are an arena value. An image part holds them as a binary string,
 `data`, in the message that carries the image, so they live and are collected
-with the conversation, and there is nothing beside the arena:
+with the conversation, and there is nothing beside the arena. A file part is
+the same: it holds its text in the part, in the arena, and has no digest of a
+blob. An export writes the part into the directive of its message, and an
+import reads it back as it is, the text with it:
 
 ```text
 <project>/.fyai/arena                the durable root, the image bytes included
@@ -73,10 +101,14 @@ content:
   states a type is checked against them: a mismatch is an error, not a retype,
   because the digest must name one interpretation of the bytes.
 
-A reader that needs the text of a message takes it through
-`fyai_media_text()`, and a reader that needs every part takes it through
+A reader that needs the words of a message takes them through
+`fyai_media_text()`, and a reader that needs every image part takes it through
 `fyai_media_parts()`; neither walks `content` itself. This keeps the sequence
-form in one place.
+form in one place. `fyai_media_text()` is the words alone: the text of a file
+part is not in it. What the model reads is `fyai_media_model_text()`, the
+words and then each file, and what a person reads is
+`fyai_media_text_references()`, the words and then one row for each
+attachment.
 
 ## The wire form
 
@@ -117,7 +149,7 @@ same restriction when it attaches the image.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `media/max_bytes` | 4194304 | Bytes of one attachment. |
+| `media/max_bytes` | 4194304 | Bytes of one attachment. A text file is also bounded by 256 KiB: the smaller of the two applies. |
 | `media/max_per_message` | 8 | Attachments of one message. |
 | `media/clipboard_command` | empty | A program that writes image bytes to standard output, in place of the detected one. |
 | `media/clipboard_timeout_ms` | 5000 | Time limit of that program. |

@@ -137,17 +137,28 @@ fyai -i
 
 ### Attaching an image
 
-A message can carry an image beside its text. There are three ways to attach
-one, and each is explicit: a path typed into a message is never attached by
-itself.
+A message can carry an image or a text file beside its text. Each way to
+attach one is explicit: a path typed into a message is attached only when
+`@` comes before it.
 
 ```sh
 fyai --image shot.png "what is wrong in this screenshot?"
+fyai "what is wrong in @shot.png and @~/notes.txt"
 
 fyai -i
 > /image add shot.png       # or: /image paste, from the system clipboard
+> /attach notes.txt         # an image, or a text file the model reads
 > what is wrong in this screenshot?
 ```
+
+A path with blanks is quoted, `@"my shot.png"`, or escapes them,
+`@my\ shot.png`; `\@` and `@@` are a literal `@`. A text file of at most
+256 KiB, or `media/max_bytes` when that is smaller, goes
+to the model as its text, and the transcript shows one row for it. A file that
+is neither an image nor text is refused. A line with a mention that cannot
+attach is not sent, in a session and in a prompt on the command line alike:
+fix the path and send it again. A prompt that starts with `/` has no
+mention, and neither has the task of `fyai agent`.
 
 An attachment waits for the next message and travels with that message only:
 a line typed later does not send it again. `/image list` shows what is

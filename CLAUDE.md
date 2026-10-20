@@ -316,8 +316,16 @@ are PNG, JPEG, GIF, and WebP; `doc/media.md` is the design.
 - Image input is a model property: `image_input_supported` is derived from
   `image` in the model's `modalities`. Do not infer it from the provider name
   or require an endpoint capability flag.
-- An attachment enters only where the user names it: `/image add`,
-  `/image paste`, or `--image`. A path typed in a line is text.
+- An attachment enters only where the user names it: `@PATH` in a typed
+  line, `/attach`, `/image add`, `/image paste`, or `--image`. A path typed
+  in a line without `@` is text. `fyai_media_take_mentions()` reads the
+  mentions of a line before it is shown or sent. It reads the line the user
+  typed and nothing else: not the task of the `agent` verb or of a sub-agent.
+- A text file is a file part, `{type: text, text, file, bytes, lines}`: the
+  model reads `fyai_media_model_text()`, the words and each file; a person
+  reads `fyai_media_text_references()`, the words and one row a file.
+  `fyai_media_text()` is the words alone. It is not what a provider sends
+  for a file part: a reader that wants what the model reads must not use it.
 - `fyai_make_user_message()` takes the attachments that wait; a message the
   program writes uses `fyai_make_instruction_message()`, so an attachment
   never leaves with a sub-agent instruction.
