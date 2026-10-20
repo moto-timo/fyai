@@ -31,6 +31,7 @@ FYAI_TEST_ENTRY(media, content_references, media_content_references)
 FYAI_TEST_ENTRY(media, rows_styled, media_rows_styled)
 FYAI_TEST_ENTRY(media, image_roundtrip, media_image_roundtrip)
 FYAI_TEST_ENTRY(media, image_limits, media_image_limits)
+FYAI_TEST_ENTRY(media, import_content, media_import_content)
 FYAI_TEST_ENTRY(media, pending_message, media_pending_message)
 FYAI_TEST_ENTRY(media, pinned_root, media_pinned_root)
 
@@ -316,6 +317,105 @@ int media_rows_styled(void)
 		free(out);
 	}
 	FYAI_TCHECK(!fyai_media_rows_styled(NULL));
+	return 0;
+}
+
+/*
+ * An imported content is rebuilt from the bytes of each image: a part that
+ * went through YAML and back is accepted, and a part whose bytes are missing
+ * or whose metadata does not match them is refused.
+ */
+int media_import_content(void)
+{
+	struct fy_generic_builder_cfg gb_cfg = {
+		.flags = FYGBCF_SCOPE_LEADER,
+	};
+	struct fyai_media_image image;
+	struct fyai_cfg cfg;
+	struct fyai_ctx ctx;
+	fy_generic part, ref, content, emitted, parsed, out, data;
+	fy_generic_sized_string raw;
+	char *text;
+	int rc;
+
+	memset(&cfg, 0, sizeof(cfg));
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.cfg = &cfg;
+	ctx.gb = ctx.transient_gb = ctx.durable_gb =
+		fy_generic_builder_create(&gb_cfg);
+	FYAI_TCHECK(ctx.gb);
+	cfg.gb = ctx.gb;
+	cfg.media_max_bytes = 1024;
+	cfg.media_max_per_message = 2;
+	rc = fyai_diag_setup(&cfg.diag);
+	FYAI_TCHECK(!rc);
+
+	rc = fyai_media_image_bytes(&ctx, ctx.gb, png_head, sizeof(png_head),
+				    NULL, "shot", &image);
+	FYAI_TCHECK(!rc);
+	part = fyai_media_image_part(ctx.gb, &image);
+	/* The same part without its bytes. */
+	image.data = fy_invalid;
+	ref = fyai_media_image_part(ctx.gb, &image);
+	fyai_media_image_release(&image);
+	FYAI_TCHECK(fyai_media_part_has_bytes(part));
+	FYAI_TCHECK(fyai_media_part_is_image(ref));
+	FYAI_TCHECK(!fyai_media_part_has_bytes(ref));
+	content = fy_sequence(ctx.gb,
+		fy_mapping(ctx.gb, "type", "text", "text", "look"), part);
+
+	/* The bytes are !!binary in YAML and read back as the same bytes. */
+	emitted = fy_emit(ctx.gb, content, FYOPEF_DISABLE_DIRECTORY |
+			  FYOPEF_MODE_YAML_1_2 | FYOPEF_STYLE_PRETTY |
+			  FYOPEF_BINARY_BASE64, NULL);
+	FYAI_TCHECK(fy_is_string(emitted));
+	parsed = fy_parse(ctx.gb, emitted, FYOPPF_DISABLE_DIRECTORY |
+			  FYOPPF_MODE_YAML_1_2 | FYOPPF_INPUT_TYPE_STRING, NULL);
+	FYAI_TCHECK(fy_is_sequence(parsed));
+	out = fyai_media_import_content(&ctx, ctx.gb, parsed);
+	FYAI_TCHECK(fy_is_sequence(out) && fy_len(out) == 2);
+	FYAI_TCHECK(fy_equal(fy_get_at_path(out, 0, "text"), "look"));
+	FYAI_TCHECK(fy_equal(fy_get_at(out, 1), part));
+	data = fy_get_at_path(out, 1, "data");
+	raw = fy_castp(&data, fy_szstr_empty);
+	FYAI_TCHECK(raw.size == sizeof(png_head));
+	FYAI_TCHECK(!memcmp(raw.data, png_head, sizeof(png_head)));
+
+	/* A digest that is not the digest of the bytes. */
+	out = fyai_media_import_content(&ctx, ctx.gb, fy_sequence(ctx.gb,
+		fy_assoc(ctx.gb, part, "digest", "00")));
+	FYAI_TCHECK(fy_is_invalid(out));
+	text = fyai_diag_string(fyai_ctx_diag(&ctx));
+	FYAI_TCHECK(text && strstr(text, "digest"));
+	free(text);
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	/* A size that the header of the bytes does not state. */
+	out = fyai_media_import_content(&ctx, ctx.gb, fy_sequence(ctx.gb,
+		fy_assoc(ctx.gb, part, "width", 1LL)));
+	FYAI_TCHECK(fy_is_invalid(out));
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	/* A reference with no bytes. */
+	out = fyai_media_import_content(&ctx, ctx.gb, fy_sequence(ctx.gb, ref));
+	FYAI_TCHECK(fy_is_invalid(out));
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	/* More bytes than the limit. */
+	cfg.media_max_bytes = 8;
+	out = fyai_media_import_content(&ctx, ctx.gb, content);
+	FYAI_TCHECK(fy_is_invalid(out));
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+	cfg.media_max_bytes = 1024;
+
+	/* More images than one message takes. */
+	out = fyai_media_import_content(&ctx, ctx.gb,
+		fy_sequence(ctx.gb, part, part, part));
+	FYAI_TCHECK(fy_is_invalid(out));
+	fyai_diag_reset(fyai_ctx_diag(&ctx));
+
+	fyai_diag_cleanup(&cfg.diag);
+	fy_generic_builder_destroy(ctx.gb);
 	return 0;
 }
 
