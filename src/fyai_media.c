@@ -610,6 +610,72 @@ fy_generic fyai_media_text_references(struct fy_generic_builder *gb,
 	return fyai_join_strings(gb, chunks);
 }
 
+/* The end of the line at @s: its newline or the end of the text. */
+static const char *media_line_end(const char *s)
+{
+	const char *e;
+
+	e = strchr(s, '\n');
+	return e ? e : s + strlen(s);
+}
+
+/* Whether @line, of @len bytes, is a whole row of fyai_media_part_reference(). */
+static bool media_line_is_row(const char *line, size_t len)
+{
+	static const char head[] = "![image: ";
+	static const char hook[] = "](fyai-media:";
+	const char *s;
+
+	if (len < sizeof(head) - 1 || memcmp(line, head, sizeof(head) - 1) ||
+	    line[len - 1] != ')')
+		return false;
+	for (s = line; s + sizeof(hook) - 1 <= line + len; s++) {
+		if (!memcmp(s, hook, sizeof(hook) - 1))
+			return true;
+	}
+	return false;
+}
+
+char *fyai_media_rows_styled(const char *text)
+{
+	static const char on[] = "**<fy-role name=\"ref\">";
+	static const char off[] = "</fy-role>**";
+	const char *s, *e;
+	char *out, *o;
+	size_t len, rows;
+
+	if (!text)
+		return NULL;
+	rows = 0;
+	for (s = text; *s; s = *e ? e + 1 : e) {
+		e = media_line_end(s);
+		if (media_line_is_row(s, (size_t)(e - s)))
+			rows++;
+	}
+	out = malloc(strlen(text) + rows * (sizeof(on) + sizeof(off) - 2) + 1);
+	if (!out)
+		return NULL;
+	o = out;
+	for (s = text; *s; s = *e ? e + 1 : e) {
+		e = media_line_end(s);
+		len = (size_t)(e - s);
+		if (media_line_is_row(s, len)) {
+			memcpy(o, on, sizeof(on) - 1);
+			o += sizeof(on) - 1;
+		}
+		memcpy(o, s, len);
+		o += len;
+		if (media_line_is_row(s, len)) {
+			memcpy(o, off, sizeof(off) - 1);
+			o += sizeof(off) - 1;
+		}
+		if (*e)
+			*o++ = '\n';
+	}
+	*o = '\0';
+	return out;
+}
+
 /* Whether the next user message carries an attachment. */
 bool fyai_media_pending_any(const struct fyai_ctx *ctx)
 {

@@ -1494,7 +1494,7 @@ int markdown_render_reverse(struct fyai_cfg *cfg, const char *text, size_t len,
 			    const char *theme)
 {
 	return markdown_render_flags(cfg, text, len, out, color, theme,
-				     FYMD_RF_REVERSE, 0);
+				     FYMD_RF_REVERSE | FYMD_RF_UI, 0);
 }
 
 static int markdown_fprint(FILE *fp, const char *text, struct fyai_cfg *cfg,

@@ -150,6 +150,10 @@ int markdown_render_margins(struct fyai_cfg *cfg, const char *text, size_t len,
 			    struct response_buffer *out,
 			    const char *first_margin,
 			    const char *next_margin);
+/*
+ * Render @text as a card, with UI Markdown: the caller escapes what it did
+ * not write with markdown_ui_escape().
+ */
 int markdown_render_reverse(struct fyai_cfg *cfg, const char *text, size_t len,
 			    struct response_buffer *out, bool color,
 			    const char *theme);

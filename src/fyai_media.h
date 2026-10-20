@@ -146,6 +146,15 @@ fy_generic fyai_media_part_reference(struct fy_generic_builder *gb,
 fy_generic fyai_media_text_references(struct fy_generic_builder *gb,
 				      fy_generic content);
 
+/*
+ * A copy of @text in which each line that is a whole reference row, as
+ * fyai_media_part_reference() writes it, is bold and in the ref role of the
+ * palette: **<fy-role name="ref">![image: ...](fyai-media:...)</fy-role>**.
+ * It is for a UI Markdown render of text that markdown_ui_escape() made safe;
+ * what is stored and exported keeps the plain row. The caller frees it.
+ */
+char *fyai_media_rows_styled(const char *text);
+
 /* Whether @part is an image part that carries its bytes. */
 bool fyai_media_part_has_bytes(fy_generic part);
 

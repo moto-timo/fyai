@@ -5121,6 +5121,8 @@ static void fyai_print_card(struct fyai_ctx *ctx, const char *line, bool live)
 	const char *on;
 	const char *off;
 	char *quoted;
+	char *escaped;
+	char *styled;
 	size_t quotedlen;
 	size_t end;
 	bool fenced;
@@ -5134,12 +5136,21 @@ static void fyai_print_card(struct fyai_ctx *ctx, const char *line, bool live)
 	if (!cfg->markdown || !ctx->stdout_tty)
 		return;
 
+	/*
+	 * The card is UI Markdown, so the words cannot place fy-* tags of their
+	 * own; an attachment row is bold and in the ref colour.
+	 */
+	escaped = markdown_ui_escape(line);
+	styled = escaped ? fyai_media_rows_styled(escaped) : NULL;
+	free(escaped);
+
 	/* Render the input as a blockquote so the bubble keeps the "> " rail. */
-	mf = open_memstream(&quoted, &quotedlen);
+	mf = styled ? open_memstream(&quoted, &quotedlen) : NULL;
 	if (mf) {
-		fyai_emit_blockquote(mf, line);
+		fyai_emit_blockquote(mf, styled);
 		fclose(mf);
 	}
+	free(styled);
 
 	rc = quoted ? markdown_render_reverse(cfg, quoted, quotedlen, &rb, true,
 					      cfg->theme_variant) : -1;
