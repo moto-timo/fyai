@@ -244,6 +244,7 @@ int fyai_cmd_skill_edit(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_skill_new(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_skill_enable(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_image_add(struct fyai_cmd_call *call, fy_generic *result);
+int fyai_cmd_attach(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_image_paste(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_image_clear(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_image_list(struct fyai_cmd_call *call, fy_generic *result);

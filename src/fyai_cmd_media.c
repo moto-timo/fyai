@@ -57,7 +57,7 @@ static fy_generic media_add_result(struct fyai_cmd_call *call,
 	if (!ctx->cfg->image_input_supported)
 		out = fy_assoc(call->gb, out, "note",
 			fy_sprintfa("the model '%s' takes no image input; the "
-				    "message cannot be sent",
+				    "next message cannot be sent",
 				    ctx->cfg->model ? ctx->cfg->model : ""));
 	return out;
 }
@@ -92,6 +92,33 @@ int fyai_cmd_image_paste(struct fyai_cmd_call *call, fy_generic *result)
 		ctx->media_pending = pending;
 	}
 	*result = media_add_result(call, pending);
+	return 0;
+}
+
+/*
+ * Attach a file by what it holds: an image as with image add, or a text file
+ * that the model reads inline. The result says which.
+ */
+int fyai_cmd_attach(struct fyai_cmd_call *call, fy_generic *result)
+{
+	struct fyai_ctx *ctx = call->ctx;
+	const char *path = fyai_cmd_arg_str(call, "path");
+	fy_generic part = fy_invalid;
+	char size[48];
+
+	if (fyai_media_attach_file(ctx, path, false, &part))
+		return -1;
+	if (!fyai_media_part_is_file(part)) {
+		*result = media_add_result(call, ctx->media_pending);
+		return 0;
+	}
+	fyai_media_file_size(size, sizeof(size), part);
+	*result = fy_mapping(call->gb,
+		"file", fy_get(part, "file", ""),
+		"size", fy_value(call->gb, size),
+		"lines", fy_get(part, "lines", 0LL),
+		"bytes", fy_get(part, "bytes", 0LL),
+		"pending", true);
 	return 0;
 }
 

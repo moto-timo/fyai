@@ -131,6 +131,7 @@ static const struct {
 	{ "todo_show",		fyai_cmd_todo_show },
 	{ "todo_clear",		fyai_cmd_todo_clear },
 	{ "image_add",		fyai_cmd_image_add },
+	{ "attach",		fyai_cmd_attach },
 	{ "image_paste",	fyai_cmd_image_paste },
 	{ "image_clear",	fyai_cmd_image_clear },
 	{ "image_list",		fyai_cmd_image_list },

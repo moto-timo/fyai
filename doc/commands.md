@@ -3055,9 +3055,10 @@ the bytes, so they are kept in the arena with the conversation. A path
 that starts with `~/` is under the home directory, here and wherever
 a command takes the path of an attachment.
 
-A path is never taken from what you type in a line: an image enters
-only through `image add`, through `image paste`, or through an option
-that names it.
+A path in a typed line is text, unless `@` comes before it: `@PATH`
+attaches the file as `attach` does. An image also enters through
+`image add`, through `image paste`, or through an option that names
+it.
 
 
 ### Commands
@@ -3150,6 +3151,51 @@ List the attachments that the next message carries.
 | --- | --- |
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
+
+## fyai attach
+
+attach a file to the next message
+
+**Usage:** `fyai attach PATH`
+
+Attach the file at PATH to the next message the model reads, by what
+it holds. An image is attached as `image add` does. A UTF-8 text file with
+no control character but the blanks of text, of at most 256 KiB or
+`media/max_bytes` when that is smaller, is attached as its text, which
+the model reads after the words of the message; the transcript shows
+one row for it. Any other file is refused. A path that starts with
+`~/` is under the home directory.
+
+In a typed line, `@PATH` does the same: `look at @shot.png`. A path
+with blanks is quoted, `@"my shot.png"`, or escapes them,
+`@my\ shot.png`. `\@` and `@@` are a literal `@`. A line with a mention
+that cannot attach is not sent. The task of `agent` is not a typed
+line: its `@PATH` is text.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `PATH` | the file to attach |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+### Examples
+
+    fyai attach notes.txt
+
+attach the text of notes.txt to the next message
+
+    fyai attach ~/shot.png
+
+attach the image in shot.png in the home directory
+
 
 ## fyai agent
 
@@ -5957,9 +6003,10 @@ the bytes, so they are kept in the arena with the conversation. A path
 that starts with `~/` is under the home directory, here and wherever
 a command takes the path of an attachment.
 
-A path is never taken from what you type in a line: an image enters
-only through `image add`, through `image paste`, or through an option
-that names it.
+A path in a typed line is text, unless `@` comes before it: `@PATH`
+attaches the file as `attach` does. An image also enters through
+`image add`, through `image paste`, or through an option that names
+it.
 
 
 ### Commands
@@ -6048,6 +6095,50 @@ List the attachments that the next message carries.
 | Option | Description |
 | --- | --- |
 | `-h`, `--help` | show this help |
+
+## /attach
+
+attach a file to the next message
+
+**Usage:** `/attach PATH`
+
+Attach the file at PATH to the next message the model reads, by what
+it holds. An image is attached as `image add` does. A UTF-8 text file with
+no control character but the blanks of text, of at most 256 KiB or
+`media/max_bytes` when that is smaller, is attached as its text, which
+the model reads after the words of the message; the transcript shows
+one row for it. Any other file is refused. A path that starts with
+`~/` is under the home directory.
+
+In a typed line, `@PATH` does the same: `look at @shot.png`. A path
+with blanks is quoted, `@"my shot.png"`, or escapes them,
+`@my\ shot.png`. `\@` and `@@` are a literal `@`. A line with a mention
+that cannot attach is not sent. The task of `agent` is not a typed
+line: its `@PATH` is text.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `PATH` | the file to attach |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+### Examples
+
+    /attach notes.txt
+
+attach the text of notes.txt to the next message
+
+    /attach ~/shot.png
+
+attach the image in shot.png in the home directory
+
 
 ## /status
 
