@@ -1003,6 +1003,19 @@ The tile header of a sub-agent shows the branch, the model, the execution id,
 and the running time after the agent description. While a turn runs, the input
 pane header shows the running time of the turn.
 
+While a turn runs, the prompt mark is an ellipsis in place of the usual
+arrow: a line typed then waits. The lines that wait stand on top of the input
+pane, under **pending**, as they were typed, and the next request takes them.
+The arrow comes back when a line is taken at once. The ellipsis has the columns
+of the arrow, so the input does not move. The theme can give another glyph
+(`prompt.busy`), and `display/prompt_busy` replaces both. A PTY script waits for the mark as
+`doc/pty-driver.md` says.
+
+A long queue does not push the page away. The lines that wait take a third of
+the screen at most, and never a row of the input pane. When they do not fit,
+the oldest lines go: **pending** keeps the count of all the lines, and the
+newest lines stand under it, with the header and the status.
+
 ### Questions to the user
 
 The `ask_user` tool puts one to four questions to the user. Each question has
