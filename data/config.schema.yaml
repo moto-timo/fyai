@@ -1381,7 +1381,11 @@ properties:
         default: "  > "
         description: >-
           Set the interactive prompt marker. Empty uses the built-in ("  > " with
-          markdown, "> " otherwise). May carry SGR colour escapes.
+          markdown, "> " otherwise). May carry SGR colour escapes. While a
+          typed line would wait, because a turn runs, the marker is the
+          glyph of display/prompt_busy with the SGR escapes that start the
+          configured marker, padded with blanks to the columns of that
+          marker so the input does not move.
       prompt_busy:
         x-fyai-model: review
         type: string

@@ -222,7 +222,7 @@ answer a question that fyai puts to the user.
 | Ceiling | removes a limit on the model | `shell/max_timeout_ms`, `shell/hard_max_output_tokens`, `read/hard_max_bytes`, `agent/max_timeout_ms`, `agent/hang_timeout_ms`, `agent/timeout_kill`, `agent/max_live_agents`, `agent/max_branch_depth`, `max_tool_iterations` |
 | Persistence | puts text of the model into later requests | `system_prompt`, `parallel_tool_calls_prompt`, `agent/personas`, skills |
 | Concealment | hides the actions of the model from the user | `display/tool_detail`, `display/tool_preview_lines`, `display/notice_output`, `display/thinking`, `view/ignore`, `view/gitignore` |
-| Spoofing | draws chrome or escapes the model chose | `display/prompt`, `display/prompt_top`, `display/prompt_bottom`, `display/session_margin`, `display/keys` (can unbind the key that leaves a tile) |
+| Spoofing | draws chrome or escapes the model chose | `display/prompt`, `display/prompt_busy`, `display/prompt_top`, `display/prompt_bottom`, `display/session_margin`, `display/keys` (can unbind the key that leaves a tile) |
 | Cost | spends money or provider capacity | `model`, `max_tokens`, `retry/*`, `web_search` |
 
 Approval must come from the user:
@@ -298,7 +298,7 @@ under it, except the rows below it that name a deeper key.
 | `arena_dir` | read | |
 | `display` | write | presentation |
 | `display/tool_detail`, `display/tool_preview_lines`, `display/notice_output`, `display/thinking` | review | concealment |
-| `display/prompt`, `display/prompt_top`, `display/prompt_bottom`, `display/session_margin` | review | spoofing; can hold escapes |
+| `display/prompt`, `display/prompt_busy`, `display/prompt_top`, `display/prompt_bottom`, `display/session_margin` | review | spoofing; can hold escapes |
 | `display/keys` | review | spoofing; can leave the user in a tile |
 | `display/page` | read | execution: names a file on disk |
 | `model_info` | read | derived |

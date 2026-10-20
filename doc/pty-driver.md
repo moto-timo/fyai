@@ -163,6 +163,14 @@ time that is left of the session.
 Do not use `wait:` for text that the command row also holds. Use `wait-row`
 or `wait-screen` for the output of the program.
 
+The prompt mark is an ellipsis (U+2026) while a turn runs (unless the theme or
+`display/prompt_busy` sets another glyph), and the configured
+mark (U+276F by default) when a line is taken at once. To act on an idle
+prompt, e.g. with Escape, wait for the whole frame of the answer and then for
+the mark: `wait-frame: ANSWER`, then `wait-screen:` with the configured mark,
+`"\u276f"` by default. A `wait:` can return before that frame ends, while the
+screen still shows the frame before it.
+
 ## Rules for a case
 
 - Wait for a state, not for a time. The driver has no pause after a key.
