@@ -21,7 +21,8 @@ rows: 40
 cols: 100
 steps:
   - type: first question
-  - wait: banana
+  # the frame of the answer is whole before the keys of the next step
+  - wait-frame: banana
     timeout: session
   - write: "not sent"
   - wait-screen: not sent
@@ -29,6 +30,7 @@ steps:
   - wait-gone: not sent
   - write: "\e\x00"
   - type: "/status"
+  - wait-screen: "\u25a1"
   - click: "□"
   - wait-screen: Auth / provider
   - write: "\e\x00"
