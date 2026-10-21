@@ -75,6 +75,47 @@ A bridge started by hand has the same choice as `--bin`:
 node server/bridge.mjs --bin /usr/local/bin/fyai --cwd ~/project
 ```
 
+## Desktop app
+
+`scripts/desktop.sh` opens the page in an Electron window. The bridge runs
+as a child of the app, so nothing else has to be started:
+
+```sh
+cd web
+./scripts/desktop.sh                     # the repo build, or fyai on PATH
+./scripts/desktop.sh --fyai ~/bin/fyai   # another fyai
+./scripts/desktop.sh --cwd ~/project     # another project
+```
+
+The window loads the built page, so run `npm run build` after you change it.
+Electron needs Node 20 or later, and a graphical session.
+
+### Bundle it with fyai
+
+`scripts/package.sh` writes a self-contained app to `dist-app/fyai-linux-<arch>/`.
+With a standalone fyai in `fyai-bundle/fyai` it travels inside the bundle and
+the app looks for it before the project build and `PATH`:
+
+```sh
+scripts/package.sh --bundle-fyai   # build a portable fyai first
+scripts/package.sh                 # package the page as it stands
+```
+
+`scripts/bundle-fyai.sh` makes that binary. The default mode is `mostly`:
+the fyai dependencies are static and only the host libc is needed, which every
+glibc Linux has. `--mode musl` gives a fully static binary for a musl or an
+older machine.
+
+```sh
+scripts/bundle-fyai.sh                 # docker build, mode mostly
+scripts/bundle-fyai.sh --mode musl     # fully static
+scripts/bundle-fyai.sh --from PATH     # copy a binary you built already
+scripts/bundle-fyai.sh --check         # what a bundle would carry
+```
+
+The static modes build the fyai repository above `web/` in Docker; set
+`FYAI_SRC` for another checkout.
+
 ## Bridge options
 
 | Option              | Environment                   | Default             | Meaning                                 |
