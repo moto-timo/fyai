@@ -19,6 +19,8 @@ import {
 } from '$lib/enums';
 import { ChatService } from '$lib/services/chat.service';
 import { DatabaseService } from '$lib/services/database.service';
+import { buildFyaiPrompt, parseProviderKeys, streamFyaiTurn } from '$lib/services/fyai.service';
+import { FyaiTurnAssembler } from '$lib/services/fyai.turn';
 // direct imports between stores, not via the barrel, to avoid circular deps
 import { agenticStore } from '$lib/stores/agentic/index.svelte';
 import { chatActivityStore } from '$lib/stores/chat/activity.svelte';
@@ -32,7 +34,6 @@ import { serverStore } from '$lib/stores/server.svelte';
 import { settingsStore } from '$lib/stores/settings/index.svelte';
 import { toolsStore } from '$lib/stores/tools.svelte';
 import type {
-	ApiChatMessageData,
 	ChatMessagePromptProgress,
 	ChatMessageTimings,
 	ChatStreamCallbacks,
@@ -608,6 +609,16 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 	async sendMessage(content: string, extras?: DatabaseMessageExtra[]): Promise<void> {
 		if (!content.trim() && (!extras || extras.length === 0)) return;
 
+		/*
+		 * Each conversation is its own fyai session, so a new conversation is
+		 * what clears the model context. The line is not stored.
+		 */
+		if (content.trim() === '/clear') {
+			await conversationsStore.createConversation();
+
+			return;
+		}
+
 		const activeConv = conversationsStore.activeConversation;
 
 		// If agentic loop is running, inject as a steering message instead of starting a new flow
@@ -1128,6 +1139,40 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 		};
 
 		{
+			/*
+			 * fyai keeps the conversation and runs the tool loop of the turn
+			 * itself, so one request is the whole turn: its assistant
+			 * messages and tool results arrive in the one stream.
+			 */
+			const fyaiResult = await this.runFyaiTurn({
+				allMessages,
+				assistantMessage,
+				callbacks: streamCallbacks,
+				convId,
+				model: modelsStore.selectedModelName ?? effectiveModel ?? null,
+				signal: abortController.signal
+			});
+
+			if (fyaiResult !== 'skip') {
+				if (fyaiResult === 'ok') {
+					cleanupStreamingState();
+
+					if (onComplete) await onComplete(streamedContent);
+
+					if (firstUserMessageContent) {
+						await this.generateTitleWithLLM(firstUserMessageContent, streamedContent, convId);
+					}
+
+					const pending = this.consumePendingMessage(convId);
+
+					if (pending) await this.sendMessage(pending.content, pending.extras);
+				}
+
+				return;
+			}
+		}
+
+		{
 			const agenticResult = await agenticStore.runAgenticFlow({
 				callbacks: streamCallbacks,
 				conversationId: convId,
@@ -1257,6 +1302,7 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 	async updateMessage(messageId: string, newContent: string): Promise<void> {
 		return this.flows.updateMessage(messageId, newContent);
 	}
+
 	private abortRequest(convId?: string): void {
 		if (convId) {
 			const c = this.abortControllers.get(convId);
@@ -1270,49 +1316,19 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 			this.abortControllers.clear();
 		}
 	}
-
 	private async generateTitleWithLLM(
 		userContent: string,
-		assistantContent: string,
+		_assistantContent: string,
 		convId: string
 	): Promise<void> {
-		const effectiveModel =
-			serverStore.isRouterMode && modelsStore.selectedModelName
-				? modelsStore.selectedModelName
-				: undefined;
-		const configValue = settingsStore.config;
-		const titlePromptTemplate =
-			typeof configValue.titleGenerationPrompt === 'string' &&
-			configValue.titleGenerationPrompt.trim()
-				? configValue.titleGenerationPrompt
-				: TITLE_GENERATION.DEFAULT_PROMPT;
-		const titlePrompt = titlePromptTemplate
-			.replace('{{USER}}', String(userContent || ''))
-			.replace('{{ASSISTANT}}', String(assistantContent || ''));
-		const titleMessage: ApiChatMessageData = {
-			content: titlePrompt,
-			role: MessageRole.USER
-		};
-		const titleResponse = await ChatService.generateTitle(titleMessage, effectiveModel);
+		/*
+		 * The title comes from the message. A model request would start a
+		 * session that no conversation reads.
+		 */
+		const firstLine = userContent.split('\n').find((line) => line.trim().length > 0);
+		const cleanTitle = (firstLine ?? TITLE_GENERATION.FALLBACK).trim().slice(0, 80);
 
-		if (!titleResponse) {
-			return;
-		}
-
-		let cleanTitle = titleResponse.trim();
-
-		cleanTitle = cleanTitle
-			.replace(TITLE_GENERATION.PREFIX_PATTERN, '')
-			.replace(TITLE_GENERATION.QUOTE_PATTERN, '')
-			.trim();
-
-		if (!cleanTitle || cleanTitle.length < TITLE_GENERATION.MIN_LENGTH) {
-			const firstLine = userContent.split('\n').find((l) => l.trim().length > 0);
-
-			cleanTitle = firstLine ? firstLine.trim() : TITLE_GENERATION.FALLBACK;
-		}
-
-		if (cleanTitle && cleanTitle.length >= TITLE_GENERATION.MIN_LENGTH) {
+		if (cleanTitle.length >= TITLE_GENERATION.MIN_LENGTH) {
 			await conversationsStore.updateConversationName(convId, cleanTitle);
 		}
 	}
@@ -1323,6 +1339,91 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 		return this.chatStreamingStates.get(convId);
 	}
 
+	/**
+	 * Runs one fyai turn. The bridge streams the frames of the Agent SDK
+	 * protocol; the assembler turns them into chat messages. fyai runs the
+	 * tools of the turn itself, so none runs here.
+	 *
+	 * @returns 'skip' when the last user message has no text to send
+	 */
+	private async runFyaiTurn(options: {
+		allMessages: DatabaseMessage[];
+		assistantMessage: DatabaseMessage;
+		callbacks: ChatStreamCallbacks;
+		convId: string;
+		model: string | null;
+		signal: AbortSignal;
+	}): Promise<'ok' | 'error' | 'skip'> {
+		const prompt = buildFyaiPrompt(options.allMessages);
+		const { callbacks, convId } = options;
+
+		if (!prompt) return 'skip';
+
+		/*
+		 * The session ID is the conversation ID. fyai stores the turns, so a
+		 * turn sends only what the user typed since the last one. A conversation
+		 * with no answer yet has no session, unless an earlier turn failed after
+		 * it started one: the bridge asks fyai for the other mode then.
+		 */
+		const fresh = !options.allMessages.some((m) => m.role === MessageRole.ASSISTANT);
+
+		let timings: ChatMessageTimings | undefined;
+		let error = false;
+
+		const assembler = new FyaiTurnAssembler({
+			createMessage: () => callbacks.createAssistantMessage?.(),
+			createToolResult: async (toolUseId: string, text: string) => {
+				await callbacks.createToolResultMessage?.(toolUseId, text);
+			},
+			messageDone: async (message) => {
+				await callbacks.onAssistantTurnComplete?.(
+					message.content,
+					undefined,
+					timings,
+					message.toolCalls.length
+						? message.toolCalls.map((call) => ({
+								function: { arguments: call.arguments, name: call.name },
+								id: call.id,
+								type: 'function' as const
+							}))
+						: undefined
+				);
+			},
+			onError: (cause) => {
+				error = true;
+				callbacks.onError?.(cause);
+			},
+			onModel: (model) => callbacks.onModel?.(model),
+			onText: (text) => callbacks.onChunk?.(text),
+			onTimings: (value) => {
+				timings = value;
+				callbacks.onTimings?.(value);
+			}
+		});
+
+		try {
+			await streamFyaiTurn(
+				{
+					apiKey: settingsStore.config.apiKey?.toString().trim() ?? '',
+					conversationId: convId,
+					fresh,
+					model: options.model,
+					prompt,
+					providerKeys: parseProviderKeys(settingsStore.config.providerApiKeys?.toString() ?? '')
+				},
+				(frame) => assembler.push(frame),
+				options.signal
+			);
+		} catch (cause) {
+			if (!assembler.hasFailed) {
+				callbacks.onError?.(cause instanceof Error ? cause : new Error(String(cause)));
+			}
+		}
+
+		if (await assembler.settled()) return 'error';
+
+		return error ? 'error' : 'ok';
+	}
 	private async savePartialResponseIfNeeded(convId?: string): Promise<void> {
 		const conversationId = convId || conversationsStore.activeConversation?.id;
 

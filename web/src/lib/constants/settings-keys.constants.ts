@@ -44,6 +44,7 @@ export const SETTINGS_KEYS = {
 	PDF_AS_IMAGE: 'pdfAsImage',
 	// Performance
 	PRE_ENCODE_CONVERSATION: 'preEncodeConversation',
+	PROVIDER_API_KEYS: 'providerApiKeys',
 	PRESENCE_PENALTY: 'presence_penalty',
 	RENDER_THINKING_AS_MARKDOWN: 'renderThinkingAsMarkdown',
 	RENDER_USER_CONTENT_AS_MARKDOWN: 'renderUserContentAsMarkdown',
