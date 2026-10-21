@@ -60,6 +60,12 @@ const config = {
 	extraArgs: (argv['extra-arg'] ?? env.FYAI_BRIDGE_ARGS ?? '').split(/\s+/).filter(Boolean),
 	host: argv.host ?? env.FYAI_BRIDGE_HOST ?? '127.0.0.1',
 	model: argv.model ?? env.FYAI_BRIDGE_MODEL ?? '',
+	/*
+	 * The program that started this one, when it wants the bridge to stop with
+	 * it. The desktop app sets it, so closing the window leaves no bridge
+	 * behind even if the app is killed instead of quitting.
+	 */
+	parentPid: Number(argv['parent-pid'] ?? env.FYAI_BRIDGE_PARENT_PID ?? 0),
 	permissionMode: argv['permission-mode'] ?? env.FYAI_PERMISSION_MODE ?? 'bypassPermissions',
 	port: Number(argv.port ?? env.FYAI_BRIDGE_PORT ?? 9331),
 	staticDir: resolve(argv.static ?? env.FYAI_BRIDGE_STATIC ?? join(HERE, '..', 'dist')),
@@ -71,6 +77,110 @@ const SDKMODES = new Set(['default', 'acceptEdits', 'bypassPermissions', 'dontAs
 
 function log(...args) {
 	process.stderr.write(`fyai-bridge: ${args.join(' ')}\n`);
+}
+
+/* ------------------------------------------------------------- life cycle */
+
+/*
+ * Every fyai process this program started and has not seen stop. A bridge that
+ * is told to stop, or whose parent goes away, ends them too: otherwise the
+ * turns of a closed window keep running their tools with nobody to read the
+ * result.
+ */
+const children = new Set();
+
+let stopping = false;
+/** Set once the HTTP server exists, so a shutdown can stop listening. */
+let server = null;
+
+function trackChild(child) {
+	children.add(child);
+	child.on('close', () => children.delete(child));
+
+	return child;
+}
+
+/** Stop the children, then this process. */
+function shutdown(reason, code = 0) {
+	if (stopping) return;
+
+	stopping = true;
+
+	if (reason) log(`stopping: ${reason}`);
+
+	for (const child of children) {
+		try {
+			child.kill('SIGTERM');
+		} catch {
+			/* It ended between the loop and the signal. */
+		}
+	}
+
+	/*
+	 * A child that ignores SIGTERM must not hold the port open. The grace
+	 * period keeps a normal shutdown from landing a signal on a dying pid.
+	 */
+	const timer = setTimeout(() => {
+		for (const child of children) {
+			try {
+				child.kill('SIGKILL');
+			} catch {
+				/* Already gone. */
+			}
+		}
+
+		process.exit(code);
+	}, 2000);
+
+	timer.unref();
+
+	if (server) server.close(() => process.exit(code));
+	else process.exit(code);
+}
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+	process.on(signal, () => shutdown(signal));
+}
+
+/**
+ * The parent that asked this bridge to die with it. A parent that is gone
+ * cannot tell its child, so the child looks: a signal that fails with ESRCH
+ * means the process is no longer there.
+ */
+function watchParent(pid) {
+	if (!pid || pid === process.pid) return;
+
+	/*
+	 * A parent that dies closes its end of the pipe. That is immediate,
+	 * where the check below can only notice within a second, and it also
+	 * covers a pid that another process has reused.
+	 */
+	process.stdin.on('end', () => shutdown('the parent closed its end'));
+	process.stdin.on('close', () => shutdown('the parent closed its end'));
+	process.stdin.resume();
+	process.stdin.unref?.();
+
+	const alive = () => {
+		try {
+			process.kill(pid, 0);
+
+			return true;
+		} catch (error) {
+			return error.code === 'EPERM';
+		}
+	};
+
+	if (!alive()) {
+		shutdown('the parent process is gone');
+
+		return;
+	}
+
+	const timer = setInterval(() => {
+		if (!alive()) shutdown('the parent process is gone');
+	}, 1000);
+
+	timer.unref();
 }
 
 /* ------------------------------------------------------------------- utils */
@@ -219,11 +329,13 @@ function spawnTurn(options) {
 		log('spawn', config.bin, args.join(' '));
 	}
 
-	const child = spawn(config.bin, args, {
-		cwd: config.cwd,
-		env,
-		stdio: ['pipe', 'pipe', 'pipe']
-	});
+	const child = trackChild(
+		spawn(config.bin, args, {
+			cwd: config.cwd,
+			env,
+			stdio: ['pipe', 'pipe', 'pipe']
+		})
+	);
 	const summary = {
 		code: null,
 		frames: 0,
@@ -383,7 +495,7 @@ async function runSlashCommand(sessionId, command, model, env = process.env) {
 
 function runCapture(bin, args, timeoutMs = 10000, env = process.env) {
 	return new Promise((resolvePromise) => {
-		const child = spawn(bin, args, { cwd: config.cwd, env });
+		const child = trackChild(spawn(bin, args, { cwd: config.cwd, env }));
 
 		let out = '';
 		let err = '';
@@ -838,7 +950,7 @@ async function serveStatic(req, res, pathname) {
 	}
 }
 
-const server = createServer(async (req, res) => {
+server = createServer(async (req, res) => {
 	const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 	const pathname = url.pathname;
 
@@ -981,8 +1093,34 @@ const server = createServer(async (req, res) => {
 });
 
 await listModels(true);
+/*
+ * A port that is taken is a common accident: another bridge, another window of
+ * the app, or a development server. Say so in one line instead of letting the
+ * socket error out of the process.
+ */
+server.on('error', (error) => {
+	if (error.code === 'EADDRINUSE') {
+		log(
+			`port ${config.port} is in use by another program; start on another one ` +
+				'with --port PORT, or with --port 0 for any free port'
+		);
+	} else {
+		log(`cannot listen on ${config.host}:${config.port}: ${error.message}`);
+	}
+
+	process.exit(1);
+});
+
 server.listen(config.port, config.host, () => {
-	log(`listening on http://${config.host}:${config.port}`);
+	/* Port 0 asks the system for a free port, so report the one it gave. */
+	const address = server.address();
+	const port = address && typeof address === 'object' ? address.port : config.port;
+
+	config.port = port;
+	log(`listening on http://${config.host}:${port}`);
 	log(`fyai: ${config.bin}  cwd: ${config.cwd}  static: ${config.staticDir}`);
 	log(`permission mode: ${config.permissionMode}`);
 });
+
+/* A bridge that the parent asked to stop with it must not outlive it. */
+watchParent(config.parentPid);

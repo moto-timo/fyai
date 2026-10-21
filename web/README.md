@@ -106,6 +106,16 @@ cd web
 The window loads the built page, so run `npm run build` after you change it.
 Electron needs Node 20 or later, and a graphical session.
 
+The window asks the bridge for a free loopback port and reads the address it
+reports, so a second window, a development bridge on 9331, or a bridge left
+behind by an earlier run does not stop it. `FYAI_BRIDGE_PORT` pins the port
+when something else, such as a browser, has to reach the same bridge.
+
+The bridge stops with the app: the window tells it to quit, and it also
+watches the app's process and its standard input, so an app that is killed
+rather than closed still leaves nothing behind. A turn that is running when
+that happens is stopped too, with the tools it started.
+
 ### Bundle it with fyai
 
 `scripts/package.sh` writes a self-contained app to `dist-app/fyai-linux-<arch>/`.
@@ -162,11 +172,12 @@ carry the label `web`, so a C-only run stays quick:
 
 | Option              | Environment                   | Default             | Meaning                                 |
 | ------------------- | ----------------------------- | ------------------- | --------------------------------------- |
-| `--port`            | `FYAI_BRIDGE_PORT`            | `9331`              | listen port                             |
+| `--port`            | `FYAI_BRIDGE_PORT`            | `9331`              | listen port; 0 picks a free one         |
 | `--host`            | `FYAI_BRIDGE_HOST`            | `127.0.0.1`         | listen address                          |
 | `--bin`             | `FYAI_BIN`                    | `fyai`              | the fyai program (`--fyai` on a script) |
 | `--cwd`             | `FYAI_BRIDGE_CWD`             | current directory   | project fyai works in                   |
 | `--model`           | `FYAI_BRIDGE_MODEL`           |                     | default model of a session              |
+| `--parent-pid`      | `FYAI_BRIDGE_PARENT_PID`      |                     | stop when this process stops            |
 | `--permission-mode` | `FYAI_PERMISSION_MODE`        | `bypassPermissions` | how fyai decides on tool calls          |
 | `--extra-arg`       | `FYAI_BRIDGE_ARGS`            |                     | extra arguments for `fyai claude-sdk`   |
 | `--turn-timeout-ms` | `FYAI_BRIDGE_TURN_TIMEOUT_MS` | `0`                 | stop a turn after this; 0 is no limit   |

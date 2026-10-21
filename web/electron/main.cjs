@@ -23,11 +23,19 @@ const HERE = __dirname;
  */
 const ROOT = app.isPackaged ? join(process.resourcesPath, 'app') : join(HERE, '..');
 const STATIC_DIR = join(ROOT, 'dist');
-/* The port is fixed so that a reload of the window finds the same bridge. */
-const PORT = Number(process.env.FYAI_BRIDGE_PORT ?? 9331);
 
+/*
+ * Port 0 asks the system for a free one, which the bridge reports and this
+ * process then uses. A fixed port would collide with a second window of the
+ * app, with a development bridge, or with a stale one of either; a reload of
+ * the window finds the same bridge because the address never changes while
+ * the app runs.
+ */
+let port = Number(process.env.FYAI_BRIDGE_PORT ?? 0);
 let bridge = null;
 let window = null;
+/* Set while the app is on its way out, so a silent bridge is not an error. */
+let quitting = false;
 
 /**
  * The fyai program: the one the environment names, else the static one
@@ -49,16 +57,31 @@ function fyaiProgram() {
 	return '';
 }
 
-/** Start the bridge in a child of this process and wait for its port. */
+/** The address the bridge reports on its first line of output. */
+const LISTENING = /listening on (http:\/\/[^\s]+)/;
+
+/**
+ * Start the bridge in a child of this process. Its address is read from its
+ * output, because port 0 lets the system pick one.
+ *
+ * @returns {Promise<string>} the address the window loads
+ */
 function startBridge() {
 	const args = [
 		join(ROOT, 'server', 'bridge.mjs'),
 		'--port',
-		String(PORT),
+		String(port),
 		'--host',
 		'127.0.0.1',
 		'--static',
-		STATIC_DIR
+		STATIC_DIR,
+		/*
+		 * So the bridge stops with this process, even when the window is
+		 * killed rather than quit: a bridge left behind would hold the port
+		 * and keep any running turn alive.
+		 */
+		'--parent-pid',
+		String(process.pid)
 	];
 	const model = process.env.FYAI_BRIDGE_MODEL;
 	const cwd = process.env.FYAI_BRIDGE_CWD;
@@ -80,18 +103,47 @@ function startBridge() {
 	bridge = spawn(process.execPath, args, {
 		cwd: process.env.FYAI_BRIDGE_CWD ?? ROOT,
 		env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-		stdio: ['ignore', 'pipe', 'pipe']
+		/*
+		 * stdin stays open for as long as this process lives: the bridge
+		 * reads it to notice that it was left behind.
+		 */
+		stdio: ['pipe', 'pipe', 'pipe']
 	});
 
-	bridge.stdout.setEncoding('utf8');
-	bridge.stdout.on('data', (chunk) => process.stdout.write(chunk));
+	/* The first address the bridge prints is the one the window loads. */
+	let settle;
+
+	const listening = new Promise((resolve) => {
+		let seen = false;
+
+		settle = (address) => {
+			if (seen) return;
+
+			seen = true;
+			resolve(address);
+		};
+
+		const read = (chunk) => {
+			process.stdout.write(chunk);
+
+			const found = LISTENING.exec(chunk);
+
+			if (found) settle(found[1]);
+		};
+
+		bridge.stdout.setEncoding('utf8');
+		bridge.stdout.on('data', read);
+	});
+
 	bridge.stderr.setEncoding('utf8');
 	bridge.stderr.on('data', (chunk) => process.stderr.write(chunk));
 
 	bridge.on('exit', (code) => {
 		bridge = null;
+		/* A bridge that dies before it listens leaves no address to load. */
+		settle('');
 
-		if (app.isReady() && !window?.isDestroyed() && code !== 0) {
+		if (!quitting && app.isReady() && !window?.isDestroyed() && code !== 0) {
 			dialog.showErrorBox(
 				'fyai bridge stopped',
 				`The bridge exited with status ${code}. See the terminal for its report.`
@@ -99,15 +151,44 @@ function startBridge() {
 			app.quit();
 		}
 	});
+
+	return listening;
+}
+
+/**
+ * Stop the bridge and wait a moment for it. It ends its own fyai processes,
+ * so this is the one place that has to be sure it got the signal.
+ */
+function stopBridge() {
+	if (!bridge) return;
+
+	const child = bridge;
+
+	bridge = null;
+
+	try {
+		child.kill('SIGTERM');
+	} catch {
+		return;
+	}
+
+	/* An app that is already gone cannot wait for a polite exit. */
+	setTimeout(() => {
+		try {
+			child.kill('SIGKILL');
+		} catch {
+			/* It ended on its own. */
+		}
+	}, 3000).unref();
 }
 
 /** Wait until the bridge answers, or give up after a few seconds. */
-async function waitForBridge(ms = 20000) {
+async function waitForBridge(address, ms = 20000) {
 	const started = Date.now();
 
 	while (Date.now() - started < ms) {
 		try {
-			const res = await fetch(`http://127.0.0.1:${PORT}/props`);
+			const res = await fetch(`${address}/props`);
 
 			if (res.ok) return true;
 		} catch {
@@ -131,12 +212,18 @@ async function createWindow() {
 		return;
 	}
 
-	startBridge();
+	const address = await startBridge();
 
-	if (!(await waitForBridge())) {
+	if (!address) {
+		app.quit();
+
+		return;
+	}
+
+	if (!(await waitForBridge(address))) {
 		dialog.showErrorBox(
 			'fyai did not start',
-			`The bridge did not answer on port ${PORT}. Run "npm run bridge" to see why.`
+			`The bridge did not answer at ${address}. Run "npm run bridge" to see why.`
 		);
 		app.quit();
 
@@ -168,20 +255,55 @@ async function createWindow() {
 		return { action: 'deny' };
 	});
 
-	await window.loadURL(`http://127.0.0.1:${PORT}/`);
+	try {
+		await window.loadURL(`${address}/`);
+	} catch (error) {
+		dialog.showErrorBox(
+			'Cannot load the page',
+			`${address} answered, but the page did not load: ${error.message}`
+		);
+		app.quit();
+	}
 }
 
-app.whenReady().then(createWindow);
+app
+	.whenReady()
+	.then(createWindow)
+	.catch((error) => {
+		dialog.showErrorBox('fyai did not start', error?.message ?? String(error));
+		app.quit();
+	});
 
 app.on('window-all-closed', () => {
 	app.quit();
 });
 
+/*
+ * The bridge is a child, and a child outlives its parent unless it is told
+ * otherwise. Stop it on the way out, and again on the last synchronous chance
+ * the process gets, which covers a quit that never reached `before-quit`.
+ */
 app.on('before-quit', () => {
-	if (bridge) {
-		bridge.kill('SIGTERM');
-		bridge = null;
-	}
+	quitting = true;
+	stopBridge();
+});
+
+app.on('will-quit', stopBridge);
+process.on('exit', stopBridge);
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+	process.on(signal, () => {
+		quitting = true;
+		stopBridge();
+		app.quit();
+	});
+}
+
+process.on('uncaughtException', (error) => {
+	quitting = true;
+	stopBridge();
+	console.error('fyai:', error);
+	app.exit(1);
 });
 
 /* A second launch shows the window of the first. */
