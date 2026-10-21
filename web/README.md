@@ -116,6 +116,32 @@ scripts/bundle-fyai.sh --check         # what a bundle would carry
 The static modes build the fyai repository above `web/` in Docker; set
 `FYAI_SRC` for another checkout.
 
+## Build system
+
+The fyai build has targets for this tree. They build nothing unless you ask
+for them, and `FYAI_WEB=ON` makes the page part of a plain `ninja`:
+
+| Target                 | What it does                          |
+| ---------------------- | ------------------------------------- |
+| `fyai-web-install`     | `npm ci`                              |
+| `fyai-web`             | builds the page into `web/dist`       |
+| `fyai-web-dev`         | the bridge and Vite, for editing      |
+| `fyai-web-test`        | the unit tests                        |
+| `fyai-web-turn`        | one turn against fyai's mock provider |
+| `fyai-desktop`         | opens the desktop window              |
+| `fyai-desktop-package` | `dist-app/`, with a bundled fyai      |
+
+```sh
+ninja -C build fyai-web            # build the page
+ninja -C build fyai-web-test       # its tests
+ctest --test-dir build -R fyai/web-test
+cmake -S . -B build -DFYAI_WEB=ON  # or make it part of the build
+```
+
+The unit tests are registered with CTest only when `FYAI_WEB=ON`, and they
+carry the label `web`, so a C-only run stays quick:
+`ctest --test-dir build -LE web`.
+
 ## Bridge options
 
 | Option              | Environment                   | Default             | Meaning                                 |
