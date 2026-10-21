@@ -68,15 +68,19 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        # The release workflow runs beside this one on a tag push, so the
+        # fyai tarball of this platform may not be published yet.
         for i in $(seq 60); do
-          if gh release download "$TAG" --pattern '${{ matrix.asset }}*' \
-               --pattern 'fyai-${{ matrix.platform }}.tar.gz' --dir assets 2>/dev/null; then
-            break
+          if gh release download "$TAG" \
+               --pattern "fyai-${{ matrix.platform }}.tar.gz" --dir assets; then
+            ls -l assets
+            exit 0
           fi
-          echo "waiting for the assets of $TAG"
+          echo "waiting for fyai-${{ matrix.platform }}.tar.gz in $TAG"
           sleep 20
         done
-        ls -l assets
+        echo "::error::the release $TAG has no fyai-${{ matrix.platform }}.tar.gz"
+        exit 1
 
     - name: "Install the page's dependencies"
       working-directory: web
@@ -89,8 +93,10 @@ jobs:
     - name: "Bundle fyai"
       working-directory: web
       run: |
-        tar -C assets -xzf "assets/fyai-${{ matrix.platform }}.tar.gz"
-        bash scripts/bundle-fyai.sh --from "assets/fyai-${{ matrix.platform }}/fyai"
+        mkdir -p ../assets/extract
+        tar -C ../assets/extract -xzf "../assets/fyai-${{ matrix.platform }}.tar.gz"
+        bash scripts/bundle-fyai.sh \
+          --from "../assets/extract/fyai-${{ matrix.platform }}/fyai"
         bash scripts/bundle-fyai.sh --check
 
     - name: "Package the app"
@@ -106,7 +112,8 @@ jobs:
       if: runner.os == 'Linux'
       working-directory: web
       run: |
-        tar -C "dist-app/fyai-linux-x64" -czf "${{ matrix.asset }}.tar.gz" .
+        # Keep the directory in the archive: unpacking makes one app folder.
+        tar -C dist-app -czf "${{ matrix.asset }}.tar.gz" fyai-linux-x64
 
     - name: "Archive the app (macOS)"
       if: runner.os == 'macOS'
@@ -114,6 +121,13 @@ jobs:
       run: |
         APP="dist-app/fyai-darwin-arm64/fyai.app"
         ditto -c -k --sequesterRsrc --keepParent "$APP" "${{ matrix.asset }}.zip"
+
+    - name: "Check the archive"
+      working-directory: web
+      run: |
+        test -s "${{ matrix.asset }}.tar.gz" 2>/dev/null ||
+          test -s "${{ matrix.asset }}.zip"
+        ls -l "${{ matrix.asset }}".*
 
     - name: "Upload the app as an artifact"
       uses: actions/upload-artifact@v4

@@ -41,6 +41,8 @@ storybook-static
 .vitest-attachments/
 tests/**/__screenshots__/
 
-# The desktop bundle: built output, and the fyai copied into it
+# The desktop bundle: built output, the fyai copied into it, and the
+# archives of a release run
 dist-app
 fyai-bundle
+fyai-app-*

@@ -24,3 +24,6 @@ client_secret_*.apps.googleusercontent.com.json
 /fyai
 .swp
 x/
+
+# A release run's downloads
+/assets/
