@@ -7,6 +7,8 @@
 	let value = $state('');
 	let caretOffset = $state(0);
 	const calls: string[] = [];
+	// Models that /model can name, as the store would hold them.
+	let knownModels: string[] = [];
 
 	const pickers = useChatFormPickers({
 		focusInput: () => {},
@@ -20,6 +22,11 @@
 		hasPrompts: () => true,
 		openModelSelector: () => {
 			calls.push('openModelSelector');
+		},
+		selectModel: (name) => {
+			calls.push(`selectModel:${name}`);
+
+			return knownModels.includes(name);
 		},
 		setCaretOffset: (o) => {
 			caretOffset = o;
@@ -43,6 +50,10 @@
 
 	export function getCalls() {
 		return calls;
+	}
+
+	export function setKnownModels(names: string[]) {
+		knownModels = names;
 	}
 
 	export function getPickers(): UseChatFormPickersReturn {

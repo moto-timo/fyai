@@ -25,6 +25,22 @@ conversation, and fyai stores the turn in the branch `sdk/<conversation-id>`.
 The session ID is the conversation ID of the page, so a turn only sends the
 new message and the conversation survives a bridge restart.
 
+## Choosing the model
+
+fyai serves every model of the project catalogue, so the bridge answers the
+page as a llama.cpp _router_: the picker at the composer lists the catalogue,
+and the model a conversation picks travels with each turn. fyai has no load
+step, so every model is reported as loaded.
+
+- The model of the project (`fyai --get model`) is the first row, and the one
+  a new conversation starts with.
+- `/model NAME` selects a model as well. Typed in full it is resolved by the
+  page; when the prompt reaches fyai instead (pick the command from the list,
+  or press Escape and then Enter), its output is shown as a message and the
+  page takes the model it names.
+- An answer records the model that produced it, so a conversation reopened
+  from history returns the picker to that model.
+
 ## Requirements
 
 - Node 20 or later.

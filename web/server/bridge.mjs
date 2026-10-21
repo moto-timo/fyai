@@ -15,7 +15,9 @@
  */
 
 import {
+	catalogueModelName,
 	fencedOutput,
+	findCatalogueModel,
 	parseSlashCommand,
 	providerKeyEnvName,
 	sessionIdFor,
@@ -336,6 +338,31 @@ let catalogue = { at: 0, models: [] };
 
 /* The provider of each model, as the catalogue resolves it. */
 const providers = new Map();
+/*
+ * fyai has no load step: any model of the catalogue answers a turn. The page
+ * asks for a llama.cpp router, where a model is loaded before it is used, so
+ * every model is reported as loaded and a load or unload only changes what
+ * this map says. The status feed then tells the page about the change.
+ */
+const modelStatus = new Map();
+const statusFeeds = new Set();
+
+function statusOf(name) {
+	return modelStatus.get(name) ?? 'loaded';
+}
+
+/** Tell every open /models/sse reader about a status change. */
+function announceModelStatus(name, status) {
+	for (const feed of statusFeeds) {
+		if (feed.closed) {
+			statusFeeds.delete(feed);
+
+			continue;
+		}
+
+		feed.send({ data: { status }, event: 'status_change', model: name });
+	}
+}
 
 /**
  * Runs one slash command on the session branch and returns its output. The
@@ -465,34 +492,51 @@ async function listModels(force = false) {
 		projectModel(),
 		runCapture(config.bin, ['catalog', 'list', '--output', 'json'], 20000)
 	]);
-	const models = [];
 
-	if (primary) {
-		models.push({ context_window: 0, max_output_tokens: 0, name: primary, primary: true });
-	}
+	let listed = [];
 
 	if (res.code === 0) {
 		try {
 			const parsed = JSON.parse(res.out);
 
-			if (Array.isArray(parsed)) {
-				for (const model of parsed) {
-					if (!model || typeof model.name !== 'string') continue;
-
-					if (model.name === primary) continue;
-
-					models.push({
-						context_window: Number(model.context_window) || 0,
-						max_output_tokens: Number(model.max_output_tokens) || 0,
-						name: model.name
-					});
-				}
-			}
+			if (Array.isArray(parsed)) listed = parsed;
 		} catch (error) {
 			log('cannot parse the catalogue:', error.message);
 		}
 	} else {
 		log('catalog list failed:', res.err.trim() || `status ${res.code}`);
+	}
+
+	const entries = listed
+		.filter((model) => model && typeof model.name === 'string')
+		.map((model) => ({
+			context_window: Number(model.context_window) || 0,
+			max_output_tokens: Number(model.max_output_tokens) || 0,
+			name: model.name
+		}));
+	/*
+	 * The model of the project comes first, and keeps the context window and
+	 * the output limit the catalogue reports for it; it is usually the same
+	 * entry under another spelling, which is then not listed twice. The name
+	 * stays the one fyai used, so a turn sends exactly the model of the
+	 * project and not another offering of the same name.
+	 */
+	const first = primary ? findCatalogueModel(entries, primary) : null;
+	const models = primary
+		? [
+				{
+					context_window: Number(first?.context_window) || 0,
+					max_output_tokens: Number(first?.max_output_tokens) || 0,
+					name: primary,
+					primary: true
+				}
+			]
+		: [];
+
+	for (const entry of entries) {
+		if (first && entry.name === first.name) continue;
+
+		models.push(entry);
 	}
 
 	catalogue = { at: Date.now(), models };
@@ -503,6 +547,7 @@ async function listModels(force = false) {
 function modelsPayload(models) {
 	return {
 		data: models.map((m) => ({
+			context_length: m.context_window,
 			created: 0,
 			id: m.name,
 			in_cache: true,
@@ -510,7 +555,7 @@ function modelsPayload(models) {
 			object: 'model',
 			owned_by: 'fyai',
 			path: '',
-			status: 'unloaded'
+			status: { args: [], value: statusOf(m.name) }
 		})),
 		models: models.map((m) => ({
 			capabilities: [],
@@ -522,13 +567,18 @@ function modelsPayload(models) {
 	};
 }
 
-function propsPayload() {
+/**
+ * The props of one model. The page asks for the model it is about to use, so
+ * the context window and the name are the ones of that model; the project
+ * model answers when no model is named.
+ */
+function propsPayload(requested = '') {
 	/*
 	 * The model of the project is the one the page starts with. A catalogue
 	 * entry for it supplies the context window when the catalogue knows the
 	 * same name.
 	 */
-	const model = catalogue.models.find((m) => m.primary)?.name ?? config.model;
+	const model = requested || (catalogue.models.find((m) => m.primary)?.name ?? config.model);
 	const known = catalogue.models.find((m) => m.name === model);
 
 	return {
@@ -583,6 +633,13 @@ function propsPayload() {
 		modalities: { audio: false, vision: false },
 		model_alias: model,
 		model_path: model || 'fyai',
+		/*
+		 * fyai serves many models and the page picks one per conversation, so
+		 * the bridge answers as a router: that is what opens the model picker
+		 * instead of the single-model manager, and what makes the page send the
+		 * chosen model with each turn.
+		 */
+		role: 'router',
 		total_slots: 1
 	};
 }
@@ -632,13 +689,32 @@ async function handleChat(req, res) {
 	if (command) {
 		const result = await runSlashCommand(sessionId, command, model, env);
 
-		stream.send({ sessionId, subtype: 'start', type: 'bridge' });
-		stream.send({
+		/*
+		 * With a name, `/model` changes the model of the session branch, which
+		 * the page would otherwise override with the model it has selected.
+		 * The name in the frame lets the page select the same one and keep
+		 * sending it; a name that the catalogue does not list cannot be shown
+		 * there, and the answer says what will happen to the next turn.
+		 */
+		if (result.ok && command.name === 'model' && command.rest.length > 0) {
+			const chosen = catalogueModelName(await listModels(), command.rest[0]);
+
+			if (chosen) result.model = chosen;
+			else
+				result.text = `${result.text}\n\nThe catalogue does not list '${command.rest[0]}', so the page cannot show this model. Its next turn names the model selected there.`;
+		}
+
+		const frame = {
 			ok: result.ok,
 			subtype: 'command',
 			text: fencedOutput(result),
 			type: 'bridge'
-		});
+		};
+
+		if (result.model) frame.model = result.model;
+
+		stream.send({ sessionId, subtype: 'start', type: 'bridge' });
+		stream.send(frame);
 		stream.send({ subtype: 'done', type: 'bridge' });
 		stream.end();
 
@@ -807,8 +883,44 @@ const server = createServer(async (req, res) => {
 			return;
 		}
 
+		/*
+		 * The status feed of the router protocol. fyai needs no load, but the
+		 * page follows the status of a model it unloaded or loaded, so the
+		 * feed stays open and the handlers below write to it.
+		 */
+		if (pathname === '/models/sse') {
+			const feed = new EventStream(req, res);
+
+			statusFeeds.add(feed);
+			res.on('close', () => statusFeeds.delete(feed));
+
+			return;
+		}
+
+		if ((pathname === '/models/load' || pathname === '/models/unload') && req.method === 'POST') {
+			let body = {};
+
+			try {
+				body = JSON.parse(await readBody(req));
+			} catch {
+				/* A request without a body names no model, and changes nothing. */
+			}
+
+			const name = typeof body.model === 'string' ? body.model : '';
+			const status = pathname === '/models/load' ? 'loaded' : 'unloaded';
+
+			if (name) {
+				modelStatus.set(name, status);
+				announceModelStatus(name, status);
+			}
+
+			sendJson(res, 200, { success: true });
+
+			return;
+		}
+
 		if (pathname === '/props') {
-			sendJson(res, 200, propsPayload());
+			sendJson(res, 200, propsPayload(url.searchParams.get('model') ?? ''));
 
 			return;
 		}

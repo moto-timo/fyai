@@ -164,6 +164,15 @@
 				.some((s) => s.enabled && prefs.isServerToolsEnabled(s.id) && s.url.trim());
 		},
 		openModelSelector: () => chatFormActionsRef?.openModelSelector(),
+		selectModel: (name) => {
+			const option = modelsStore.findModelByName(name);
+
+			if (!option) return false;
+
+			void modelsStore.selectModelById(option.id, { recordRecent: true });
+
+			return true;
+		},
 		setCaretOffset: (offset) => inputRef?.setCaretOffset(offset),
 		setValue: (v) => {
 			value = v;

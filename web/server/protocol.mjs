@@ -73,7 +73,12 @@ export function slashCommandArgs(sessionId, command, model, extraArgs = []) {
 
 	if (!entry) return null;
 
-	const setsModel = command.name === 'model' && command.rest.length > 0;
+	/*
+	 * `/model` reads or writes the model of the session branch, so it is never
+	 * told another one: with a name it stores that model, and without one it
+	 * reports the model the branch already has.
+	 */
+	const setsModel = command.name === 'model';
 	/* Global options come before the command, as fyai reads them there. */
 	const args = [...extraArgs, '--branch', `${SDK_BRANCH_PREFIX}${sessionId}`];
 
@@ -94,6 +99,67 @@ export function unknownCommandMessage(name) {
 	const names = [...SLASH_COMMANDS.keys()].map((command) => `/${command}`).join(', ');
 
 	return `unknown command /${name}; this page serves ${names}`;
+}
+
+/**
+ * A model name as it compares to another: the part after a provider prefix,
+ * lower-cased, without the punctuation that fyai and the catalogue spell
+ * differently (`claude-haiku-5-5` is `claude-haiku-5.5`). A `:tag` suffix is
+ * kept, so `gpt-oss-120b` and `gpt-oss-120b:batch` stay apart.
+ *
+ * @param {unknown} name
+ * @returns {string}
+ */
+function modelKey(name) {
+	const text = String(name ?? '')
+		.trim()
+		.toLowerCase();
+	const bare = text.slice(text.lastIndexOf('/') + 1);
+
+	return bare.replace(/[^a-z0-9:]/g, '');
+}
+
+/**
+ * The catalogue entry that a name refers to, or null. fyai names a model the
+ * way its provider does, and may put the provider in front of it
+ * (`anthropic/claude-haiku-5-5`), where the catalogue uses the name of the
+ * model (`claude-haiku-5.5`).
+ *
+ * @param {{ name: string }[]} models
+ * @param {unknown} name
+ * @returns {{ name: string } | null}
+ */
+export function findCatalogueModel(models, name) {
+	const wanted = String(name ?? '').trim();
+
+	if (!wanted) return null;
+
+	const exact = models.find((model) => model.name === wanted);
+
+	if (exact) return exact;
+
+	const bare = wanted.slice(wanted.lastIndexOf('/') + 1);
+	const listed = models.find((model) => model.name === bare);
+
+	if (listed) return listed;
+
+	const key = modelKey(wanted);
+
+	if (!key) return null;
+
+	return models.find((model) => modelKey(model.name) === key) ?? null;
+}
+
+/**
+ * The catalogue name of a model that a `/model` argument names, or '' when
+ * the catalogue has no such model.
+ *
+ * @param {{ name: string }[]} models
+ * @param {unknown} name
+ * @returns {string}
+ */
+export function catalogueModelName(models, name) {
+	return findCatalogueModel(models, name)?.name ?? '';
 }
 
 /**

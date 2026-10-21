@@ -30,6 +30,8 @@ export interface UseChatFormPickersOptions {
 	/** Mention search fallback scope. */
 	getServerHome: () => string | null;
 	openModelSelector: () => void;
+	/** Select a model by the name typed after `/model`, false when unknown. */
+	selectModel: (name: string) => boolean;
 	/** Delegate a keydown to the mounted pickers component, if any. */
 	getPickersRef: () => { handleKeydown(event: KeyboardEvent): boolean } | undefined;
 }
@@ -100,7 +102,12 @@ export function useChatFormPickers(opts: UseChatFormPickersOptions) {
 			case ChatFormCommandAction.MODEL:
 				isWorkingDirectoryPickerOpen = false;
 				opts.setValue('');
-				opts.openModelSelector();
+
+				/*
+				 * `/model claude-haiku-5.5` names the model it wants, so select
+				 * it at once. Without a name the selector opens, as before.
+				 */
+				if (!args.trim() || !opts.selectModel(args.trim())) opts.openModelSelector();
 
 				break;
 		}

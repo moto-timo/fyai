@@ -1389,11 +1389,25 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 						: undefined
 				);
 			},
+			/*
+			 * A command that selects a model must move the page's own
+			 * selection too: every turn names the selected model to fyai, so
+			 * a branch that /model changed would be overridden otherwise.
+			 */
+			onCommandModel: (model) => {
+				modelsStore.selectModelByName(model);
+				callbacks.onModel?.(model);
+			},
 			onError: (cause) => {
 				error = true;
 				callbacks.onError?.(cause);
 			},
-			onModel: (model) => callbacks.onModel?.(model),
+			/*
+			 * The frame names the model of the provider, which the catalogue
+			 * may spell another way. The model this turn asked for is the one
+			 * the page knows, so a later turn and the picker agree with it.
+			 */
+			onModel: (model) => callbacks.onModel?.(options.model ?? model),
 			onText: (text) => callbacks.onChunk?.(text),
 			onTimings: (value) => {
 				timings = value;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import {
+	catalogueModelName,
 	fencedOutput,
 	parseSlashCommand,
 	providerKeyEnvName,
@@ -76,6 +77,14 @@ describe('slashCommandArgs', () => {
 		]);
 	});
 
+	it('reports the model of the session when /model has no name', () => {
+		expect(slashCommandArgs('c1', { name: 'model', rest: [] }, 'other')).toEqual([
+			'--branch',
+			'sdk/c1',
+			'model'
+		]);
+	});
+
 	it('gives no arguments for a command that the page does not serve', () => {
 		expect(slashCommandArgs('c1', { name: 'nope', rest: [] }, '')).toBeNull();
 	});
@@ -101,6 +110,31 @@ describe('unknownCommandMessage', () => {
 });
 
 describe('providerKeyEnvName', () => {
+	it('finds the catalogue name that /model typed out', () => {
+		const models = [{ name: 'claude-haiku-5.5' }, { name: 'gpt-5.4' }];
+
+		expect(catalogueModelName(models, 'claude-haiku-5.5')).toBe('claude-haiku-5.5');
+		expect(catalogueModelName(models, 'GPT-5.4')).toBe('gpt-5.4');
+		/* fyai and the catalogue spell the same model with different punctuation */
+		expect(catalogueModelName(models, 'claude-haiku-5-5')).toBe('claude-haiku-5.5');
+		/* fyai may name the provider in front of the model */
+		expect(catalogueModelName(models, 'anthropic/claude-haiku-5-5')).toBe('claude-haiku-5.5');
+	});
+
+	it('gives no model for one the catalogue does not list', () => {
+		expect(catalogueModelName([{ name: 'gpt-5.4' }], 'haiku')).toBe('');
+		expect(catalogueModelName([{ name: 'gpt-5.4' }], '')).toBe('');
+	});
+
+	it('keeps a tag apart from the model it tags', () => {
+		const models = [{ name: 'gpt-oss-120b' }, { name: 'gpt-oss-120b:batch' }];
+
+		expect(catalogueModelName(models, 'gpt-oss-120b')).toBe('gpt-oss-120b');
+		expect(catalogueModelName(models, 'gpt-oss-120b:batch')).toBe('gpt-oss-120b:batch');
+		/* The tag is not punctuation to drop: it names an offering of its own. */
+		expect(catalogueModelName([{ name: 'gpt-oss-120b:batch' }], 'gpt-oss-120b')).toBe('');
+	});
+
 	it('names the variable of a provider', () => {
 		expect(providerKeyEnvName('anthropic')).toBe('ANTHROPIC_API_KEY');
 		expect(providerKeyEnvName('openai')).toBe('OPENAI_API_KEY');

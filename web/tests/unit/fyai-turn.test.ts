@@ -47,6 +47,7 @@ function collector() {
 	const toolResults: Array<{ id: string; text: string }> = [];
 	const texts: string[] = [];
 	const errors: Error[] = [];
+	const commandModels: string[] = [];
 	const models: string[] = [];
 	const timings: Array<{ predicted_n: number; prompt_n: number }> = [];
 
@@ -54,6 +55,7 @@ function collector() {
 	let done = 0;
 
 	return {
+		commandModels,
 		counts: () => ({ created, done }),
 		errors,
 		messages,
@@ -69,6 +71,7 @@ function collector() {
 				done++;
 				messages.push(message);
 			},
+			onCommandModel: (model: string) => commandModels.push(model),
 			onError: (error: Error) => errors.push(error),
 			onModel: (model: string) => models.push(model),
 			onText: (text: string) => texts.push(text),
@@ -170,6 +173,24 @@ describe('FyaiTurnAssembler', () => {
 		await assembler.settled();
 
 		expect(c.messages).toEqual([{ content: '```text\nrows\n```', toolCalls: [] }]);
+		expect(c.commandModels).toEqual([]);
+	});
+
+	it('reports the model that /model selected', async () => {
+		const c = collector();
+		const assembler = new FyaiTurnAssembler(c.sink);
+
+		assembler.push({
+			model: 'small-model',
+			ok: true,
+			subtype: 'command',
+			text: '```text\nmodel: small-model\n```',
+			type: 'bridge'
+		});
+
+		await assembler.settled();
+
+		expect(c.commandModels).toEqual(['small-model']);
 	});
 
 	it('reports an error frame of the bridge', async () => {

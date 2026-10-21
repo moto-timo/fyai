@@ -38,6 +38,8 @@ export interface TurnSink {
 	createToolResult?: (toolUseId: string, text: string) => Promise<unknown> | unknown;
 	onError?: (error: Error) => void;
 	onModel?: (model: string) => void;
+	/** `/model NAME` succeeded: the session now uses this model. */
+	onCommandModel?: (model: string) => void;
 	onText?: (text: string) => void;
 	/** The open assistant message is complete. */
 	messageDone: (message: TurnMessage) => Promise<unknown> | unknown;
@@ -191,6 +193,8 @@ export class FyaiTurnAssembler {
 		/* A slash command answers with its output, not with a turn. */
 		if (frame.subtype === 'command' && typeof frame.text === 'string') {
 			const text = frame.text;
+
+			if (typeof frame.model === 'string' && frame.model) this.sink.onCommandModel?.(frame.model);
 
 			this.enqueue(async () => {
 				await this.beginSegment();
