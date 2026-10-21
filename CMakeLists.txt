@@ -100,6 +100,18 @@ if(FYAI_HAVE_WERROR_STACK_ADDR)
     list(APPEND FYAI_C_WARNINGS -Werror=return-stack-address)
 endif()
 
+# A boolean must be a _Bool in every translation unit, or libfyaml encodes a
+# request field as an integer (src/fyai_bool.h carries the detail). Force the
+# header so that no source file can miss it.
+check_c_compiler_flag("-include ${CMAKE_CURRENT_SOURCE_DIR}/src/fyai_bool.h"
+    FYAI_HAVE_FORCE_INCLUDE)
+if(FYAI_HAVE_FORCE_INCLUDE)
+    add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/src/fyai_bool.h)
+else()
+    message(WARNING "cannot force-include src/fyai_bool.h: a libc whose "
+        "<stdbool.h> makes true an int will send integer request fields")
+endif()
+
 set(WITH_LIBFYAML "" CACHE PATH "Path to a libfyaml checkout build directory")
 option(FYAI_WITH_LIBFYAML_TAGS "Include fetched libfyaml sources in fyai tags" ON)
 
