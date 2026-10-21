@@ -27,10 +27,12 @@
 		"test:ui": "vitest --project=ui",
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build",
-		"cleanup": "rm -rf .svelte-kit build node_modules test-results dist dev-dist debug-storybook.log static/pwa-*.png static/maskable-icon-*.png static/apple-touch-icon-*.png static/apple-splash-*.png static/favicon*.ico"
+		"cleanup": "rm -rf .svelte-kit build node_modules test-results dist dev-dist debug-storybook.log static/pwa-*.png static/maskable-icon-*.png static/apple-touch-icon-*.png static/apple-splash-*.png static/favicon*.ico",
+		"electron": "electron ."
 	},
 	"devDependencies": {
 		"@chromatic-com/storybook": "5.2.1",
+		"@electron/packager": "^18.4.4",
 		"@eslint/compat": "1.4.1",
 		"@eslint/js": "9.39.2",
 		"@internationalized/date": "3.12.2",
@@ -59,6 +61,7 @@
 		"clsx": "2.1.1",
 		"dexie": "4.4.3",
 		"dompurify": "3.4.13",
+		"electron": "^41.0.0",
 		"eslint": "9.39.4",
 		"eslint-config-prettier": "10.1.8",
 		"eslint-plugin-perfectionist": "^5.10.1",
@@ -112,5 +115,6 @@
 		"cookie": "1.1.1",
 		"sharp": "0.35.3",
 		"valibot": "1.4.2"
-	}
+	},
+	"main": "electron/main.cjs"
 }
