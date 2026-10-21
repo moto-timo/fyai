@@ -311,6 +311,7 @@ endif()
 option(ENABLE_ASAN "Enable ASAN support" OFF)
 option(BUILD_TESTING "Build tests" ON)
 option(ENABLE_LIBSECRET "Store credentials in the Linux Secret Service" OFF)
+option(FYAI_WEB "Build the web page with the rest" OFF)
 
 set(FYAI_PROGRAMS fyai)
 
@@ -936,6 +937,9 @@ install(FILES
 # tags and cscope support
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/tags.cmake)
 
+# The web page and the desktop app: targets only, unless FYAI_WEB is ON
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/web.cmake)
+
 # Show configuration info
 message(STATUS "fyai configuration:")
 message(STATUS "VERSION:               ${PROJECT_VERSION}")
@@ -951,3 +955,4 @@ message(STATUS "FYAI_MOSTLY_STATIC:    ${FYAI_MOSTLY_STATIC}")
 message(STATUS "ENABLE_LIBSECRET:      ${ENABLE_LIBSECRET}")
 message(STATUS "FYAI_STATIC:           ${FYAI_STATIC}")
 message(STATUS "FYAI_MUSL_STATIC:      ${FYAI_MUSL_STATIC}")
+message(STATUS "FYAI_WEB:              ${FYAI_WEB}")
