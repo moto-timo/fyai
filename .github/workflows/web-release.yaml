@@ -54,6 +54,10 @@ jobs:
 
     env:
       TAG: ${{ inputs.tag || (startsWith(github.event.workflow_run.head_branch, 'v') && github.event.workflow_run.head_branch || 'nightly') }}
+      # The single-chunk page build peaks at about 3 GB of RSS; Node's
+      # default heap on a 7 GB macOS runner is 2 GB, so vite is killed by
+      # the V8 heap limit there unless it is raised.
+      NODE_OPTIONS: --max-old-space-size=4096
 
     steps:
     - name: "Checkout"
@@ -96,7 +100,7 @@ jobs:
         mkdir -p ../assets/extract
         tar -C ../assets/extract -xzf "../assets/fyai-${{ matrix.platform }}.tar.gz"
         bash scripts/bundle-fyai.sh \
-          --from "../assets/extract/fyai-${{ matrix.platform }}/fyai"
+          --from "../assets/extract/fyai-${{ matrix.platform }}"
         bash scripts/bundle-fyai.sh --check
 
     - name: "Package the app"
