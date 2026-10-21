@@ -4,28 +4,35 @@
 # Build the desktop app: the built page, the bridge, and a static fyai when
 # one is bundled, in dist-app/.
 #
-#   scripts/package.sh                 # dist-app/fyai-linux-x64/fyai
-#   scripts/package.sh --bundle-fyai   # build the static fyai first
+#   scripts/package.sh                 # dist-app/fyai-<os>-<arch>/
+#   scripts/package.sh --bundle-fyai   # build the fyai it carries first
 #   scripts/package.sh --arch arm64
 #
-# Without a bundled fyai the app uses FYAI_BIN, the project build beside the
-# page, or fyai on PATH, so a development machine needs nothing here.
+# The platform is the one the script runs on, or --platform. Without a
+# bundled fyai the app uses FYAI_BIN, the project build beside the page, or
+# fyai on PATH, so a development machine needs nothing here.
 set -eu
 
 cd "$(dirname "$0")/.."
 
 ARCH="x64"
+PLATFORM=""
 BUNDLE=0
+
+case "$(uname -s)" in
+Darwin) PLATFORM="darwin"; ARCH="$(uname -m | sed 's/x86_64/x64/')" ;;
+Linux) PLATFORM="linux" ;;
+esac
 
 usage() {
 	cat <<'EOF'
 Build the fyai desktop app.
 
-  scripts/package.sh                 dist-app/fyai-linux-x64/fyai
-  scripts/package.sh --bundle-fyai   build the static fyai first
-  scripts/package.sh --arch arm64    another architecture
+  scripts/package.sh                   dist-app/fyai-<os>-<arch>/
+  scripts/package.sh --bundle-fyai     build the fyai it carries first
+  scripts/package.sh --arch arm64      another architecture
 
-Options: --arch ARCH, --bundle-fyai, -h.
+Options: --arch ARCH, --platform linux|darwin, --bundle-fyai, -h.
 EOF
 	exit "${1:-0}"
 }
@@ -38,6 +45,14 @@ while [ $# -gt 0 ]; do
 			exit 1
 		fi
 		ARCH="$2"
+		shift 2
+		;;
+	--platform)
+		if [ $# -lt 2 ] || [ -z "$2" ]; then
+			echo "package.sh: --platform needs linux or darwin" >&2
+			exit 1
+		fi
+		PLATFORM="$2"
 		shift 2
 		;;
 	--bundle-fyai) BUNDLE=1; shift ;;
@@ -67,10 +82,10 @@ else
 	echo "package.sh: no fyai-bundle/fyai; the app finds fyai on the machine"
 fi
 
-rm -rf "dist-app/fyai-linux-$ARCH"
+rm -rf "dist-app/fyai-$PLATFORM-$ARCH"
 
 npx @electron/packager . fyai \
-	--platform=linux \
+	--platform="$PLATFORM" \
 	--arch="$ARCH" \
 	--electron-version="$(node -p "require('electron/package.json').version")" \
 	--out=dist-app \
@@ -79,10 +94,16 @@ npx @electron/packager . fyai \
 	--ignore="^/(dist-app|fyai-bundle|node_modules|src|static|scripts|tests)(/|$)" \
 	"${EXTRA[@]+"${EXTRA[@]}"}"
 
-APP="dist-app/fyai-linux-$ARCH"
-chmod 755 "$APP/fyai"
+APP="dist-app/fyai-$PLATFORM-$ARCH"
 
-echo "package.sh: $APP/fyai"
+if [ "$PLATFORM" = darwin ]; then
+	APP="$APP/fyai.app"
+fi
+if [ "$PLATFORM" = linux ]; then
+	chmod 755 "$APP/fyai"
+fi
+
+echo "package.sh: $APP"
 if [ -x "$APP/resources/fyai" ]; then
 	echo "package.sh: bundled fyai $(du -h "$APP/resources/fyai" | cut -f1)"
 	file "$APP/resources/fyai" | sed 's/^/package.sh: /'

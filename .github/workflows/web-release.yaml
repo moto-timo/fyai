@@ -1,0 +1,130 @@
+# A desktop app for Linux and macOS, built from the page and a released fyai.
+#
+# This runs after "Release (mostly-static)" publishes a tag, and takes the
+# fyai binary of each platform from that release's assets, so the app carries
+# the same fyai as the tarballs. It attaches the app to the same release.
+#
+# A manual run names the tag to build and to attach to.
+#
+# A macOS app that is not signed and notarized opens only after the user
+# removes the quarantine mark (System Settings, "Open Anyway"). Signing needs
+# an Apple Developer ID and these repository secrets:
+#   APPLE_CERTIFICATE           base64 of the .p12
+#   APPLE_CERTIFICATE_PASSWORD  its password
+#   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD   notarization
+
+name: Web release (desktop app)
+
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && format('Web release · {0}', inputs.tag) ||
+      format('Web release · {0}', github.event.workflow_run.head_branch) }}
+
+on:
+  workflow_run:
+    workflows: ["Release (mostly-static)"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: the release tag to build the app for and attach it to
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  app:
+    name: app - ${{ matrix.os }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            asset: fyai-app-linux-x86_64
+          - os: macos-latest
+            platform: macos-arm64
+            asset: fyai-app-macos-arm64
+
+    env:
+      TAG: ${{ inputs.tag || (startsWith(github.event.workflow_run.head_branch, 'v') && github.event.workflow_run.head_branch || 'nightly') }}
+
+    steps:
+    - name: "Checkout"
+      uses: actions/checkout@v4
+
+    - name: "Setup node"
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: "Wait for the fyai release assets"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        for i in $(seq 60); do
+          if gh release download "$TAG" --pattern '${{ matrix.asset }}*' \
+               --pattern 'fyai-${{ matrix.platform }}.tar.gz' --dir assets 2>/dev/null; then
+            break
+          fi
+          echo "waiting for the assets of $TAG"
+          sleep 20
+        done
+        ls -l assets
+
+    - name: "Install the page's dependencies"
+      working-directory: web
+      run: npm ci
+
+    - name: "Build the page"
+      working-directory: web
+      run: npm run build
+
+    - name: "Bundle fyai"
+      working-directory: web
+      run: |
+        tar -C assets -xzf "assets/fyai-${{ matrix.platform }}.tar.gz"
+        bash scripts/bundle-fyai.sh --from "assets/fyai-${{ matrix.platform }}/fyai"
+        bash scripts/bundle-fyai.sh --check
+
+    - name: "Package the app"
+      working-directory: web
+      run: |
+        if [ "${{ runner.os }}" = "Linux" ]; then
+          bash scripts/package.sh
+        else
+          bash scripts/package.sh --arch arm64
+        fi
+
+    - name: "Archive the app (Linux)"
+      if: runner.os == 'Linux'
+      working-directory: web
+      run: |
+        tar -C "dist-app/fyai-linux-x64" -czf "${{ matrix.asset }}.tar.gz" .
+
+    - name: "Archive the app (macOS)"
+      if: runner.os == 'macOS'
+      working-directory: web
+      run: |
+        APP="dist-app/fyai-darwin-arm64/fyai.app"
+        ditto -c -k --sequesterRsrc --keepParent "$APP" "${{ matrix.asset }}.zip"
+
+    - name: "Upload the app as an artifact"
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset }}
+        path: web/${{ matrix.asset }}.*
+
+    - name: "Attach the app to the release"
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.TAG }}
+        name: ${{ env.TAG == 'nightly' && 'Nightly build' || env.TAG }}
+        prerelease: ${{ env.TAG == 'nightly' }}
+        files: web/${{ matrix.asset }}.*
