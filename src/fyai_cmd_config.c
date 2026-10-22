@@ -1027,7 +1027,7 @@ int fyai_cmd_session_status(struct fyai_cmd_call *call, fy_generic *result)
 	const char *note = NULL;
 	bool want_view = preset_view_session(ctx), stored_on, running_on, view_on, restricted;
 
-	restricted = fy_is_valid(net) && (!cfg->sandbox_lockdown || fyai_sandbox_net_restrictable(-1));
+	restricted = fy_is_valid(net) && (!cfg->sandbox_profile || fyai_sandbox_net_restrictable(-1));
 	/* A key that is stored and not yet in force waits for the next start. */
 	stored_on = strcmp(stored, "none") != 0;
 	running_on = strcmp(running, "none") != 0;
@@ -1039,8 +1039,9 @@ int fyai_cmd_session_status(struct fyai_cmd_call *call, fy_generic *result)
 	*result = fy_mapping(call->gb,
 			     "transport", running_on ? running : "off",
 			     "sandbox", !cfg->enable_sandbox ? "off" :
-					cfg->sandbox_lockdown ? (restricted ? "on, lockdown, network restricted" :
-								 "on, lockdown") :
+					cfg->sandbox_profile ?
+						fy_sprintfa("on, %s%s", cfg->sandbox_profile,
+							    restricted ? ", network restricted" : "") :
 					restricted ? "on, network restricted" : "on",
 			     "agents", preset_agents(ctx, view_on),
 			     "view", name ? name : "none");

@@ -214,21 +214,80 @@ builtin_shell: false
 # `fyai sandbox on` stores this policy:
 # sandbox: { enabled: true, deny: [secrets, ~/.ssh], network: { tcp: { ports: [443], bind_ports: [] }, udp: { ports: [], bind_ports: [] } } }
 sandbox: false
-# The profile that confines shell executions: normal uses `sandbox` above, and
-# lockdown uses `sandbox_lockdown` and enables the sandbox. `/session lockdown`
-# selects lockdown and `/session yolo` selects normal.
-sandbox_profile: normal
-# The lockdown profile takes deny, allow and network as `sandbox` does.
-# A key that it omits keeps this default:
+# The profile that confines shell executions: `normal` uses `sandbox` above; any
+# other name is a profile of `sandbox_profiles` below. A profile enables the
+# sandbox whatever `sandbox` says. `/session profile NAME` selects one and
+# restarts the session; `/session dev`, `/session lockdown` and `/session yolo`
+# select `dev`, `lockdown` and `normal` and set the other isolation keys too.
+sandbox_profile: dev
+# The profiles. This sample is the source of `dev` and `lockdown`: an arena that
+# has none of them uses these, and one that stores them uses its own. A profile
+# has a description, `extends` (the profile it starts from), `deny`, `allow`,
+# `network` and `view` (the session runs in a view of the project). A key that a
+# profile names replaces the key of the profile it extends, except `allow`, which
+# adds to it. A path may use {{hostname}}, {{os}}, {{arch}} and {{host_specific}}
+# (~/.fyai/hosts/{{hostname}}), so one profile serves hosts that differ.
+sandbox_profiles:
+  lockdown:
+    description: the project and nothing else; no network; the session runs in a view
+    view: true
+    deny: [~/.ssh]       # The secret locations of the platform.
+    allow: []
+    network:
+      tcp: { ports: [], bind_ports: [] }  # No TCP connects or binds.
+      udp: { ports: [], bind_ports: [] }  # No UDP sends or binds on ABI 10.
+  dev:
+    description: project work with toolchains, and TCP to git and package registries
+    view: false
+    deny:
+      - ~/.ssh
+      - ~/.aws
+      - ~/.gnupg
+      - ~/.netrc
+      - ~/.config/gh
+      - ~/.docker
+      - ~/.kube
+      - ~/.npmrc
+      - ~/.cargo/credentials.toml
+    allow:               # The toolchains and package caches, and the git configuration.
+      - { path: ~/.cargo/bin, mode: ro }
+      - { path: ~/.rustup, mode: ro }
+      - { path: ~/.cargo/registry, mode: rw }
+      - { path: ~/.cargo/git, mode: rw }
+      - { path: ~/.nvm, mode: ro }
+      - { path: ~/.npm, mode: rw }
+      - { path: ~/.local/share/pnpm, mode: rw }
+      - { path: ~/.cache/yarn, mode: rw }
+      - { path: ~/.cache/pip, mode: rw }
+      - { path: ~/.cache/ccache, mode: rw }
+      - { path: ~/.cache/go-build, mode: rw }
+      - { path: ~/go/pkg, mode: rw }
+      - { path: ~/go/bin, mode: ro }
+      - { path: ~/.gitconfig, mode: ro }
+      - { path: ~/.config/git, mode: ro }
+    network:
+      tcp: { ports: [80, 443, 9418] }     # git and the package registries.
+      udp: { ports: [53] }                # DNS on ABI 10.
+  # Add a profile of your own, starting from another:
+  # node:
+  #   description: a Node project
+  #   extends: dev
+  #   allow:
+  #     - { path: "{{host_specific}}/tools", mode: ro }
+  #   network:
+  #     tcp: { ports: [80, 443, 3000] }   # git, registries and a dev server.
+  #   view: true
+# `sandbox_lockdown` is the legacy way to change lockdown, applied over the
+# profile of that name:
 # sandbox_lockdown:
-#   deny: [~/.ssh]        # The secret locations of the platform.
+#   deny: [~/.ssh]
 #   network:
 #     tcp:
-#       ports: []       # No TCP connects.
-#       bind_ports: []  # No TCP binds.
+#       ports: []
+#       bind_ports: []
 #     udp:
-#       ports: []       # No UDP sends on ABI 10.
-#       bind_ports: []  # No UDP binds on ABI 10.
+#       ports: []
+#       bind_ports: []
 
 logprobs: false
 top_logprobs: -1

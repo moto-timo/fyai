@@ -21,6 +21,7 @@
 
 #include "fyai.h"
 #include "fyai_cmd.h"
+#include "fyai_sandbox_profile.h"
 #include "fyai_skill.h"
 #include "fyai_cmd_int.h"
 #include "fyai_branch.h"
@@ -606,6 +607,18 @@ static void kind_page_layout(struct complete_req *r)
 				     page_layout_cand, r);
 }
 
+static void sandbox_profile_cand(void *arg, const char *name, const char *desc)
+{
+	cand(arg, name, desc);
+}
+
+static void kind_sandbox_profile(struct complete_req *r)
+{
+	if (r->ctx)
+		fyai_sandbox_profile_names(r->ctx->cfg, r->ctx->cfg->config_doc,
+					   sandbox_profile_cand, r);
+}
+
 static void help_topic_cand(void *arg, const char *value, const char *desc)
 {
 	cand(arg, value, desc);
@@ -641,6 +654,7 @@ static const struct {
 	{ "setting-value",	kind_setting_value },
 	{ "page-layout",	kind_page_layout },
 	{ "skill",		kind_skill },
+	{ "sandbox-profile",	kind_sandbox_profile },
 };
 
 bool fyai_cmd_kind_known(const char *name)

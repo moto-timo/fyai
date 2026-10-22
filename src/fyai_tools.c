@@ -909,7 +909,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	tcp = fy_get(net, "tcp");
 	udp = fy_get(net, "udp");
 	if (fy_is_valid(tcp) && !fyai_sandbox_net_restrictable(-1) &&
-	    ctx->cfg->sandbox_lockdown) {
+	    ctx->cfg->sandbox_profile) {
 		/* The parent reported it when it applied the configuration. */
 		tcp = fy_invalid;
 	}

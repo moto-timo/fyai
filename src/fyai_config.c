@@ -35,6 +35,7 @@
 #include "fyai_branch.h"
 #include "fyai_config.h"
 #include "fyai_sandbox.h"
+#include "fyai_sandbox_profile.h"
 #include "fyai_provider.h"
 #include "fyai_event.h"
 #include "fyai_schema.h"
@@ -372,46 +373,11 @@ static int resolve_secret(struct fyai_cfg *cfg, const char **out, fy_generic v)
 	return 0;
 }
 
-/*
- * The policy of the lockdown profile: the keys of sandbox_lockdown over the
- * default, which denies the secret locations of the platform and supported
- * TCP and UDP operations. The result lives in the builder of the configuration.
- */
-static fy_generic sandbox_lockdown_policy(struct fyai_cfg *cfg, fy_generic root)
-{
-	fy_generic set = fy_get(root, "sandbox_lockdown", fy_invalid);
-	fy_generic deny = fy_get(set, "deny", fy_invalid);
-	fy_generic allow = fy_get(set, "allow", fy_invalid);
-	fy_generic net = fy_get(set, "network", fy_invalid);
-	fy_generic tcp, udp;
-
-	if (!fy_is_sequence(deny))
-		deny = fy_sequence(cfg->gb, "~/.ssh");
-	if (!fy_is_mapping(net))
-		net = fy_mapping(cfg->gb);
-	tcp = fy_get(net, "tcp", fy_invalid);
-	udp = fy_get(net, "udp", fy_invalid);
-	if (!fy_is_mapping(tcp))
-		tcp = fy_mapping(cfg->gb);
-	if (!fy_is_mapping(udp))
-		udp = fy_mapping(cfg->gb);
-	tcp = fy_mapping(cfg->gb,
-			 "ports", fy_get(tcp, "ports", fy_sequence(cfg->gb)),
-			 "bind_ports", fy_get(tcp, "bind_ports", fy_sequence(cfg->gb)));
-	udp = fy_mapping(cfg->gb,
-			 "ports", fy_get(udp, "ports", fy_sequence(cfg->gb)),
-			 "bind_ports", fy_get(udp, "bind_ports", fy_sequence(cfg->gb)));
-	net = fy_mapping(cfg->gb, "tcp", tcp, "udp", udp);
-	if (!fy_is_sequence(allow))
-		allow = fy_sequence(cfg->gb);
-	return fy_mapping(cfg->gb, "enabled", true, "deny", deny, "allow", allow,
-			  "network", net);
-}
-
 void fyai_config_sandbox_lockdown(struct fyai_cfg *cfg)
 {
-	cfg->sandbox_lockdown = true;
-	cfg->sandbox = sandbox_lockdown_policy(cfg, cfg->config_doc);
+	cfg->sandbox_profile = "lockdown";
+	cfg->sandbox = fyai_sandbox_profile_policy(cfg, cfg->config_doc,
+						   "lockdown");
 	cfg->enable_sandbox = true;
 }
 
@@ -580,13 +546,18 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 	/* sandbox is either a bool (enable with defaults) or a mapping
 	 * { enabled, allow, deny, network }. A mapping enables unless it says
 	 * otherwise and is retained for the tool path to read grants from. The
-	 * lockdown profile replaces it and is always enabled. */
+	 * dev and lockdown profiles replace it and are always enabled. */
 	v = fy_get(root, "sandbox_profile", fy_invalid);
-	if (fy_is_string(v))
-		cfg->sandbox_lockdown = fy_equal(v, "lockdown");
+	cfg->sandbox_profile = fy_gb_intern_string(cfg->gb,
+			fy_is_string(v) ? fy_castp(&v, "") : FYAI_SANDBOX_PROFILE_DEFAULT);
+	if (!strcmp(cfg->sandbox_profile, FYAI_SANDBOX_PROFILE_NORMAL))
+		cfg->sandbox_profile = NULL;
 	sb = fy_get(root, "sandbox");
-	if (cfg->sandbox_lockdown) {
-		cfg->sandbox = sandbox_lockdown_policy(cfg, root);
+	if (cfg->sandbox_profile) {
+		cfg->sandbox = fyai_sandbox_profile_policy(cfg, root,
+							   cfg->sandbox_profile);
+		if (fy_is_invalid(cfg->sandbox))
+			return -1;
 		cfg->enable_sandbox = true;
 	} else if (fy_is_mapping(sb)) {
 		cfg->sandbox = sb;
@@ -2598,7 +2569,7 @@ void fyai_config_sandbox_report(struct fyai_cfg *cfg)
 
 	if (cfg->tool_child || cfg->agent_child)
 		return;
-	key = cfg->sandbox_lockdown ? "lockdown" : cfg->enable_sandbox ? "sandbox" : NULL;
+	key = cfg->sandbox_profile ? cfg->sandbox_profile : cfg->enable_sandbox ? "sandbox" : NULL;
 	if (!key || !fy_is_mapping(cfg->sandbox)) {
 		cfg->sandbox_reported = NULL;
 		return;
@@ -2609,7 +2580,7 @@ void fyai_config_sandbox_report(struct fyai_cfg *cfg)
 	net = fy_get(cfg->sandbox, "network", fy_invalid);
 	tcp = fy_get(net, "tcp", fy_invalid);
 	udp = fy_get(net, "udp", fy_invalid);
-	if (cfg->sandbox_lockdown && fy_is_valid(tcp) && !fyai_sandbox_net_restrictable(-1))
+	if (cfg->sandbox_profile && fy_is_valid(tcp) && !fyai_sandbox_net_restrictable(-1))
 		fyai_cfg_warning(cfg, "sandbox '%s': TCP egress remains open; Landlock ABI 4 "
 				 "is unavailable", key);
 	if (fy_is_valid(udp) && !fyai_sandbox_udp_restrictable(-1))

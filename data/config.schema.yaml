@@ -732,19 +732,110 @@ properties:
                       maximum: 65535
   sandbox_profile:
     x-fyai-model: read
+    x-fyai-complete: sandbox-profile
     type: string
-    enum: [normal, lockdown]
-    default: normal
+    default: dev
     description: >-
-      Select the sandbox policy that confines shell-tool executions. `normal`
-      uses `sandbox`. `lockdown` uses `sandbox_lockdown` and enables the sandbox
-      whatever `sandbox` says. `/session lockdown` selects `lockdown` and
-      `/session yolo` selects `normal`.
+      Name the sandbox profile that confines shell-tool executions: `normal`,
+      which uses `sandbox`, or a profile of `sandbox_profiles`, built-in or
+      your own. `dev` is the default: the project, the toolchains and package
+      caches, and TCP to git and the registries. `lockdown` is the project and
+      no network. A profile other than `normal` enables the sandbox whatever
+      `sandbox` says. `/session profile NAME` selects one; `/session dev`,
+      `/session lockdown` and `/session yolo` select `dev`, `lockdown` and
+      `normal`. A name that no profile has is an error.
+  sandbox_profiles:
+    x-fyai-model: read
+    type: object
+    description: >-
+      Define sandbox profiles by name. `dev` and `lockdown` are in
+      config.yaml.sample, which an arena starts from; one that stores none of
+      them uses those of the sample. A profile starts from nothing, or from the
+      profile that `extends` names. A key that it names replaces the key of that
+      profile, except `allow`, which adds to it. A path may
+      use `{{hostname}}`, `{{os}}`, `{{arch}}` and `{{host_specific}}`, the
+      directory `~/.fyai/hosts/{{hostname}}`, so one profile serves each host.
+    additionalProperties:
+      type: object
+      properties:
+        description:
+          type: string
+          description: Say what the profile is for; `/session profile` lists it.
+        extends:
+          type: string
+          description: Name the profile that this one starts from.
+        view:
+          type: boolean
+          description: >-
+            Run the session in a view of the project, where this host can make
+            one. `/session profile` puts the session in a view or takes it out
+            of one to match, and the changes of a view go into the project
+            first, when none conflicts.
+        deny:
+          type: array
+          description: >-
+            Deny access to the specified paths. Paths can be project-relative,
+            absolute, or home-relative. The .fyai arena is always denied. A path
+            that does not exist is left out.
+          items:
+            type: string
+        allow:
+          type: array
+          description: Grant access to paths outside the project, in addition to those below.
+          items:
+            anyOf:
+              - type: string
+                description: Grant read and write access to this path.
+              - type: object
+                required: [path]
+                properties:
+                  path:
+                    type: string
+                    description: Name the path for this sandbox grant.
+                  mode:
+                    type: string
+                    enum: [rw, ro, edit, append]
+                    description: >-
+                      Select the access mode for this path. rw is the default;
+                      ro allows read and execute; edit modifies existing files
+                      without create or delete; append writes without truncation.
+        network:
+          type: object
+          description: >-
+            Restrict TCP connects and UDP sends independently. A protocol that
+            no profile below names stays unrestricted. TCP needs Landlock ABI 4;
+            UDP needs ABI 10.
+          properties:
+            tcp:
+              type: object
+              description: Restrict TCP to listed destination and bind ports.
+              properties:
+                ports:
+                  type: array
+                  description: Allowed TCP destination ports; empty denies TCP connects.
+                  items: {type: integer, minimum: 1, maximum: 65535}
+                bind_ports:
+                  type: array
+                  description: Allowed local TCP bind ports; empty denies binds. Omit to leave binds open.
+                  items: {type: integer, minimum: 1, maximum: 65535}
+            udp:
+              type: object
+              description: Restrict UDP to listed destination and bind ports.
+              properties:
+                ports:
+                  type: array
+                  description: Allowed UDP destination ports; empty denies UDP sends.
+                  items: {type: integer, minimum: 1, maximum: 65535}
+                bind_ports:
+                  type: array
+                  description: Allowed local UDP bind ports.
+                  items: {type: integer, minimum: 1, maximum: 65535}
   sandbox_lockdown:
     x-fyai-model: read
     type: object
     description: >-
-      Set the sandbox policy of the `lockdown` profile, apart from `sandbox`.
+      Legacy: the same as `sandbox_profiles: {lockdown: ...}`, which is
+      preferred. Set the sandbox policy of the `lockdown` profile, apart from `sandbox`.
       It is always enabled. A key that this mapping omits keeps its default: the
       secret locations of the platform are denied and available Landlock
       network rights are restricted.
