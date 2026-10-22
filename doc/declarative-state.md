@@ -216,7 +216,7 @@ answer a question that fyai puts to the user.
 
 | Class | Effect of a change by the model | Keys |
 |---|---|---|
-| Escalation | removes confinement | `sandbox`, `sandbox_profile`, `sandbox_lockdown`, `agent/isolation`, `agent/transport_isolation`, `agent/spawn`, `view/isolate_session`, `view/scratch_dir` |
+| Escalation | removes confinement | `sandbox`, `sandbox_profile`, `sandbox_profiles`, `sandbox_lockdown`, `agent/isolation`, `agent/transport_isolation`, `agent/spawn`, `view/isolate_session`, `view/scratch_dir` |
 | Execution | runs a program the model names | `shell/shell`, `shell/login`, `catalog_update/command`, `mcp/servers`, `mcp/endpoint`, `display/page` (a file the model wrote) |
 | Exfiltration | sends credentials or the conversation to another place | `api_url`, `api_key`, `auth`, `no_auth`, `mcp/auth_token`, the OAuth client secrets of `mcp/servers`, `catalog_update/credentials`, `whitewash_api_keys`, `logging/*` |
 | Ceiling | removes a limit on the model | `shell/max_timeout_ms`, `shell/hard_max_output_tokens`, `read/hard_max_bytes`, `agent/max_timeout_ms`, `agent/hang_timeout_ms`, `agent/timeout_kill`, `agent/max_live_agents`, `agent/max_branch_depth`, `max_tool_iterations` |
@@ -291,7 +291,7 @@ under it, except the rows below it that name a deeper key.
 | `agent/max_timeout_ms`, `agent/hang_timeout_ms`, `agent/timeout_kill`, `agent/max_branch_depth`, `agent/max_live_agents` | read | ceiling |
 | `agent/isolation`, `agent/spawn`, `agent/transport_isolation` | read | escalation |
 | `agent/personas` | review | persistence; a persona names a model and a list of tools |
-| `sandbox`, `sandbox_profile`, `sandbox_lockdown` | read | escalation |
+| `sandbox`, `sandbox_profile`, `sandbox_profiles`, `sandbox_lockdown` | read | escalation |
 | `logprobs`, `top_logprobs`, `token_extents`, `response_chain` | write | |
 | `no_obfuscation` | review | removes a provider defence |
 | `whitewash_api_keys`, `logging` | read | exfiltration |

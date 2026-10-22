@@ -1780,6 +1780,37 @@ child. A forked child keeps the same paths in its configuration structure.
 These paths are invocation state and do not enter stored configuration. No
 environment variable selects the view or its arena.
 
+**Profiles that carry a view.** A sandbox profile has a `view` setting. `/session
+profile NAME` stores the profile and `view/isolate_session` to match, then starts the
+session again. Outside a view the session runs this program again, as `/reload`
+does, and enters a view when the profile asks for one. A session in a view cannot
+make another or leave its own, so it asks its supervisor with the request `restart`
+on the channel that `push` and `pull` use. The supervisor compares the view with the
+project, as `push --dry-run` does, and refuses the request when any path conflicts:
+nothing is written, and the session puts back the profile and the view setting that
+it had stored. Otherwise it applies the view to the project and ends the session.
+For a profile with a view the supervisor then captures a fresh view and starts the
+session on it, as `pull` does. For a profile without one the supervisor records the
+view and runs this program again on the branch of the session with
+`FYAI_SESSION_RESTART` set, outside any view, so the new process reads the stored
+configuration. The credential of the new session must come from the environment or
+from `fyai auth`: it has no command line to carry a key.
+
+**The arena outside a view.** A tool that does not run in a view has the arena in the
+project, at `.fyai`. Landlock cannot deny a path under a directory that it grants, and
+the carve-out that stands in for that denial leaves the directory above the denied
+path only the right to list: a tool could not create an entry in the project root.
+Where a user namespace is available, `fyai_fsview_hide()` therefore runs the tool in
+private user, mount and PID namespaces instead. It covers each existing denied path
+and the arena with an empty read-only mount (a directory by an empty one, a file by
+`/dev/null`), mounts a procfs that lists only the namespace, and drops the
+capabilities. Landlock then gets no deny list. The process that calls it forks twice
+and never returns: it waits for the init of the namespace, which waits for the program
+and ends with its status, so the parent sees one child. When the program ends, the
+kernel ends the rest of the namespace, so a process that a tool command started in
+the background does not outlive it. A tool in a view keeps the carve-out, because the
+view hides the arena already. Without user namespaces the carve-out stays.
+
 `view enter --lockdown` runs the command in the view under the lockdown sandbox
 profile, as a tool call of a session under `/session lockdown` runs, for that
 run only. It checks the isolation of such a session by hand.

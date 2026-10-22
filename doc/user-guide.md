@@ -1134,14 +1134,84 @@ The `.fyai` arena is denied to sandboxed tools. Landlock is best-effort on unsup
 
 Supported path modes include `rw`, `ro`, `edit`, and `append`. `network.tcp.ports` and `network.udp.ports` list permitted destination ports independently. `bind_ports` under each protocol lists permitted local ports. An empty list denies that operation; omitting a protocol leaves it unrestricted in the normal profile. UDP sends also permit an ephemeral source bind. TCP needs Landlock ABI 4 and UDP needs ABI 10. On older ABIs fyai reports that the requested UDP restriction is unavailable. Local Unix sockets remain available.
 
-`sandbox_profile` selects the policy: `normal` uses `sandbox`, and `lockdown` uses
-`sandbox_lockdown` and enables the sandbox whatever `sandbox` says. `/session
-lockdown` selects the lockdown profile and `/session yolo` selects `normal`. The
-profile is stored, so a restart of the session keeps it, and it leaves the
-`sandbox` policy as it was. `sandbox_lockdown` takes `deny`, `allow` and `network`
-as `sandbox` does. A key that it omits keeps its default: `deny` lists `~/.ssh`,
+`sandbox_profile` names the policy: `normal` uses `sandbox`, and any other name
+is a profile. The profile enables the sandbox whatever `sandbox` says. `dev` is the
+default. The profiles are the `sandbox_profiles` key. `dev` and `lockdown` are in
+`config.yaml.sample`, so an arena that starts from the sample stores them and
+`fyai config show` lists them; an arena that stores none of them uses those of the
+sample. A profile has a `description`, `extends` (the profile it starts from, or
+nothing), `deny`, `allow`, `network` and `view`. A key that a profile names replaces
+the key of the profile it extends, except `allow`, which adds to it. `extends` its
+own name starts from the sample profile of that name. A name that no profile has, or
+a chain of `extends` that is a cycle, is an error.
+
+A profile has a `view` setting: `true` runs the session in a view of the project,
+where this host can make one (`lockdown` does; `dev` does not). `/session profile`
+lists the profiles and marks the current one. `/session profile NAME` stores the
+profile and its view setting, and starts the session again to apply them, as
+`/reload` does: live shells and sub-agents must finish first. A session that runs in
+a view is started again by its supervisor, which stays outside the view. The
+supervisor first applies the changes of the view to the project, as `/session push`
+does, and refuses the switch when a path conflicts with the project: nothing changes
+then, and the stored profile is put back. The new session runs in a view or outside
+one as the profile says. A session that runs outside a view starts again in one for
+a profile that asks for it. The credential must then come from the environment or
+`fyai auth`, not from `-k`, because the new session has no command line to carry it.
+`/session dev`,
+`/session lockdown` and `/session yolo` select `dev`, `lockdown` and `normal` and set
+the credential transport and the view too. The profile is stored, so a restart keeps
+it, and it leaves the `sandbox` policy as it was.
+
+A path of a profile may use `{{hostname}}`, `{{os}}`, `{{arch}}` and
+`{{host_specific}}`, which is `~/.fyai/hosts/{{hostname}}`. One configuration then
+serves hosts that differ, for example a toolchain directory that exists on one host
+and not on another. A placeholder that is not one of these is an error.
+
+```yaml
+sandbox_profile: node
+sandbox_profiles:
+  node:
+    description: a Node project
+    extends: dev
+    allow:
+      - { path: "{{host_specific}}/tools", mode: ro }
+    network:
+      tcp: { ports: [80, 443, 3000] }
+```
+
+The `dev` profile confines a tool to project work. It reads and writes the
+project, runs the toolchains of the user, and reads the git configuration. The
+grants are `~/.cargo/bin`, `~/.rustup`, `~/.nvm`, `~/.local/share/pnpm`, `~/go/bin`
+(read and execute); `~/.cargo/registry`, `~/.cargo/git`, `~/.npm`, `~/.cache/yarn`,
+`~/.cache/pip`, `~/.cache/ccache`, `~/.cache/go-build`, `~/go/pkg` (read and
+write); and `~/.gitconfig` and `~/.config/git` (read). A path that does not exist
+is skipped. It denies the secret locations: `~/.ssh`, `~/.aws`, `~/.gnupg`,
+`~/.netrc`, `~/.config/gh`, `~/.docker`, `~/.kube`, `~/.npmrc` and
+`~/.cargo/credentials.toml`. The default `network` lets TCP connect to ports
+80, 443 and 9418, which git and the package registries use, and UDP send to port 53
+for DNS on Landlock ABI 10 or newer. Binds are not restricted. Git over SSH does not
+work, because `~/.ssh` is denied. A server on a local port needs that port in
+`network.tcp.ports`, because Landlock does not tell loopback from other addresses.
+
+Where the host allows an unprivileged user and mount namespace, a sandboxed tool
+does not get its denied paths from Landlock. The tool runs in a private mount
+namespace of its own, with each existing denied path and the `.fyai` arena covered
+by an empty read-only mount, a directory by an empty one and a file by `/dev/null`.
+The host and the other processes are not changed. A path that Landlock denies
+would leave the directory above it only the right to list, so a tool could not
+create entries in the project root; a covered path does not. The tool also has a PID namespace of its own: it sees only its own processes, and a
+process that a command left in the background ends with the command. Without
+namespaces, Landlock denies the path as before.
+
+In every profile that uses Landlock, PATH keeps only the directories that the
+grants reach: an entry that is relative or empty, under a denied path, or outside the
+system, scratch, project and `allow` trees is removed. A tool then does not find a
+program that it could not run. If no entry is left, PATH is `/usr/local/bin:/usr/bin:/bin`.
+
+The `lockdown` profile takes the same keys; `sandbox_lockdown` is the older key
+that changes it. A key that it omits keeps its default: `deny` lists `~/.ssh`,
 the secret location of the platform, and `network` has an empty port list, which
-denies TCP connects and binds and, on Landlock ABI 10 or newer, UDP sends and binds. On older ABIs UDP remains unrestricted. A kernel without network rights leaves egress open. Each omitted protocol entry keeps its lockdown default.
+denies TCP connects and binds and, on Landlock ABI 10 or newer, UDP sends and binds. On older ABIs UDP remains unrestricted. A kernel without network rights leaves egress open. Each omitted protocol entry keeps its lockdown default. A kernel that cannot restrict an operation gets one warning for each process.
 
 ```yaml
 sandbox_profile: lockdown

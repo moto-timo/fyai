@@ -493,6 +493,9 @@ read from the environment. `level-b` installs no filesystem or keyring
 policy, so a tool of the same user can still reach a key stored outside the
 environment; the design document lists these limits.
 
+`/session dev` is the default: the tools run in a sandbox that allows project
+work - the project, the toolchains of the user, and TCP to git and the package
+registries - and denies the secret locations of the platform.
 `/session lockdown` takes the strongest isolation this host can enforce in one
 step: the credential transport (`auto`), the sandbox with TCP egress restricted
 on Landlock ABI 4 and UDP egress restricted on ABI 10, and the session itself in a view of the project
