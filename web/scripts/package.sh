@@ -110,6 +110,18 @@ APP="dist-app/fyai-$PLATFORM-$ARCH"
 
 if [ "$PLATFORM" = darwin ]; then
 	APP="$APP/fyai.app"
+
+	# The packager renames Electron and edits its Info.plist, which breaks the
+	# signature of the bundle. macOS then reports a downloaded app as damaged,
+	# not as unverified. Sign it again, ad hoc, so that it verifies and the
+	# user can open it from the Gatekeeper prompt.
+	if command -v codesign >/dev/null 2>&1; then
+		codesign --force --deep --sign - "$APP"
+		codesign --verify --deep --strict "$APP"
+		echo "package.sh: signed $APP ad hoc"
+	else
+		echo "package.sh: no codesign; the app is not signed" >&2
+	fi
 fi
 if [ "$PLATFORM" = linux ]; then
 	chmod 755 "$APP/fyai"
