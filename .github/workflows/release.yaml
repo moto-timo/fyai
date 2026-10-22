@@ -14,12 +14,6 @@ on:
 permissions:
   contents: write
 
-env:
-  # Pinned to the same libfyaml revision fyai's CMakeLists fetches, so the
-  # statically-linked archive matches what a normal build would pull in.
-  LIBFYAML_REPO: https://github.com/pantoniou/libfyaml
-  LIBFYAML_REF: d312d213f50fb3fff46bd745488e605138b9d4d1
-
 jobs:
   build:
     name: mostly-static - ${{ matrix.os }}
@@ -62,43 +56,11 @@ jobs:
         brew install pkg-config openssl zstd
         python -m pip install --upgrade yq
 
-    - name: "Build & install static libfyaml"
+    - name: "Build (mostly-static)"
+      env:
+        BUILD_JOBS: 4
       run: |
-        git clone "${LIBFYAML_REPO}" /tmp/libfyaml
-        git -C /tmp/libfyaml checkout "${LIBFYAML_REF}"
-        cmake -S /tmp/libfyaml -B /tmp/libfyaml/build \
-          -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=OFF \
-          -DBUILD_TESTING=OFF \
-          -DCMAKE_INSTALL_PREFIX=/usr/local
-        cmake --build /tmp/libfyaml/build
-        sudo cmake --install /tmp/libfyaml/build
-
-    - name: "Build & install static libfypalette"
-      run: |
-        git clone https://github.com/pantoniou/libfypalette /tmp/libfypalette
-        git -C /tmp/libfypalette checkout 20db8800e89dac8f8f03dddaa528747c8ad99050
-        cmake -S /tmp/libfypalette -B /tmp/libfypalette/build \
-          -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=OFF \
-          -DBUILD_FYPALETTE_TESTS=OFF \
-          -DBUILD_FYPALETTE_TOOLS=OFF \
-          -DCMAKE_INSTALL_PREFIX=/usr/local
-        cmake --build /tmp/libfypalette/build
-        sudo cmake --install /tmp/libfypalette/build
-
-    - name: "Configure fyai (mostly-static)"
-      run: |
-        cmake -B build -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DFYAI_MOSTLY_STATIC=ON \
-          -DBUILD_TESTING=OFF
-
-    - name: "Build"
-      run: |
-        cmake --build build
+        scripts/build-static-native.sh -b build-static -o build/fyai
 
     - name: "Verify linkage"
       run: |

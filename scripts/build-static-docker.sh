@@ -8,7 +8,7 @@
 #   scripts/build-static-docker.sh [OUTPUT]
 #
 # OUTPUT defaults to ./fyai in the repo root. Env defaults still work:
-# MODE, IMAGE, LIBFYAML_REF.
+# MODE, IMAGE, LIBFYAML_REF, BUILD_JOBS (parallel compiles, default 2).
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -72,6 +72,10 @@ esac
 build_args="--build-arg STATIC_MODE=$mode"
 if [ -n "$libfyaml_ref" ]; then
 	build_args="$build_args --build-arg LIBFYAML_REF=$libfyaml_ref"
+fi
+
+if [ -n "${BUILD_JOBS:-}" ]; then
+	build_args="$build_args --build-arg BUILD_JOBS=$BUILD_JOBS"
 fi
 
 # shellcheck disable=SC2086

@@ -36,6 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ARG STATIC_MODE=mostly
 
+# Parallel compile jobs of the fyai build. A large translation unit needs
+# memory, and a small Docker VM kills cc1 when every core compiles at once.
+ARG BUILD_JOBS=2
+
 # musl mode cannot use Ubuntu's glibc-built libssl.a/libz.a, so build the libc,
 # zlib and OpenSSL stack with musl-gcc under one prefix.
 ARG MUSL_REPO=https://git.musl-libc.org/git/musl
@@ -77,7 +81,9 @@ RUN if [ "$STATIC_MODE" = musl ]; then \
 # matches fyai's FetchContent libfyaml GIT_TAG; override with --build-arg.
 ARG LIBFYAML_REPO=https://github.com/pantoniou/libfyaml
 ARG LIBFYAML_REF=d312d213f50fb3fff46bd745488e605138b9d4d1
-RUN git clone "$LIBFYAML_REPO" /libfyaml \
+# The mostly mode builds its own libfyaml in scripts/build-static-native.sh.
+RUN if [ "$STATIC_MODE" = mostly ]; then exit 0; fi \
+    && git clone "$LIBFYAML_REPO" /libfyaml \
     && git -C /libfyaml checkout "$LIBFYAML_REF" \
     && if [ "$STATIC_MODE" = musl ]; then export CC=/opt/musl/bin/musl-gcc PKG_CONFIG_PATH=/opt/musl/lib/pkgconfig; fi \
     && cmake -S /libfyaml -B /libfyaml/build \
@@ -100,11 +106,14 @@ RUN if [ "$STATIC_MODE" = musl ]; then \
     elif [ "$STATIC_MODE" = full ]; then \
         cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release \
             -DFYAI_STATIC=ON -DBUILD_TESTING=OFF; \
-    else \
-        cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release \
-            -DFYAI_MOSTLY_STATIC=ON -DBUILD_TESTING=OFF; \
     fi \
-    && cmake --build /build -j"$(nproc)"
+    && if [ "$STATIC_MODE" = mostly ]; then \
+        mkdir -p /build \
+        && LIBFYAML_REF="$LIBFYAML_REF" LIBFYAML_REPO="$LIBFYAML_REPO" \
+            /src/scripts/build-static-native.sh -b /native -j "$BUILD_JOBS" -o /build/fyai; \
+    else \
+        cmake --build /build -j"$BUILD_JOBS"; \
+    fi
 
 # Confirm the selected linkage, then install it.
 RUN if [ "$STATIC_MODE" = musl ] || [ "$STATIC_MODE" = full ]; then \
