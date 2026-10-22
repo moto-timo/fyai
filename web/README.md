@@ -187,7 +187,15 @@ serves the page on `http://127.0.0.1:9331` and runs fyai in the current
 directory; it needs only `node` at run time. The page needs node 20 or later
 to build: with an older node, `FYAI_WEB=ON` leaves the page out and says so.
 Build first and install second (`make && sudo make install`), so that `npm`
-does not run as root. The desktop app is not installed.
+does not run as root.
+
+`FYAI_DESKTOP=ON` (Linux, with `FYAI_WEB=ON`) also packages the desktop app
+and installs it under `share/fyai/desktop`, with a `fyai-desktop` launcher, a
+menu entry and an icon. The app is about 350 MB and `npm` downloads Electron
+to build it. It carries no fyai: the launcher points it at the fyai installed
+beside it. `chrome-sandbox` is installed setuid root, as Electron expects
+where the kernel gives a user no namespace of its own. The macOS app is built
+by `fyai-desktop-package` and the release workflow, and is not installed.
 
 ## Bridge options
 
