@@ -28,6 +28,7 @@ endif()
 # Get version from git-version-gen
 execute_process(
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/scripts/git-version-gen" "${CMAKE_CURRENT_SOURCE_DIR}/.tarball-version"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     OUTPUT_VARIABLE PROJECT_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -35,6 +36,11 @@ execute_process(
 # Parse version components
 string(REGEX MATCH "^([0-9]+)(\\.([0-9]+)(\\.([0-9]+))?)?(-(.*))?$" _ "${PROJECT_VERSION}")
 set(VERSION_MAJOR "${CMAKE_MATCH_1}")
+if("${VERSION_MAJOR}" STREQUAL "")
+    # No git history and no .tarball-version: build with a version that says so.
+    message(WARNING "cannot derive the version (got '${PROJECT_VERSION}'); using 0.0.0")
+    set(VERSION_MAJOR "0")
+endif()
 if(CMAKE_MATCH_3)
     set(VERSION_MINOR "${CMAKE_MATCH_3}")
 else()
@@ -51,9 +57,12 @@ else()
     set(VERSION_EXTRA "")
 endif()
 
+# project() accepts only a numeric version; keep the full string for display.
+set(FYAI_VERSION_FULL "${PROJECT_VERSION}")
 project(fyai
     LANGUAGES C
-    VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}${VERSION_EXTRA})
+    VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+set(PROJECT_VERSION "${FYAI_VERSION_FULL}")
 
 # Export compile commands by default for clangd LSP support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
