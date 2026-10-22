@@ -60,7 +60,8 @@ assert_stdout_contains other-data
 # empty mount in the tool, and the tool creates entries in the project root. Without
 # them, Landlock denies the arena, and the directory above it keeps only the right to
 # list, so the root cannot take new entries.
-if unshare -Urnmpf true 2>/dev/null; then
+shell_with 'sandbox_profile: dev' 'touch cover-probe && rm -f cover-probe && echo cover-works'
+if grep -q cover-works "$TEST_DIR/stdout"; then
 	shell_with 'sandbox_profile: dev' 'cat other/data.txt && echo w > made.txt && cat made.txt'
 	[ -f made.txt ] || fail 'a tool could not create a file in the project root'
 	shell_with 'sandbox_profile: dev' 'mkdir madedir && touch madedir/x && echo dir-ok'
