@@ -568,7 +568,11 @@ err:
 
 static bool skill_dir_has_md(const char *dir, char *md, size_t md_size)
 {
-	snprintf(md, md_size, "%s/SKILL.md", dir);
+	int n;
+
+	n = snprintf(md, md_size, "%s/SKILL.md", dir);
+	if (n < 0 || (size_t)n >= md_size)
+		return false;
 	return is_mode_file(md, R_OK);
 }
 
@@ -756,12 +760,17 @@ static int skill_scan_commands(struct skill_import *im, const char *dir,
 static int skill_scan_claude_dir(struct skill_import *im, const char *base)
 {
 	char path[PATH_MAX];
-	int rc;
+	int rc, n;
 
-	snprintf(path, sizeof(path), "%s/skills", base);
+	/* A path longer than PATH_MAX names nothing that can be opened. */
+	n = snprintf(path, sizeof(path), "%s/skills", base);
+	if (n < 0 || (size_t)n >= sizeof(path))
+		return 0;
 	rc = skill_scan_skills(im, path);
 	if (!rc) {
-		snprintf(path, sizeof(path), "%s/commands", base);
+		n = snprintf(path, sizeof(path), "%s/commands", base);
+		if (n < 0 || (size_t)n >= sizeof(path))
+			return 0;
 		rc = skill_scan_commands(im, path, 0);
 	}
 	return rc;
@@ -773,9 +782,11 @@ static int skill_scan_synced(struct skill_import *im, const char *base)
 	char path[PATH_MAX], bucket[PATH_MAX];
 	struct dirent *de;
 	DIR *d;
-	int rc;
+	int rc, n;
 
-	snprintf(path, sizeof(path), "%s/skills/synced", base);
+	n = snprintf(path, sizeof(path), "%s/skills/synced", base);
+	if (n < 0 || (size_t)n >= sizeof(path))
+		return 0;
 	d = opendir(path);
 	if (!d)
 		return 0;
