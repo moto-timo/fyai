@@ -32,6 +32,11 @@ page as a llama.cpp _router_: the picker at the composer lists the catalogue,
 and the model a conversation picks travels with each turn. fyai has no load
 step, so every model is reported as loaded.
 
+- Only the models of a provider that has a key are listed
+  (`fyai catalog list models --available`): the key is in the environment of
+  the bridge, in the keyring, or behind a credential transport. When no
+  provider has one, the whole catalogue is listed, so a key can be entered in
+  the settings.
 - The model of the project (`fyai --get model`) is the first row, and the one
   a new conversation starts with.
 - `/model NAME` selects a model as well. Typed in full it is resolved by the
@@ -102,6 +107,14 @@ cd web
 ./scripts/desktop.sh --fyai ~/bin/fyai   # another fyai
 ./scripts/desktop.sh --cwd ~/project     # another project
 ```
+
+The app works in the project of fyai that it finds. The `FYAI_BRIDGE_CWD`
+directory wins, then the directory the app was started in. A launcher starts
+it in the bundle, in `/` or in the home directory, which is no place for an
+arena, so the app then uses a directory of its own under the data directory of
+the platform (`~/.config/fyai/project` on Linux, `~/Library/Application
+Support/fyai/project` on macOS). A directory with no project gets one from
+`fyai init`.
 
 The window loads the built page, so run `npm run build` after you change it.
 Electron needs Node 20 or later, and a graphical session.
@@ -234,28 +247,19 @@ value is not shown on the screen.
 ## Slash commands
 
 fyai's `claude-sdk` sends a `/` line to the model as text, except `/clear`.
-This page therefore keeps a short list of its own and runs each one as an
-fyai verb on the conversation's session branch:
-
-| Line            | Runs                                                   |
-| --------------- | ------------------------------------------------------ |
-| `/branch`       | `fyai branch`                                          |
-| `/compact`      | `fyai compact`                                         |
-| `/context`      | `fyai context`                                         |
-| `/help`         | `fyai help`                                            |
-| `/history`      | `fyai history`                                         |
-| `/model [NAME]` | `fyai model [NAME]`                                    |
-| `/stats`        | `fyai stats`                                           |
-| `/todo`         | `fyai todo`                                            |
-| `/clear`        | starts a new conversation, which is a new fyai session |
+This page therefore runs a command itself, as an fyai verb on the
+conversation's session branch. It keeps no list of commands: the bridge reads
+them from `fyai schema commands --output json` and serves them at
+`/api/fyai/commands`, and the `/` picker of the page offers that list. A
+command qualifies when it exists both as a verb and as a slash command and
+needs no terminal. `/model` and `/cwd` keep the pickers of the page, and
+`/clear` starts a new conversation, which is a new fyai session.
 
 The output arrives as one fenced block in a message row, so a table keeps its
 columns. A command runs as a child process with the words as argv; no shell
 sees them. Anything else that starts with `/` is answered as unknown and does
-not reach the model.
-
-To serve more of fyai, add a line to `SLASH_COMMANDS` in
-`server/bridge.mjs`. Each entry is the fyai command and its fixed arguments.
+not reach the model. An fyai without `schema` exports no commands, and the
+page then serves none of them.
 
 ## What is not wired yet
 
