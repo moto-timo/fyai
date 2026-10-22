@@ -14,12 +14,15 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 
 #include "fyai.h"
 #include "fyai_cmd.h"
 #include "fyai_cmd_int.h"
 #include "fyai_config.h"
+#include "fyai_sandbox_profile.h"
+#include "fyai_skill.h"
 #include "fyai_settings.h"
 #include "fyai_agents.h"
 #include "fyai_event.h"
@@ -981,22 +984,25 @@ int fyai_cmd_lockdown(struct fyai_cmd_call *call, fy_generic *result)
 }
 
 /*
- * The opposite of lockdown: no transport, no sandbox and no view. A restart
- * cannot end the transport of a live session: the key lived only in the
- * transport, and the next image would start with none. The keys are stored and
- * the transport ends when fyai starts again, with the key of that run.
+ * Take off the isolation that lockdown added: no transport and no view. The
+ * sandbox profile is @profile; the profile `normal` also turns `sandbox` off.
+ * A restart cannot end the transport of a live session: the key lived only in
+ * the transport, and the next image would start with none. The keys are stored
+ * and the transport ends when fyai starts again, with the key of that run.
  */
-int fyai_cmd_yolo(struct fyai_cmd_call *call, fy_generic *result)
+static int preset_relax(struct fyai_cmd_call *call, fy_generic *result,
+			const char *profile)
 {
 	struct fyai_ctx *ctx = call->ctx;
 	bool in_view = preset_in_view(ctx);
+	bool normal = !strcmp(profile, "normal");
 	const char *note = NULL;
 	int rc;
 
 	if (preset_idle(call))
 		return -1;
-	rc = preset_set(call, "sandbox_profile", "normal");
-	if (!rc)
+	rc = preset_set(call, "sandbox_profile", profile);
+	if (!rc && normal)
 		rc = preset_set(call, "sandbox", "false");
 	if (!rc && preset_view_session(ctx))
 		rc = preset_set(call, "view/isolate_session", "false");
@@ -1009,11 +1015,27 @@ int fyai_cmd_yolo(struct fyai_cmd_call *call, fy_generic *result)
 		       "again: start it with the key, from the environment or `fyai auth`";
 	else if (in_view)
 		note = "this session stays in its view until fyai restarts";
-	*result = fy_mapping(call->gb, "mode", "yolo", "transport", "none",
-			     "sandbox", "off", "agents", preset_agents(ctx, in_view));
+	*result = fy_mapping(call->gb, "mode", normal ? "yolo" : "dev", "transport", "none",
+			     "sandbox", normal ? "off" : "dev", "agents",
+			     preset_agents(ctx, in_view));
 	if (note)
 		*result = fy_assoc(call->gb, *result, "note", fy_value(call->gb, note));
 	return 0;
+}
+
+/* The opposite of lockdown: no transport, no sandbox and no view. */
+int fyai_cmd_yolo(struct fyai_cmd_call *call, fy_generic *result)
+{
+	return preset_relax(call, result, "normal");
+}
+
+/*
+ * The default: no transport and no view, and the tools confined by the dev
+ * profile, which lets them do project work.
+ */
+int fyai_cmd_dev(struct fyai_cmd_call *call, fy_generic *result)
+{
+	return preset_relax(call, result, "dev");
 }
 
 /* Show the isolation of the session as it runs, and what is stored beyond that. */
@@ -1059,6 +1081,8 @@ struct session_request {
 	struct fyai_cmd_call *call;
 	struct fyai_event_source *source;
 	bool ends_session;	/* a pull that went through: the supervisor starts a new session */
+	char *revert_profile;	/* the stored values to put back when the supervisor refuses */
+	int revert_view;	/* -1: none; else the value of view/isolate_session */
 };
 
 static void session_request_cleanup(struct fyai_cmd_call *call)
@@ -1069,8 +1093,22 @@ static void session_request_cleanup(struct fyai_cmd_call *call)
 		return;
 	if (r->source)
 		fyai_event_source_remove(r->source);
+	free(r->revert_profile);
 	free(r);
 	call->priv = NULL;
+}
+
+/* Put back the stored values that a refused request had changed. */
+static void session_request_revert(struct fyai_cmd_call *call, struct session_request *r)
+{
+	if (r->revert_profile &&
+	    preset_set(call, "sandbox_profile", fy_sprintfa("'%s'", r->revert_profile)))
+		fyai_warning(call->ctx, "%s: could not put back the sandbox profile '%s'",
+			     call->path, r->revert_profile);
+	if (r->revert_view >= 0 &&
+	    preset_set(call, "view/isolate_session", r->revert_view ? "true" : "false"))
+		fyai_warning(call->ctx, "%s: could not put back view/isolate_session", call->path);
+	(void)fyai_config_rederive(call->ctx);
 }
 
 static void session_quit(void *userdata)
@@ -1100,6 +1138,7 @@ static enum fyai_event_action session_reply(const struct fyai_event *ev)
 		why = fy_get(m, "message", fy_invalid);
 		fyai_error(ctx, "%s: %s", call->path, fy_is_string(why) ? fy_castp(&why, "") :
 			   "the supervisor refused");
+		session_request_revert(call, r);
 		fyai_cmd_done(call, -1, fy_invalid);
 		return FYAIEA_CONTINUE;
 	}
@@ -1129,6 +1168,7 @@ static int session_request(struct fyai_cmd_call *call, const char *op, fy_generi
 	fyai_error_check(ctx, r, err, "%s: out of memory", call->path);
 	r->call = call;
 	r->ends_session = ends_session;
+	r->revert_view = -1;
 	call->priv = r;
 	call->cleanup = session_request_cleanup;
 	request = fy_assoc(call->gb, request, "op", fy_value(call->gb, op));
@@ -1163,4 +1203,96 @@ int fyai_cmd_session_pull(struct fyai_cmd_call *call, fy_generic *result)
 	return session_request(call, "pull",
 			       fy_mapping(call->gb, "discard", fyai_cmd_arg_bool(call, "discard")),
 			       true);
+}
+
+struct profile_list {
+	struct fy_generic_builder *gb;
+	const char *current;
+	fy_generic names;
+};
+
+static void profile_list_add(void *arg, const char *name, const char *desc)
+{
+	struct profile_list *l = arg;
+
+	(void)desc;
+	l->names = fy_append(l->gb, l->names, fy_stringf(l->gb, "%s%s", name,
+			     !strcmp(name, l->current) ? " (current)" : ""));
+}
+
+/*
+ * Select the sandbox profile of the session by name, or list the profiles. The
+ * profile is stored, with the view of the session that it asks for, and the
+ * session starts again to apply it. Outside a view the session runs this program
+ * again. In a view the supervisor does it: it applies the view to the project
+ * first, refuses when a path conflicts, and starts the session again in a view
+ * or outside one. The credential transport is not changed: `/session dev`,
+ * `/session lockdown` and `/session yolo` set that too.
+ */
+int fyai_cmd_session_profile(struct fyai_cmd_call *call, fy_generic *result)
+{
+	struct fyai_ctx *ctx = call->ctx;
+	struct fyai_cfg *cfg = ctx->cfg;
+	const char *name = fyai_cmd_arg_str(call, "name");
+	struct profile_list list = { .gb = call->gb,
+		.current = cfg->sandbox_profile ? cfg->sandbox_profile : "normal" };
+	bool in_view = preset_in_view(ctx), was_view = preset_view_session(ctx);
+	bool pview = false, want_view;
+	const char *c, *note = NULL, *old = list.current;
+	fy_generic none, policy;
+	struct session_request *r;
+	int rc;
+
+	list.names = fy_sequence(call->gb);
+	if (name) {
+		for (c = name; *c; c++)
+			fyai_error_check(ctx, isalnum((unsigned char)*c) || *c == '_' ||
+					 *c == '-', err,
+					 "profile: '%s' is not a profile name", name);
+		if (strcmp(name, "normal")) {
+			policy = fyai_sandbox_profile_policy(cfg, cfg->config_doc, name);
+			fyai_error_check(ctx, fy_is_valid(policy), err,
+					 "profile: could not select '%s'", name);
+			pview = fy_get(policy, "view", false);
+		}
+		/* A session in a view cannot make another: the supervisor decides. */
+		want_view = pview && (in_view || fyai_view_session_available(ctx));
+		if (pview && !want_view)
+			fyai_warning(ctx, "profile '%s' asks for a view of the session, which "
+				     "this host cannot make: the tools are confined, and the "
+				     "session runs in the project", name);
+		if (strcmp(name, old) || want_view != (in_view || was_view)) {
+			/* A restart follows, and it ends the live work. */
+			if (preset_idle(call))
+				return -1;
+			rc = preset_set(call, "sandbox_profile", fy_sprintfa("'%s'", name));
+			if (!rc && want_view != was_view)
+				rc = preset_set(call, "view/isolate_session",
+						want_view ? "true" : "false");
+			if (rc || preset_commit(call, in_view))
+				return -1;
+			if (in_view) {
+				rc = session_request(call, "restart",
+						     fy_mapping(call->gb, "view", want_view), true);
+				if (rc == FYAI_CMD_PENDING && (r = call->priv)) {
+					r->revert_profile = strdup(old);
+					r->revert_view = was_view;
+				}
+				return rc;
+			}
+			if (fyai_cmd_reload(call, &none))
+				fyai_warning(ctx, "sandbox_profile is stored; it applies after the next restart");
+			else
+				note = "restarting to apply the profile";
+		}
+		list.current = name;
+	}
+	fyai_sandbox_profile_names(cfg, cfg->config_doc, profile_list_add, &list);
+	*result = fy_mapping(call->gb, "profile", list.current,
+			     "available", fyai_skill_join(call->gb, list.names, ", "));
+	if (note)
+		*result = fy_assoc(call->gb, *result, "note", fy_value(call->gb, note));
+	return 0;
+err:
+	return -1;
 }

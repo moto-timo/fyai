@@ -6304,7 +6304,7 @@ Commit the current branch and restart fyai on it. Live shells and sub-agents mus
 
 set the isolation of this session and move work between it and the project
 
-**Usage:** `/session {lockdown|new|pull|push|status|yolo} ...`
+**Usage:** `/session {dev|lockdown|new|profile|pull|push|status|yolo} ...`
 
 The isolation of the session. With no subcommand, show the state.
 `lockdown` takes the strongest isolation that this host can enforce, and
@@ -6317,8 +6317,10 @@ its view and the project: `push` writes its changes into the project, and
 
 | Command | Description |
 | --- | --- |
+| `dev` | confine the tools to project work |
 | `lockdown` | take the strongest isolation that this host can enforce |
 | `new` | start a new session with an empty conversation |
+| `profile` | select the sandbox profile of the tools, or list the profiles |
 | `pull` | take the project as it is now into the session |
 | `push` | apply the changes of the session to the project |
 | `status` | show the isolation of this session |
@@ -6411,6 +6413,40 @@ to apply what is stored.
 | --- | --- |
 | `-h`, `--help` | show this help |
 
+## /session profile
+
+select the sandbox profile of the tools, or list the profiles
+
+**Usage:** `/session profile [NAME]`
+
+Select the sandbox profile that confines the tools, `sandbox_profile`,
+by name. The profile is stored, with the view of the session that it
+asks for (`view`), and the session starts again to apply it, as
+`/reload` does, so live shells and sub-agents must finish first. A
+session that runs in a view is started again by its supervisor, which
+first applies the changes of the view to the project, as `/session
+push` does, and refuses when a path conflicts: nothing changes then. The
+new session runs in a view or outside one as the profile says. The
+credential transport stays as it is, which `/session dev`, `/session
+lockdown` and `/session yolo` also set. With
+no name, list the profiles and mark the current one. `normal` is the
+`sandbox` key; the others are the built-in `dev` and `lockdown` and
+those of `sandbox_profiles`. A profile can use `{{hostname}}`,
+`{{os}}`, `{{arch}}` and `{{host_specific}}` in its paths.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `NAME` | the profile to select |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
 ## /session lockdown
 
 take the strongest isolation that this host can enforce
@@ -6431,6 +6467,31 @@ start the transport and the view, as `/reload` does, so live shells
 and sub-agents must finish first. A change of the project that is
 made later is not in the view: `view update session` takes it.
 `/session yolo` goes the other way.
+
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-h`, `--help` | show this help |
+
+## /session dev
+
+confine the tools to project work
+
+**Usage:** `/session dev`
+
+Take off the credential transport and the view of the session, as
+`/session yolo` does, but keep the tools in the sandbox:
+`sandbox_profile: dev`, which confines them by its entry in `sandbox_profiles`. A tool
+reads and writes the project, runs the toolchains of the user (Cargo,
+nvm, npm, pnpm, pip, Go), reads the git configuration, connects over
+TCP to ports 80, 443 and 9418 and sends UDP to port 53 where the
+kernel can restrict them. The secret locations of the platform are
+denied, and PATH keeps only the directories that the tools can reach.
+Git over SSH does not work: `~/.ssh` stays denied. This is the
+default profile. The keys are stored, and a session that runs with the
+credential transport or in a view stays so until fyai starts again.
 
 
 ### Options

@@ -3673,6 +3673,43 @@ commands:
             - "session view: {view}"
             - "{note}"
 
+      - command: profile
+        title: select the sandbox profile of the tools, or list the profiles
+        description: |
+          Select the sandbox profile that confines the tools, `sandbox_profile`,
+          by name. The profile is stored, with the view of the session that it
+          asks for (`view`), and the session starts again to apply it, as
+          `/reload` does, so live shells and sub-agents must finish first. A
+          session that runs in a view is started again by its supervisor, which
+          first applies the changes of the view to the project, as `/session
+          push` does, and refuses when a path conflicts: nothing changes then. The
+          new session runs in a view or outside one as the profile says. The
+          credential transport stays as it is, which `/session dev`, `/session
+          lockdown` and `/session yolo` also set. With
+          no name, list the profiles and mark the current one. `normal` is the
+          `sandbox` key; the others are the built-in `dev` and `lockdown` and
+          those of `sandbox_profiles`. A profile can use `{{hostname}}`,
+          `{{os}}`, `{{arch}}` and `{{host_specific}}` in its paths.
+        handler: session_profile
+        mode: async
+        while_busy: run
+        arguments:
+          type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+              description: the profile to select
+              x-fyai-positional: 0
+              x-fyai-meta: NAME
+              x-fyai-complete: sandbox-profile
+        render:
+          message:
+            - "sandbox profile: {profile}"
+            - "available: {available}"
+            - "{note}"
+
       - command: lockdown
         title: take the strongest isolation that this host can enforce
         description: |
@@ -3694,6 +3731,26 @@ commands:
         render:
           message:
             - "lockdown: credential transport {transport}, sandbox {sandbox}, sub-agents {agents}"
+            - "{note}"
+
+      - command: dev
+        title: confine the tools to project work
+        description: |
+          Take off the credential transport and the view of the session, as
+          `/session yolo` does, but keep the tools in the sandbox:
+          `sandbox_profile: dev`, which confines them by its entry in `sandbox_profiles`. A tool
+          reads and writes the project, runs the toolchains of the user (Cargo,
+          nvm, npm, pnpm, pip, Go), reads the git configuration, connects over
+          TCP to ports 80, 443 and 9418 and sends UDP to port 53 where the
+          kernel can restrict them. The secret locations of the platform are
+          denied, and PATH keeps only the directories that the tools can reach.
+          Git over SSH does not work: `~/.ssh` stays denied. This is the
+          default profile. The keys are stored, and a session that runs with the
+          credential transport or in a view stays so until fyai starts again.
+        handler: dev
+        render:
+          message:
+            - "dev: credential transport {transport}, sandbox {sandbox}, sub-agents {agents}"
             - "{note}"
 
       - command: yolo
