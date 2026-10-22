@@ -140,20 +140,23 @@ scripts/package.sh --bundle-fyai   # build a portable fyai first
 scripts/package.sh                 # package the page as it stands
 ```
 
-`scripts/bundle-fyai.sh` makes that binary. The default mode is `mostly`:
-the fyai dependencies are static and only the host libc is needed, which every
-glibc Linux has. `--mode musl` gives a fully static binary for a musl or an
-older machine.
+`scripts/bundle-fyai.sh` makes that binary for the platform that runs it. The
+default mode is `mostly`: the fyai dependencies are static and only the system
+libraries are needed (libSystem and the frameworks on macOS, the glibc on
+Linux). It runs `scripts/build-static-native.sh` of the fyai repository, the
+build that the release workflow and the Docker image also use. `--mode musl`
+gives a fully static Linux binary for a musl or an older machine, built with
+Docker.
 
 ```sh
-scripts/bundle-fyai.sh                 # docker build, mode mostly
-scripts/bundle-fyai.sh --mode musl     # fully static
+scripts/bundle-fyai.sh                 # native build, mode mostly
+scripts/bundle-fyai.sh --mode musl     # fully static, with Docker
 scripts/bundle-fyai.sh --from PATH     # copy a binary you built already
 scripts/bundle-fyai.sh --check         # what a bundle would carry
 ```
 
-The static modes build the fyai repository above `web/` in Docker; set
-`FYAI_SRC` for another checkout.
+The build builds the fyai repository above `web/`; set `FYAI_SRC` for another
+checkout. Its files go to `fyai-static-build/` (`FYAI_STATIC_BUILD`).
 
 ## Build system
 
@@ -176,6 +179,14 @@ ninja -C build fyai-web-test       # its tests
 ctest --test-dir build -R fyai/web-test
 cmake -S . -B build -DFYAI_WEB=ON  # or make it part of the build
 ```
+
+The targets never write the source tree, which can be read-only. They link
+`web/` into `<build>/web` (`fyai-web-stage`, which needs `rsync`) and run npm,
+Vite and the packager there. The page is in `<build>/web/dist`, the bundled
+fyai in `<build>/web/fyai-bundle`, and the app in `<build>/web/dist-app`. Files are
+hard links to the source when both are on one filesystem, else copies. The
+links are made again by each target, so an edit of `web/` takes on the next
+build, and `fyai-web-dev` serves the copy: restart it after an edit.
 
 The unit tests are registered with CTest only when `FYAI_WEB=ON`, and they
 carry the label `web`, so a C-only run stays quick:
