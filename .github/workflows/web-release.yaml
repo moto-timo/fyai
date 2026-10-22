@@ -6,7 +6,8 @@
 #
 # A manual run names the tag to build and to attach to.
 #
-# A macOS app that is not signed and notarized opens only after the user
+# package.sh signs the macOS app ad hoc, so that its signature verifies. An app
+# that is not signed with a Developer ID and notarized opens only after the user
 # removes the quarantine mark (System Settings, "Open Anyway"). Signing needs
 # an Apple Developer ID and these repository secrets:
 #   APPLE_CERTIFICATE           base64 of the .p12

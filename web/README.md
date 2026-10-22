@@ -129,6 +129,20 @@ watches the app's process and its standard input, so an app that is killed
 rather than closed still leaves nothing behind. A turn that is running when
 that happens is stopped too, with the tools it started.
 
+### Open the macOS app
+
+`scripts/package.sh` signs the macOS app ad hoc, so that its signature verifies.
+Without that step the packager leaves a signature that no longer matches the
+bundle, and macOS reports a downloaded app as damaged. An ad hoc signature is
+not a Developer ID, and the app is not notarized, so the first start of a
+downloaded app is refused with a message that the developer cannot be
+verified. Open it with a right click and Open, or with System Settings,
+Privacy & Security, Open Anyway, or remove the quarantine mark:
+
+```sh
+xattr -dr com.apple.quarantine fyai.app
+```
+
 ### Bundle it with fyai
 
 `scripts/package.sh` writes a self-contained app to `dist-app/fyai-linux-<arch>/`.
