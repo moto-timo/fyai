@@ -253,7 +253,7 @@ static bool page_text_visible(const char *text)
 
 static int page_slot(struct response_buffer *out, const char *id, int rows)
 {
-	char buf[96];
+	char buf[256];
 
 	if (rows < 1)
 		return 0;
