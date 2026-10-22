@@ -181,6 +181,14 @@ The unit tests are registered with CTest only when `FYAI_WEB=ON`, and they
 carry the label `web`, so a C-only run stays quick:
 `ctest --test-dir build -LE web`.
 
+With `FYAI_WEB=ON`, `make install` also installs the built page and the
+bridge under `share/fyai/web`, and a `fyai-web` launcher in `bin`. The launcher
+serves the page on `http://127.0.0.1:9331` and runs fyai in the current
+directory; it needs only `node` at run time. The page needs node 20 or later
+to build: with an older node, `FYAI_WEB=ON` leaves the page out and says so.
+Build first and install second (`make && sudo make install`), so that `npm`
+does not run as root. The desktop app is not installed.
+
 ## Bridge options
 
 | Option              | Environment                   | Default             | Meaning                                 |
