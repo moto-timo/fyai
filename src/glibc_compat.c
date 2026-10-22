@@ -20,11 +20,22 @@ extern unsigned long long int fyai_glibc_strtoull(const char *nptr,
 extern int fyai_glibc_vsscanf(const char *str, const char *format,
 			      va_list ap);
 
-__asm__(".symver fyai_glibc_strtol,strtol@GLIBC_2.2.5");
-__asm__(".symver fyai_glibc_strtoul,strtoul@GLIBC_2.2.5");
-__asm__(".symver fyai_glibc_strtoll,strtoll@GLIBC_2.2.5");
-__asm__(".symver fyai_glibc_strtoull,strtoull@GLIBC_2.2.5");
-__asm__(".symver fyai_glibc_vsscanf,vsscanf@GLIBC_2.2.5");
+/* The first glibc version of these symbols depends on the architecture. */
+#if defined(__x86_64__)
+#define FYAI_GLIBC_BASE "GLIBC_2.2.5"
+#elif defined(__aarch64__)
+#define FYAI_GLIBC_BASE "GLIBC_2.17"
+#elif defined(__riscv)
+#define FYAI_GLIBC_BASE "GLIBC_2.27"
+#else
+#error "glibc_compat.c: unknown baseline glibc version for this architecture"
+#endif
+
+__asm__(".symver fyai_glibc_strtol,strtol@" FYAI_GLIBC_BASE);
+__asm__(".symver fyai_glibc_strtoul,strtoul@" FYAI_GLIBC_BASE);
+__asm__(".symver fyai_glibc_strtoll,strtoll@" FYAI_GLIBC_BASE);
+__asm__(".symver fyai_glibc_strtoull,strtoull@" FYAI_GLIBC_BASE);
+__asm__(".symver fyai_glibc_vsscanf,vsscanf@" FYAI_GLIBC_BASE);
 
 long int __isoc23_strtol(const char *nptr, char **endptr, int base)
 {
