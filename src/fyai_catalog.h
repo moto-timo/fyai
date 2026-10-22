@@ -147,10 +147,14 @@ fy_generic fyai_catalog_at(struct fyai_ctx *ctx, const char *path);
 /* The value at @path of @doc, borrowed from @doc. */
 fy_generic fyai_catalog_doc_at(fy_generic doc, const char *path);
 
-/* The models, or with @what "providers" the providers, of the catalogue. */
+/*
+ * The models, or with @what "providers" the providers, of the catalogue.
+ * With @available only those with a credential here. Each model row names
+ * in key_provider a provider that offers it and has one, else "".
+ */
 fy_generic fyai_catalog_list_data(struct fyai_ctx *ctx,
 				  struct fy_generic_builder *gb,
-				  const char *what);
+				  const char *what, bool available);
 /*
  * The tools of the coding agent @agent, or of fyai itself, as Markdown; the
  * caller frees it. NULL with the cause raised.

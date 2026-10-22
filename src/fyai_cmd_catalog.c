@@ -42,7 +42,8 @@ int fyai_cmd_catalog_list(struct fyai_cmd_call *call, fy_generic *result)
 {
 	const char *what = fyai_cmd_arg_str(call, "what");
 
-	*result = fyai_catalog_list_data(call->ctx, call->gb, what);
+	*result = fyai_catalog_list_data(call->ctx, call->gb, what,
+					 fyai_cmd_arg_bool(call, "available"));
 	if (!fy_is_valid(*result))
 		return -1;
 	call->renderopts = !strcmp(what, "providers") ?
@@ -55,7 +56,8 @@ int fyai_cmd_catalog_list(struct fyai_cmd_call *call, fy_generic *result)
 		fy_mapping(call->gb, "title", "Models",
 			   "keys", fy_sequence(call->gb, "name",
 					       "context_window",
-					       "max_output_tokens"));
+					       "max_output_tokens",
+					       "key_provider"));
 	return 0;
 }
 

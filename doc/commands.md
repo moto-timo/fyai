@@ -2133,7 +2133,7 @@ Show a summary of the catalogue of the branch.
 
 list the models or the providers
 
-**Usage:** `fyai catalog list [WHAT]`
+**Usage:** `fyai catalog list [--available] [WHAT]`
 
 List the models, or the providers, of the catalogue.
 
@@ -2147,6 +2147,7 @@ List the models, or the providers, of the catalogue.
 
 | Option | Description |
 | --- | --- |
+| `--available` | list only what has a credential here |
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 
@@ -4938,7 +4939,7 @@ Show a summary of the catalogue of the branch.
 
 list the models or the providers
 
-**Usage:** `/catalog list [WHAT]`
+**Usage:** `/catalog list [--available] [WHAT]`
 
 List the models, or the providers, of the catalogue.
 
@@ -4952,6 +4953,7 @@ List the models, or the providers, of the catalogue.
 
 | Option | Description |
 | --- | --- |
+| `--available` | list only what has a credential here |
 | `-h`, `--help` | show this help |
 
 ## /catalog tools

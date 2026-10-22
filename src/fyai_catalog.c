@@ -25,6 +25,7 @@
 #include "fyai_config.h"
 #include "fyai_markdown.h"
 #include "fyai_schema.h"
+#include "fyai_secret.h"
 #include "fyai_storage.h"
 #include "fyai_tool_spec.h"
 #include "fyai_tools.h"
@@ -1259,17 +1260,77 @@ err:
 	return NULL;
 }
 
+/*
+ * True when a model request to the provider @name can be authenticated from
+ * here: its key variable is set, the kernel keyring holds its key, or the
+ * run has a login or no authentication for it. A credential transport holds
+ * keys this image cannot see, so it counts as present.
+ */
+static bool catalog_provider_keyed(struct fyai_ctx *ctx, const char *name)
+{
+	const struct fyai_cfg *cfg = ctx->cfg;
+	const char *env, *val;
+	char *secret = NULL;
+	size_t len = 0;
+	int rc;
+
+	if (ctx->tclient)
+		return true;
+	if (cfg->provider && !strcmp(cfg->provider, name) &&
+	    (cfg->chatgpt_auth || cfg->no_auth))
+		return true;
+	env = fyai_config_provider_env_key(ctx->cfg->gb, name);
+	if (!env)
+		return false;
+	val = getenv(env);
+	if (val && *val)
+		return true;
+	rc = fyai_secret_kernel_get(fy_sprintfa("fyai:api-key/%s", name),
+				    &secret, &len);
+	if (rc != FYAI_SECRET_OK)
+		return false;
+	fyai_secret_clear_and_free(&secret, &len);
+	return true;
+}
+
+/*
+ * The name of a keyed provider that offers the model @model, interned in
+ * @gb, else "". @keyed is the sequence of the keyed providers.
+ */
+static const char *catalog_model_key_provider(struct fy_generic_builder *gb,
+					      fy_generic keyed,
+					      const char *model)
+{
+	fy_generic p, o, v;
+
+	fy_foreach(p, keyed) {
+		fy_foreach(o, fy_get(p, "models", fy_invalid)) {
+			v = fy_get(o, "canonical_id", fy_invalid);
+			if (!fy_is_string(v) || strcmp(fy_castp(&v, ""), model))
+				continue;
+			v = fy_get(p, "name", fy_invalid);
+			return fy_gb_intern_string(gb, fy_castp(&v, ""));
+		}
+	}
+	return "";
+}
+
 fy_generic fyai_catalog_list_data(struct fyai_ctx *ctx,
 				  struct fy_generic_builder *gb,
-				  const char *what)
+				  const char *what, bool available)
 {
-	fy_generic cat, rows, m, p, e, protocols;
+	fy_generic cat, rows, m, p, e, protocols, keyed, v;
+	const char *name, *key;
 
 	cat = fyai_catalog_effective(ctx->arena_catalog, ctx->cfg->gb);
 	fyai_error_check(ctx, fy_is_valid(cat), err, "none available");
 	rows = fy_seq_empty;
 	if (!strcmp(what, "providers")) {
 		fy_foreach(p, fy_get(cat, "providers", fy_invalid)) {
+			v = fy_get(p, "name", fy_invalid);
+			name = fy_castp(&v, "");
+			if (available && !catalog_provider_keyed(ctx, name))
+				continue;
 			protocols = fy_seq_empty;
 			fy_foreach(e, fy_get(p, "endpoints", fy_invalid))
 				protocols = fy_append(gb, protocols,
@@ -1281,12 +1342,26 @@ fy_generic fyai_catalog_list_data(struct fyai_ctx *ctx,
 		}
 		return rows;
 	}
-	fy_foreach(m, fy_get(cat, "models", fy_invalid))
+	keyed = fy_seq_empty;
+	fy_foreach(p, fy_get(cat, "providers", fy_invalid)) {
+		v = fy_get(p, "name", fy_invalid);
+		name = fy_castp(&v, "");
+		if (catalog_provider_keyed(ctx, name))
+			keyed = fy_append(gb, keyed, p);
+	}
+	fy_foreach(m, fy_get(cat, "models", fy_invalid)) {
+		v = fy_get(m, "name", fy_invalid);
+		name = fy_castp(&v, "");
+		key = catalog_model_key_provider(gb, keyed, name);
+		if (available && !*key)
+			continue;
 		rows = fy_append(gb, rows, fy_mapping(gb,
 			"name", fy_get(m, "name", fy_invalid),
 			"context_window", fy_get(m, "context_window", 0LL),
 			"max_output_tokens", fy_get(m, "max_output_tokens",
-						    0LL)));
+						    0LL),
+			"key_provider", key));
+	}
 	return rows;
 err:
 	return fy_invalid;

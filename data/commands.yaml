@@ -2202,6 +2202,9 @@ commands:
               description: what to list
               x-fyai-positional: 0
               x-fyai-meta: WHAT
+            available:
+              type: boolean
+              description: list only what has a credential here
 
       - command: tools
         title: list the tools of a coding agent
