@@ -38,6 +38,10 @@ grep -q 9418 "$TEST_DIR/profile.out" || fail 'the dev profile is not in the stor
 (cd fresh && "$FYAI_BIN" -k test-key config get sandbox_profiles/lockdown/view >"$TEST_DIR/profile.out" 2>&1)
 grep -q true "$TEST_DIR/profile.out" || fail 'the lockdown profile is not in the stored configuration'
 
+(cd fresh && "$FYAI_BIN" -k test-key config get sandbox_profiles/dev-view >"$TEST_DIR/profile.out" 2>&1)
+grep -q 'extends: dev' "$TEST_DIR/profile.out" && grep -q 'view: true' "$TEST_DIR/profile.out" ||
+	fail 'the dev-view profile is not in the stored configuration'
+
 # The dev profile enables the sandbox although `sandbox` is off.
 shell_with 'sandbox: false
 sandbox_profile: dev' 'cat ~/.ssh/id_test || echo deny-ok'
@@ -90,6 +94,10 @@ assert_stdout_contains cargo-tool
 RELEASE="$(uname -r)"
 if [ "$(printf '%s\n6.7\n' "${RELEASE%%-*}" | sort -V | head -n 1)" = 6.7 ]; then
 	shell_with 'sandbox_profile: dev' "$CONNECT || echo net-denied"
+	assert_stdout_contains net-denied
+	assert_stdout_not_contains connected
+	# dev-view confines the tools as dev does; it differs by the view alone.
+	shell_with 'sandbox_profile: dev-view' "$CONNECT || echo net-denied"
 	assert_stdout_contains net-denied
 	assert_stdout_not_contains connected
 	shell_with "sandbox_profile: t
