@@ -18,21 +18,70 @@
 # the page out of the build and the install with a message, not an error. The end-to-end target needs a provider key and
 # runs fyai's mock provider, so it is never part of CTest.
 #
-# FYAI_DESKTOP=ON, on Linux, also packages the Electron app (about 350 MB,
-# and a download of Electron) and installs it under share/fyai/desktop with a
-# fyai-desktop launcher, a menu entry and an icon. The installed app uses the
-# fyai installed beside it.
+# The source tree is never written. npm, Vite, the icon generator and the
+# packager all write beside their input, so fyai-web-stage links web/ into
+# the build directory and every target runs there: node_modules, dist,
+# fyai-bundle and dist-app are all under <build>/web.
 #
 # FYAI_DESKTOP=ON, on Linux, also packages the Electron app (about 350 MB,
 # and a download of Electron) and installs it under share/fyai/desktop with a
 # fyai-desktop launcher, a menu entry and an icon. The installed app uses the
 # fyai installed beside it.
 
-set(FYAI_WEB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/web")
+set(FYAI_WEB_SRC "${CMAKE_CURRENT_SOURCE_DIR}/web")
+set(FYAI_WEB_DIR "${CMAKE_CURRENT_BINARY_DIR}/web")
 set(FYAI_WEB_STAMP "${CMAKE_CURRENT_BINARY_DIR}/web-test.stamp")
 
 find_program(FYAI_NPM_EXECUTABLE npm)
 find_program(FYAI_NODE_EXECUTABLE node)
+find_program(FYAI_RSYNC_EXECUTABLE rsync)
+
+# The options of the copy of web/, one list for the probe and the target.
+# The output directories are excluded by name as well as by .gitignore: a file
+# that only a filter rule hides is not protected from --delete by every rsync.
+set(FYAI_WEB_RSYNC_OPTS -a --delete --chmod=Du+rwx --exclude=.git
+    --exclude=/node_modules --exclude=/dist --exclude=/dist-app
+    --exclude=/fyai-bundle --exclude=/.svelte-kit --exclude=/test-results
+    "--filter=:- .gitignore")
+
+# rsync must work, not only exist: the probe runs the options of the copy
+# on a small tree, with a hard link, an ignored file and an output directory
+# that the copy must neither take nor delete.
+set(FYAI_RSYNC_WORKS OFF)
+if(FYAI_RSYNC_EXECUTABLE)
+    set(_probe "${CMAKE_CURRENT_BINARY_DIR}/rsync-probe")
+    file(REMOVE_RECURSE "${_probe}")
+    file(MAKE_DIRECTORY "${_probe}/src")
+    file(WRITE "${_probe}/src/kept" "kept\n")
+    file(WRITE "${_probe}/src/skipped" "skipped\n")
+    file(WRITE "${_probe}/src/.gitignore" "skipped\n")
+    file(WRITE "${_probe}/dst/fyai-bundle/kept" "kept\n")
+    execute_process(
+        COMMAND "${FYAI_RSYNC_EXECUTABLE}" ${FYAI_WEB_RSYNC_OPTS}
+            "--link-dest=${_probe}/src/" "${_probe}/src/" "${_probe}/dst/"
+        RESULT_VARIABLE _rc
+        OUTPUT_QUIET ERROR_QUIET)
+    if(_rc EQUAL 0 AND EXISTS "${_probe}/dst/kept"
+       AND NOT EXISTS "${_probe}/dst/skipped"
+       AND EXISTS "${_probe}/dst/fyai-bundle/kept")
+        set(FYAI_RSYNC_WORKS ON)
+    endif()
+    file(REMOVE_RECURSE "${_probe}")
+    unset(_probe)
+    unset(_rc)
+endif()
+
+if(NOT FYAI_RSYNC_WORKS)
+    set(_msg "rsync is needed to link the web sources into the build "
+        "directory, and ${FYAI_RSYNC_EXECUTABLE} does not work with the "
+        "options of the copy (-a --delete --chmod --link-dest --filter)")
+    if(NOT FYAI_RSYNC_EXECUTABLE)
+        set(_msg "rsync is needed to link the web sources into the build "
+            "directory, and it was not found")
+    endif()
+    string(CONCAT _msg ${_msg})
+    message(STATUS "${_msg}; the web targets cannot build")
+endif()
 
 if(NOT FYAI_NPM_EXECUTABLE)
     message(STATUS "npm not found; the web page and its tests cannot build")
@@ -58,12 +107,38 @@ if(FYAI_NPM_EXECUTABLE AND FYAI_NODE_EXECUTABLE)
     endif()
 endif()
 
+# The page is part of the build only with a working rsync.
+if(FYAI_WEB AND FYAI_WEB_CAN_BUILD AND NOT FYAI_RSYNC_WORKS)
+    message(FATAL_ERROR "FYAI_WEB=ON: ${_msg}")
+endif()
+
 # npm starts `node` through the PATH. A root shell has another PATH than the
 # one that configured the build, and its node can be too old, so every npm
 # command runs with the directory of the node that was checked in front.
 get_filename_component(FYAI_NODE_DIR "${FYAI_NODE_EXECUTABLE}" DIRECTORY)
 set(FYAI_WEB_NPM "${CMAKE_COMMAND}" -E env "PATH=${FYAI_NODE_DIR}:$ENV{PATH}"
     "${FYAI_NPM_EXECUTABLE}")
+
+# The copy of web/ that the targets run in. The ignore rules of web/ keep the
+# outputs of an earlier build in the source tree out of the copy, and keep
+# the outputs already in the copy from being deleted. A file is a hard link to
+# the source when both are on one filesystem, else a copy; no tool writes a
+# source file, so the link is never written through. A directory is real and
+# writable, because the generators add files to it.
+if(FYAI_RSYNC_WORKS)
+    add_custom_target(fyai-web-stage
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${FYAI_WEB_DIR}"
+        COMMAND "${FYAI_RSYNC_EXECUTABLE}" ${FYAI_WEB_RSYNC_OPTS}
+            "--link-dest=${FYAI_WEB_SRC}/" "${FYAI_WEB_SRC}/" "${FYAI_WEB_DIR}/"
+        COMMENT "linking the web sources into the build directory"
+        VERBATIM)
+else()
+    add_custom_target(fyai-web-stage
+        COMMAND "${CMAKE_COMMAND}" -E echo "${_msg}"
+        COMMAND "${CMAKE_COMMAND}" -E false
+        COMMENT "checking for rsync"
+        VERBATIM)
+endif()
 
 # The dependencies of the page. npm ci writes node_modules/.package-lock.json,
 # so that file is the stamp: a newer lock file makes an install again and an
@@ -74,22 +149,23 @@ set(FYAI_WEB_MODULES "${FYAI_WEB_DIR}/node_modules/.package-lock.json")
 add_custom_command(OUTPUT "${FYAI_WEB_MODULES}"
     COMMAND ${FYAI_WEB_NPM} ci
     COMMENT "installing the page's dependencies"
-    DEPENDS "${FYAI_WEB_DIR}/package-lock.json"
+    DEPENDS "${FYAI_WEB_SRC}/package-lock.json"
     WORKING_DIRECTORY "${FYAI_WEB_DIR}"
     USES_TERMINAL
     VERBATIM)
 
 add_custom_target(fyai-web-install DEPENDS "${FYAI_WEB_MODULES}")
+add_dependencies(fyai-web-install fyai-web-stage)
 
 # The page, from every source file that builds it.
 file(GLOB_RECURSE FYAI_WEB_SOURCES CONFIGURE_DEPENDS
-    "${FYAI_WEB_DIR}/src/*"
-    "${FYAI_WEB_DIR}/static/*")
+    "${FYAI_WEB_SRC}/src/*"
+    "${FYAI_WEB_SRC}/static/*")
 list(APPEND FYAI_WEB_SOURCES
-    "${FYAI_WEB_DIR}/package.json"
-    "${FYAI_WEB_DIR}/svelte.config.js"
-    "${FYAI_WEB_DIR}/vite.config.ts")
-list(FILTER FYAI_WEB_SOURCES EXCLUDE REGEX "/node_modules/")
+    "${FYAI_WEB_SRC}/package.json"
+    "${FYAI_WEB_SRC}/svelte.config.js"
+    "${FYAI_WEB_SRC}/vite.config.ts")
+list(FILTER FYAI_WEB_SOURCES EXCLUDE REGEX "/(node_modules|dist|dist-app|fyai-bundle)/")
 
 set(FYAI_WEB_PAGE "${FYAI_WEB_DIR}/dist/index.html")
 
@@ -112,10 +188,10 @@ add_dependencies(fyai-web fyai-web-install)
 add_custom_target(fyai-web-dev
     COMMAND "${CMAKE_COMMAND}" -E env
         "FYAI_BIN=$<TARGET_FILE:fyai>" "FYAI_BRIDGE_CWD=${CMAKE_CURRENT_SOURCE_DIR}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/web/scripts/dev.sh"
+        "${FYAI_WEB_DIR}/scripts/dev.sh"
     COMMENT "serving the page in development"
-    DEPENDS fyai
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    DEPENDS fyai fyai-web-stage
+    WORKING_DIRECTORY "${FYAI_WEB_DIR}"
     USES_TERMINAL
     VERBATIM)
 
@@ -144,7 +220,7 @@ add_custom_target(fyai-web-turn
         "TD=${CMAKE_CURRENT_BINARY_DIR}/web-turn"
         bash "${FYAI_WEB_DIR}/server/test-turn.sh" chat_stream.json hello conv-1
     COMMENT "running one turn of the page against the mock provider"
-    DEPENDS fyai fyai-web-install
+    DEPENDS fyai fyai-web-stage fyai-web-install
     USES_TERMINAL
     VERBATIM)
 
@@ -155,7 +231,7 @@ add_custom_target(fyai-desktop
         "${FYAI_WEB_DIR}/scripts/desktop.sh"
     COMMENT "opening the desktop window"
     DEPENDS fyai-web
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    WORKING_DIRECTORY "${FYAI_WEB_DIR}"
     USES_TERMINAL
     VERBATIM)
 
@@ -165,7 +241,7 @@ add_custom_target(fyai-desktop-package
         "${FYAI_WEB_DIR}/scripts/package.sh" --bundle-fyai
     COMMENT "packaging the desktop app with fyai"
     DEPENDS fyai-web
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    WORKING_DIRECTORY "${FYAI_WEB_DIR}"
     USES_TERMINAL
     VERBATIM)
 
@@ -177,12 +253,12 @@ if(FYAI_WEB AND FYAI_WEB_CAN_BUILD)
     set(FYAI_WEB_SHARE "${CMAKE_INSTALL_DATAROOTDIR}/fyai/web")
     file(RELATIVE_PATH FYAI_WEB_SHARE_RELATIVE
         "/${CMAKE_INSTALL_BINDIR}" "/${FYAI_WEB_SHARE}")
-    configure_file("${FYAI_WEB_DIR}/scripts/fyai-web.in"
+    configure_file("${FYAI_WEB_SRC}/scripts/fyai-web.in"
         "${CMAKE_CURRENT_BINARY_DIR}/fyai-web" @ONLY)
     install(DIRECTORY "${FYAI_WEB_DIR}/dist"
         DESTINATION "${FYAI_WEB_SHARE}")
-    install(FILES "${FYAI_WEB_DIR}/server/bridge.mjs"
-        "${FYAI_WEB_DIR}/server/protocol.mjs"
+    install(FILES "${FYAI_WEB_SRC}/server/bridge.mjs"
+        "${FYAI_WEB_SRC}/server/protocol.mjs"
         DESTINATION "${FYAI_WEB_SHARE}/server")
     install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/fyai-web"
         DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -207,7 +283,7 @@ if(FYAI_WEB AND FYAI_WEB_CAN_BUILD)
 
         file(RELATIVE_PATH FYAI_DESKTOP_SHARE_RELATIVE
             "/${CMAKE_INSTALL_BINDIR}" "/${FYAI_DESKTOP_SHARE}")
-        configure_file("${FYAI_WEB_DIR}/scripts/fyai-desktop.in"
+        configure_file("${FYAI_WEB_SRC}/scripts/fyai-desktop.in"
             "${CMAKE_CURRENT_BINARY_DIR}/fyai-desktop" @ONLY)
         install(DIRECTORY "${FYAI_DESKTOP_DIR}/"
             DESTINATION "${FYAI_DESKTOP_SHARE}"
@@ -221,10 +297,10 @@ if(FYAI_WEB AND FYAI_WEB_CAN_BUILD)
                 GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)
         install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/fyai-desktop"
             DESTINATION "${CMAKE_INSTALL_BINDIR}")
-        install(FILES "${FYAI_WEB_DIR}/scripts/fyai.desktop.in"
+        install(FILES "${FYAI_WEB_SRC}/scripts/fyai.desktop.in"
             DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications"
             RENAME fyai.desktop)
-        install(FILES "${FYAI_WEB_DIR}/static/pwa-512x512.png"
+        install(FILES "${FYAI_WEB_SRC}/static/pwa-512x512.png"
             DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps"
             RENAME fyai.png)
     elseif(FYAI_DESKTOP)
