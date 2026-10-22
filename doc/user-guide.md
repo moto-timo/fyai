@@ -1155,7 +1155,10 @@ supervisor first applies the changes of the view to the project, as `/session pu
 does, and refuses the switch when a path conflicts with the project: nothing changes
 then, and the stored profile is put back. The new session runs in a view or outside
 one as the profile says. A session that runs outside a view starts again in one for
-a profile that asks for it. The credential must then come from the environment or
+a profile that asks for it. A session that ends from an idle prompt applies its view
+to the project when no path conflicts (`view/apply_on_exit`); a new session refuses to
+start while the view holds a change that the project does not have, and names `view
+apply session` and `view remove session`. The credential must then come from the environment or
 `fyai auth`, not from `-k`, because the new session has no command line to carry it.
 `/session dev`,
 `/session lockdown` and `/session yolo` select `dev`, `lockdown` and `normal` and set

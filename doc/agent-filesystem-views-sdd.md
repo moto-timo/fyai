@@ -1939,9 +1939,20 @@ kept across sessions, and `undo` is a command of a session.
 requests captures the view `session` and runs again inside it, with the same
 command line, on the same branch (`FYAI_BRANCH`). The terminal, the signals and
 the exit status go through the same code as `view enter`. At the end the
-invocation records the result and prints a notice that names the branch and the
-commands to review and apply the result. The view is on that branch, so name
-the branch with `-b` for a later command. A session in a view shares the view
+invocation records the result. A session that ends from an idle prompt (exit
+status 0: `/exit`, Ctrl-D, or Ctrl-C at an idle prompt) applies its view to the
+project when no path conflicts, as `view apply` does, and says so; `view/apply_on_exit:
+false` turns this off. A session that a signal stopped, or whose paths conflict with
+the project, keeps its view, and the notice names the branch and the commands to
+review and apply the result. The view is on that branch, so name the branch with `-b`
+for a later command. A new session replaces the view with a capture of the project, and
+the changes that the old view held would be lost. The invocation therefore compares the
+recorded result of the view with the project before it starts, and refuses while an
+apply would still write or conflict, or while the state of the view is not `ready`,
+because a session that did not end cleanly may hold changes that it did not record. The
+refusal names `view apply session`, which writes them to the project, and `view remove
+session`, which drops them. A view that nothing separates from the project is replaced
+without a question. A session in a view shares the view
 with its sub-agents; `isolated` does nothing there. With credential isolation the
 supervisor admits the session at the transport when the session enters its view,
 and the session keeps the control connection of the supervisor for the run.

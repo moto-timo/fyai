@@ -34,6 +34,9 @@
 - **Turn control.** A turn reports why it stopped and can stop at a cost; a
   turn can answer with structured output; `branch` can start a fresh session
   from a branch.
+- A session that runs in a view applies the view to the project when it ends from
+  an idle prompt and no path conflicts (`view/apply_on_exit`). A new session
+  refuses to start while the view holds a change that the project does not have.
 - `FYAI_CAST` records a terminal session; the mock provider is served by a
   hidden `fyai` verb.
 - `patch` accepts a unified diff inside the Begin Patch envelope.

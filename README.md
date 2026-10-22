@@ -402,6 +402,11 @@ view:
   isolate_session: true
 ```
 
+A session that ends from an idle prompt applies its view to the project when no path
+conflicts (`view/apply_on_exit`, on by default). Otherwise the changes stay in the
+view, and a new session refuses to start until you run `view apply session` or `view
+remove session`, so nothing is lost without a word.
+
 Sub-agents can each get a view of their own, which lets several of them edit
 the same tree in parallel without touching it:
 
