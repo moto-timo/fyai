@@ -186,8 +186,10 @@ bridge under `share/fyai/web`, and a `fyai-web` launcher in `bin`. The launcher
 serves the page on `http://127.0.0.1:9331` and runs fyai in the current
 directory; it needs only `node` at run time. The page needs node 20 or later
 to build: with an older node, `FYAI_WEB=ON` leaves the page out and says so.
-Build first and install second (`make && sudo make install`), so that `npm`
-does not run as root.
+Build first and install second (`make && sudo make install`): the page and
+`node_modules` are rebuilt only when a source is newer, so an up-to-date build
+runs no `npm` as root. When `npm` does run, it runs with the node that
+configured the build in front of the `PATH`, whatever `PATH` a root shell has.
 
 `FYAI_DESKTOP=ON` (Linux, with `FYAI_WEB=ON`) also packages the desktop app
 and installs it under `share/fyai/desktop`, with a `fyai-desktop` launcher, a
