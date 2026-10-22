@@ -2043,7 +2043,8 @@ cannot create files in the project root. Install the profile with
 `fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai` and
 `sudo apparmor_parser -r /etc/apparmor.d/fyai`. The profile grants that
 permission and confines nothing else. The other fix is to install
-bubblewrap, which Ubuntu lets make a user namespace; see `sandbox_cover`.
+bubblewrap with its AppArmor profile; see `sandbox_cover` and
+doc/apparmor-userns.md.
 
 
 ### Options

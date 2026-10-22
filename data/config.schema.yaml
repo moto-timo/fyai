@@ -755,11 +755,12 @@ properties:
       carve-out that stands in for the denial leaves a tool unable to create an
       entry in the project root. A tool therefore hides the paths in a mount
       namespace. `userns` makes the namespaces in the tool. `bwrap` starts a
-      bubblewrap process once, which holds them, and the tool joins them: Ubuntu
-      lets bubblewrap make a user namespace when it does not let an unconfined
-      program do so. `auto` tries `userns`, then `bwrap`. `none` leaves it to
-      Landlock. Where a cover is not possible, fyai says so at the start and
-      names the fix: `fyai sandbox apparmor`, or bubblewrap.
+      bubblewrap process once, which holds them, and the tool joins them. That
+      works where the host lets bubblewrap make a user namespace, which on a host
+      with the AppArmor restriction needs a profile for it. `auto` tries `userns`,
+      then `bwrap`. `none` leaves it to Landlock. Where a cover is not possible,
+      fyai says so at the start and names the fix: `fyai sandbox apparmor`, or
+      bubblewrap with its AppArmor profile.
   sandbox_profile:
     x-fyai-model: read
     x-fyai-complete: sandbox-profile

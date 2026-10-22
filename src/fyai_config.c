@@ -2597,8 +2597,9 @@ static void config_cover_report(struct fyai_ctx *ctx, const char *key)
 			 "is not usable", key);
 	fyai_cfg_warning(cfg, "to fix it, install the AppArmor profile: `fyai sandbox apparmor "
 			 "| sudo tee /etc/apparmor.d/fyai >/dev/null && sudo apparmor_parser -r "
-			 "/etc/apparmor.d/fyai`; or install bubblewrap (`sudo apt install "
-			 "bubblewrap`); or set `sandbox_cover: none` to keep this and say no more");
+			 "/etc/apparmor.d/fyai`; or install bubblewrap with its AppArmor profile "
+			 "(doc/apparmor-userns.md); or set `sandbox_cover: none` to keep this and "
+			 "say no more");
 }
 
 void fyai_config_sandbox_report(struct fyai_ctx *ctx)
