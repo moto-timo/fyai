@@ -877,6 +877,53 @@ static void ui_note_set(struct fyai_ui *ui, const char *heading,
 		ui_note_clear(ui);
 }
 
+/* Whether the row of @len bytes at @row reports an error. */
+static bool ui_log_row_is_error(const char *row, size_t len)
+{
+	const char *e, *w;
+	char *copy = strndup(row, len);
+	bool error;
+
+	if (!copy)
+		return false;
+	e = strstr(copy, "error:");
+	w = strstr(copy, "warning:");
+	error = e && (!w || e < w);
+	free(copy);
+	return error;
+}
+
+/*
+ * The text of an entry of the log with the rows that report an error first.
+ * The compact log shows the first rows of the newest entry, and the cause of
+ * a failure must not stand below the warnings that came before it.
+ */
+static char *ui_log_errors_first(const char *text, size_t len)
+{
+	size_t start, end, n = 0;
+	char *out;
+	int pass;
+
+	out = malloc(len + 1);
+	if (!out)
+		return NULL;
+	for (pass = 0; pass < 2; pass++) {
+		for (start = 0; start < len; start = end) {
+			for (end = start; end < len && text[end] != '\n'; )
+				end++;
+			if (end < len)
+				end++;
+			if (ui_log_row_is_error(text + start, end - start) ==
+			    (pass == 0)) {
+				memcpy(out + n, text + start, end - start);
+				n += end - start;
+			}
+		}
+	}
+	out[n] = '\0';
+	return out;
+}
+
 /*
  * Keep a result of a fullscreen session in the log. A short result at the
  * filter or above also stands above the status while the popup is hidden; a
@@ -891,7 +938,8 @@ static void ui_popup_append(struct fyai_ui *ui, enum fyai_error_type level,
 
 	e.level = level;
 	e.heading = strdup(heading);
-	e.text = strndup(text, len);
+	e.text = level == FYAIET_ERROR ? ui_log_errors_first(text, len) :
+		 strndup(text, len);
 	if (!e.heading || !e.text) {
 		ui_log_entry_free(&e);
 		fyai_warning(ui->ctx, "cannot keep the result in the log");
