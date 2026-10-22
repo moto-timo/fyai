@@ -5445,6 +5445,7 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	free(ctx->patch_display);
 	ctx->patch_display = NULL;
 	fyai_output_cleanup(ctx);		/* the document it has open */
+	fyai_diag_reset(&ctx->cfg->diag);	/* what the parent has not drained yet */
 	fyai_cover_abandon(&ctx->cover);	/* the holder that it does not own */
 	fyai_skill_dirs_abandon(ctx);		/* the skills it wrote out */
 	fyai_settings_abandon(ctx);		/* and the exports */
