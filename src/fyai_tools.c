@@ -817,6 +817,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	sp->project_root = sb->root;
 	sp->scratch_root = ctx->cfg->view_scratch;
 	sp->strict = false;			/* floor is the config policy */
+	sp->filter_path = true;
 
 	/* deny: always the arena, then each config sandbox.deny entry. */
 	deny = fy_get(cs, "deny");

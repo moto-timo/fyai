@@ -119,12 +119,28 @@ struct fyai_sandbox_spec {
 	size_t udp_bind_ports_n;
 
 	/*
+	 * Remove from PATH every entry that the grants do not reach: a relative
+	 * or empty entry, one under a denied path, and one outside the system,
+	 * scratch, project and allow trees. A tool then cannot find a program
+	 * that it could not run. Applied with the ruleset, in the child.
+	 */
+	bool filter_path;
+
+	/*
 	 * When Landlock is unavailable or too old for the requested policy:
 	 * strict fails the exec (fail-closed); non-strict proceeds unconfined
 	 * (the config policy / prompt remains the portable floor).
 	 */
 	bool strict;
 };
+
+/*
+ * True when @dir is an absolute path without a ".." segment that @spec lets a
+ * tool execute from: it is under a system, scratch, project, scratch_root or
+ * allow tree and under no denied path.
+ */
+bool fyai_sandbox_path_visible(const struct fyai_sandbox_spec *spec,
+			       const char *dir);
 
 /* Highest supported Landlock ABI (>=1), 0 if unsupported, <0 on error. */
 int fyai_sandbox_abi(void);

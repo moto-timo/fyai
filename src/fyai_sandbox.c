@@ -404,6 +404,83 @@ bool fyai_sandbox_udp_restrictable(int abi)
 #endif
 }
 
+/* True when @path is @root or beneath it. */
+static bool path_within(const char *path, const char *root)
+{
+	size_t n = strlen(root);
+
+	while (n > 1 && root[n - 1] == '/')
+		n--;
+	if (n == 1 && root[0] == '/')
+		return true;
+	return !strncmp(path, root, n) && (path[n] == '/' || path[n] == '\0');
+}
+
+bool fyai_sandbox_path_visible(const struct fyai_sandbox_spec *spec,
+			       const char *dir)
+{
+	const char *const *p;
+	const char *s;
+	size_t i;
+	bool seen;
+
+	if (!dir || dir[0] != '/')
+		return false;
+	for (s = dir; *s; s++)
+		if (s[0] == '/' && s[1] == '.' && s[2] == '.' &&
+		    (s[3] == '/' || s[3] == '\0'))
+			return false;
+	for (i = 0; i < spec->deny_n; i++)
+		if (path_within(dir, spec->deny[i]))
+			return false;
+	seen = false;
+	for (p = fyai_sys_ro; *p && !seen; p++)
+		seen = path_within(dir, *p);
+	for (p = fyai_scratch_rw; *p && !seen; p++)
+		seen = path_within(dir, *p);
+	if (spec->project_root && path_within(dir, spec->project_root))
+		seen = true;
+	if (spec->scratch_root && path_within(dir, spec->scratch_root))
+		seen = true;
+	for (i = 0; i < spec->allow_n && !seen; i++)
+		seen = path_within(dir, spec->allow[i].path);
+	return seen;
+}
+
+/*
+ * Rewrite PATH to the entries that the grants reach. The child owns its
+ * environment, and the buffer is on the stack: no allocation after the fork.
+ * Nothing left selects the system directories.
+ */
+static void sandbox_filter_path(const struct fyai_sandbox_spec *spec)
+{
+	static const char fallback[] = "/usr/local/bin:/usr/bin:/bin";
+	char out[8192], dir[4096];
+	const char *path = getenv("PATH"), *end;
+	size_t len, used = 0;
+
+	if (!path)
+		return;
+	out[0] = '\0';
+	while (*path) {
+		end = strchr(path, ':');
+		len = end ? (size_t)(end - path) : strlen(path);
+		if (len && len < sizeof(dir)) {
+			memcpy(dir, path, len);
+			dir[len] = '\0';
+			if (fyai_sandbox_path_visible(spec, dir) &&
+			    used + len + 2 <= sizeof(out)) {
+				if (used)
+					out[used++] = ':';
+				memcpy(out + used, dir, len + 1);
+				used += len;
+			}
+		}
+		path = end ? end + 1 : path + len;
+	}
+	setenv("PATH", used ? out : fallback, 1);
+}
+
 int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
 {
 	struct landlock_ruleset_attr attr = {0};
@@ -511,6 +588,8 @@ int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
 		goto out;
 	if (ll_restrict_self(fd, 0))
 		goto out;
+	if (spec->filter_path)
+		sandbox_filter_path(spec);
 	rc = 0;
 out:
 	close(fd);
@@ -539,6 +618,13 @@ bool fyai_sandbox_udp_restrictable(int abi)
 {
 	(void)abi;
 	return false;
+}
+
+bool fyai_sandbox_path_visible(const struct fyai_sandbox_spec *spec,
+			       const char *dir)
+{
+	(void)spec;
+	return dir && dir[0] == '/';
 }
 
 int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
