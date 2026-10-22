@@ -2222,8 +2222,16 @@ static int fyai_turn_run_collect_tools(struct fyai_turn_run *run)
 		ok = false;
 		rc = fyai_tool_job_group_collect(run->tool_group,
 						 group_index++, &result, &ok);
-		fyai_error_check(ctx, !rc, err,
-				 "could not collect tool job result");
+		/* Test hook for a call that has no result. */
+		if (!rc && getenv("FYAI_TEST_COLLECT_FAIL"))
+			rc = -1;
+		/* The model answers for a call that has no result. */
+		if (rc || fy_is_invalid(result)) {
+			fyai_warning(ctx, "a tool call returned no result");
+			result = fy_value(ctx->transient_gb,
+					  "tool error: the call returned no result");
+			ok = false;
+		}
 		run->turn = fyai_finish_tool_call(ctx, run->turn, tool_call,
 						 result, ok, false);
 		fyai_error_check(ctx, fy_is_valid(run->turn), err,
