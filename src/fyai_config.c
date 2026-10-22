@@ -3203,6 +3203,39 @@ const char *fyai_config_provider_env_key(struct fy_generic_builder *gb,
 
 /* Resolve the model offering, provider, wire id, and derived endpoint. */
 /*
+ * True when the URL in force is one that fyai derived, rather than one the
+ * user named: a built-in default, or the endpoint of any provider in the
+ * catalogue. A derived URL belongs to the grammar it was derived for, so it
+ * can be re-derived when the grammar changes; a URL that is none of these is
+ * a proxy the user chose, and stays.
+ */
+static bool config_api_url_is_derived(fy_generic catalog, const char *url)
+{
+	fy_generic providers, provider, endpoints, endpoint;
+	const char *root;
+
+	if (!url || !*url)
+		return true;
+	if (!strcmp(url, OPENAI_RESPONSES_URL) ||
+	    !strcmp(url, OPENAI_CHAT_COMPLETIONS_URL) ||
+	    !strcmp(url, ANTHROPIC_MESSAGES_URL))
+		return true;
+	providers = fy_get(catalog, "providers");
+	fy_foreach(provider, providers) {
+		root = fy_get(provider, "root_url", "");
+		endpoints = fy_get(provider, "endpoints");
+		fy_foreach(endpoint, endpoints) {
+			const char *path = fy_get(endpoint, "endpoint", "");
+
+			if (*root && *path &&
+			    !strcmp(url, fy_sprintfa("%s%s", root, path)))
+				return true;
+		}
+	}
+	return false;
+}
+
+/*
  * A change of `api` alone leaves the URL of the old grammar. When the stored
  * URL is the catalogue URL of another grammar of the provider, the user did
  * not choose it: keep the grammar and derive the URL from it. Keep any other
@@ -3290,19 +3323,42 @@ static int config_resolve_catalog_model(struct fyai_cfg *cfg,
 	if (*pmid)
 		cfg->model = fy_gb_intern_string(cfg->gb, pmid);
 
+	/*
+	 * The grammar and its URL are one choice. A stored pair belongs to the
+	 * provider the model had when it was stored, so a model of another
+	 * provider can arrive with a grammar that provider does not speak: the
+	 * request is then built for one API and sent to the endpoint of another,
+	 * and the server rejects it (an Anthropic Messages endpoint answering a
+	 * Responses body complains about `tool_choice`, which one spells as a
+	 * string and the other as an object).
+	 */
+	cat_ep = fyai_catalog_endpoint(cat_prov, cfg->api_mode);
+	if (fy_is_valid(cat_prov) && fy_is_invalid(cat_ep)) {
+		/* Take the first grammar the provider offers that fyai speaks. */
+		for (i = 0; i < FYAI_API_COUNT && fy_is_invalid(cat_ep); i++) {
+			cat_ep = fyai_catalog_endpoint(cat_prov,
+					(enum fyai_api_mode)i);
+			if (fy_is_valid(cat_ep))
+				cfg->api_mode = (enum fyai_api_mode)i;
+		}
+		if (fy_is_valid(cat_ep)) {
+			if (config_api_url_is_derived(catalog, cfg->api_url))
+				cfg->api_url = fy_gb_intern_string(cfg->gb,
+						fy_sprintfa("%s%s",
+							fy_get(cat_prov, "root_url", ""),
+							fy_get(cat_ep, "endpoint", "")));
+			else
+				/* The user named this URL: keep it, and say the
+				 * grammar it must now accept. */
+				fyai_cfg_notice(cfg, "api_url %s is kept for "
+						"model '%s', which speaks %s; the "
+						"endpoint must accept that grammar",
+						cfg->api_url, cfg->model,
+						fyai_api_to_string(cfg->api_mode));
+		}
+	}
 	if (!cfg->api_url || !*cfg->api_url) {
 		cat_ep = fyai_catalog_endpoint(cat_prov, cfg->api_mode);
-		if (fy_is_invalid(cat_ep) &&
-		    fy_is_valid(cat_prov)) {
-			/* provider does not speak the current grammar: take
-			 * the first one it offers that fyai supports */
-			for (i = 0; i < FYAI_API_COUNT && fy_is_invalid(cat_ep); i++) {
-				cat_ep = fyai_catalog_endpoint(cat_prov,
-						(enum fyai_api_mode)i);
-				if (fy_is_valid(cat_ep))
-					cfg->api_mode = (enum fyai_api_mode)i;
-			}
-		}
 		if (fy_is_valid(cat_ep))
 			cfg->api_url = fy_gb_intern_string(cfg->gb,
 					fy_sprintfa("%s%s",
