@@ -1,5 +1,6 @@
 import { PROMPT_TRIGGER_PREFIX } from '$lib/constants';
 import { ChatFormCommandAction, KeyboardKey } from '$lib/enums';
+import { fyaiCommandsStore } from '$lib/stores/fyai-commands.svelte';
 import type { ChatFormCommand } from '$lib/types';
 import { getChatCommands } from '$lib/utils';
 import {
@@ -42,6 +43,8 @@ export interface UseChatFormPickersOptions {
  * textarea/caret/attachment handling stays in the chat form.
  */
 export function useChatFormPickers(opts: UseChatFormPickersOptions) {
+	void fyaiCommandsStore.load();
+
 	let isCommandPickerOpen = $state(false);
 	let commandQuery = $state('');
 	let isPromptPickerOpen = $state(false);
@@ -61,6 +64,7 @@ export function useChatFormPickers(opts: UseChatFormPickersOptions) {
 	const mentionScopePath = $derived(opts.getCwd() ?? opts.getServerHome() ?? null);
 	const availableCommands = $derived(
 		getChatCommands({
+			fyaiCommands: fyaiCommandsStore.commands,
 			hasCwdTools: opts.hasCwdTools,
 			hasPrompts: opts.hasPrompts,
 			showModelSelector: opts.getShowModelSelector()
@@ -96,6 +100,16 @@ export function useChatFormPickers(opts: UseChatFormPickersOptions) {
 
 				workingDirectoryQuery = trimmed;
 				isWorkingDirectoryPickerOpen = true;
+
+				break;
+			}
+			case ChatFormCommandAction.FYAI: {
+				/* The bridge runs the line; the words after the name are the user's. */
+				const line = `/${command.name} ${args.trim()}`.trimEnd() + ' ';
+
+				isWorkingDirectoryPickerOpen = false;
+				opts.setValue(line);
+				queueMicrotask(() => opts.setCaretOffset(line.length));
 
 				break;
 			}
@@ -155,6 +169,22 @@ export function useChatFormPickers(opts: UseChatFormPickersOptions) {
 				commandDismissedSnapshot.args === token.args;
 
 			if (isDismissedSticky) {
+				isCommandPickerOpen = false;
+				commandQuery = '';
+
+				return;
+			}
+
+			// A line that names a command of fyai and goes on with words is
+			// that command with its arguments: sending it is the next step,
+			// so the picker stays closed.
+			const isFyaiLine =
+				value.includes(' ') &&
+				fyaiCommandsStore.commands.some(
+					(c) => c.name === token.name || c.aliases.includes(token.name)
+				);
+
+			if (isFyaiLine) {
 				isCommandPickerOpen = false;
 				commandQuery = '';
 

@@ -81,6 +81,7 @@ export enum PdfViewMode {
 
 export enum ChatFormCommandAction {
 	CWD = 'cwd',
+	FYAI = 'fyai',
 	MODEL = 'model',
 	PROMPT = 'prompt'
 }

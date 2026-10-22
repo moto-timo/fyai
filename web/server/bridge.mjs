@@ -16,6 +16,7 @@
 
 import {
 	catalogueModelName,
+	commandsFromSchema,
 	fencedOutput,
 	findCatalogueModel,
 	parseSlashCommand,
@@ -447,6 +448,37 @@ function spawnTurn(options) {
 /* ---------------------------------------------------------------- models */
 
 let catalogue = { at: 0, models: [] };
+let commandList = { at: 0, commands: [] };
+
+/**
+ * The commands of the page, from `fyai schema`. An fyai without that verb
+ * exports none, and the page then serves no slash command of fyai.
+ */
+async function listCommands(force = false) {
+	if (!force && commandList.at && Date.now() - commandList.at < 60000) return commandList.commands;
+
+	const res = await runCapture(
+		config.bin,
+		[...config.extraArgs, 'schema', 'commands', '--output', 'json'],
+		20000
+	);
+
+	let commands = [];
+
+	if (res.code === 0) {
+		try {
+			commands = commandsFromSchema(JSON.parse(res.out));
+		} catch (error) {
+			log('cannot parse the command schema:', error.message);
+		}
+	} else {
+		log('schema failed:', res.err.trim() || `status ${res.code}`);
+	}
+
+	commandList = { at: Date.now(), commands };
+
+	return commands;
+}
 
 /* The provider of each model, as the catalogue resolves it. */
 const providers = new Map();
@@ -481,9 +513,10 @@ function announceModelStatus(name, status) {
  * verb writes its own result; this program only forwards it.
  */
 async function runSlashCommand(sessionId, command, model, env = process.env) {
-	const args = slashCommandArgs(sessionId, command, model, config.extraArgs);
+	const commands = await listCommands();
+	const args = slashCommandArgs(sessionId, command, model, config.extraArgs, commands);
 
-	if (!args) return { ok: false, text: unknownCommandMessage(command.name) };
+	if (!args) return { ok: false, text: unknownCommandMessage(command.name, commands) };
 
 	const res = await runCapture(config.bin, args, 120000, env);
 	const text = (res.out || res.err || '').trim();
@@ -989,6 +1022,12 @@ server = createServer(async (req, res) => {
 				permissionMode: config.permissionMode,
 				version: 1
 			});
+
+			return;
+		}
+
+		if (pathname === '/api/fyai/commands') {
+			sendJson(res, 200, { commands: await listCommands() });
 
 			return;
 		}

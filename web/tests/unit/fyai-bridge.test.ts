@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import {
 	catalogueModelName,
+	commandsFromSchema,
 	fencedOutput,
 	parseSlashCommand,
 	providerKeyEnvName,
@@ -47,9 +48,42 @@ describe('parseSlashCommand', () => {
 	});
 });
 
+const SCHEMA = {
+	commands: [
+		{ command: 'context', surfaces: ['cli', 'session'], title: 'show the context fill' },
+		{ command: 'compact', surfaces: ['cli', 'session'], title: 'summarize' },
+		{ command: 'model', surfaces: ['cli', 'session'], title: 'the model' },
+		{ command: 'todo', surfaces: ['cli', 'session'], title: 'the todo list' },
+		{
+			aliases: ['switch'],
+			command: 'resume',
+			flags: ['interactive'],
+			surfaces: ['cli', 'session']
+		},
+		{ command: 'init', surfaces: ['cli'], title: 'create the arena' },
+		{ command: 'exit', surfaces: ['session'], title: 'leave' }
+	]
+};
+const COMMANDS = commandsFromSchema(SCHEMA);
+
+describe('commandsFromSchema', () => {
+	it('keeps the commands that exist as a verb and a slash command', () => {
+		expect(COMMANDS.map((c) => c.name)).toEqual(['context', 'compact', 'model', 'todo']);
+	});
+
+	it('leaves out a command that needs a terminal', () => {
+		expect(COMMANDS.some((c) => c.name === 'resume')).toBe(false);
+	});
+
+	it('gives nothing for a document that is not a schema', () => {
+		expect(commandsFromSchema(null)).toEqual([]);
+		expect(commandsFromSchema({ commands: 3 })).toEqual([]);
+	});
+});
+
 describe('slashCommandArgs', () => {
 	it('names the session branch and the verb', () => {
-		expect(slashCommandArgs('c1', { name: 'context', rest: [] }, 'gpt-5.5')).toEqual([
+		expect(slashCommandArgs('c1', { name: 'context', rest: [] }, 'gpt-5.5', [], COMMANDS)).toEqual([
 			'--branch',
 			'sdk/c1',
 			'--model',
@@ -59,26 +93,19 @@ describe('slashCommandArgs', () => {
 	});
 
 	it('passes the words of the user as separate arguments', () => {
-		expect(slashCommandArgs('c1', { name: 'compact', rest: ['a', 'b'] }, '')).toEqual([
-			'--branch',
-			'sdk/c1',
-			'compact',
-			'a',
-			'b'
-		]);
+		expect(slashCommandArgs('c1', { name: 'compact', rest: ['a', 'b'] }, '', [], COMMANDS)).toEqual(
+			['--branch', 'sdk/c1', 'compact', 'a', 'b']
+		);
 	});
 
 	it('does not override the model that /model stores', () => {
-		expect(slashCommandArgs('c1', { name: 'model', rest: ['gpt-5.5'] }, 'other')).toEqual([
-			'--branch',
-			'sdk/c1',
-			'model',
-			'gpt-5.5'
-		]);
+		expect(
+			slashCommandArgs('c1', { name: 'model', rest: ['gpt-5.5'] }, 'other', [], COMMANDS)
+		).toEqual(['--branch', 'sdk/c1', 'model', 'gpt-5.5']);
 	});
 
 	it('reports the model of the session when /model has no name', () => {
-		expect(slashCommandArgs('c1', { name: 'model', rest: [] }, 'other')).toEqual([
+		expect(slashCommandArgs('c1', { name: 'model', rest: [] }, 'other', [], COMMANDS)).toEqual([
 			'--branch',
 			'sdk/c1',
 			'model'
@@ -86,26 +113,23 @@ describe('slashCommandArgs', () => {
 	});
 
 	it('gives no arguments for a command that the page does not serve', () => {
-		expect(slashCommandArgs('c1', { name: 'nope', rest: [] }, '')).toBeNull();
+		expect(slashCommandArgs('c1', { name: 'nope', rest: [] }, '', [], COMMANDS)).toBeNull();
 	});
 
 	it('puts the extra arguments of the bridge before the command', () => {
-		expect(slashCommandArgs('c1', { name: 'todo', rest: [] }, '', ['--set', 'a=b'])).toEqual([
-			'--set',
-			'a=b',
-			'--branch',
-			'sdk/c1',
-			'todo'
-		]);
+		expect(
+			slashCommandArgs('c1', { name: 'todo', rest: [] }, '', ['--set', 'a=b'], COMMANDS)
+		).toEqual(['--set', 'a=b', '--branch', 'sdk/c1', 'todo']);
 	});
 });
 
 describe('unknownCommandMessage', () => {
 	it('names the commands that the page serves', () => {
-		const message = unknownCommandMessage('nope');
+		const message = unknownCommandMessage('nope', COMMANDS);
 
 		expect(message).toContain('unknown command /nope');
-		expect(message).toContain('/stats');
+		expect(message).toContain('/todo');
+		expect(unknownCommandMessage('nope')).toContain('exports no commands');
 	});
 });
 

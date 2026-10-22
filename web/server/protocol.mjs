@@ -9,21 +9,55 @@
 export const SDK_BRANCH_PREFIX = 'sdk/';
 
 /*
- * The slash commands of the page. fyai claude-sdk sends every other `/` line
- * to the model as text, and `/clear` there starts a session the page does not
- * know, so each command here runs an fyai verb on the session branch instead.
- * No shell sees the words: they become argv.
+ * The slash commands of the page come from `fyai schema commands`, so the
+ * page offers what the fyai it runs supports and keeps no list of its own.
+ * fyai claude-sdk sends every other `/` line to the model as text, and
+ * `/clear` there starts a session the page does not know, so each command
+ * runs an fyai verb on the session branch instead. No shell sees the words:
+ * they become argv.
  */
-export const SLASH_COMMANDS = new Map([
-	['branch', { args: ['branch'], help: 'list the branches of the project' }],
-	['compact', { args: ['compact'], help: 'summarize the conversation' }],
-	['context', { args: ['context'], help: 'show the context fill' }],
-	['help', { args: ['help'], help: 'describe the fyai commands' }],
-	['history', { args: ['history'], help: 'show the conversation of the session' }],
-	['model', { args: ['model'], help: 'show or select the model of the session' }],
-	['stats', { args: ['stats'], help: 'show the token use and the cost' }],
-	['todo', { args: ['todo'], help: 'show the todo list of the session' }]
-]);
+
+/**
+ * The commands that a line of the page can run, from the schema document.
+ * The page runs a verb and shows what it wrote, so a command qualifies when
+ * it exists as a verb and as a slash command and needs no terminal.
+ *
+ * @param {any} doc the document of `fyai schema commands --output json`
+ * @returns {{ name: string, aliases: string[], title: string, description: string,
+ *   arguments: object | null }[]}
+ */
+export function commandsFromSchema(doc) {
+	/** @type {any[]} */
+	const list = Array.isArray(doc?.commands) ? doc.commands : [];
+
+	return list
+		.filter(
+			(entry) =>
+				entry &&
+				typeof entry.command === 'string' &&
+				Array.isArray(entry.surfaces) &&
+				entry.surfaces.includes('cli') &&
+				entry.surfaces.includes('session') &&
+				!(Array.isArray(entry.flags) && entry.flags.includes('interactive'))
+		)
+		.map((entry) => ({
+			aliases: Array.isArray(entry.aliases) ? entry.aliases.map(String) : [],
+			arguments: entry.arguments ?? null,
+			description: String(entry.description ?? '').trim(),
+			name: entry.command,
+			title: String(entry.title ?? '')
+		}));
+}
+
+/**
+ * The command that a typed name refers to: its name or one of its aliases.
+ *
+ * @param {{ name: string, aliases: string[] }[]} commands
+ * @param {string} name
+ */
+export function findCommand(commands, name) {
+	return commands.find((entry) => entry.name === name || entry.aliases.includes(name)) ?? null;
+}
 
 /**
  * The session ID of a conversation. fyai accepts only alphanumerics, '-' and
@@ -66,10 +100,11 @@ export function parseSlashCommand(prompt) {
  * @param {{ name: string, rest: string[] }} command
  * @param {string} model
  * @param {string[]} [extraArgs]
+ * @param {{ name: string, aliases: string[] }[]} [commands] what fyai supports
  * @returns {string[] | null}
  */
-export function slashCommandArgs(sessionId, command, model, extraArgs = []) {
-	const entry = SLASH_COMMANDS.get(command.name);
+export function slashCommandArgs(sessionId, command, model, extraArgs = [], commands = []) {
+	const entry = findCommand(commands, command.name);
 
 	if (!entry) return null;
 
@@ -78,13 +113,13 @@ export function slashCommandArgs(sessionId, command, model, extraArgs = []) {
 	 * told another one: with a name it stores that model, and without one it
 	 * reports the model the branch already has.
 	 */
-	const setsModel = command.name === 'model';
+	const setsModel = entry.name === 'model';
 	/* Global options come before the command, as fyai reads them there. */
 	const args = [...extraArgs, '--branch', `${SDK_BRANCH_PREFIX}${sessionId}`];
 
 	if (model && !setsModel) args.push('--model', model);
 
-	args.push(...entry.args, ...command.rest);
+	args.push(entry.name, ...command.rest);
 
 	return args;
 }
@@ -93,12 +128,15 @@ export function slashCommandArgs(sessionId, command, model, extraArgs = []) {
  * The message of an unknown command, naming what the page serves.
  *
  * @param {string} name
+ * @param {{ name: string }[]} [commands]
  * @returns {string}
  */
-export function unknownCommandMessage(name) {
-	const names = [...SLASH_COMMANDS.keys()].map((command) => `/${command}`).join(', ');
+export function unknownCommandMessage(name, commands = []) {
+	const names = commands.map((command) => `/${command.name}`).join(', ');
 
-	return `unknown command /${name}; this page serves ${names}`;
+	return names
+		? `unknown command /${name}; this page serves ${names}`
+		: `unknown command /${name}; this fyai exports no commands (fyai schema)`;
 }
 
 /**

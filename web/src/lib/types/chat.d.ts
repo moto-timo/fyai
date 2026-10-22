@@ -220,6 +220,8 @@ export interface ChatCommandsOptions {
 	hasPrompts: () => boolean;
 	/** Gates `/cwd`. */
 	hasCwdTools: () => boolean;
+	/** The commands of fyai, which the bridge reports from its schema. */
+	fyaiCommands?: { name: string; title: string; description: string }[];
 }
 
 /** Protocol-level verbs accepted by the realtime inference control endpoint. Mirrors `CONTROL_ACTION`. */
