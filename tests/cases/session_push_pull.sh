@@ -12,7 +12,7 @@ FYAI_TMPDIR_BASE="$(dirname "$FYAI_BIN")"
 fyai_test_setup
 unshare -Urnm true 2>/dev/null || exit 77
 # The scratch directory of a view must lie outside the project.
-export TMPDIR="$FYAI_TMPDIR_BASE"
+fyai_test_scratch
 
 # Exercise root directory mutations under the lockdown tool policy in a view.
 "$PYTHON" - "$SCENARIOS_DIR/session_isolated.json" "$TEST_DIR/root-mutations.json" <<'PY'

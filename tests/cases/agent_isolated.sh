@@ -11,7 +11,7 @@ FYAI_TMPDIR_BASE="$(dirname "$FYAI_BIN")"
 fyai_test_setup
 unshare -Urnm true 2>/dev/null || exit 77
 # The scratch directory of a view must lie outside the project.
-export TMPDIR="$FYAI_TMPDIR_BASE"
+fyai_test_scratch
 printf baseline > file
 mock_start agent_isolated.json
 

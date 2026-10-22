@@ -61,6 +61,16 @@ skip() {
 	exit 77
 }
 
+# fyai_test_scratch: the scratch directory of a view for this case. A view replaces its
+# scratch directory with a private tmpfs, so it must lie outside the project and must
+# not hold the programs and libraries that fyai runs from: a build directory does.
+# The directory is the case's own, and the cleanup removes it.
+fyai_test_scratch() {
+	TEST_SCRATCH="$FYAI_TMPDIR_BASE/$(basename "$TEST_DIR")-tmp"
+	mkdir -p "$TEST_SCRATCH"
+	export TMPDIR="$TEST_SCRATCH"
+}
+
 fyai_test_cleanup() {
 	# A failing case must leave evidence: the next run destroys the
 	# sandbox (captures, mock log, requests). This trap runs on every
@@ -101,6 +111,7 @@ fyai_test_cleanup() {
 		fi
 	fi
 	mock_stop_quiet
+	[ -z "${TEST_SCRATCH:-}" ] || rm -rf "$TEST_SCRATCH"
 	if [ -n "$TEST_DIR" ]; then
 		fyai_sanitizer_report
 		rm -rf "$TEST_DIR"

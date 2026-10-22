@@ -12,7 +12,7 @@ set -eu
 FYAI_TMPDIR_BASE="$(dirname "$FYAI_BIN")"
 fyai_test_setup
 # The scratch directory of a view must lie outside the project.
-export TMPDIR="$FYAI_TMPDIR_BASE"
+fyai_test_scratch
 VIEW=no
 unshare -Urnm true 2>/dev/null && VIEW=yes
 mock_start tool_diff.json

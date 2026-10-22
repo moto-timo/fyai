@@ -13,7 +13,7 @@ FYAI_TMPDIR_BASE="$(dirname "$FYAI_BIN")"
 fyai_test_setup
 unshare -Urnm true 2>/dev/null || exit 77
 # The scratch directory of a view must lie outside the project.
-export TMPDIR="$FYAI_TMPDIR_BASE"
+fyai_test_scratch
 export OPENAI_API_KEY=test-key
 
 # The files of the case itself are in the project: they are not what it is about.

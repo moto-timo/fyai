@@ -10,7 +10,7 @@ set -eu
 FYAI_TMPDIR_BASE="$(dirname "$FYAI_BIN")"
 fyai_test_setup
 unshare -Urnm true 2>/dev/null || exit 77
-export TMPDIR="$FYAI_TMPDIR_BASE"
+fyai_test_scratch
 printf baseline > file
 
 # The names of views of sub-agents are not for a user.
