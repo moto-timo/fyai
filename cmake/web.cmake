@@ -4,7 +4,7 @@
 # installs a large dependency tree, and a C change never needs it.
 #
 #   fyai-web-install     npm ci, when node_modules is missing or stale
-#   fyai-web             the built page in web/dist
+#   fyai-web             the built page in web/dist, when a source is newer
 #   fyai-web-dev         the bridge and Vite, for editing (not a build)
 #   fyai-web-test        the unit tests of the page
 #   fyai-web-turn        the bridge and mock provider: one turn and its frames
@@ -58,14 +58,28 @@ if(FYAI_NPM_EXECUTABLE AND FYAI_NODE_EXECUTABLE)
     endif()
 endif()
 
-# The dependencies of the page. The lock file is the stamp: a change of it
-# needs an install again, and the directory itself is what an install makes.
-add_custom_target(fyai-web-install
-    COMMAND "${FYAI_NPM_EXECUTABLE}" ci
+# npm starts `node` through the PATH. A root shell has another PATH than the
+# one that configured the build, and its node can be too old, so every npm
+# command runs with the directory of the node that was checked in front.
+get_filename_component(FYAI_NODE_DIR "${FYAI_NODE_EXECUTABLE}" DIRECTORY)
+set(FYAI_WEB_NPM "${CMAKE_COMMAND}" -E env "PATH=${FYAI_NODE_DIR}:$ENV{PATH}"
+    "${FYAI_NPM_EXECUTABLE}")
+
+# The dependencies of the page. npm ci writes node_modules/.package-lock.json,
+# so that file is the stamp: a newer lock file makes an install again and an
+# installed tree is left alone. A build that is up to date then runs no npm,
+# which is what lets `make && sudo make install` leave npm out of root's hands.
+set(FYAI_WEB_MODULES "${FYAI_WEB_DIR}/node_modules/.package-lock.json")
+
+add_custom_command(OUTPUT "${FYAI_WEB_MODULES}"
+    COMMAND ${FYAI_WEB_NPM} ci
     COMMENT "installing the page's dependencies"
+    DEPENDS "${FYAI_WEB_DIR}/package-lock.json"
     WORKING_DIRECTORY "${FYAI_WEB_DIR}"
     USES_TERMINAL
     VERBATIM)
+
+add_custom_target(fyai-web-install DEPENDS "${FYAI_WEB_MODULES}")
 
 # The page, from every source file that builds it.
 file(GLOB_RECURSE FYAI_WEB_SOURCES CONFIGURE_DEPENDS
@@ -77,14 +91,21 @@ list(APPEND FYAI_WEB_SOURCES
     "${FYAI_WEB_DIR}/vite.config.ts")
 list(FILTER FYAI_WEB_SOURCES EXCLUDE REGEX "/node_modules/")
 
-add_custom_target(fyai-web
+set(FYAI_WEB_PAGE "${FYAI_WEB_DIR}/dist/index.html")
+
+add_custom_command(OUTPUT "${FYAI_WEB_PAGE}"
     COMMAND "${CMAKE_COMMAND}" -E remove_directory "${FYAI_WEB_DIR}/dist"
-    COMMAND "${FYAI_NPM_EXECUTABLE}" run build
+    COMMAND ${FYAI_WEB_NPM} run build
     COMMENT "building the web page"
-    DEPENDS ${FYAI_WEB_SOURCES} fyai-web-install
+    DEPENDS ${FYAI_WEB_SOURCES}
     WORKING_DIRECTORY "${FYAI_WEB_DIR}"
     USES_TERMINAL
     VERBATIM)
+
+# Ordered by target, not by file: two targets that name the same output file
+# can each run its command in a parallel build.
+add_custom_target(fyai-web DEPENDS "${FYAI_WEB_PAGE}")
+add_dependencies(fyai-web fyai-web-install)
 
 # The page in development: the bridge and Vite. It does not end, so it is not
 # a build step.
@@ -101,7 +122,7 @@ add_custom_target(fyai-web-dev
 # The unit tests. The stamp makes a pass of them a step that can be depended
 # on; the test of fyai/web-test runs them again under CTest.
 add_custom_command(OUTPUT "${FYAI_WEB_STAMP}"
-    COMMAND "${FYAI_NPM_EXECUTABLE}" run test:unit -- --run
+    COMMAND ${FYAI_WEB_NPM} run test:unit -- --run
     COMMAND "${CMAKE_COMMAND}" -E touch "${FYAI_WEB_STAMP}"
     COMMENT "running the page's unit tests"
     DEPENDS ${FYAI_WEB_SOURCES} fyai-web-install
@@ -110,7 +131,7 @@ add_custom_command(OUTPUT "${FYAI_WEB_STAMP}"
 
 add_custom_target(fyai-web-test
     COMMAND "${CMAKE_COMMAND}" -E remove -f "${FYAI_WEB_STAMP}"
-    COMMAND "${FYAI_NPM_EXECUTABLE}" run test:unit -- --run
+    COMMAND ${FYAI_WEB_NPM} run test:unit -- --run
     COMMENT "running the page's unit tests"
     DEPENDS ${FYAI_WEB_SOURCES} fyai-web-install
     WORKING_DIRECTORY "${FYAI_WEB_DIR}"
@@ -214,7 +235,7 @@ endif()
 # The unit tests under CTest, only when the page is part of the build.
 if(BUILD_TESTING AND FYAI_WEB AND FYAI_WEB_CAN_BUILD)
     add_test(NAME fyai/web-test
-        COMMAND "${FYAI_NPM_EXECUTABLE}" run test:unit -- --run
+        COMMAND ${FYAI_WEB_NPM} run test:unit -- --run
         WORKING_DIRECTORY "${FYAI_WEB_DIR}")
     set_tests_properties(fyai/web-test PROPERTIES
         LABELS web
