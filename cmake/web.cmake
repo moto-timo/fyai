@@ -17,6 +17,16 @@
 # with a fyai-web launcher; a node that is too old to build the page leaves
 # the page out of the build and the install with a message, not an error. The end-to-end target needs a provider key and
 # runs fyai's mock provider, so it is never part of CTest.
+#
+# FYAI_DESKTOP=ON, on Linux, also packages the Electron app (about 350 MB,
+# and a download of Electron) and installs it under share/fyai/desktop with a
+# fyai-desktop launcher, a menu entry and an icon. The installed app uses the
+# fyai installed beside it.
+#
+# FYAI_DESKTOP=ON, on Linux, also packages the Electron app (about 350 MB,
+# and a download of Electron) and installs it under share/fyai/desktop with a
+# fyai-desktop launcher, a menu entry and an icon. The installed app uses the
+# fyai installed beside it.
 
 set(FYAI_WEB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/web")
 set(FYAI_WEB_STAMP "${CMAKE_CURRENT_BINARY_DIR}/web-test.stamp")
@@ -155,6 +165,50 @@ if(FYAI_WEB AND FYAI_WEB_CAN_BUILD)
         DESTINATION "${FYAI_WEB_SHARE}/server")
     install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/fyai-web"
         DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+    if(FYAI_DESKTOP AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+            set(FYAI_DESKTOP_ARCH arm64)
+        else()
+            set(FYAI_DESKTOP_ARCH x64)
+        endif()
+        set(FYAI_DESKTOP_DIR "${FYAI_WEB_DIR}/dist-app/fyai-linux-${FYAI_DESKTOP_ARCH}")
+        set(FYAI_DESKTOP_SHARE "${CMAKE_INSTALL_DATAROOTDIR}/fyai/desktop")
+
+        # The page is already built by fyai-web; the app carries no fyai.
+        add_custom_target(fyai-desktop-app ALL
+            COMMAND "${FYAI_WEB_DIR}/scripts/package.sh" --skip-build --no-fyai
+            COMMENT "packaging the desktop app"
+            DEPENDS fyai-web
+            WORKING_DIRECTORY "${FYAI_WEB_DIR}"
+            USES_TERMINAL
+            VERBATIM)
+
+        file(RELATIVE_PATH FYAI_DESKTOP_SHARE_RELATIVE
+            "/${CMAKE_INSTALL_BINDIR}" "/${FYAI_DESKTOP_SHARE}")
+        configure_file("${FYAI_WEB_DIR}/scripts/fyai-desktop.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/fyai-desktop" @ONLY)
+        install(DIRECTORY "${FYAI_DESKTOP_DIR}/"
+            DESTINATION "${FYAI_DESKTOP_SHARE}"
+            USE_SOURCE_PERMISSIONS
+            PATTERN "chrome-sandbox" EXCLUDE)
+        # The sandbox helper of Chromium runs setuid root where the kernel
+        # does not give a user a namespace of its own.
+        install(PROGRAMS "${FYAI_DESKTOP_DIR}/chrome-sandbox"
+            DESTINATION "${FYAI_DESKTOP_SHARE}"
+            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)
+        install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/fyai-desktop"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}")
+        install(FILES "${FYAI_WEB_DIR}/scripts/fyai.desktop.in"
+            DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications"
+            RENAME fyai.desktop)
+        install(FILES "${FYAI_WEB_DIR}/static/pwa-512x512.png"
+            DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps"
+            RENAME fyai.png)
+    elseif(FYAI_DESKTOP)
+        message(STATUS "FYAI_DESKTOP packages the Linux app only; nothing to install here")
+    endif()
 endif()
 
 # The unit tests under CTest, only when the page is part of the build.

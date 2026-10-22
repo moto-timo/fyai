@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=fyai
+Comment=A chat interface for the fyai coding assistant
+Exec=fyai-desktop
+Icon=fyai
+Terminal=false
+Categories=Development;

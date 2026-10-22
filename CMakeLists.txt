@@ -312,6 +312,7 @@ option(ENABLE_ASAN "Enable ASAN support" OFF)
 option(BUILD_TESTING "Build tests" ON)
 option(ENABLE_LIBSECRET "Store credentials in the Linux Secret Service" OFF)
 option(FYAI_WEB "Build the web page with the rest" OFF)
+option(FYAI_DESKTOP "Package the desktop app and install it (needs FYAI_WEB, Linux)" OFF)
 
 set(FYAI_PROGRAMS fyai)
 

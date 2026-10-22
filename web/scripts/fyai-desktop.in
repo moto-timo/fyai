@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+#
+# Open the installed fyai desktop app. It works in the current directory when
+# that is a project or a place to make one, else in a directory of its own,
+# and uses the fyai installed beside this launcher.
+set -eu
+
+here="$(dirname "$(readlink -f "$0")")"
+app="$here/@FYAI_DESKTOP_SHARE_RELATIVE@"
+
+if [ -z "${FYAI_BIN:-}" ] && [ -x "$here/fyai" ]; then
+	FYAI_BIN="$here/fyai"
+	export FYAI_BIN
+fi
+
+exec "$app/fyai" "$@"
