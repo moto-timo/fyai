@@ -48,30 +48,41 @@ sandbox_profile: dev' 'cat ~/.ssh/id_test || echo deny-ok'
 assert_stdout_contains deny-ok
 assert_stdout_not_contains classified
 
-# The project is readable and writable, and a tool creates entries in its root.
-shell_with 'sandbox_profile: dev' 'cat other/data.txt && echo w > made.txt && cat made.txt'
+# The project is readable and writable.
+shell_with 'sandbox_profile: dev' 'cat other/data.txt && echo w > other/made.txt && cat other/made.txt'
 assert_stdout_contains other-data
-[ -f made.txt ] || fail 'a tool could not create a file in the project root'
-shell_with 'sandbox_profile: dev' 'mkdir madedir && touch madedir/x && echo dir-ok'
-assert_stdout_contains dir-ok
-[ -d madedir ] || fail 'a tool could not create a directory in the project root'
+[ -f other/made.txt ] || fail 'a tool could not create a file in the project'
 
-# The arena is covered by an empty mount in the tool, and the host keeps it.
-shell_with 'sandbox_profile: dev' 'test -z $(ls -A .fyai) && echo arena-hidden; echo x > .fyai/probe || echo arena-readonly'
-assert_stdout_contains arena-hidden
+# Where the host can make user, mount and PID namespaces, the arena is covered by an
+# empty mount in the tool, and the tool creates entries in the project root. Without
+# them, Landlock denies the arena, and the directory above it keeps only the right to
+# list, so the root cannot take new entries.
+if unshare -Urnmpf true 2>/dev/null; then
+	shell_with 'sandbox_profile: dev' 'cat other/data.txt && echo w > made.txt && cat made.txt'
+	[ -f made.txt ] || fail 'a tool could not create a file in the project root'
+	shell_with 'sandbox_profile: dev' 'mkdir madedir && touch madedir/x && echo dir-ok'
+	assert_stdout_contains dir-ok
+	[ -d madedir ] || fail 'a tool could not create a directory in the project root'
+
+	shell_with 'sandbox_profile: dev' 'test -z $(ls -A .fyai) && echo arena-hidden'
+	assert_stdout_contains arena-hidden
+	# The tool is in a PID namespace of its own: it has a small process id under an init,
+	# and the procfs lists its own processes, not those of the host.
+	shell_with 'sandbox_profile: dev' 'echo pid=$$; echo procs=$(ls /proc | grep -c ^[0-9])'
+	pid="$(sed -n 's/.*pid=\([0-9]*\).*/\1/p' "$TEST_DIR/stdout" | head -n 1)"
+	[ -n "$pid" ] && [ "$pid" -lt 10 ] || fail "the tool has process id $pid, not one of a PID namespace"
+	procs="$(sed -n 's/.*procs=\([0-9]*\).*/\1/p' "$TEST_DIR/stdout" | head -n 1)"
+	[ -n "$procs" ] && [ "$procs" -lt 10 ] || fail "the tool sees $procs processes"
+	# The root of the parent process does not show it either.
+	shell_with 'sandbox_profile: dev' 'test -z $(ls -A /proc/$PPID/root/$PWD/.fyai 2>/dev/null) && echo proc-hidden'
+	assert_stdout_contains proc-hidden
+fi
+
+# The arena cannot be written, with the cover or without it, and the host keeps it.
+shell_with 'sandbox_profile: dev' 'echo x > .fyai/probe || echo arena-readonly'
 assert_stdout_contains arena-readonly
 [ ! -e .fyai/probe ] || fail 'a tool wrote into the arena'
 [ -d .fyai/objects ] || [ -n "$(ls -A .fyai)" ] || fail 'the host lost its arena'
-# The tool is in a PID namespace of its own: it has a small process id under an init, and the
-# procfs lists its own processes, not those of the host.
-shell_with 'sandbox_profile: dev' 'echo pid=$$; echo procs=$(ls /proc | grep -c ^[0-9])'
-pid="$(sed -n 's/.*pid=\([0-9]*\).*/\1/p' "$TEST_DIR/stdout" | head -n 1)"
-[ -n "$pid" ] && [ "$pid" -lt 10 ] || fail "the tool has process id $pid, not one of a PID namespace"
-procs="$(sed -n 's/.*procs=\([0-9]*\).*/\1/p' "$TEST_DIR/stdout" | head -n 1)"
-[ -n "$procs" ] && [ "$procs" -lt 10 ] || fail "the tool sees $procs processes"
-# The root of the parent process does not show it either.
-shell_with 'sandbox_profile: dev' 'test -z $(ls -A /proc/$PPID/root/$PWD/.fyai 2>/dev/null) && echo proc-hidden'
-assert_stdout_contains proc-hidden
 
 # A toolchain that the profile grants runs from PATH.
 shell_with 'sandbox_profile: dev' 'devtool'
