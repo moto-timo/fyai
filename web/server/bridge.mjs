@@ -600,10 +600,20 @@ async function turnEnv(keys, apiKey, model) {
 async function listModels(force = false) {
 	if (!force && Date.now() - catalogue.at < 30000) return catalogue.models;
 
-	const [primary, res] = await Promise.all([
-		projectModel(),
-		runCapture(config.bin, ['catalog', 'list', '--output', 'json'], 20000)
-	]);
+	/*
+	 * Only the models of a provider that has a key here are offered. With no
+	 * such provider, or an fyai that cannot tell, the whole catalogue is
+	 * listed: the page can hold a key of its own, and a list with nothing in
+	 * it leaves no way to enter one.
+	 */
+	const list = (extra) =>
+		runCapture(config.bin, ['catalog', 'list', 'models', ...extra, '--output', 'json'], 20000);
+	const [primary, keyed] = await Promise.all([projectModel(), list(['--available'])]);
+
+	let res = keyed;
+
+	if (res.code === 0 && /^\s*\[\s*\]\s*$/.test(res.out)) res = await list([]);
+	else if (res.code !== 0) res = await list([]);
 
 	let listed = [];
 
