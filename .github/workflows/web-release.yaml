@@ -107,9 +107,9 @@ jobs:
       working-directory: web
       run: |
         if [ "${{ runner.os }}" = "Linux" ]; then
-          bash scripts/package.sh
+          bash scripts/package.sh --skip-build
         else
-          bash scripts/package.sh --arch arm64
+          bash scripts/package.sh --skip-build --arch arm64
         fi
 
     - name: "Archive the app (Linux)"
