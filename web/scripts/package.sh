@@ -7,6 +7,8 @@
 #   scripts/package.sh                 # dist-app/fyai-<os>-<arch>/
 #   scripts/package.sh --bundle-fyai   # build the fyai it carries first
 #   scripts/package.sh --arch arm64
+#   scripts/package.sh --skip-build    # the page in dist/ is up to date
+#   scripts/package.sh --no-fyai       # carry no fyai, even if one is built
 #
 # The platform is the one the script runs on, or --platform. Without a
 # bundled fyai the app uses FYAI_BIN, the project build beside the page, or
@@ -18,10 +20,12 @@ cd "$(dirname "$0")/.."
 ARCH="x64"
 PLATFORM=""
 BUNDLE=0
+SKIP_BUILD=0
+NO_FYAI=0
 
 case "$(uname -s)" in
 Darwin) PLATFORM="darwin"; ARCH="$(uname -m | sed 's/x86_64/x64/')" ;;
-Linux) PLATFORM="linux" ;;
+Linux) PLATFORM="linux"; ARCH="$(uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')" ;;
 esac
 
 usage() {
@@ -31,8 +35,10 @@ Build the fyai desktop app.
   scripts/package.sh                   dist-app/fyai-<os>-<arch>/
   scripts/package.sh --bundle-fyai     build the fyai it carries first
   scripts/package.sh --arch arm64      another architecture
+  scripts/package.sh --skip-build      the page in dist/ is up to date
+  scripts/package.sh --no-fyai         carry no fyai, even if one is built
 
-Options: --arch ARCH, --platform linux|darwin, --bundle-fyai, -h.
+Options: --arch ARCH, --platform linux|darwin, --bundle-fyai, --no-fyai, --skip-build, -h.
 EOF
 	exit "${1:-0}"
 }
@@ -56,6 +62,8 @@ while [ $# -gt 0 ]; do
 		shift 2
 		;;
 	--bundle-fyai) BUNDLE=1; shift ;;
+	--skip-build) SKIP_BUILD=1; shift ;;
+	--no-fyai) NO_FYAI=1; shift ;;
 	-h | --help) usage 0 ;;
 	*) echo "package.sh: unknown option '$1'" >&2; usage 1 >&2 ;;
 	esac
@@ -66,8 +74,12 @@ if [ ! -d node_modules ]; then
 	npm ci
 fi
 
-echo "package.sh: building the page"
-npm run build
+if [ "$SKIP_BUILD" = 1 ] && [ -f dist/index.html ]; then
+	echo "package.sh: using the page in dist/"
+else
+	echo "package.sh: building the page"
+	npm run build
+fi
 
 EXTRA=()
 
@@ -75,7 +87,7 @@ if [ "$BUNDLE" = 1 ]; then
 	bash scripts/bundle-fyai.sh
 fi
 
-if [ -x fyai-bundle/fyai ]; then
+if [ "$NO_FYAI" = 0 ] && [ -x fyai-bundle/fyai ]; then
 	EXTRA=(--extra-resource=fyai-bundle/fyai)
 	echo "package.sh: bundling fyai-bundle/fyai"
 else
