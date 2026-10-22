@@ -13,9 +13,10 @@
 /* A CommonJS main process: Electron loads it before a module graph exists. */
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { app, BrowserWindow, dialog, shell } = require('electron');
-const { spawn } = require('node:child_process');
-const { existsSync } = require('node:fs');
-const { join } = require('node:path');
+const { spawn, spawnSync } = require('node:child_process');
+const { existsSync, mkdirSync } = require('node:fs');
+const { homedir } = require('node:os');
+const { dirname, join, resolve, sep } = require('node:path');
 const HERE = __dirname;
 /*
  * In a packaged app the page lives under the application directory and the
@@ -57,6 +58,71 @@ function fyaiProgram() {
 	return '';
 }
 
+/** True when @path is @root or inside it. */
+function isInside(path, root) {
+	const rel = resolve(path);
+	const top = resolve(root);
+
+	return rel === top || rel.startsWith(top + sep);
+}
+
+/** True when @dir or one of its parents holds a project arena, as fyai looks for it. */
+function hasProject(dir) {
+	for (let at = resolve(dir); ; at = dirname(at)) {
+		if (existsSync(join(at, '.fyai', 'arena'))) return true;
+
+		if (dirname(at) === at) return false;
+	}
+}
+
+/**
+ * The directory the app works in, which is the project of fyai. The one the
+ * environment names wins, then the directory the app was started in. A
+ * desktop launcher starts it in the bundle, in the root or in the home
+ * directory, none of which is a project to put an arena in, so the app has a
+ * directory of its own under the data directory of the platform.
+ */
+function projectDir() {
+	const given = process.env.FYAI_BRIDGE_CWD;
+
+	if (given) return resolve(given);
+
+	const here = process.cwd();
+	const stray =
+		dirname(here) === here ||
+		here === homedir() ||
+		isInside(here, ROOT) ||
+		isInside(here, process.resourcesPath ?? ROOT);
+
+	if (!stray) return here;
+
+	return join(app.getPath('userData'), 'project');
+}
+
+/**
+ * Make @dir and give it a project when it has none: `fyai init` creates the
+ * arena there. A failure is reported and the bridge still starts, so the
+ * page opens and says what is missing.
+ */
+function ensureProject(dir, fy) {
+	mkdirSync(dir, { recursive: true });
+
+	if (hasProject(dir)) return;
+
+	const res = spawnSync(fy || 'fyai', ['init'], {
+		cwd: dir,
+		encoding: 'utf8',
+		env: { ...process.env },
+		timeout: 30000
+	});
+
+	if (res.status !== 0)
+		console.error(
+			`fyai: init in ${dir} failed: ${(res.stderr || res.error?.message || '').trim()}`
+		);
+	else console.log(`fyai: created a project in ${dir}`);
+}
+
 /** The address the bridge reports on its first line of output. */
 const LISTENING = /listening on (http:\/\/[^\s]+)/;
 
@@ -84,16 +150,18 @@ function startBridge() {
 		String(process.pid)
 	];
 	const model = process.env.FYAI_BRIDGE_MODEL;
-	const cwd = process.env.FYAI_BRIDGE_CWD;
 	const fy = fyaiProgram();
+	const cwd = projectDir();
+
+	ensureProject(cwd, fy);
 
 	if (fy) args.push('--bin', fy);
 
 	if (model) args.push('--model', model);
 
-	if (cwd) args.push('--cwd', cwd);
+	args.push('--cwd', cwd);
 
-	console.log(`fyai: ${fy || 'fyai on PATH'}`);
+	console.log(`fyai: ${fy || 'fyai on PATH'}  project: ${cwd}`);
 
 	/*
 	 * The bridge is a child rather than a module in this process: it starts
@@ -101,7 +169,7 @@ function startBridge() {
 	 * with it.
 	 */
 	bridge = spawn(process.execPath, args, {
-		cwd: process.env.FYAI_BRIDGE_CWD ?? ROOT,
+		cwd,
 		env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
 		/*
 		 * stdin stays open for as long as this process lives: the bridge
