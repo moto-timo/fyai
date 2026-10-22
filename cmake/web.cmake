@@ -41,7 +41,7 @@ find_program(FYAI_RSYNC_EXECUTABLE rsync)
 # that only a filter rule hides is not protected from --delete by every rsync.
 set(FYAI_WEB_RSYNC_OPTS -a --delete --chmod=Du+rwx --exclude=.git
     --exclude=/node_modules --exclude=/dist --exclude=/dist-app
-    --exclude=/fyai-bundle --exclude=/.svelte-kit --exclude=/test-results
+    --exclude=/fyai-bundle --exclude=/fyai-static-build --exclude=/.svelte-kit --exclude=/test-results
     "--filter=:- .gitignore")
 
 # rsync must work, not only exist: the probe runs the options of the copy

@@ -4,18 +4,20 @@
 # Put a standalone fyai beside the page, so that a packaged desktop app can
 # carry it and run on a machine that has no fyai of its own.
 #
-#   scripts/bundle-fyai.sh                 # build a portable one with Docker
-#   scripts/bundle-fyai.sh --from PATH     # copy an existing static binary
+#   scripts/bundle-fyai.sh                 # build a portable one on this host
+#   scripts/bundle-fyai.sh --from PATH     # copy an existing binary
 #   scripts/bundle-fyai.sh --check         # report what would be bundled
 #
-# The result is fyai-bundle/fyai. A fully static build is what travels: it
-# needs no libc, no shared library and no toolchain on the machine that runs
-# the app. Build it from the fyai repository (docker/Dockerfile.static).
+# The result is fyai-bundle/fyai, built for the platform that runs the script,
+# because the app is packaged for that platform. The build is the mostly-static
+# one of the fyai repository (scripts/build-static-native.sh): the fyai
+# libraries are linked in, and only the system libraries are needed: libSystem
+# and the frameworks on macOS, the libc on Linux. The build files go to
+# fyai-static-build/.
 #
-# The default mode is `mostly`: static fyai dependencies over the host libc,
-# which every glibc Linux has. Build the fully static musl binary with
-# --mode musl, but see the note in README.md: it sends "stream": 1 where the
-# provider requires a boolean.
+# --mode musl builds the fully static binary for a musl or an older Linux
+# machine with Docker (scripts/build-static-docker.sh), but see the note in
+# README.md: it sends "stream": 1 where the provider requires a boolean.
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -29,15 +31,16 @@ usage() {
 	cat <<'EOF'
 Bundle a standalone fyai for the desktop app.
 
-  scripts/bundle-fyai.sh                build a portable fyai with Docker
+  scripts/bundle-fyai.sh                build a portable fyai on this host
   scripts/bundle-fyai.sh --from PATH    copy an existing binary
   scripts/bundle-fyai.sh --check        report what would be bundled
 
 Options: --from PATH, --mode mostly|musl, --check, -h.
 Environment: FYAI_SRC (the fyai repository, default the one above web/),
              FYAI_STATIC_MODE (mostly, the default, or musl).
-The mode names the docker STATIC_MODE: `mostly` links the fyai dependencies
-statically over the host libc; `musl` is fully static but bad JSON booleans.
+`mostly` links the fyai dependencies statically over the system libraries;
+`musl` is fully static, built with Docker, but bad JSON booleans.
+FYAI_STATIC_BUILD names the directory for the build files.
 EOF
 	exit "${1:-0}"
 }
@@ -78,13 +81,18 @@ report() {
 		return
 	fi
 
-	# The libc, libm and the loader are the host's; anything else must travel.
-	other="$(ldd "$bin" 2>/dev/null |
-		awk '{print $1}' |
-		grep -vE '^(linux-vdso|libc|libm|ld-linux|/lib.*ld-linux)' || true)"
+	# The system libraries are the host's; anything else must travel.
+	if [ "$(uname -s)" = Darwin ]; then
+		other="$(otool -L "$bin" | tail -n +2 | awk '{print $1}' |
+			grep -vE '^(/usr/lib/|/System/Library/)' || true)"
+	else
+		other="$(ldd "$bin" 2>/dev/null |
+			awk '{print $1}' |
+			grep -vE '^(linux-vdso|libc|libm|ld-linux|/lib.*ld-linux)' || true)"
+	fi
 
 	if [ -z "$other" ]; then
-		echo "bundle-fyai.sh: needs only the host libc, as every Linux has"
+		echo "bundle-fyai.sh: needs only the system libraries, as every machine has"
 	else
 		echo "bundle-fyai.sh: needs these libraries, which the app does not carry:" >&2
 		printf '  %s\n' "$other" >&2
@@ -114,24 +122,23 @@ if [ -n "$FROM" ]; then
 	exit 0
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
-	echo "bundle-fyai.sh: docker is needed to build a static fyai; use --from PATH" >&2
-	exit 1
-fi
-if [ ! -f "$REPO/docker/Dockerfile.static" ]; then
+if [ ! -d "$REPO/scripts" ] || [ ! -f "$REPO/scripts/build-static-native.sh" ]; then
 	echo "bundle-fyai.sh: no fyai repository at '$REPO'; set FYAI_SRC" >&2
 	exit 1
 fi
 
-IMAGE="fyai-$MODE-static"
-echo "bundle-fyai.sh: building $IMAGE with STATIC_MODE=$MODE (this takes a while)"
-docker build -f "$REPO/docker/Dockerfile.static" --build-arg "STATIC_MODE=$MODE" \
-	-t "$IMAGE" "$REPO"
-
-# Copy the binary out of the image without running it.
-cid="$(docker create "$IMAGE")"
-trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-docker cp "$cid:/usr/local/bin/fyai" "$OUT/fyai"
+if [ "$MODE" = musl ]; then
+	if ! command -v docker >/dev/null 2>&1; then
+		echo "bundle-fyai.sh: docker is needed for a musl fyai; use --from PATH" >&2
+		exit 1
+	fi
+	echo "bundle-fyai.sh: building a musl fyai with Docker (this takes a while)"
+	sh "$REPO/scripts/build-static-docker.sh" -m musl -o "$OUT/fyai"
+else
+	BUILD="${FYAI_STATIC_BUILD:-$PWD/fyai-static-build}"
+	echo "bundle-fyai.sh: building a mostly-static fyai in $BUILD (this takes a while)"
+	sh "$REPO/scripts/build-static-native.sh" -b "$BUILD" -o "$OUT/fyai"
+fi
 chmod 755 "$OUT/fyai"
 
 report "$OUT/fyai"
