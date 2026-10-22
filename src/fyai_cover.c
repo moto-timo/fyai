@@ -215,18 +215,19 @@ static pid_t holder_child_pid(const char *info)
  * tmpfs and a file gets /dev/null.
  */
 static int holder_argv(const char *bwrap, const char *const *paths, size_t n,
-		       int info_fd, int ready_fd, char ***argvp)
+		       int info_fd, int ready_fd, char *num, size_t num_size,
+		       char *script, size_t script_size, char ***argvp)
 {
-	char **argv, num[16], script[64];
+	char **argv;
 	struct stat st;
 	size_t i, argc = 0;
 
 	argv = calloc(24 + 5 * n, sizeof(*argv));
 	if (!argv)
 		return -1;
-	snprintf(num, sizeof(num), "%d", info_fd);
+	snprintf(num, num_size, "%d", info_fd);
 	/* The program runs when the mounts stand: it says so, and then waits on the pipe. */
-	snprintf(script, sizeof(script), "echo >&%d; exec cat", ready_fd);
+	snprintf(script, script_size, "echo >&%d; exec cat", ready_fd);
 	argv[argc++] = (char *)bwrap;
 	argv[argc++] = "--unshare-user";
 	argv[argc++] = "--unshare-pid";
@@ -254,11 +255,11 @@ static int holder_argv(const char *bwrap, const char *const *paths, size_t n,
 	}
 	argv[argc++] = "--die-with-parent";
 	argv[argc++] = "--info-fd";
-	argv[argc++] = strdup(num);
+	argv[argc++] = num;
 	argv[argc++] = "--";
 	argv[argc++] = "sh";
 	argv[argc++] = "-c";
-	argv[argc++] = strdup(script);
+	argv[argc++] = script;
 	argv[argc] = NULL;
 	*argvp = argv;
 	return 0;
@@ -271,7 +272,7 @@ static int holder_argv(const char *bwrap, const char *const *paths, size_t n,
 static int holder_start(struct fyai_cover *cover, const char *const *paths, size_t n)
 {
 	int hold[2] = { -1, -1 }, info[2] = { -1, -1 }, ready[2] = { -1, -1 };
-	char buf[COVER_INFO_MAX], num[32], ch, **argv = NULL;
+	char buf[COVER_INFO_MAX], num[32], arg_info[16], arg_script[64], ch, **argv = NULL;
 	const char *bwrap = bwrap_path();
 	size_t used = 0, i, len = 1;
 	ssize_t got;
@@ -280,7 +281,8 @@ static int holder_start(struct fyai_cover *cover, const char *const *paths, size
 
 	if (!bwrap || cover_pipe(hold) || cover_pipe(info) || cover_pipe(ready))
 		goto err;
-	if (holder_argv(bwrap, paths, n, info[1], COVER_READY_FD, &argv))
+	if (holder_argv(bwrap, paths, n, info[1], COVER_READY_FD, arg_info, sizeof(arg_info),
+			arg_script, sizeof(arg_script), &argv))
 		goto err;
 	child = fork();
 	if (child < 0)
