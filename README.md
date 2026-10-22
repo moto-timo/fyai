@@ -590,6 +590,10 @@ cmake -S . -B build-static -DFYAI_MOSTLY_STATIC=ON
 cmake --build build-static
 ```
 
+`scripts/build-static-native.sh [OUTPUT]` does the same on this machine with a
+private static libfyaml, so it does not depend on the libraries installed
+here. It is the build that the release workflow and the Docker image use.
+
 For a fully static musl binary, use the Docker builder:
 
 ```sh
