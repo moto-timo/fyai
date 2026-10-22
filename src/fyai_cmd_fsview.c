@@ -3546,6 +3546,62 @@ err:
 	return -1;
 }
 
+/*
+ * Compare the recorded result of the view session with the project: the paths
+ * that an apply would write, and those that the project and the view changed
+ * differently. Returns 0, or -1 with the cause reported.
+ */
+static int view_session_pending(struct fyai_ctx *ctx, long long *applied, long long *conflicts)
+{
+	int status = ctx->cfg->exit_status;
+	fy_generic result;
+	int rc;
+
+	rc = fyai_view_pull(ctx, ctx->gb, "session", NULL, NULL, 0, FYAI_VIEW_PULL_DRY_RUN, &result);
+	/* A conflict is an outcome to read; it does not end the run with a status. */
+	ctx->cfg->exit_status = status;
+	if (rc)
+		return -1;
+	*applied = fy_get(result, "applied", 0LL);
+	*conflicts = fy_get(result, "conflicts", 0LL);
+	return 0;
+}
+
+/*
+ * A new session replaces the view of the last one with a capture of the project,
+ * and what the old view held that the project does not is lost. Refuse to start
+ * while it holds such a change, or when it did not end cleanly and may hold some
+ * that it did not record.
+ */
+static int view_session_stale(struct fyai_ctx *ctx)
+{
+	fy_generic view = view_find(ctx, "session");
+	long long applied = 0, conflicts = 0;
+	const char *branch = fyai_ctx_branch(ctx);
+
+	if (!fy_is_mapping(view))
+		return 0;
+	fyai_error_check(ctx, fy_equal(fy_get(view, "state", "ready"), "ready"), err,
+			 "view 'session' did not end cleanly, and may hold changes that it did not "
+			 "record: apply what it recorded with `fyai -b %s view apply session`, or drop "
+			 "it with `fyai -b %s view remove session`, and start again", branch, branch);
+	if (!fy_is_mapping(fy_get(view, "result", fy_invalid)))
+		return 0;
+	if (view_session_pending(ctx, &applied, &conflicts))
+		return -1;
+	fyai_error_check(ctx, !applied && !conflicts, err,
+			 "view 'session' holds %lld change%s that the project does not have%s: apply "
+			 "%s with `fyai -b %s view apply session`, or drop %s with `fyai -b %s view "
+			 "remove session`, and start again", applied + conflicts,
+			 applied + conflicts == 1 ? "" : "s",
+			 conflicts ? " or has changed differently" : "",
+			 applied + conflicts == 1 ? "it" : "them", branch,
+			 applied + conflicts == 1 ? "it" : "them", branch);
+	return 0;
+err:
+	return -1;
+}
+
 int fyai_view_session_bootstrap(struct fyai_ctx *ctx)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
@@ -3558,8 +3614,10 @@ int fyai_view_session_bootstrap(struct fyai_ctx *ctx)
 	char **argv = NULL, startup[FYAI_CHILD_START_TEXT_MAX];
 	char *summary = NULL;
 	const char *why;
+	long long applied, conflicts;
+	fy_generic result;
 	size_t argc = 0, i;
-	int rc = -1, saved;
+	int rc = -1, saved, status;
 
 	if (!fy_get(section, "isolate_session", false) || ctx->cfg->view_project ||
 	    cfg->tool_child || !cfg->argv || fyai_cfg_no_requests(cfg))
@@ -3578,6 +3636,10 @@ int fyai_view_session_bootstrap(struct fyai_ctx *ctx)
 	argv[5] = "--branch";
 	for (i = 1; i < argc; i++)
 		argv[i + 6] = cfg->argv[i];
+	if (view_session_stale(ctx)) {
+		rc = -1;
+		goto out;
+	}
 restart:
 	tpp = NULL;
 	if (fyai_view_run_begin(ctx, "session", &run))
@@ -3680,10 +3742,32 @@ restart:
 	if (rc)
 		goto out;
 	cfg->exit_status = output.exit_code;
+	/*
+	 * A session that ends from an idle prompt has no turn in flight: apply its view
+	 * to the project when no path conflicts. A session that was stopped, or that a
+	 * conflict blocks, keeps its view for the user to review.
+	 */
+	applied = conflicts = 0;
+	if (output.exit_code == 0 && fy_get(section, "apply_on_exit", true) &&
+	    !view_session_pending(ctx, &applied, &conflicts) && applied && !conflicts) {
+		status = cfg->exit_status;
+		rc = fyai_view_pull(ctx, ctx->gb, "session", NULL, NULL, 0, FYAI_VIEW_PULL_APPLY,
+				    &result);
+		cfg->exit_status = status;
+		if (!rc) {
+			fyai_notice(ctx, "The session ran in the view 'session' on the branch %s. Its "
+					 "%lld change%s are applied to the project.\n",
+				    fyai_ctx_branch(ctx), applied, applied == 1 ? "" : "s");
+			rc = 1;
+			goto out;
+		}
+		rc = 0;
+	}
 	fyai_notice(ctx, "The session ran in the view 'session' on the branch %s. Its changes "
-			 "are not in the project; %s\nReview them with `fyai -b %s view diff "
+			 "are not in the project; %s\n%sReview them with `fyai -b %s view diff "
 			 "session` and apply them with `fyai -b %s view apply session`.\n",
 		    fyai_ctx_branch(ctx), summary ? summary : "the change could not be listed",
+		    conflicts ? "Some paths conflict with the project, so none was applied.\n" : "",
 		    fyai_ctx_branch(ctx), fyai_ctx_branch(ctx));
 	rc = 1;
 out:
