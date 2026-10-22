@@ -2144,6 +2144,19 @@ commands:
         handler: sandbox_show
         render:
           document: yaml
+      - command: apparmor
+        title: write the AppArmor profile that lets fyai make user namespaces
+        description: |
+          Write an AppArmor profile for this binary to standard output. Ubuntu 24.04
+          and later let only a program that a profile names make a user namespace,
+          and a sandboxed tool needs one to hide the project arena. Without it a tool
+          cannot create files in the project root. Install the profile with
+          `fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai` and
+          `sudo apparmor_parser -r /etc/apparmor.d/fyai`. The profile grants that
+          permission and confines nothing else. The other fix is to install
+          bubblewrap, which Ubuntu lets make a user namespace; see `sandbox_cover`.
+        handler: sandbox_apparmor
+        flags: [no-storage]
       - command: "on"
         aliases: [enable]
         title: store the default sandbox policy

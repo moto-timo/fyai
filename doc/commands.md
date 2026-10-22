@@ -1991,7 +1991,7 @@ namespaces, OverlayFS, and Landlock.
 
 show or set the stored sandbox policy
 
-**Usage:** `fyai sandbox {edit|off|on|show} ...`
+**Usage:** `fyai sandbox {apparmor|edit|off|on|show} ...`
 
 Show or change the `sandbox` key of the configuration. `on` stores a
 policy that denies secrets and ~/.ssh and allows port 443; `edit`
@@ -2003,6 +2003,7 @@ of the session instead.
 
 | Command | Description |
 | --- | --- |
+| `apparmor` | write the AppArmor profile that lets fyai make user namespaces |
 | `edit` | edit the configuration in an editor |
 | `off`, `disable` | store no sandbox |
 | `on`, `enable` | store the default sandbox policy |
@@ -2021,6 +2022,29 @@ write the stored sandbox value
 **Aliases:** `get`
 
 Write the stored sandbox value as YAML.
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai sandbox apparmor
+
+write the AppArmor profile that lets fyai make user namespaces
+
+**Usage:** `fyai sandbox apparmor`
+
+Write an AppArmor profile for this binary to standard output. Ubuntu 24.04
+and later let only a program that a profile names make a user namespace,
+and a sandboxed tool needs one to hide the project arena. Without it a tool
+cannot create files in the project root. Install the profile with
+`fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai` and
+`sudo apparmor_parser -r /etc/apparmor.d/fyai`. The profile grants that
+permission and confines nothing else. The other fix is to install
+bubblewrap, which Ubuntu lets make a user namespace; see `sandbox_cover`.
+
 
 ### Options
 

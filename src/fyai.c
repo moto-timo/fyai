@@ -4493,7 +4493,7 @@ int fyai_run(struct fyai_cfg *cfg)
 		rc = 0;
 		goto out;
 	}
-	fyai_config_sandbox_report(cfg);
+	fyai_config_sandbox_report(&ctx);
 	rc = fyai_execute(&ctx);
 	fyai_cfg_error_check(cfg, !rc, err_out, "fyai execution failed");
 	if (cfg->reload_branch) {

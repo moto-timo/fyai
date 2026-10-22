@@ -23,6 +23,7 @@
 #include "fyai_config.h"
 #include "fyai_sandbox_profile.h"
 #include "fyai_skill.h"
+#include "fyai_sink.h"
 #include "fyai_settings.h"
 #include "fyai_agents.h"
 #include "fyai_event.h"
@@ -739,6 +740,59 @@ int fyai_cmd_sandbox_set(struct fyai_cmd_call *call, fy_generic *result)
 		return -1;
 	*result = fy_mapping(call->gb, "sandbox", on ? "on" : "off");
 	return 0;
+}
+
+/* The embedded data/apparmor.in profile, with @FYAI_BIN@ for the binary that runs. */
+#include "embedded_apparmor.inc"
+
+/*
+ * Write the AppArmor profile of this binary. The profile names an absolute path,
+ * so it is for the file that runs: /proc/self/exe on Linux, which a link or a
+ * relative argv[0] does not change.
+ */
+int fyai_cmd_sandbox_apparmor(struct fyai_cmd_call *call, fy_generic *result)
+{
+	static const char marker[] = "@FYAI_BIN@", deleted[] = " (deleted)";
+	const char *tpl = (const char *)FYAI_EMBEDDED_APPARMOR;
+	size_t tpl_len = FYAI_EMBEDDED_APPARMOR_LEN, mark_len = sizeof(marker) - 1;
+	size_t exe_len, count = 0, i, o;
+	char exe[PATH_MAX], *out;
+	ssize_t got;
+
+	(void)result;
+	got = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+	fyai_error_check(call->ctx, got > 0, err,
+			 "sandbox apparmor: cannot find the binary that runs: %s",
+			 strerror(errno));
+	exe[got] = '\0';
+	/* The kernel appends this to a path that was removed since the program started. */
+	if ((size_t)got > sizeof(deleted) - 1 &&
+	    !strcmp(exe + got - (sizeof(deleted) - 1), deleted))
+		exe[got - (sizeof(deleted) - 1)] = '\0';
+	fyai_error_check(call->ctx, !strchr(exe, ' ') && !strchr(exe, '"'), err,
+			 "sandbox apparmor: the path '%s' has a blank or a quote, which the "
+			 "profile cannot name here: write it by hand", exe);
+	exe_len = strlen(exe);
+	for (i = 0; i + mark_len <= tpl_len; i++)
+		if (!memcmp(tpl + i, marker, mark_len))
+			count++;
+	out = malloc(tpl_len + count * exe_len + 1);
+	fyai_error_check(call->ctx, out, err, "sandbox apparmor: out of memory");
+	for (i = 0, o = 0; i < tpl_len;) {
+		if (i + mark_len <= tpl_len && !memcmp(tpl + i, marker, mark_len)) {
+			memcpy(out + o, exe, exe_len);
+			o += exe_len;
+			i += mark_len;
+		} else {
+			out[o++] = tpl[i++];
+		}
+	}
+	/* A profile is written as it stands, for a pipe to tee. */
+	(void)fyai_sink_write(call->ctx->sink, FYAI_SINK_MACHINE, out, o);
+	free(out);
+	return 0;
+err:
+	return -1;
 }
 
 static const char *const setting_on[] = { "on", "true", "yes", NULL };

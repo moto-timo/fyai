@@ -220,7 +220,7 @@ void fyai_config_sandbox_lockdown(struct fyai_cfg *cfg);
  * the sandbox profile changes; it says nothing again for the same profile. A tool
  * child and a sub-agent say nothing.
  */
-void fyai_config_sandbox_report(struct fyai_cfg *cfg);
+void fyai_config_sandbox_report(struct fyai_ctx *ctx);
 
 /*
  * Set @key to @value in the session layer of the configuration: this session

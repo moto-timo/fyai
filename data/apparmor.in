@@ -1,0 +1,24 @@
+# AppArmor profile that lets fyai make user namespaces.
+#
+# Ubuntu 24.04 and later restrict unprivileged user namespaces to programs that a
+# profile names (kernel.apparmor_restrict_unprivileged_userns=1). Without one, a
+# sandboxed tool of fyai cannot hide the project arena in a mount namespace, and
+# the sandbox falls back to Landlock alone: a tool then cannot create files in the
+# project root. The profile grants that one permission and confines nothing else,
+# as the profiles of flatpak and chrome do. The sandbox of fyai is Landlock.
+#
+# Install it for the binary that runs:
+#   fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
+#   sudo apparmor_parser -r /etc/apparmor.d/fyai
+# The profile names a path: write it again after the binary moves. Instead,
+# install bubblewrap (sudo apt install bubblewrap), which Ubuntu lets make a user
+# namespace. See doc/apparmor-userns.md.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile fyai @FYAI_BIN@ flags=(unconfined) {
+  userns,
+
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/fyai>
+}

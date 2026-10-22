@@ -377,6 +377,7 @@ fyai_embed(FYAI_EMBEDDED_CONFIG_SCHEMA embedded_config_schema.inc
 
 # Embed the built-in tool specifications in wire shape.
 fyai_embed(FYAI_EMBEDDED_TOOLS embedded_tools.inc data/tools.yaml)
+fyai_embed(FYAI_EMBEDDED_APPARMOR embedded_apparmor.inc data/apparmor.in)
 
 # Embed the page document that the page renderer transcribes.
 fyai_embed(FYAI_EMBEDDED_PAGE embedded_page.inc data/page.yaml)

@@ -34,6 +34,7 @@
 #include "fyai_catalog.h"
 #include "fyai_branch.h"
 #include "fyai_config.h"
+#include "fyai_cover.h"
 #include "fyai_sandbox.h"
 #include "fyai_sandbox_profile.h"
 #include "fyai_provider.h"
@@ -2565,8 +2566,44 @@ void fyai_config_focus_bg_check(struct fyai_cfg *cfg)
  * not for each tool call. A tool child and a sub-agent leave it to the parent.
  * The start is reported by the caller once the verb has set those flags.
  */
-void fyai_config_sandbox_report(struct fyai_cfg *cfg)
+/*
+ * A tool hides the project arena in a mount namespace (fyai_cover.h). Where it
+ * cannot, Landlock denies the arena, and a tool cannot create files in the
+ * project root. Say so once, with the two ways to fix it.
+ */
+static void config_cover_report(struct fyai_ctx *ctx, const char *key)
 {
+	struct fyai_cfg *cfg = ctx->cfg;
+	bool userns, bwrap;
+	char *root;
+	char path[PATH_MAX];
+	int n;
+
+	if (cfg->view_project || !strcmp(cfg->sandbox_cover, "none"))
+		return;
+	root = fyai_discover_project_root();
+	if (!root)
+		return;
+	n = snprintf(path, sizeof(path), "%s/.fyai", root);
+	free(root);
+	if (n < 0 || (size_t)n >= sizeof(path) || access(path, F_OK))
+		return;
+	fyai_cover_probe(&ctx->cover, &userns, &bwrap);
+	if (userns || bwrap)
+		return;
+	fyai_cfg_warning(cfg, "sandbox '%s': this host does not let fyai hide the project "
+			 "arena in a namespace, so a tool cannot create files in the project root. "
+			 "User namespaces are restricted (Ubuntu 24.04 and later) and bubblewrap "
+			 "is not usable", key);
+	fyai_cfg_warning(cfg, "to fix it, install the AppArmor profile: `fyai sandbox apparmor "
+			 "| sudo tee /etc/apparmor.d/fyai >/dev/null && sudo apparmor_parser -r "
+			 "/etc/apparmor.d/fyai`; or install bubblewrap (`sudo apt install "
+			 "bubblewrap`); or set `sandbox_cover: none` to keep this and say no more");
+}
+
+void fyai_config_sandbox_report(struct fyai_ctx *ctx)
+{
+	struct fyai_cfg *cfg = ctx->cfg;
 	fy_generic net, tcp, udp;
 	const char *key;
 
@@ -2589,6 +2626,7 @@ void fyai_config_sandbox_report(struct fyai_cfg *cfg)
 	if (fy_is_valid(udp) && !fyai_sandbox_udp_restrictable(-1))
 		fyai_cfg_warning(cfg, "sandbox '%s': UDP egress remains open; Landlock ABI 10 "
 				 "is unavailable", key);
+	config_cover_report(ctx, key);
 }
 
 static int config_rederive_doc(struct fyai_ctx *ctx, fy_generic doc,
@@ -2602,7 +2640,7 @@ static int config_rederive_doc(struct fyai_ctx *ctx, fy_generic doc,
 	cfg->config_doc = doc;
 	if (fyai_config_apply(cfg, doc))
 		return -1;
-	fyai_config_sandbox_report(cfg);
+	fyai_config_sandbox_report(ctx);
 	fyai_ui_config_reassert(ctx);
 
 	if (cfg->markdown)
