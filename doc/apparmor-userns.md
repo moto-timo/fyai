@@ -50,15 +50,20 @@ path, so write it again after the binary moves. A package that installs
 `/usr/bin/fyai` can ship the profile with that path. Site changes go in
 `/etc/apparmor.d/local/fyai`.
 
-### Install bubblewrap
+### Install bubblewrap with its profile
 
 ```sh
-sudo apt install bubblewrap
+sudo apt install bubblewrap apparmor-profiles
+sudo install -m 644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/
+sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 ```
 
-fyai then uses `bwrap` when it cannot make the namespaces itself. Whether the host
-lets bubblewrap make a user namespace depends on its profile; if it does not, fyai
-says so at the start, as below.
+fyai then uses `bwrap` when it cannot make the namespaces itself. On Ubuntu 24.04 the
+bubblewrap package has no AppArmor profile, so installing the package alone does not
+help: the profile is in the `apparmor-profiles` package. Later Ubuntu releases are
+reported to ship and enable it. If `bwrap` still cannot make a user namespace, fyai
+says so at the start, as below. The profile of fyai is the simpler fix, because it
+grants the permission to the program that needs it.
 
 ### The other choice
 
@@ -73,7 +78,7 @@ changes:
 
 ```
 sandbox 'dev': this host does not let fyai hide the project arena in a namespace, so a tool cannot create files in the project root. User namespaces are restricted (Ubuntu 24.04 and later) and bubblewrap is not usable
-to fix it, install the AppArmor profile: `fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null && sudo apparmor_parser -r /etc/apparmor.d/fyai`; or install bubblewrap (`sudo apt install bubblewrap`); or set `sandbox_cover: none` to keep this and say no more
+to fix it, install the AppArmor profile: `fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null && sudo apparmor_parser -r /etc/apparmor.d/fyai`; or install bubblewrap with its AppArmor profile (doc/apparmor-userns.md); or set `sandbox_cover: none` to keep this and say no more
 ```
 
 ## Check a host

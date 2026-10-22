@@ -39,7 +39,7 @@
   namespace of the tool, a bubblewrap holder that the tool joins, or none. On Ubuntu
   24.04 and later, which restrict user namespaces, fyai says at the start what to do:
   `fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai` (a new command that writes
-  an AppArmor profile for the binary that runs), or install bubblewrap.
+  an AppArmor profile for the binary that runs), or install bubblewrap with its AppArmor profile.
 - A session that runs in a view applies the view to the project when it ends from
   an idle prompt and no path conflicts (`view/apply_on_exit`). A new session
   refuses to start while the view holds a change that the project does not have.

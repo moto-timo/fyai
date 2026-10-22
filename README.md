@@ -383,16 +383,23 @@ needs one of these:
 
 - unprivileged user namespaces, which most Linux hosts allow; or
 - [bubblewrap](https://github.com/containers/bubblewrap) (`bwrap`), which fyai starts
-  once to hold the namespaces.
+  once to hold the namespaces, on a host that lets it make a user namespace.
 
 Ubuntu 24.04 and later restrict user namespaces with AppArmor, so on a stock install
-neither may work. Install a profile that lets fyai make them, or install bubblewrap:
+neither works. Install a profile that lets fyai make them:
 
 ```sh
 fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
 sudo apparmor_parser -r /etc/apparmor.d/fyai
-# or
-sudo apt install bubblewrap
+```
+
+Or install bubblewrap with its AppArmor profile. On Ubuntu 24.04 the bubblewrap package
+has no profile: it is in the `apparmor-profiles` package.
+
+```sh
+sudo apt install bubblewrap apparmor-profiles
+sudo install -m 644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/
+sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 ```
 
 Without either, fyai says so at the start, the arena stays denied by Landlock, and a

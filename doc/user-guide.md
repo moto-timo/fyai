@@ -1220,8 +1220,15 @@ Two fixes are available, and either is enough:
 ```sh
 fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
 sudo apparmor_parser -r /etc/apparmor.d/fyai
-# or
-sudo apt install bubblewrap
+```
+
+or bubblewrap with its AppArmor profile, which on Ubuntu 24.04 is in the
+`apparmor-profiles` package and not in the bubblewrap package:
+
+```sh
+sudo apt install bubblewrap apparmor-profiles
+sudo install -m 644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/
+sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
 ```
 
 `fyai sandbox apparmor` writes an AppArmor profile for the binary that runs. It grants
