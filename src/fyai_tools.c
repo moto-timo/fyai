@@ -1163,7 +1163,25 @@ static bool fyai_shell_tty_requested(struct fyai_ctx *ctx, fy_generic call)
 	return ctx->cfg->shell_tty;
 }
 
-/* Read the call's shell, falling back to shell/shell. */
+/*
+ * The shell of a tool call that names none and for which shell/shell is empty:
+ * bash where the system has it, so a command that the model writes meets one
+ * dialect on every host, and else the empty string, which runs /bin/sh.
+ */
+static const char *fyai_shell_default(void)
+{
+	static const char *const bash[] = {
+		"/bin/bash", "/usr/bin/bash", "/usr/local/bin/bash", NULL,
+	};
+	const char *const *p;
+
+	for (p = bash; *p; p++)
+		if (!access(*p, X_OK))
+			return *p;
+	return "";
+}
+
+/* Read the call's shell, falling back to shell/shell, then to the default. */
 static const char *fyai_shell_shell_requested(struct fyai_ctx *ctx,
 					      fy_generic call)
 {
@@ -1174,7 +1192,10 @@ static const char *fyai_shell_shell_requested(struct fyai_ctx *ctx,
 	 * that of @call and not that of a copy. It lives as long as the call.
 	 */
 	shell = fy_get(call, "shell", "");
-	return !fy_str_empty(shell) ? shell : ctx->cfg->shell_shell;
+	if (!fy_str_empty(shell))
+		return shell;
+	return !fy_str_empty(ctx->cfg->shell_shell) ? ctx->cfg->shell_shell :
+							fyai_shell_default();
 }
 
 static bool fyai_shell_login_requested(struct fyai_ctx *ctx, fy_generic call)

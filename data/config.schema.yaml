@@ -412,8 +412,10 @@ properties:
         type: string
         default: ""
         description: >-
-          Set the default shell for a call. An empty value
-          runs `/bin/sh`, as each other command of this program does.
+          Set the default shell for a call. An empty value runs bash, from
+          `/bin/bash`, `/usr/bin/bash` or `/usr/local/bin/bash`, where the
+          system has it, so the model meets one dialect on every host, and
+          else `/bin/sh`, as each other command of this program does.
       login:
         x-fyai-model: read
         type: boolean
