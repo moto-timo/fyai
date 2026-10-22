@@ -2369,6 +2369,36 @@ names. A session runs it in the work pane.
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 
+## fyai schema
+
+export the schemas that fyai supports
+
+**Usage:** `fyai schema [--surface SURFACE] [WHAT]`
+
+Write a schema document. `commands` gives the commands of one surface
+with their descriptions and the JSON Schema of their arguments, so a
+front end offers them without a list of its own. `config` gives the
+schema of the configuration and `catalog` the schema of the catalogue.
+Each command names its surfaces and its flags. The hidden commands
+and options are left out. Use `--output json` for JSON.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `WHAT` | the schema to write (commands, config, catalog); default commands |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--surface SURFACE` | the surface whose commands are written; `all` writes every command and names its surfaces in each  (cli, session, all); default all |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+**See also:** `fyai help config`, `fyai help catalog`
+
 ## fyai history
 
 show the conversation of the branch
@@ -5162,6 +5192,35 @@ names. A session runs it in the work pane.
 | `--curated` | keep only the curated models |
 | `--provider NAME` | update only this provider |
 | `-h`, `--help` | show this help |
+
+## /schema
+
+export the schemas that fyai supports
+
+**Usage:** `/schema [--surface SURFACE] [WHAT]`
+
+Write a schema document. `commands` gives the commands of one surface
+with their descriptions and the JSON Schema of their arguments, so a
+front end offers them without a list of its own. `config` gives the
+schema of the configuration and `catalog` the schema of the catalogue.
+Each command names its surfaces and its flags. The hidden commands
+and options are left out. Use `--output json` for JSON.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `WHAT` | the schema to write (commands, config, catalog); default commands |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--surface SURFACE` | the surface whose commands are written; `all` writes every command and names its surfaces in each  (cli, session, all); default all |
+| `-h`, `--help` | show this help |
+
+**See also:** `/help config`, `/help catalog`
 
 ## /history
 

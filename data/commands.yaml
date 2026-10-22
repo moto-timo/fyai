@@ -2391,6 +2391,43 @@ commands:
               x-fyai-meta: PROVIDER
               x-fyai-complete: provider
 
+  - command: schema
+    title: export the schemas that fyai supports
+    description: |
+      Write a schema document. `commands` gives the commands of one surface
+      with their descriptions and the JSON Schema of their arguments, so a
+      front end offers them without a list of its own. `config` gives the
+      schema of the configuration and `catalog` the schema of the catalogue.
+      Each command names its surfaces and its flags. The hidden commands
+      and options are left out. Use `--output json` for JSON.
+    surfaces: [cli, session]
+    handler: schema
+    flags: [no-storage]
+    view: true
+    while_busy: run
+    see_also: [config, catalog]
+    render:
+      document: yaml
+    arguments:
+      type: object
+      additionalProperties: false
+      properties:
+        what:
+          type: string
+          enum: [commands, config, catalog]
+          default: commands
+          description: the schema to write
+          x-fyai-positional: 0
+          x-fyai-meta: WHAT
+        surface:
+          type: string
+          enum: [cli, session, all]
+          default: all
+          description: |
+            the surface whose commands are written; `all` writes every
+            command and names its surfaces in each
+          x-fyai-meta: SURFACE
+
   - command: history
     aliases: [transcript, display]
     title: show the conversation of the branch

@@ -563,6 +563,7 @@ set(FYAI_SOURCES
     src/fyai_cmd_auth.c
     src/fyai_cmd_branch.c
     src/fyai_cmd_catalog.c
+    src/fyai_cmd_schema.c
     src/fyai_cmd_complete.c
     src/fyai_cmd_config.c
     src/fyai_cmd_help.c

@@ -263,6 +263,7 @@ int fyai_cmd_catalog_import(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_catalog_export(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_catalog_validate(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_catalog_schema(struct fyai_cmd_call *call, fy_generic *result);
+int fyai_cmd_schema(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_catalog_reset(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_catalog_edit(struct fyai_cmd_call *call, fy_generic *result);
 int fyai_cmd_catalog_update(struct fyai_cmd_call *call, fy_generic *result);

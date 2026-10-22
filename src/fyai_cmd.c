@@ -146,6 +146,7 @@ static const struct {
 	{ "skill_disable",		fyai_cmd_skill_disable },
 	{ "skill_exec",		fyai_cmd_skill_exec },
 	{ "skill_files",		fyai_cmd_skill_files },
+	{ "schema",		fyai_cmd_schema },
 	{ "catalog_show",	fyai_cmd_catalog_show },
 	{ "catalog_list",	fyai_cmd_catalog_list },
 	{ "render",		fyai_cmd_render },
