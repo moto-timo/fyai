@@ -51,7 +51,7 @@
   key takes more (`extends`, `deny`, `allow`, `network`, `view`). Paths may use `{{hostname}}`, `{{os}}`,
   `{{arch}}` and `{{host_specific}}`. `dev` is the new default: the project,
   the toolchains and package caches of the user, and TCP to ports 80, 443 and
-  9418 (git and registries). `/session profile [NAME]` lists or selects a
+  9418 (git and registries). `dev-view` is `dev` with the session in a view. `/session profile [NAME]` lists or selects a
   profile and restarts the session; `/session dev` selects `dev`. A profile may
   carry `view: true`: the session then runs in a view of the project, and a
   switch to a profile without one applies the view to the project first and

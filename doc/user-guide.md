@@ -1146,7 +1146,8 @@ own name starts from the sample profile of that name. A name that no profile has
 a chain of `extends` that is a cycle, is an error.
 
 A profile has a `view` setting: `true` runs the session in a view of the project,
-where this host can make one (`lockdown` does; `dev` does not). `/session profile`
+where this host can make one (`lockdown` and `dev-view` do; `dev` does not, because a
+view is jarring as a default). `dev-view` is `dev` with `view: true`. `/session profile`
 lists the profiles and marks the current one. `/session profile NAME` stores the
 profile and its view setting, and starts the session again to apply them, as
 `/reload` does: live shells and sub-agents must finish first. A session that runs in
