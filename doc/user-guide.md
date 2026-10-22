@@ -128,6 +128,8 @@ fyai "inspect this repository and suggest the next cleanup"
 
 A prompt invocation may call the model several times and use tools until it reaches a final answer, the configured iteration limit, an interrupt, or an unrecoverable error.
 
+An error in the tool loop does not discard the turn. The turn keeps the steps up to the last tool round that has all its results, and the report names the cause. A tool call that returns no result gets a tool error, and the turn continues. When the log of a fullscreen session shows an entry with an error, the rows that report errors stand first.
+
 Run with no prompt, or pass `-i`, to enter interactive mode:
 
 ```sh

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **A failed turn keeps its work.** An error in the tool loop no longer drops
+  the whole turn: the steps up to the last complete tool round are stored. A
+  tool call that returns no result gets a tool error, and the turn continues.
+  The log of a fullscreen session shows the rows that report errors first.
+
 ## 0.4 - 2026-10-22
 
 ### Added
