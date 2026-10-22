@@ -108,6 +108,25 @@ jobs:
       run: |
         cmake --build build
 
+    - name: "Allow user namespaces (Ubuntu)"
+      if: runner.os == 'Linux'
+      # The hosted runner restricts unprivileged user namespaces with AppArmor. The
+      # cases of the views and of the sandbox cover need them, so install the profiles
+      # that the documentation (doc/apparmor-userns.md) names, for the binary that
+      # runs and for bubblewrap. The cases also use unshare, to see whether the host
+      # has the namespaces and to emulate a host that has none, so it gets one too.
+      run: |
+        sudo apt-get install --no-install-recommends -y bubblewrap apparmor-profiles
+        build/fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
+        sudo install -m 644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict \
+          /etc/apparmor.d/
+        printf 'abi <abi/4.0>,\ninclude <tunables/global>\nprofile unshare /usr/bin/unshare flags=(unconfined) {\n  userns,\n}\n' |
+          sudo tee /etc/apparmor.d/unshare-ci >/dev/null
+        sudo apparmor_parser -r /etc/apparmor.d/fyai \
+          /etc/apparmor.d/bwrap-userns-restrict /etc/apparmor.d/unshare-ci
+        unshare -Urnmpf true
+        bwrap --version
+
     - name: "Scan McCabe complexity"
       if: runner.os == 'Linux'
       run: |
