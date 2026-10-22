@@ -523,3 +523,6 @@ view:
   # Also leave out what the .gitignore files of the project ignore.
   gitignore: true
   isolate_session: false
+  # Apply the view of a session to the project when it ends from an idle prompt and
+  # no path conflicts. Otherwise the changes stay in the view.
+  apply_on_exit: true

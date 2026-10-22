@@ -105,7 +105,19 @@ properties:
           project. The invocation captures the project, runs again inside the
           view, and records the result. Its changes stay in the view until
           `view apply` writes them to the project. Linux only. It needs a
-          writable arena and no credential isolation.
+          writable arena and no credential isolation. A new session refuses to
+          start while the view still holds a change that the project does not
+          have: apply it with `view apply session`, or drop it with `view remove
+          session`.
+      apply_on_exit:
+        x-fyai-model: read
+        type: boolean
+        default: true
+        description: >-
+          Apply the view of a session to the project when the session ends from
+          an idle prompt, if no path conflicts with the project. A session that
+          a signal stopped, or that a conflict blocks, keeps its view for
+          `view apply`.
   auth:
     x-fyai-model: read
     type: string
