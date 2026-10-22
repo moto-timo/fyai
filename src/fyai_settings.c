@@ -130,8 +130,14 @@ static bool settings_arena_protected(struct fyai_ctx *ctx)
 	if (!root)
 		return false;
 	deny = NULL;
-	inside = asprintf(&deny, "%s/.fyai", root) >= 0 &&
-		 realpath(deny, denied) && realpath(cfg->arena_dir, arena);
+	inside = asprintf(&deny, "%s/.fyai", root) >= 0 && realpath(deny, denied);
+	/*
+	 * A tool that has the arena covered cannot resolve a path below it: the
+	 * cover is the protection, so the path as given is compared instead.
+	 */
+	if (inside && !realpath(cfg->arena_dir, arena))
+		inside = errno == EACCES &&
+			 snprintf(arena, sizeof(arena), "%s", cfg->arena_dir) < (int)sizeof(arena);
 	len = inside ? strlen(denied) : 0;
 	inside = inside && !strncmp(denied, arena, len) &&
 		 (arena[len] == '/' || !arena[len]);

@@ -119,6 +119,15 @@ struct fyai_sandbox_spec {
 	size_t udp_bind_ports_n;
 
 	/*
+	 * Existing paths to hide: each is covered by an empty read-only mount in a
+	 * private mount namespace before confinement. A hidden path needs no entry
+	 * in @deny, and the directories above it keep their write rights, which a
+	 * denied path takes away. The caller checks fyai_fsview_hide_usable().
+	 */
+	const char *const *hide;
+	size_t hide_n;
+
+	/*
 	 * Remove from PATH every entry that the grants do not reach: a relative
 	 * or empty entry, one under a denied path, and one outside the system,
 	 * scratch, project and allow trees. A tool then cannot find a program

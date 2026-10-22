@@ -90,6 +90,30 @@ int fyai_fsview_metacopy_check(const char *runtime);
 /* Whether this process may enter the user, mount and PID namespaces of a view. */
 bool fyai_fsview_namespace_usable(void);
 
+/*
+ * Whether this process may hide paths with fyai_fsview_hide(): it can make a
+ * user, mount and PID namespace. A probe child makes them.
+ */
+bool fyai_fsview_hide_usable(void);
+
+/*
+ * Run the rest of this process in private user, mount and PID namespaces, with
+ * each of the @n paths covered by an empty read-only mount (a directory by an
+ * empty one, a file by /dev/null) and a procfs that lists only the processes of
+ * the namespace. The capabilities are dropped, so nothing that runs here sees
+ * or changes what the paths hold, undoes the cover, or reaches the processes
+ * that started it. A path that does not exist is skipped.
+ *
+ * The call forks twice. The process that calls it never returns: it waits for
+ * the init of the namespace and ends with the status of the program, so the
+ * parent sees one child, as before. The init reaps what the program leaves and
+ * ends with it, and the kernel then ends the rest of the namespace. Only the
+ * program returns. Call it from a process that has one thread, before it
+ * confines itself. Returns 0 in the program, or -1 with errno set before any
+ * fork.
+ */
+int fyai_fsview_hide(const char *const *paths, size_t n);
+
 /* Read-only inspection mounts persist in the caller's mount namespace. */
 int fyai_fsview_mount(const struct fyai_fsview *view, const char *target,
 		      struct fyai_fsview_mount *identity);

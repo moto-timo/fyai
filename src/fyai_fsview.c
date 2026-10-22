@@ -501,6 +501,26 @@ bool fyai_fsview_namespace_usable(void)
 	return waited == child && WIFEXITED(status) && !WEXITSTATUS(status);
 }
 
+/*
+ * Probe the namespaces of fyai_fsview_hide() in a child, which owns the
+ * namespaces it makes.
+ */
+bool fyai_fsview_hide_usable(void)
+{
+	pid_t child, waited;
+	int status;
+
+	child = fork();
+	if (child < 0)
+		return false;
+	if (!child)
+		_exit(view_namespace(true) ? 1 : 0);
+	do {
+		waited = waitpid(child, &status, 0);
+	} while (waited < 0 && errno == EINTR);
+	return waited == child && WIFEXITED(status) && !WEXITSTATUS(status);
+}
+
 static int view_cover(const char *source, const char *target)
 {
 	int rc;
@@ -510,6 +530,99 @@ static int view_cover(const char *source, const char *target)
 		return -1;
 	return mount(NULL, target, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV,
 		     NULL);
+}
+
+static int view_drop_capabilities(void);
+
+/* Cover one path: a directory by an empty mount, a file by /dev/null. */
+static int view_hide_one(const char *path)
+{
+	struct stat st;
+	unsigned long flags = MS_NOSUID | MS_NODEV | MS_NOEXEC;
+	int rc;
+
+	rc = stat(path, &st);
+	if (rc)
+		return errno == ENOENT ? 0 : -1;
+	if (S_ISDIR(st.st_mode))
+		rc = mount("tmpfs", path, "tmpfs", flags, "mode=0000,size=4k");
+	else
+		rc = mount("/dev/null", path, NULL, MS_BIND, NULL);
+	if (rc)
+		return -1;
+	return mount(NULL, path, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | flags, NULL);
+}
+
+/* The exit status that a wait status stands for, as a shell reports it. */
+static int view_wait_status(pid_t waited, int status)
+{
+	return waited < 0	? 127 :
+	       WIFEXITED(status) ? WEXITSTATUS(status) :
+				   128 + WTERMSIG(status);
+}
+
+/*
+ * The init of the PID namespace: it runs the program as its only child, reaps
+ * what the program leaves, and ends with its status. When the namespace ends,
+ * the kernel ends every process in it. Never returns.
+ */
+static void view_pid_init(pid_t program)
+{
+	int status;
+	pid_t waited;
+
+	for (;;) {
+		waited = waitpid(-1, &status, 0);
+		if (waited == program)
+			_exit(view_wait_status(waited, status));
+		if (waited < 0 && errno != EINTR)
+			_exit(127);
+	}
+}
+
+int fyai_fsview_hide(const char *const *paths, size_t n)
+{
+	pid_t child, program, waited;
+	int status;
+	size_t i;
+	int rc;
+
+	rc = view_namespace(true);
+	if (rc)
+		return -1;
+	for (i = 0; i < n; i++)
+		if (view_hide_one(paths[i]))
+			return -1;
+	/*
+	 * The processes of the tool are the children of this one, in a PID
+	 * namespace where this process and its parent do not exist. This process
+	 * waits for the init of the namespace and ends with its status, so the
+	 * caller sees one child, as it did.
+	 */
+	child = fork();
+	if (child < 0)
+		return -1;
+	if (child) {
+		do {
+			waited = waitpid(child, &status, 0);
+		} while (waited < 0 && errno == EINTR);
+		_exit(view_wait_status(waited, status));
+	}
+	/* The namespace ends with this process, and so do the programs in it. */
+	if (prctl(PR_SET_PDEATHSIG, SIGKILL))
+		_exit(127);
+	/*
+	 * The host procfs lists the processes of the host. A tool that cannot mount
+	 * its own, because a container masks /proc, keeps the host one: the
+	 * confinement of the process still holds.
+	 */
+	(void)mount("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
+	program = fork();
+	if (program < 0)
+		_exit(127);
+	if (program)
+		view_pid_init(program);
+	return view_drop_capabilities();
 }
 
 static int view_drop_capabilities(void)
@@ -1433,6 +1546,19 @@ int fyai_fsview_manifest_publish(const char *storage, const struct fyai_manifest
 bool fyai_fsview_namespace_usable(void)
 {
 	return false;
+}
+
+bool fyai_fsview_hide_usable(void)
+{
+	return false;
+}
+
+int fyai_fsview_hide(const char *const *paths, size_t n)
+{
+	(void)paths;
+	(void)n;
+	errno = ENOTSUP;
+	return -1;
 }
 
 int fyai_fsview_metacopy_check(const char *runtime)

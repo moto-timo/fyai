@@ -747,6 +747,8 @@ static void fyai_shell_output(void *userdata,
 struct fyai_shell_sandbox {
 	struct fyai_sandbox_spec spec;
 	char *root;
+	const char **hide;			/* each entry owned; covered in the tool */
+	size_t hide_n;
 	struct fyai_sandbox_path *allow;	/* each .path owned */
 	const char **deny;			/* each entry owned */
 	uint16_t *tcp_ports;
@@ -782,6 +784,16 @@ static char *sandbox_resolve(const char *base, const char *p)
 	return asprintf(&out, "%s/%s", base, p) < 0 ? NULL : out;
 }
 
+/* Whether a tool can have the arena covered: probed once for the process. */
+static bool sandbox_hide_usable(void)
+{
+	static int usable = -1;
+
+	if (usable < 0)
+		usable = fyai_fsview_hide_usable();
+	return usable;
+}
+
 /*
  * Build the tool sandbox spec from cfg->sandbox, or return NULL when disabled.
  * Confinement is scoped to the project root (or cwd when none is found), with
@@ -797,6 +809,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	fy_generic allow, deny, net, tcp, udp, ports, e;
 	fy_generic port, pv;
 	enum fyai_sandbox_mode mode;
+	bool cover;
 	char cwd[4096];
 	char *resolved;
 	const char *ps;
@@ -819,11 +832,19 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	sp->strict = false;			/* floor is the config policy */
 	sp->filter_path = true;
 
-	/* deny: always the arena, then each config sandbox.deny entry. */
+	/*
+	 * deny: always the arena, then each config sandbox.deny entry. Where the
+	 * tool can have a private mount, each existing path is covered by it and
+	 * Landlock gets no deny: a denied path under a granted directory would
+	 * leave that directory only the right to list, so a tool could not create
+	 * entries in the project root. Elsewhere Landlock denies the path.
+	 */
 	deny = fy_get(cs, "deny");
 	n = fy_is_sequence(deny) ? fy_len(deny) : 0;
-	sb->deny = calloc(n + 1, sizeof(*sb->deny));
-	fyai_error_check(ctx, sb->deny, err_out,
+	cover = !ctx->cfg->view_project && sandbox_hide_usable();
+	sb->deny = calloc(n + 2, sizeof(*sb->deny));
+	sb->hide = calloc(n + 2, sizeof(*sb->hide));
+	fyai_error_check(ctx, sb->deny && sb->hide, err_out,
 			 "sandbox: could not allocate the deny list");
 	/* Configured denies apply to every grant. Ignore paths that do not exist. */
 	fy_foreach(e, deny) {
@@ -835,7 +856,10 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 			free(resolved);
 			continue;
 		}
-		sb->deny[sp->deny_n++] = resolved;
+		if (cover)
+			sb->hide[sb->hide_n++] = resolved;
+		else
+			sb->deny[sp->deny_n++] = resolved;
 	}
 	sp->deny_global_n = sp->deny_n;
 	resolved = sandbox_resolve(sb->root, ".fyai");
@@ -843,9 +867,13 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 			 "sandbox: could not resolve the arena deny path");
 	if (ctx->cfg->view_project || access(resolved, F_OK))
 		free(resolved);
+	else if (cover)
+		sb->hide[sb->hide_n++] = resolved;
 	else
 		sb->deny[sp->deny_n++] = resolved;
 	sp->deny = sb->deny;
+	sp->hide = (const char *const *)sb->hide;
+	sp->hide_n = sb->hide_n;
 
 	/* allow: extra grants; a string is rw, a mapping {path, mode: ro}. */
 	allow = fy_get(cs, "allow");
@@ -966,6 +994,9 @@ static void fyai_shell_sandbox_end(struct fyai_shell_sandbox *sb)
 	free(sb->tcp_bind_ports);
 	free(sb->udp_ports);
 	free(sb->udp_bind_ports);
+	for (i = 0; i < sb->hide_n; i++)
+		free((char *)sb->hide[i]);
+	free(sb->hide);
 	free(sb->root);
 	memset(sb, 0, sizeof(*sb));
 }

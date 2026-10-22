@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#include "fyai_fsview.h"
 #include "fyai_sandbox.h"
 
 /*
@@ -433,6 +434,9 @@ bool fyai_sandbox_path_visible(const struct fyai_sandbox_spec *spec,
 	for (i = 0; i < spec->deny_n; i++)
 		if (path_within(dir, spec->deny[i]))
 			return false;
+	for (i = 0; i < spec->hide_n; i++)
+		if (path_within(dir, spec->hide[i]))
+			return false;
 	seen = false;
 	for (p = fyai_sys_ro; *p && !seen; p++)
 		seen = path_within(dir, *p);
@@ -500,6 +504,10 @@ int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
 	    !fyai_sandbox_net_restrictable(abi))
 		return -1;
 	if (spec->restrict_udp && !fyai_sandbox_udp_restrictable(abi))
+		return -1;
+
+	/* The cover comes first: the ruleset then sees the tree as the tool does. */
+	if (spec->hide_n && fyai_fsview_hide(spec->hide, spec->hide_n))
 		return -1;
 
 	mask = fs_mask(abi);
