@@ -528,6 +528,7 @@ set(FYAI_SOURCES
     src/fyai_provider.c
     src/fyai_render.c
     src/fyai_sandbox.c
+    src/fyai_cover.c
     src/fyai_sandbox_profile.c
     src/fyai_session.c
     src/fyai_browser.c

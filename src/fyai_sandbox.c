@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#include "fyai_cover.h"
 #include "fyai_fsview.h"
 #include "fyai_sandbox.h"
 
@@ -507,8 +508,12 @@ int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
 		return -1;
 
 	/* The cover comes first: the ruleset then sees the tree as the tool does. */
-	if (spec->hide_n && fyai_fsview_hide(spec->hide, spec->hide_n))
+	if (spec->cover_holder > 0) {
+		if (fyai_cover_join(spec->cover_holder))
+			return -1;
+	} else if (spec->hide_n && fyai_fsview_hide(spec->hide, spec->hide_n)) {
 		return -1;
+	}
 
 	mask = fs_mask(abi);
 	attr.handled_access_fs = mask;

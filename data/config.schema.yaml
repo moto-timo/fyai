@@ -744,6 +744,22 @@ properties:
                       type: integer
                       minimum: 1
                       maximum: 65535
+  sandbox_cover:
+    x-fyai-model: read
+    type: string
+    enum: [auto, userns, bwrap, none]
+    default: auto
+    description: >-
+      Choose how a sandboxed tool hides the project arena and the denied paths.
+      Landlock cannot deny a path under a directory that it grants, and the
+      carve-out that stands in for the denial leaves a tool unable to create an
+      entry in the project root. A tool therefore hides the paths in a mount
+      namespace. `userns` makes the namespaces in the tool. `bwrap` starts a
+      bubblewrap process once, which holds them, and the tool joins them: Ubuntu
+      lets bubblewrap make a user namespace when it does not let an unconfined
+      program do so. `auto` tries `userns`, then `bwrap`. `none` leaves it to
+      Landlock. Where a cover is not possible, fyai says so at the start and
+      names the fix: `fyai sandbox apparmor`, or bubblewrap.
   sandbox_profile:
     x-fyai-model: read
     x-fyai-complete: sandbox-profile

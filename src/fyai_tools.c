@@ -59,6 +59,7 @@
 #include "fyai_todo.h"
 #include "fyai_tools.h"
 #include "fyai_view.h"
+#include "fyai_cover.h"
 #include "fyai_fsview.h"
 #include "fyai_asks.h"
 #include "fyai_wait.h"
@@ -784,16 +785,6 @@ static char *sandbox_resolve(const char *base, const char *p)
 	return asprintf(&out, "%s/%s", base, p) < 0 ? NULL : out;
 }
 
-/* Whether a tool can have the arena covered: probed once for the process. */
-static bool sandbox_hide_usable(void)
-{
-	static int usable = -1;
-
-	if (usable < 0)
-		usable = fyai_fsview_hide_usable();
-	return usable;
-}
-
 /*
  * Build the tool sandbox spec from cfg->sandbox, or return NULL when disabled.
  * Confinement is scoped to the project root (or cwd when none is found), with
@@ -809,7 +800,10 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	fy_generic allow, deny, net, tcp, udp, ports, e;
 	fy_generic port, pv;
 	enum fyai_sandbox_mode mode;
-	bool cover;
+	char **cand = NULL;
+	enum fyai_cover_method method;
+	pid_t holder = 0;
+	size_t cn = 0, gn, i;
 	char cwd[4096];
 	char *resolved;
 	const char *ps;
@@ -833,18 +827,18 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	sp->filter_path = true;
 
 	/*
-	 * deny: always the arena, then each config sandbox.deny entry. Where the
-	 * tool can have a private mount, each existing path is covered by it and
-	 * Landlock gets no deny: a denied path under a granted directory would
+	 * deny: each config sandbox.deny entry, then the arena. Where a cover is
+	 * possible (fyai_cover.h), each existing path is hidden in a mount namespace
+	 * and Landlock gets no deny: a denied path under a granted directory would
 	 * leave that directory only the right to list, so a tool could not create
 	 * entries in the project root. Elsewhere Landlock denies the path.
 	 */
 	deny = fy_get(cs, "deny");
 	n = fy_is_sequence(deny) ? fy_len(deny) : 0;
-	cover = !ctx->cfg->view_project && sandbox_hide_usable();
 	sb->deny = calloc(n + 2, sizeof(*sb->deny));
 	sb->hide = calloc(n + 2, sizeof(*sb->hide));
-	fyai_error_check(ctx, sb->deny && sb->hide, err_out,
+	cand = calloc(n + 2, sizeof(*cand));
+	fyai_error_check(ctx, sb->deny && sb->hide && cand, err_out,
 			 "sandbox: could not allocate the deny list");
 	/* Configured denies apply to every grant. Ignore paths that do not exist. */
 	fy_foreach(e, deny) {
@@ -856,24 +850,37 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 			free(resolved);
 			continue;
 		}
-		if (cover)
-			sb->hide[sb->hide_n++] = resolved;
-		else
-			sb->deny[sp->deny_n++] = resolved;
+		cand[cn++] = resolved;
 	}
-	sp->deny_global_n = sp->deny_n;
+	gn = cn;
 	resolved = sandbox_resolve(sb->root, ".fyai");
 	fyai_error_check(ctx, resolved, err_out,
 			 "sandbox: could not resolve the arena deny path");
 	if (ctx->cfg->view_project || access(resolved, F_OK))
 		free(resolved);
-	else if (cover)
-		sb->hide[sb->hide_n++] = resolved;
 	else
-		sb->deny[sp->deny_n++] = resolved;
+		cand[cn++] = resolved;
+	/* A session in a view keeps the carve-out: the view hides the arena already. */
+	method = ctx->cfg->view_project ? FYAI_COVER_NONE :
+		 fyai_cover_select(&ctx->cover, ctx->cfg->sandbox_cover,
+				   (const char *const *)cand, cn, &holder);
+	for (i = 0; i < cn; i++) {
+		if (method == FYAI_COVER_USERNS ||
+		    (method == FYAI_COVER_BWRAP && fyai_cover_covers(&ctx->cover, cand[i]))) {
+			sb->hide[sb->hide_n++] = cand[i];
+		} else {
+			sb->deny[sp->deny_n++] = cand[i];
+			if (i < gn)
+				sp->deny_global_n++;
+		}
+	}
+	free(cand);
+	cand = NULL;
 	sp->deny = sb->deny;
 	sp->hide = (const char *const *)sb->hide;
 	sp->hide_n = sb->hide_n;
+	if (method == FYAI_COVER_BWRAP && sb->hide_n)
+		sp->cover_holder = holder;
 
 	/* allow: extra grants; a string is rw, a mapping {path, mode: ro}. */
 	allow = fy_get(cs, "allow");
@@ -976,6 +983,11 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	*specp = sp;
 	return 0;
 err_out:
+	if (cand) {
+		for (i = 0; i < cn; i++)
+			free(cand[i]);
+		free(cand);
+	}
 	fyai_shell_sandbox_end(sb);
 	return -1;
 }
@@ -5433,6 +5445,7 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	free(ctx->patch_display);
 	ctx->patch_display = NULL;
 	fyai_output_cleanup(ctx);		/* the document it has open */
+	fyai_cover_abandon(&ctx->cover);	/* the holder that it does not own */
 	fyai_skill_dirs_abandon(ctx);		/* the skills it wrote out */
 	fyai_settings_abandon(ctx);		/* and the exports */
 	ctx->ui = NULL;				/* its display */

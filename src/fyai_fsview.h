@@ -114,6 +114,9 @@ bool fyai_fsview_hide_usable(void);
  */
 int fyai_fsview_hide(const char *const *paths, size_t n);
 
+/* Drop every capability of this process and lock the securebits, as a view does. */
+int fyai_fsview_drop_capabilities(void);
+
 /* Read-only inspection mounts persist in the caller's mount namespace. */
 int fyai_fsview_mount(const struct fyai_fsview *view, const char *target,
 		      struct fyai_fsview_mount *identity);

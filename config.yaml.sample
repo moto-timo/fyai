@@ -220,6 +220,11 @@ sandbox: false
 # restarts the session; `/session dev`, `/session lockdown` and `/session yolo`
 # select `dev`, `lockdown` and `normal` and set the other isolation keys too.
 sandbox_profile: dev
+# How a sandboxed tool hides the arena and the denied paths in a mount namespace:
+# auto (a user namespace of the tool, else a holder that bubblewrap starts), userns,
+# bwrap or none (Landlock alone, which stops a tool from creating entries in the
+# project root).
+sandbox_cover: auto
 # The profiles. This sample is the source of `dev` and `lockdown`: an arena that
 # has none of them uses these, and one that stores them uses its own. A profile
 # has a description, `extends` (the profile it starts from), `deny`, `allow`,

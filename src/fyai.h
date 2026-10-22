@@ -20,6 +20,7 @@
 #include <libfyaml/libfyaml-generic.h>
 #include <libfypalette.h>
 
+#include "fyai_cover.h"
 #include "utils.h"
 #include "commands.h"
 #include "fyai_auth.h"
@@ -408,6 +409,7 @@ struct fyai_cfg {
 	fy_generic sandbox;	/* policy in force: mapping (allow/deny/network), or invalid */
 	const char *sandbox_profile;	/* profile that made the policy; NULL: `sandbox` */
 	const char *sandbox_reported;	/* what the last report of open egress was for */
+	const char *sandbox_cover;	/* how a tool hides the arena: auto, userns, bwrap, none */
 	bool interactive;
 	int debug;
 	bool pretty;
@@ -916,6 +918,7 @@ struct fyai_ctx {
 	/* Set inside a forked tool sub-execution once the environment has been
 	 * sanitized and the sandbox applied, so inner steps (the shell tool's
 	 * own fork) do not re-derive and re-apply the confinement. */
+	struct fyai_cover cover;	/* how a tool hides the arena, and the holder of it */
 	bool sandbox_applied;
 	/* Index of the next pre-supplied --answer to hand to ask_user. */
 	size_t answer_next;

@@ -625,6 +625,11 @@ int fyai_fsview_hide(const char *const *paths, size_t n)
 	return view_drop_capabilities();
 }
 
+int fyai_fsview_drop_capabilities(void)
+{
+	return view_drop_capabilities();
+}
+
 static int view_drop_capabilities(void)
 {
 	struct __user_cap_header_struct header = { .version = _LINUX_CAPABILITY_VERSION_3 };
@@ -1551,6 +1556,12 @@ bool fyai_fsview_namespace_usable(void)
 bool fyai_fsview_hide_usable(void)
 {
 	return false;
+}
+
+int fyai_fsview_drop_capabilities(void)
+{
+	errno = ENOTSUP;
+	return -1;
 }
 
 int fyai_fsview_hide(const char *const *paths, size_t n)

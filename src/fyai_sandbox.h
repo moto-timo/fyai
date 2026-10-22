@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 /*
  * Landlock-based confinement for tool sub-executions (the built-in shell
@@ -126,6 +127,12 @@ struct fyai_sandbox_spec {
 	 */
 	const char *const *hide;
 	size_t hide_n;
+	/*
+	 * The holder whose namespaces cover @hide, when a holder owns the cover
+	 * (fyai_cover.h): the process joins them in place of making its own. 0 when
+	 * the process makes its own.
+	 */
+	pid_t cover_holder;
 
 	/*
 	 * Remove from PATH every entry that the grants do not reach: a relative

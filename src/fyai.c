@@ -2606,6 +2606,8 @@ void fyai_cleanup(struct fyai_ctx *ctx)
 		return;
 	cfg = ctx->cfg;
 
+	fyai_cover_release(&ctx->cover);
+
 	/* Remove the handlers before the context that they name is destroyed. */
 	/* A session cannot outlive the invocation that opened it, and neither
 	 * can a wait: there is no daemon for either to be handed to. */
@@ -2875,6 +2877,8 @@ int fyai_setup(struct fyai_ctx *ctx, struct fyai_cfg *cfg)
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->cfg = cfg;
 	ctx->auth.registrations = fy_invalid;
+	/* A holder that an ancestor started is in the environment, which a tool clears. */
+	fyai_cover_init(&ctx->cover);
 
 	ctx->stdout_tty = terminal_is_tty(STDOUT_FILENO);
 	if (!terminal_window_size(STDOUT_FILENO, &ctx->tty_rows, &ctx->tty_cols))
