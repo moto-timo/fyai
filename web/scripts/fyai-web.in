@@ -1,0 +1,34 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+#
+# Serve the installed fyai web page: start the bridge, which runs fyai in the
+# current directory and serves the page on one loopback port.
+#
+#   fyai-web                      http://127.0.0.1:9331
+#   fyai-web --port 8080          another port
+#   fyai-web --cwd ~/project      another project for fyai
+#
+# The bridge runs tools without asking, so do not expose it to a network.
+set -eu
+
+here="$(dirname "$(readlink -f "$0")")"
+share="$here/@FYAI_WEB_SHARE_RELATIVE@"
+fyai="$here/fyai"
+
+if ! command -v node >/dev/null 2>&1; then
+	echo "fyai-web: node is required" >&2
+	exit 1
+fi
+
+[ -x "$fyai" ] || fyai="$(command -v fyai || true)"
+
+if [ -z "$fyai" ]; then
+	echo "fyai-web: fyai not found" >&2
+	exit 1
+fi
+
+if [ ! -d .fyai/arena ]; then
+	echo "fyai-web: no fyai project here; run 'fyai init' first" >&2
+fi
+
+exec node "$share/server/bridge.mjs" --bin "$fyai" --static "$share/dist" "$@"

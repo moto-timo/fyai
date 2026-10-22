@@ -13,7 +13,9 @@
 #
 # With FYAI_WEB=ON the page is built with the rest and its unit tests are
 # registered with CTest; they are not registered by default, so the C suite
-# stays independent of node. The end-to-end target needs a provider key and
+# stays independent of node. The built page and its bridge are then installed
+# with a fyai-web launcher; a node that is too old to build the page leaves
+# the page out of the build and the install with a message, not an error. The end-to-end target needs a provider key and
 # runs fyai's mock provider, so it is never part of CTest.
 
 set(FYAI_WEB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/web")
@@ -24,6 +26,26 @@ find_program(FYAI_NODE_EXECUTABLE node)
 
 if(NOT FYAI_NPM_EXECUTABLE)
     message(STATUS "npm not found; the web page and its tests cannot build")
+endif()
+
+# The tools of the page need node 20; the bridge itself runs on 18.
+set(FYAI_WEB_NODE_MIN 20)
+set(FYAI_WEB_CAN_BUILD OFF)
+
+if(FYAI_NPM_EXECUTABLE AND FYAI_NODE_EXECUTABLE)
+    execute_process(COMMAND "${FYAI_NODE_EXECUTABLE}" --version
+        OUTPUT_VARIABLE FYAI_NODE_VERSION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE FYAI_NODE_RESULT)
+    string(REGEX REPLACE "^v" "" FYAI_NODE_VERSION "${FYAI_NODE_VERSION}")
+
+    if(FYAI_NODE_RESULT EQUAL 0 AND FYAI_NODE_VERSION VERSION_GREATER_EQUAL FYAI_WEB_NODE_MIN)
+        set(FYAI_WEB_CAN_BUILD ON)
+    else()
+        message(STATUS
+            "node ${FYAI_NODE_VERSION} is older than ${FYAI_WEB_NODE_MIN}; "
+            "the web page is not part of the build")
+    endif()
 endif()
 
 # The dependencies of the page. The lock file is the stamp: a change of it
@@ -116,12 +138,27 @@ add_custom_target(fyai-desktop-package
     USES_TERMINAL
     VERBATIM)
 
-if(FYAI_WEB AND FYAI_NPM_EXECUTABLE)
+if(FYAI_WEB AND FYAI_WEB_CAN_BUILD)
     add_custom_target(fyai-web-all ALL DEPENDS fyai-web)
+
+    # The built page, the bridge that serves it, and a launcher. The bridge
+    # uses only the modules of node, so no node_modules is installed.
+    set(FYAI_WEB_SHARE "${CMAKE_INSTALL_DATAROOTDIR}/fyai/web")
+    file(RELATIVE_PATH FYAI_WEB_SHARE_RELATIVE
+        "/${CMAKE_INSTALL_BINDIR}" "/${FYAI_WEB_SHARE}")
+    configure_file("${FYAI_WEB_DIR}/scripts/fyai-web.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/fyai-web" @ONLY)
+    install(DIRECTORY "${FYAI_WEB_DIR}/dist"
+        DESTINATION "${FYAI_WEB_SHARE}")
+    install(FILES "${FYAI_WEB_DIR}/server/bridge.mjs"
+        "${FYAI_WEB_DIR}/server/protocol.mjs"
+        DESTINATION "${FYAI_WEB_SHARE}/server")
+    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/fyai-web"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
 
 # The unit tests under CTest, only when the page is part of the build.
-if(BUILD_TESTING AND FYAI_WEB AND FYAI_NPM_EXECUTABLE)
+if(BUILD_TESTING AND FYAI_WEB AND FYAI_WEB_CAN_BUILD)
     add_test(NAME fyai/web-test
         COMMAND "${FYAI_NPM_EXECUTABLE}" run test:unit -- --run
         WORKING_DIRECTORY "${FYAI_WEB_DIR}")
