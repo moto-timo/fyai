@@ -71,6 +71,8 @@
 - A signed-out login counts as no login, and an interactive resume works
   without API credentials.
 - The shell tool accepts `cmd` as the command and rejects a call without one.
+- The shell tool runs bash where the system has it, and else `/bin/sh`, so the
+  model meets one dialect on every host. `shell/shell` still chooses another.
 - The mostly-static build is shared between hosts, Docker, and CI, and the
   glibc baseline is selected by architecture.
 

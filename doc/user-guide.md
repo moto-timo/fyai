@@ -716,8 +716,11 @@ that grammar has no field the model could ask with.
 
 ### The shell a command runs under
 
-A command runs under `/bin/sh`, as each other command of this program does.
-The `shell` argument names another shell, and `login` starts that shell as a login shell,
+A command of the shell tool runs under bash where the system has it (`/bin/bash`,
+`/usr/bin/bash` or `/usr/local/bin/bash`), and else under `/bin/sh`; the other commands
+of this program, such as a helper or a catalogue update, run under `/bin/sh`. Set
+`shell/shell` to choose another shell for every call, such as `/bin/sh`. The `shell`
+argument names another shell, and `login` starts that shell as a login shell,
 which reads the profile of the user.
 
 ```sh
