@@ -36,4 +36,17 @@ assert_stdout_contains "Parent and sub-agent done."
 [ "$(count_reports)" -eq "$EXPECTED" ] ||
 	fail "the run reported $(count_reports) times, a start reports $EXPECTED"
 mock_stop 4
+
+# A sub-agent that is forked, not executed, inherits the diagnostics that its parent has
+# not drained yet. It must not give them back as its own.
+mock_start agent_sandbox.json
+run_fyai --set sandbox_profile=dev --set agent/spawn=fork --set api=chat-completions \
+	 --set display/stream=false --set tools=true \
+	 --set api_url="$MOCK_URL/v1/chat/completions" -m mock-model \
+	 "delegate an edit"
+assert_status 0
+assert_stdout_contains "Parent and sub-agent done."
+[ "$(count_reports)" -eq "$EXPECTED" ] ||
+	fail "the forked run reported $(count_reports) times, a start reports $EXPECTED"
+mock_stop 4
 pass

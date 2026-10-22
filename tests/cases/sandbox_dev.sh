@@ -8,6 +8,9 @@ set -eu
 [ "$(uname -s)" = Linux ] || exit 77
 . "$(dirname "$0")/../harness.sh"
 
+# The sandbox grants the system scratch trees whole: keep the project out of them, or a
+# host without namespaces cannot protect the arena.
+FYAI_TMPDIR_BASE="$(dirname "$FYAI_BIN")"
 fyai_test_setup
 mock_start tool_diff.json
 PORT="${MOCK_URL##*:}"
