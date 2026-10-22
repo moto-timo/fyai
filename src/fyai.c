@@ -1333,6 +1333,7 @@ struct fyai_turn_run {
 	struct fyai_ctx *ctx;
 	fy_generic turn;
 	fy_generic turn_in;
+	fy_generic settled;
 	fy_generic previous;
 	fy_generic tool_calls;
 	fy_generic result;
@@ -1483,10 +1484,31 @@ static void fyai_turn_run_drop_tool_group(struct fyai_turn_run *run)
 	fyai_tool_job_group_destroy(group);
 }
 
-/* discard a turn that cannot be stored */
+/*
+ * End a turn that failed. The turn keeps the steps up to the last point where
+ * every tool call had its result: the work of a long turn is not lost to one
+ * failure, and the stored conversation stays valid for the next request.
+ * Only a turn with no such step is discarded.
+ */
 static void fyai_turn_run_abort_output(struct fyai_turn_run *run)
 {
-	fyai_output_abort(run->ctx);
+	struct fyai_ctx *ctx = run->ctx;
+	fy_generic result;
+
+	if (!fyai_turn_run_done(run) && fy_is_valid(run->settled) &&
+	    run->settled.v != run->turn_in.v) {
+		result = fyai_output_finalize(ctx, run->settled, true);
+		result = fy_gb_internalize(ctx->gb, result);
+		if (fy_is_valid(result)) {
+			result = fyai_with_diag(ctx->gb, result,
+				"the turn stopped on an error; the steps "
+				"before it are kept");
+			run->result = result;
+			(void)fyai_turn_run_transition(run, FYAITRS_DONE);
+			return;
+		}
+	}
+	fyai_output_abort(ctx);
 	run->result = fy_invalid;
 	if (run->state != FYAITRS_FAILED)
 		(void)fyai_turn_run_transition(run, FYAITRS_FAILED);
@@ -1647,11 +1669,22 @@ static int fyai_turn_run_submit_model(struct fyai_turn_run *run)
 	struct fyai_ctx *ctx;
 	struct fyai_cfg *cfg;
 	fy_generic previous;
+	const char *test_abort;
 	bool open_group;
 	int rc;
 
 	ctx = run->ctx;
 	cfg = ctx->cfg;
+	/* Every call of the turn so far has its result. */
+	if (fy_is_valid(run->turn))
+		run->settled = run->turn;
+	/* Test hook for the failure of a turn after a round of tools. */
+	test_abort = getenv("FYAI_TEST_TURN_ABORT");
+	if (test_abort && run->iteration == atoi(test_abort)) {
+		fyai_error(ctx, "injected failure of the turn");
+		fyai_turn_run_abort_output(run);
+		return -1;
+	}
 	/* A tool that answers for the turn ends it, as a final response does. */
 	if (ctx->turn_end_requested) {
 		ctx->turn_end_requested = false;
@@ -2414,6 +2447,7 @@ fyai_turn_run_submit(struct fyai_ctx *ctx, fy_generic turn)
 	run->ctx = ctx;
 	run->turn = turn;
 	run->turn_in = turn;
+	run->settled = turn;
 	run->previous = fy_get(turn, "previous", fy_null);
 	run->tool_calls = fy_null;
 	run->result = fy_invalid;
