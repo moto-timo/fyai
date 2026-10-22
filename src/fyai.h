@@ -407,6 +407,7 @@ struct fyai_cfg {
 	bool enable_sandbox;	/* Landlock-confine shell tool sub-executions */
 	fy_generic sandbox;	/* policy in force: mapping (allow/deny/network), or invalid */
 	bool sandbox_lockdown;	/* the policy is the lockdown profile */
+	const char *sandbox_reported;	/* what the last report of open egress was for */
 	bool interactive;
 	int debug;
 	bool pretty;

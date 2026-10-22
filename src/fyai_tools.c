@@ -881,7 +881,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	udp = fy_get(net, "udp");
 	if (fy_is_valid(tcp) && !fyai_sandbox_net_restrictable(-1) &&
 	    ctx->cfg->sandbox_lockdown) {
-		fyai_warning(ctx, "sandbox: TCP egress remains open; Landlock ABI 4 is unavailable");
+		/* The parent reported it when it applied the configuration. */
 		tcp = fy_invalid;
 	}
 	if (fy_is_valid(tcp)) {
@@ -916,9 +916,8 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 		}
 	}
 	if (fy_is_valid(udp)) {
-		if (!fyai_sandbox_udp_restrictable(-1)) {
-			fyai_warning(ctx, "sandbox: UDP egress remains open; Landlock ABI 10 is unavailable");
-		} else {
+		/* Without Landlock ABI 10 the parent said that UDP stays open. */
+		if (fyai_sandbox_udp_restrictable(-1)) {
 			sp->restrict_udp = true;
 			ports = fy_get(udp, "ports");
 			n = fy_is_sequence(ports) ? fy_len(ports) : 0;

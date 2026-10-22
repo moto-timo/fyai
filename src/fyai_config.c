@@ -34,6 +34,7 @@
 #include "fyai_catalog.h"
 #include "fyai_branch.h"
 #include "fyai_config.h"
+#include "fyai_sandbox.h"
 #include "fyai_provider.h"
 #include "fyai_event.h"
 #include "fyai_schema.h"
@@ -2583,6 +2584,39 @@ void fyai_config_focus_bg_check(struct fyai_cfg *cfg)
 			 text_light ? "light" : "dark");
 }
 
+/*
+ * Say once when the sandbox cannot restrict a network operation that its policy
+ * names, because the kernel lacks the Landlock ABI. The kernel does not change,
+ * so the report is for the start of the process and for a change of the profile,
+ * not for each tool call. A tool child and a sub-agent leave it to the parent.
+ * The start is reported by the caller once the verb has set those flags.
+ */
+void fyai_config_sandbox_report(struct fyai_cfg *cfg)
+{
+	fy_generic net, tcp, udp;
+	const char *key;
+
+	if (cfg->tool_child || cfg->agent_child)
+		return;
+	key = cfg->sandbox_lockdown ? "lockdown" : cfg->enable_sandbox ? "sandbox" : NULL;
+	if (!key || !fy_is_mapping(cfg->sandbox)) {
+		cfg->sandbox_reported = NULL;
+		return;
+	}
+	if (cfg->sandbox_reported && !strcmp(cfg->sandbox_reported, key))
+		return;
+	cfg->sandbox_reported = fy_gb_intern_string(cfg->gb, key);
+	net = fy_get(cfg->sandbox, "network", fy_invalid);
+	tcp = fy_get(net, "tcp", fy_invalid);
+	udp = fy_get(net, "udp", fy_invalid);
+	if (cfg->sandbox_lockdown && fy_is_valid(tcp) && !fyai_sandbox_net_restrictable(-1))
+		fyai_cfg_warning(cfg, "sandbox '%s': TCP egress remains open; Landlock ABI 4 "
+				 "is unavailable", key);
+	if (fy_is_valid(udp) && !fyai_sandbox_udp_restrictable(-1))
+		fyai_cfg_warning(cfg, "sandbox '%s': UDP egress remains open; Landlock ABI 10 "
+				 "is unavailable", key);
+}
+
 static int config_rederive_doc(struct fyai_ctx *ctx, fy_generic doc,
 			       bool resolve)
 {
@@ -2594,6 +2628,7 @@ static int config_rederive_doc(struct fyai_ctx *ctx, fy_generic doc,
 	cfg->config_doc = doc;
 	if (fyai_config_apply(cfg, doc))
 		return -1;
+	fyai_config_sandbox_report(cfg);
 	fyai_ui_config_reassert(ctx);
 
 	if (cfg->markdown)

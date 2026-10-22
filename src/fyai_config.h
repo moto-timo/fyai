@@ -215,6 +215,14 @@ int fyai_config_select_resume(struct fyai_cfg *cfg);
 void fyai_config_sandbox_lockdown(struct fyai_cfg *cfg);
 
 /*
+ * Report once, as a warning, a network operation that the sandbox policy names
+ * and the kernel cannot restrict. Call it when a process starts to run and when
+ * the sandbox profile changes; it says nothing again for the same profile. A tool
+ * child and a sub-agent say nothing.
+ */
+void fyai_config_sandbox_report(struct fyai_cfg *cfg);
+
+/*
  * Set @key to @value in the session layer of the configuration: this session
  * uses it, and nothing stores it. The merged document is checked against the
  * schema first; a failure changes nothing. Returns 0, or -1 with the cause
