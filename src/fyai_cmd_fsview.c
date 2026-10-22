@@ -397,6 +397,11 @@ static int view_runtime_clear(int fd, unsigned int depth)
 		if (rc)
 			break;
 		if (S_ISDIR(st.st_mode)) {
+			/*
+			 * OverlayFS leaves a work directory with no mode, which not even its
+			 * owner can open. It is a directory, not a link: open it after the mode.
+			 */
+			(void)fchmodat(fd, entry->d_name, 0700, 0);
 			child = openat(fd, entry->d_name,
 				       O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 			if (child < 0) {
