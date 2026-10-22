@@ -123,20 +123,25 @@ function startBridge() {
 			resolve(address);
 		};
 
-		const read = (chunk) => {
-			process.stdout.write(chunk);
+		/* The bridge logs on stderr, so that is where its address appears. */
+		let pending = '';
 
-			const found = LISTENING.exec(chunk);
+		const read = (chunk) => {
+			process.stderr.write(chunk);
+
+			pending = (pending + chunk).slice(-4096);
+
+			const found = LISTENING.exec(pending);
 
 			if (found) settle(found[1]);
 		};
 
-		bridge.stdout.setEncoding('utf8');
-		bridge.stdout.on('data', read);
+		bridge.stderr.setEncoding('utf8');
+		bridge.stderr.on('data', read);
 	});
 
-	bridge.stderr.setEncoding('utf8');
-	bridge.stderr.on('data', (chunk) => process.stderr.write(chunk));
+	bridge.stdout.setEncoding('utf8');
+	bridge.stdout.on('data', (chunk) => process.stdout.write(chunk));
 
 	bridge.on('exit', (code) => {
 		bridge = null;
