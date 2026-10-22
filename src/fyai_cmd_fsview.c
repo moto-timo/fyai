@@ -1663,6 +1663,7 @@ struct view_session_link {
 	int fd[2];			/* the supervisor end, then the session end */
 	struct fyai_event_source *source;
 	bool restart;			/* the session asked for a fresh view */
+	bool leave;			/* the restart is outside any view */
 };
 
 static enum fyai_event_action view_session_request(const struct fyai_event *ev);
@@ -3434,6 +3435,44 @@ static fy_generic view_session_pull(struct view_session_link *link, struct fy_ge
 	return fy_assoc(gb, fyai_ctl_reply_ok(gb, seq), "result", fy_mapping(gb, "restart", true));
 }
 
+/*
+ * restart: the session changes its profile and starts again. The changes of the
+ * view go into the project first, and only when none conflicts: a conflict
+ * refuses the request and changes nothing. @view says whether the new session
+ * runs in a view; without one the supervisor starts fyai again outside it.
+ */
+static fy_generic view_session_restart(struct view_session_link *link, struct fy_generic_builder *gb,
+				       fy_generic m)
+{
+	struct fyai_ctx *ctx = link->ctx;
+	long long seq = fy_get(m, "seq", 0LL), conflicts;
+	int status = ctx->cfg->exit_status;
+	fy_generic result;
+	int rc, pass;
+
+	rc = view_run_checkpoint(ctx, link->run);
+	for (pass = 0; !rc && pass < 2; pass++) {
+		/* Look first: a conflict must stop the request before anything is written. */
+		rc = fyai_view_pull(ctx, gb, link->run->name, NULL, NULL, 0,
+				    pass ? FYAI_VIEW_PULL_APPLY : FYAI_VIEW_PULL_DRY_RUN, &result);
+		ctx->cfg->exit_status = status;
+		if (rc)
+			break;
+		conflicts = fy_get(result, "conflicts", 0LL);
+		if (conflicts)
+			return fyai_ctl_reply_error(gb, seq, fy_gb_intern_string(gb, fy_sprintfa(
+				"%lld path%s of the session conflict with the project, so the view "
+				"cannot apply cleanly: `/session push` shows them; resolve them first",
+				conflicts, conflicts == 1 ? "" : "s")));
+	}
+	if (rc)
+		return view_session_failure(ctx, gb, seq, "cannot apply the view to the project");
+	link->restart = true;
+	link->leave = !fy_get(m, "view", true);
+	fyai_diag_tracef("session", "restart accepted: view %d", (int)!link->leave);
+	return fy_assoc(gb, fyai_ctl_reply_ok(gb, seq), "result", fy_mapping(gb, "restart", true));
+}
+
 static enum fyai_event_action view_session_request(const struct fyai_event *ev)
 {
 	struct view_session_link *link = ev->userdata;
@@ -3467,11 +3506,44 @@ static enum fyai_event_action view_session_request(const struct fyai_event *ev)
 		reply = view_session_push(link, gb, m);
 	else if (!strcmp(op, "pull"))
 		reply = view_session_pull(link, gb, m);
+	else if (!strcmp(op, "restart"))
+		reply = view_session_restart(link, gb, m);
 	else
 		reply = fyai_ctl_reply_error(gb, fy_get(m, "seq", 0LL), "the supervisor has no such request");
 	(void)fyai_ctl_send(link->fd[0], reply, -1, 0);
 	fy_generic_builder_destroy(gb);
 	return FYAIEA_CONTINUE;
+}
+
+/*
+ * Run this program again on the branch of the session, outside any view, as a
+ * session that has had its first prompt. Returns only on failure.
+ */
+static int view_session_leave(struct fyai_ctx *ctx)
+{
+	struct fyai_cfg *cfg = ctx->cfg;
+	const char **argv;
+	size_t argc = 0, i;
+	int saved;
+
+	while (cfg->argv[argc])
+		argc++;
+	argv = calloc(argc + 4, sizeof(*argv));
+	fyai_error_check(ctx, argv, err, "could not allocate the command line of the session");
+	argv[0] = cfg->argv[0];
+	argv[1] = "--branch";
+	argv[2] = fyai_ctx_branch(ctx);
+	for (i = 1; i < argc; i++)
+		argv[i + 2] = cfg->argv[i];
+	fyai_error_check(ctx, !setenv("FYAI_SESSION_RESTART", "1", 1), err_argv,
+			 "view 'session': cannot mark the restart: %s", strerror(errno));
+	fyai_exec_self(argv);
+	saved = errno;
+	fyai_error(ctx, "view 'session': cannot start the session again: %s", strerror(saved));
+err_argv:
+	free(argv);
+err:
+	return -1;
 }
 
 int fyai_view_session_bootstrap(struct fyai_ctx *ctx)
@@ -3544,6 +3616,7 @@ restart:
 	link.ctx = ctx;
 	link.run = run;
 	link.restart = false;
+	link.leave = false;
 	if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, link.fd)) {
 		saved = errno;
 		fyai_error(ctx, "view 'session': cannot create its request channel: %s", strerror(saved));
@@ -3579,6 +3652,17 @@ restart:
 		goto out;
 	}
 	fyai_diag_tracef("session", "the session ended: exit %d restart %d", output.exit_code, (int)link.restart);
+	if (link.restart && link.leave) {
+		/*
+		 * The changes are in the project. The session starts again outside the
+		 * view: this program runs again, and reads the stored configuration.
+		 */
+		rc = fyai_view_run_finish(ctx, run, &summary);
+		if (rc)
+			goto out;
+		rc = view_session_leave(ctx);
+		goto out;
+	}
 	if (link.restart) {
 		/* The next capture replaces this view; the session starts again on it. */
 		shell_command_result_cleanup(&output);
