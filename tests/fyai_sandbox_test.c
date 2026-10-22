@@ -9,6 +9,7 @@
 #include "fyai_sandbox.h"
 #include "fyai_test_registry.h"
 
+#ifdef __linux__
 int sandbox_path_visible(void)
 {
 	static const struct fyai_sandbox_path allow[] = {
@@ -42,5 +43,12 @@ int sandbox_path_visible(void)
 #undef CHECK
 	return fail;
 }
+#else
+/* The PATH filter belongs to the Landlock confinement of Linux. */
+int sandbox_path_visible(void)
+{
+	return 0;
+}
+#endif
 
 FYAI_TEST_ENTRY(sandbox, path_visible, sandbox_path_visible)
