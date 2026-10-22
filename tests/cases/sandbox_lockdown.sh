@@ -28,7 +28,8 @@ shell_with() {
 }
 
 # The normal profile does not confine the tools: the key file and the network are open.
-shell_with 'sandbox: false' "cat ~/.ssh/id_test; $CONNECT"
+shell_with 'sandbox: false
+sandbox_profile: normal' "cat ~/.ssh/id_test; $CONNECT"
 assert_status 0
 assert_stdout_contains classified
 assert_stdout_contains connected
