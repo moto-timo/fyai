@@ -1812,12 +1812,16 @@ and system trees included. Landlock has no non-recursive rule, so a directory
 above a denied path cannot be granted whole: it is descended, each undenied
 child is granted, and the directory itself keeps only the right to list its
 entries. That cost is why the implicit arena deny stays scoped to the project
-root, and why a deny path that does not exist is left out. A tool that can make
-a user and mount namespace (`fyai_fsview_hide_usable()`) does not use the
-carve-out: `fyai_fsview_hide()` covers each existing denied path and the arena
-with an empty read-only mount in a private namespace, and Landlock gets no deny,
-so the project root keeps its right to create entries. A session in a view keeps
-the carve-out; the view already hides the arena.
+root, and why a deny path that does not exist is left out. A tool that has a cover
+(`fyai_cover_select()`, set by `sandbox_cover`) does not use the carve-out: it
+covers each existing denied path and the arena with an empty read-only mount in a
+private namespace, and Landlock gets no deny, so the project root keeps its right to
+create entries. The tool makes the namespaces itself (`fyai_fsview_hide()`), or joins
+those of a bubblewrap holder (`fyai_cover_join()`) where user namespaces are
+restricted. Where neither works the carve-out stays, and the start says so and
+names the fix: the AppArmor profile of `fyai sandbox apparmor`, or bubblewrap
+(`doc/apparmor-userns.md`). A session in a view keeps the carve-out; the view already
+hides the arena.
 
 Fail closed on network egress. The kernel ABI is not the only condition: a
 build made against headers without the network access definitions restricts

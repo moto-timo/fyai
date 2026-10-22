@@ -1200,15 +1200,33 @@ for DNS on Landlock ABI 10 or newer. Binds are not restricted. Git over SSH does
 work, because `~/.ssh` is denied. A server on a local port needs that port in
 `network.tcp.ports`, because Landlock does not tell loopback from other addresses.
 
-Where the host allows an unprivileged user and mount namespace, a sandboxed tool
-does not get its denied paths from Landlock. The tool runs in a private mount
-namespace of its own, with each existing denied path and the `.fyai` arena covered
-by an empty read-only mount, a directory by an empty one and a file by `/dev/null`.
-The host and the other processes are not changed. A path that Landlock denies
-would leave the directory above it only the right to list, so a tool could not
-create entries in the project root; a covered path does not. The tool also has a PID namespace of its own: it sees only its own processes, and a
-process that a command left in the background ends with the command. Without
-namespaces, Landlock denies the path as before.
+Where the host allows it, a sandboxed tool does not get its denied paths from
+Landlock. The tool runs in a private mount namespace, with each existing denied path
+and the `.fyai` arena covered by an empty read-only mount, a directory by an empty one
+and a file by `/dev/null`. The host and the other processes are not changed. A path
+that Landlock denies would leave the directory above it only the right to list, so a
+tool could not create entries in the project root; a covered path does not. The tool
+also has a PID namespace of its own: it sees only its own processes, and a process
+that a command left in the background ends with the command.
+
+`sandbox_cover` chooses how the tool gets the namespaces. `auto` (the default) tries
+`userns`, where the tool makes them itself, then `bwrap`, where fyai starts one
+bubblewrap process that holds them and each tool joins them. `none` leaves the arena
+to Landlock. If neither works, which is the case on Ubuntu 24.04 and later unless the
+host allows it, fyai warns at the start and when the profile changes, and Landlock
+denies the arena as before: a tool cannot create files directly in the project root.
+Two fixes are available, and either is enough:
+
+```sh
+fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
+sudo apparmor_parser -r /etc/apparmor.d/fyai
+# or
+sudo apt install bubblewrap
+```
+
+`fyai sandbox apparmor` writes an AppArmor profile for the binary that runs. It grants
+`userns` and confines nothing else. `doc/apparmor-userns.md` has the details and the
+checks.
 
 In every profile that uses Landlock, PATH keeps only the directories that the
 grants reach: an entry that is relative or empty, under a denied path, or outside the

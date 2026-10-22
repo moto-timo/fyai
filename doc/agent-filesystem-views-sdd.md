@@ -1801,7 +1801,17 @@ project, at `.fyai`. Landlock cannot deny a path under a directory that it grant
 the carve-out that stands in for that denial leaves the directory above the denied
 path only the right to list: a tool could not create an entry in the project root.
 Where a user namespace is available, `fyai_fsview_hide()` therefore runs the tool in
-private user, mount and PID namespaces instead. It covers each existing denied path
+private user, mount and PID namespaces instead. Where the host restricts user
+namespaces, as Ubuntu 24.04 does with AppArmor, `fyai_cover_select()` (`sandbox_cover`)
+tries a holder next: one bubblewrap process, started once for the invocation, makes
+the namespaces and covers the paths, and each tool joins them with `setns()` through
+`fyai_cover_join()`. The holder reports its process id when bubblewrap has it, and a
+byte on a pipe when the mounts stand; the holder runs `cat` on a pipe that the parent
+holds, so it ends with the invocation and so do the tools in its namespace. An
+exec'd tool child finds the holder through `FYAI_COVER_HOLDER` and `FYAI_COVER_PATHS`,
+which a constructor reads before the tool clears its environment. With no cover,
+`fyai_config_sandbox_report()` says so and names the fixes (`fyai sandbox apparmor`,
+bubblewrap, `sandbox_cover: none`). See `doc/apparmor-userns.md`. It covers each existing denied path
 and the arena with an empty read-only mount (a directory by an empty one, a file by
 `/dev/null`), mounts a procfs that lists only the namespace, and drops the
 capabilities. Landlock then gets no deny list. The process that calls it forks twice

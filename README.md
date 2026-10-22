@@ -375,6 +375,30 @@ publishes to that arena; each tool that it runs is confined in its own child.
 Landlock is Linux-specific and best-effort when the host kernel lacks required
 features; the portable command/tool policy remains separate.
 
+### What the sandbox needs from the host
+
+Landlock cannot hide `.fyai` from a tool and still let the tool create files in the
+project root. fyai therefore hides the arena in a mount namespace of the tool. That
+needs one of these:
+
+- unprivileged user namespaces, which most Linux hosts allow; or
+- [bubblewrap](https://github.com/containers/bubblewrap) (`bwrap`), which fyai starts
+  once to hold the namespaces.
+
+Ubuntu 24.04 and later restrict user namespaces with AppArmor, so on a stock install
+neither may work. Install a profile that lets fyai make them, or install bubblewrap:
+
+```sh
+fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
+sudo apparmor_parser -r /etc/apparmor.d/fyai
+# or
+sudo apt install bubblewrap
+```
+
+Without either, fyai says so at the start, the arena stays denied by Landlock, and a
+tool cannot create files directly in the project root. `sandbox_cover` chooses the
+way (`auto`, `userns`, `bwrap`, `none`). See `doc/apparmor-userns.md`.
+
 ## Project views
 
 A view is a private, writable copy of the project. fyai captures the project
