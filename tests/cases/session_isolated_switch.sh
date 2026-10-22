@@ -48,7 +48,7 @@ export CHILDPROV_API_KEY=child-key
 set +e
 printf 'first question\n/model child-model\nsecond question\n/quit\n' |
 	FYAI_TRANSPORT_ISOLATION=level-b "$FYAI_BIN" --color off --set display/stream=false \
-		--set display/markdown=false --set view/isolate_session=true -i \
+		--set display/markdown=false --set view/isolate_session=true --set view/apply_on_exit=false -i \
 		>"$TEST_DIR/stdout" 2>"$TEST_DIR/stderr"
 set -e
 assert_stdout_contains "First answer."

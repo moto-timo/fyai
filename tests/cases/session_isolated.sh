@@ -15,7 +15,7 @@ export TMPDIR="$FYAI_TMPDIR_BASE"
 printf baseline > file
 mock_start session_isolated.json
 
-run_fyai --set view/isolate_session=true --set api=chat-completions \
+run_fyai --set view/isolate_session=true --set view/apply_on_exit=false --set api=chat-completions \
 	 --set display/stream=false --set tools=true \
 	 --set api_url="$MOCK_URL/v1/chat/completions" -m mock-model \
 	 "edit the files"
@@ -41,7 +41,7 @@ assert_status 0
 # A session in a view says which one, in /status and in the {view} field of the
 # header. A session outside a view says none.
 set +e
-printf '/status\n/exit\n' | "$FYAI_BIN" -k test-key --color off --set view/isolate_session=true \
+printf '/status\n/exit\n' | "$FYAI_BIN" -k test-key --color off --set view/isolate_session=true --set view/apply_on_exit=false \
 	--set api=chat-completions --set display/stream=false --set display/markdown=false \
 	--set api_url="$MOCK_URL/v1/chat/completions" -m mock-model -i \
 	>"$TEST_DIR/status-view.out" 2>"$TEST_DIR/status-view.err"

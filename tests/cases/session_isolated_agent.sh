@@ -18,7 +18,7 @@ export TMPDIR="$FYAI_TMPDIR_BASE"
 printf baseline > file
 mock_start session_isolated_agent.json
 
-run_fyai --set view/isolate_session=true --set api=chat-completions \
+run_fyai --set view/isolate_session=true --set view/apply_on_exit=false --set api=chat-completions \
 	 --set display/stream=false --set tools=true \
 	 --set api_url="$MOCK_URL/v1/chat/completions" -m mock-model \
 	 "delegate an edit"

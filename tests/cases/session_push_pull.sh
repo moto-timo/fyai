@@ -64,7 +64,7 @@ steps:
 PTY
 	    printf '%s\n' "$steps"
 	} | pty_run "$TEST_DIR/pty.out" \
-	    "$FYAI_BIN" -b "$BRANCH" -k test-key --set view/isolate_session=true --set sandbox_profile=lockdown --set "$IGNORE" \
+	    "$FYAI_BIN" -b "$BRANCH" -k test-key --set view/isolate_session=true --set view/apply_on_exit=false --set sandbox_profile=lockdown --set "$IGNORE" \
 	    --set display/stream=false --set tools=true --set api=chat-completions \
 	    --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i || driver=$?
 	if [ "$driver" -ne 0 ]; then

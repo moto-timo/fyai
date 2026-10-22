@@ -119,7 +119,7 @@ mock_stop 4
 if [ -z "${FYAI_TEST_TRANSPORT:-}" ] && unshare -Urnm true 2>/dev/null; then
 	reset_project
 	mock_start tool_diff.json
-	TMPDIR="$(dirname "$FYAI_BIN")" run_with --set view/tool_diff=true --set view/isolate_session=true \
+	TMPDIR="$(dirname "$FYAI_BIN")" run_with --set view/tool_diff=true --set view/isolate_session=true --set view/apply_on_exit=false \
 		"edit the files"
 	assert_status 0
 	assert_stdout_contains 'diff --git a/made.txt b/made.txt'

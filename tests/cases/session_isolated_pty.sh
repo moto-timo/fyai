@@ -17,7 +17,7 @@ mock_start session_isolated.json
 
 driver=0
 pty_run "$TEST_DIR/pty.out" \
-    "$FYAI_BIN" -k test-key --set view/isolate_session=true \
+    "$FYAI_BIN" -k test-key --set view/isolate_session=true --set view/apply_on_exit=false \
     --set display/stream=false --set tools=true --set api=chat-completions \
     --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model -i <<'PTY' || driver=$?
 timeout: 60
@@ -48,7 +48,7 @@ assert_stdout_contains 'added'
 
 # The bottom row of the prompt names the view that the session runs in.
 pty_run "$TEST_DIR/pty-view.out" \
-    "$FYAI_BIN" -k test-key --set view/isolate_session=true \
+    "$FYAI_BIN" -k test-key --set view/isolate_session=true --set view/apply_on_exit=false \
     --theme dark --set display/markdown=true \
     --set display/screen=fullscreen \
     --set display/stream=false --set tools=true --set api=chat-completions \
