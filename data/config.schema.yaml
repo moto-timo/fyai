@@ -835,6 +835,83 @@ properties:
             and then opens `.` needs it, as the package scripts of a build do.
             It shows the names in a denied directory that is not hidden by a
             cover.
+        mounts:
+          type: array
+          description: >-
+            Mount a path in the namespace of the tool, in order, after the
+            private home. A mount that cannot be made stops the tool, and so
+            does a host that cannot make a namespace. A source that a `deny`
+            entry covers, or a path that does not exist, is left out.
+          items:
+            type: object
+            required: [source]
+            properties:
+              kind:
+                type: string
+                enum: [bind, overlay]
+                description: >-
+                  `bind`, the default, shows the source at the target. An
+                  `overlay` shows it and keeps what the tool writes apart.
+              source:
+                type: string
+                description: Name the path to show.
+              target:
+                type: string
+                description: Name the path that shows it. The default is the source.
+              mode:
+                type: string
+                enum: [rw, ro]
+                description: Say whether the tool may write a bind. The default is `rw`.
+        home:
+          type: object
+          description: >-
+            Give a tool a home of its own. A new tree is mounted over the real
+            home in the namespace of the tool, so `HOME` and every path under
+            it stay as they are, but the tool sees only the tree: what `copy`
+            and `env` name, and what the sandbox grants under the home, such
+            as the project. A program that writes its cache or its dot files
+            there works, and the real files stay hidden. fyai makes the tree
+            before the first tool call and removes it at the end of the run,
+            unless `dir` names one. It needs a cover (`sandbox_cover`): a host
+            that cannot make a user namespace stops the tool.
+          properties:
+            private:
+              type: boolean
+              description: Give the tool a home directory of its own.
+            dir:
+              type: string
+              description: >-
+                Use this directory, which the tool may write, and keep it
+                after the run. Files in it are never replaced. By default fyai
+                makes a new one in the temporary directory.
+            method:
+              type: string
+              enum: [overlay, copy]
+              description: >-
+                Say how a directory reaches the private home. `overlay`, the
+                default, shows the original and keeps what the tool writes
+                apart, so nothing is copied and the original never changes.
+                `copy` copies it, and shares the blocks of the original where
+                the file system can. A file is always a copy.
+            copy:
+              type: array
+              description: >-
+                Give the tool a private version of these files and
+                directories, such as `~/.bashrc`, `~/.gitconfig` or
+                `~/.config/nvim`, at the same place. A path
+                that does not exist, or that a `deny` entry covers, is left out.
+              items:
+                type: string
+            env:
+              type: array
+              description: >-
+                Name environment variables that hold the path of a file or a
+                directory, such as `CARGO_HOME` or `GIT_CONFIG_GLOBAL`. The
+                tool gets a private version of what each names, as `copy`
+                gives, at the same path. `NAME=PATH` gives the path when the
+                variable is not set.
+              items:
+                type: string
         deny:
           type: array
           description: >-

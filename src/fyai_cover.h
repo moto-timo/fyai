@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <sys/types.h>
 
+struct fyai_sandbox_mount;
+
 /*
  * How a tool hides the paths that the sandbox denies and the project arena.
  *
@@ -102,12 +104,14 @@ size_t fyai_cover_members(const struct fyai_cover *cover, pid_t *pids, size_t ma
 bool fyai_cover_covers(const struct fyai_cover *cover, const char *path);
 
 /*
- * Join the namespaces of @holder and drop the capabilities of this process. The
+ * Join the namespaces of @holder, make the @mount_n mounts that it lacks,
+ * and drop the capabilities of this process. The
  * call forks: the caller never returns, and ends with the status of the program
  * that returns. Call it from a process that has one thread, before it confines
  * itself. Returns 0 in the program, or -1 with errno set before the fork.
  */
-int fyai_cover_join(pid_t holder);
+int fyai_cover_join(pid_t holder, const struct fyai_sandbox_mount *mount,
+		    size_t mount_n);
 
 /*
  * Say whether a cover is possible on this host now, without keeping a holder:

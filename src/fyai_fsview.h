@@ -3,6 +3,7 @@
 #define FYAI_FSVIEW_H
 
 #include "fyai_manifest.h"
+#include "fyai_sandbox.h"
 #include "fyai_project.h"
 
 struct fyai_cfg;
@@ -102,7 +103,8 @@ bool fyai_fsview_hide_usable(void);
  * empty one, a file by /dev/null) and a procfs that lists only the processes of
  * the namespace. The capabilities are dropped, so nothing that runs here sees
  * or changes what the paths hold, undoes the cover, or reaches the processes
- * that started it. A path that does not exist is skipped.
+ * that started it. A path that does not exist is skipped. The
+ * @mount_n mounts are made before the capabilities go.
  *
  * The call forks twice. The process that calls it never returns: it waits for
  * the init of the namespace and ends with the status of the program, so the
@@ -112,7 +114,16 @@ bool fyai_fsview_hide_usable(void);
  * confines itself. Returns 0 in the program, or -1 with errno set before any
  * fork.
  */
-int fyai_fsview_hide(const char *const *paths, size_t n);
+int fyai_fsview_hide(const char *const *paths, size_t n,
+		     const struct fyai_sandbox_mount *mount, size_t mount_n);
+
+/*
+ * Make each of the @n mounts in order, in the mount namespace of this process,
+ * which must hold the capabilities to mount. A mount that exists is left as it
+ * is, so the calls of a scope that share a namespace make it once. Returns 0, or
+ * -1 with errno set at the first mount that fails.
+ */
+int fyai_fsview_mounts(const struct fyai_sandbox_mount *mount, size_t n);
 
 /*
  * Start the holder of a scope: user, mount and PID namespaces with each of the
@@ -125,6 +136,24 @@ int fyai_fsview_hide(const char *const *paths, size_t n);
  * *@init is the process whose namespaces fyai_cover_join() joins. Returns 0, or
  * -1 with errno set.
  */
+/*
+ * Register @fn, to run with @arg in this process after the program of
+ * fyai_fsview_hide() or fyai_cover_join() has ended, and before this process
+ * ends. Without it, this process joins the namespaces and cannot see the
+ * files that they cover or the mounts that they hide. With it, those two calls
+ * start with fyai_fsview_outer(): this process waits outside the namespaces
+ * and runs @fn there.
+ */
+void fyai_fsview_on_parent_exit(void (*fn)(void *arg), void *arg);
+
+/*
+ * Make the process that registered a function with fyai_fsview_on_parent_exit()
+ * wait outside the namespaces: it forks, and the child goes on. The parent runs
+ * the function when the child ends, and ends with its status. Does nothing
+ * for any other process. Returns 0, or -1 with errno set when the fork failed.
+ */
+int fyai_fsview_outer(void);
+
 /* Set the time that the init of a holder gives its processes after SIGTERM. */
 void fyai_fsview_set_grace(long ms);
 

@@ -36,6 +36,8 @@
 #include <libfyaml/libfyaml-blake3.h>
 #include <sys/xattr.h>
 #include <sys/mount.h>
+#include <sys/statvfs.h>
+#include <sys/vfs.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <linux/capability.h>
@@ -582,19 +584,133 @@ static void view_pid_init(pid_t program)
 	}
 }
 
-int fyai_fsview_hide(const char *const *paths, size_t n)
+/* The magic number of overlayfs, as statfs() reports it. */
+#define VIEW_OVERLAY_MAGIC 0x794c7630
+
+/* Whether the target shows the mount already: a scope shares one namespace. */
+static bool view_mount_exists(const struct fyai_sandbox_mount *m)
+{
+	struct stat source, target;
+	struct statvfs vfs;
+	struct statfs fs;
+	struct statx sx;
+
+	if (m->kind == FYAI_MOUNT_OVERLAY)
+		return !statfs(m->target, &fs) && fs.f_type == VIEW_OVERLAY_MAGIC;
+	if (!strcmp(m->source, m->target)) {
+		/* A bind onto itself: the path is a mount of its own, read-only when asked. */
+		if (statx(AT_FDCWD, m->target, 0, 0, &sx) ||
+		    !(sx.stx_attributes & STATX_ATTR_MOUNT_ROOT))
+			return false;
+		return !m->readonly || (!statvfs(m->target, &vfs) && (vfs.f_flag & ST_RDONLY));
+	}
+	return !stat(m->source, &source) && !stat(m->target, &target) &&
+	       source.st_dev == target.st_dev && source.st_ino == target.st_ino;
+}
+
+static int view_mount_one(const struct fyai_sandbox_mount *m)
+{
+	char options[3 * PATH_MAX + 128];
+	unsigned long flags = MS_NOSUID | MS_NODEV;
+	struct statvfs vfs;
+	int len;
+
+	if (view_mount_exists(m))
+		return 0;
+	if (m->kind == FYAI_MOUNT_OVERLAY) {
+		len = snprintf(options, sizeof(options),
+			       "lowerdir=%s,upperdir=%s,workdir=%s,userxattr,index=off,"
+			       "redirect_dir=nofollow,metacopy=off", m->source, m->upper,
+			       m->work);
+		if (len < 0 || (size_t)len >= sizeof(options))
+			return -1;
+		return mount("overlay", m->target, "overlay", flags, options);
+	}
+	/* The mounts below a directory go with it. */
+	if (mount(m->source, m->target, NULL, MS_BIND | MS_REC, NULL))
+		return -1;
+	if (!m->readonly)
+		return 0;
+	/* A remount in a user namespace must keep the flags that the mount has. */
+	if (statvfs(m->target, &vfs))
+		return -1;
+	flags = MS_REMOUNT | MS_BIND | MS_RDONLY;
+	if (vfs.f_flag & ST_NOSUID)
+		flags |= MS_NOSUID;
+	if (vfs.f_flag & ST_NODEV)
+		flags |= MS_NODEV;
+	if (vfs.f_flag & ST_NOEXEC)
+		flags |= MS_NOEXEC;
+	if (vfs.f_flag & ST_NOATIME)
+		flags |= MS_NOATIME;
+	if (vfs.f_flag & ST_NODIRATIME)
+		flags |= MS_NODIRATIME;
+	if (vfs.f_flag & ST_RELATIME)
+		flags |= MS_RELATIME;
+	return mount(NULL, m->target, NULL, flags, NULL);
+}
+
+int fyai_fsview_mounts(const struct fyai_sandbox_mount *mounts, size_t n)
+{
+	size_t i;
+
+	for (i = 0; i < n; i++)
+		if (view_mount_one(&mounts[i]))
+			return -1;
+	return 0;
+}
+
+static void (*view_parent_exit)(void *arg);
+static void *view_parent_exit_arg;
+static pid_t view_parent_exit_pid;
+
+void fyai_fsview_on_parent_exit(void (*fn)(void *arg), void *arg)
+{
+	view_parent_exit = fn;
+	view_parent_exit_arg = arg;
+	view_parent_exit_pid = getpid();
+}
+
+int fyai_fsview_outer(void)
+{
+	pid_t child, waited;
+	int status;
+
+	/* A child that forked after the registration is not the process that waits. */
+	if (!view_parent_exit || view_parent_exit_pid != getpid())
+		return 0;
+	child = fork();
+	if (child < 0)
+		return -1;
+	if (!child) {
+		view_parent_exit = NULL;
+		return 0;
+	}
+	do {
+		waited = waitpid(child, &status, 0);
+	} while (waited < 0 && errno == EINTR);
+	view_parent_exit(view_parent_exit_arg);
+	_exit(view_wait_status(waited, status));
+}
+
+int fyai_fsview_hide(const char *const *paths, size_t n,
+		     const struct fyai_sandbox_mount *mounts, size_t mounts_n)
 {
 	pid_t child, program, waited;
 	int status;
 	size_t i;
 	int rc;
 
+	if (fyai_fsview_outer())
+		return -1;
 	rc = view_namespace(true);
 	if (rc)
 		return -1;
 	for (i = 0; i < n; i++)
 		if (view_hide_one(paths[i]))
 			return -1;
+	if (fyai_fsview_mounts(mounts, mounts_n))
+		return -1;
 	/*
 	 * The processes of the tool are the children of this one, in a PID
 	 * namespace where this process and its parent do not exist. This process
@@ -1709,9 +1825,20 @@ int fyai_fsview_drop_capabilities(void)
 	return -1;
 }
 
-int fyai_fsview_hide(const char *const *paths, size_t n)
+int fyai_fsview_hide(const char *const *paths, size_t n,
+		     const struct fyai_sandbox_mount *mount, size_t mount_n)
 {
 	(void)paths;
+	(void)n;
+	(void)mount;
+	(void)mount_n;
+	errno = ENOTSUP;
+	return -1;
+}
+
+int fyai_fsview_mounts(const struct fyai_sandbox_mount *mount, size_t n)
+{
+	(void)mount;
 	(void)n;
 	errno = ENOTSUP;
 	return -1;
@@ -1720,6 +1847,17 @@ int fyai_fsview_hide(const char *const *paths, size_t n)
 void fyai_fsview_set_grace(long ms)
 {
 	(void)ms;
+}
+
+void fyai_fsview_on_parent_exit(void (*fn)(void *arg), void *arg)
+{
+	(void)fn;
+	(void)arg;
+}
+
+int fyai_fsview_outer(void)
+{
+	return 0;
 }
 
 int fyai_fsview_metacopy_check(const char *runtime)

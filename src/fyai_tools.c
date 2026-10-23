@@ -57,6 +57,7 @@
 #include "fyai_skill.h"
 #include "fyai_settings.h"
 #include "fyai_todo.h"
+#include "fyai_home.h"
 #include "fyai_tools.h"
 #include "fyai_orphan.h"
 #include "fyai_view.h"
@@ -756,7 +757,8 @@ struct fyai_shell_sandbox {
 	char *root;
 	const char **hide;			/* each entry owned; covered in the tool */
 	size_t hide_n;
-	struct fyai_sandbox_path *allow;	/* each .path owned */
+	struct fyai_sandbox_path *allow;	/* each .path owned; see fyai_shell_sandbox_allow() */
+	size_t allow_cap;
 	const char **deny;			/* each entry owned */
 	uint16_t *tcp_ports;
 	uint16_t *tcp_bind_ports;
@@ -767,11 +769,39 @@ struct fyai_shell_sandbox {
 static void fyai_shell_sandbox_end(struct fyai_shell_sandbox *sb);
 
 /*
+ * Add an entry to the allow list of @sb, which grows as it needs. The list owns
+ * @path afterwards, and frees it when the add fails. A path that the list holds
+ * already is added again: the kernel merges the rules of one path.
+ */
+static int fyai_shell_sandbox_allow(struct fyai_ctx *ctx, struct fyai_shell_sandbox *sb,
+				    char *path, enum fyai_sandbox_mode mode)
+{
+	struct fyai_sandbox_path *grown;
+	size_t cap;
+
+	if (sb->spec.allow_n == sb->allow_cap) {
+		cap = sb->allow_cap ? sb->allow_cap * 2 : 8;
+		grown = realloc(sb->allow, cap * sizeof(*sb->allow));
+		if (!grown) {
+			free(path);
+			fyai_error(ctx, "sandbox: could not grow the allow list");
+			return -1;
+		}
+		sb->allow = grown;
+		sb->allow_cap = cap;
+	}
+	sb->allow[sb->spec.allow_n].path = path;
+	sb->allow[sb->spec.allow_n].mode = mode;
+	sb->spec.allow_n++;
+	return 0;
+}
+
+/*
  * Resolve a config path against @base: absolute as-is, "~"-prefixed against
  * $HOME, otherwise relative to @base (the project root). Returns a malloc'd
  * absolute path or NULL.
  */
-static char *sandbox_resolve(const char *base, const char *p)
+char *fyai_sandbox_resolve_path(const char *base, const char *p)
 {
 	const char *home;
 	char *out;
@@ -810,7 +840,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	enum fyai_cover_method method;
 	enum fyai_cover_start start;
 	pid_t holder = 0;
-	size_t cn = 0, gn, i;
+	size_t cn = 0, gn, i, mounts;
 	char cwd[4096];
 	char *resolved;
 	const char *ps;
@@ -833,6 +863,9 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	sp->strict = false;			/* floor is the config policy */
 	sp->filter_path = true;
 
+	/* The mounts of the profile need the namespaces that the cover makes. */
+	if (!ctx->cfg->tool_child && fyai_home_ensure(ctx))
+		goto err_out;
 	/*
 	 * deny: each config sandbox.deny entry, then the arena. Where a cover is
 	 * possible (fyai_cover.h), each existing path is hidden in a mount namespace
@@ -850,7 +883,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	/* Configured denies apply to every grant. Ignore paths that do not exist. */
 	fy_foreach(e, deny) {
 		ps = fy_castp(&e, "");
-		resolved = sandbox_resolve(sb->root, ps);
+		resolved = fyai_sandbox_resolve_path(sb->root, ps);
 		fyai_error_check(ctx, resolved, err_out,
 				 "sandbox: could not resolve deny path '%s'", ps);
 		if (access(resolved, F_OK)) {
@@ -860,7 +893,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 		cand[cn++] = resolved;
 	}
 	gn = cn;
-	resolved = sandbox_resolve(sb->root, ".fyai");
+	resolved = fyai_sandbox_resolve_path(sb->root, ".fyai");
 	fyai_error_check(ctx, resolved, err_out,
 			 "sandbox: could not resolve the arena deny path");
 	if (ctx->cfg->view_project || access(resolved, F_OK))
@@ -896,35 +929,43 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	sp->deny = sb->deny;
 	sp->hide = (const char *const *)sb->hide;
 	sp->hide_n = sb->hide_n;
-	if (method == FYAI_COVER_BWRAP && sb->hide_n)
+	mounts = ctx->home ? ctx->home->mount_n : 0;
+	fyai_error_check(ctx, !mounts || method != FYAI_COVER_NONE, err_out,
+			 "sandbox: the profile makes mounts, which need a user namespace; "
+			 "set sandbox_cover to auto and allow user namespaces (see "
+			 "doc/apparmor-userns.md)");
+	if (method == FYAI_COVER_BWRAP && (sb->hide_n || mounts))
 		sp->cover_holder = holder;
 
 	/* allow: extra grants; a string is rw, a mapping {path, mode: ro}. */
 	allow = fy_get(cs, "allow");
-	n = fy_is_sequence(allow) ? fy_len(allow) : 0;
-	if (n) {
-		sb->allow = calloc(n, sizeof(*sb->allow));
-		fyai_error_check(ctx, sb->allow, err_out,
-				 "sandbox: could not allocate the allow list");
-		fy_foreach(e, allow) {
-			mode = FYAI_SB_RW;
-			if (fy_is_mapping(e)) {
-				pv = fy_get(e, "path");
-				ps = fy_castp(&pv, "");
-				rc = fyai_sandbox_mode_parse(
-						fy_get(e, "mode", "rw"), &mode);
-				fyai_error_check(ctx, !rc,
-					err_out, "sandbox: invalid mode '%s' for path '%s'",
-					fy_get(e, "mode", "rw"), ps);
-			} else {
-				ps = fy_castp(&e, "");
-			}
-			sb->allow[sp->allow_n].path = sandbox_resolve(sb->root, ps);
-			fyai_error_check(ctx, sb->allow[sp->allow_n].path, err_out,
-					 "sandbox: could not resolve allow path '%s'", ps);
-			sb->allow[sp->allow_n].mode = mode;
-			sp->allow_n++;
+	fy_foreach(e, allow) {
+		mode = FYAI_SB_RW;
+		if (fy_is_mapping(e)) {
+			pv = fy_get(e, "path");
+			ps = fy_castp(&pv, "");
+			rc = fyai_sandbox_mode_parse(fy_get(e, "mode", "rw"), &mode);
+			fyai_error_check(ctx, !rc,
+				err_out, "sandbox: invalid mode '%s' for path '%s'",
+				fy_get(e, "mode", "rw"), ps);
+		} else {
+			ps = fy_castp(&e, "");
 		}
+		resolved = fyai_sandbox_resolve_path(sb->root, ps);
+		fyai_error_check(ctx, resolved, err_out,
+				 "sandbox: could not resolve allow path '%s'", ps);
+		if (fyai_shell_sandbox_allow(ctx, sb, resolved, mode))
+			goto err_out;
+	}
+	/* The home directory of the tool is its own to write, whatever is denied. */
+	if (ctx->home) {
+		resolved = strdup(ctx->home->dir);
+		fyai_error_check(ctx, resolved, err_out,
+				 "sandbox: could not copy the home directory path");
+		if (fyai_shell_sandbox_allow(ctx, sb, resolved, FYAI_SB_RW))
+			goto err_out;
+		sp->mount = ctx->home->mount;
+		sp->mount_n = ctx->home->mount_n;
 	}
 	sp->allow = sb->allow;
 
@@ -6701,8 +6742,10 @@ struct fyai_tool_job *fyai_tool_job_submit(struct fyai_ctx *ctx,
 
 	fyai_diag_tracef("tool", "%s start", name);
 	/* The first call of an exchange makes the scope that its calls join. */
-	if (!fy_equal(name, "agent"))
+	if (!fy_equal(name, "agent")) {
+		fyai_home_ensure(ctx);
 		fyai_scope_ensure(ctx);
+	}
 
 	job = calloc(1, sizeof(*job));
 	fyai_error_check(ctx, job, err,

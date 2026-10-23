@@ -236,7 +236,7 @@ sandbox_grace_ms: 5000
 # The profiles. This sample is the source of `dev` and `lockdown`: an arena that
 # has none of them uses these, and one that stores them uses its own. A profile
 # has a description, `extends` (the profile it starts from), `deny`, `allow`,
-# `network` and `view` (the session runs in a view of the project). A key that a
+# `network`, `list_root`, `home` and `view` (the session runs in a view of the project). A key that a
 # profile names replaces the key of the profile it extends, except `allow`, which
 # adds to it. A path may use {{hostname}}, {{os}}, {{arch}} and {{host_specific}}
 # (~/.fyai/hosts/{{hostname}}), so one profile serves hosts that differ.
@@ -286,6 +286,19 @@ sandbox_profiles:
     description: the dev profile, with the session in a view of the project
     extends: dev
     view: true           # Changes stay in the view until the session ends cleanly.
+  # A home of its own for the tools. A tree is mounted over the real home in the
+  # namespace of the tool: HOME and its paths stay as they are, and the tool sees
+  # only what is listed, and what the sandbox grants. It needs a cover.
+  # build:
+  #   description: a build with a private home
+  #   extends: dev
+  #   home:
+  #     private: true
+  #     copy: [~/.bashrc, ~/.gitconfig, ~/.vimrc, ~/.config/nvim]
+  #     env: [CARGO_HOME, "GIT_CONFIG_GLOBAL=~/.gitconfig"]   # Variables that name a path.
+  #     method: overlay            # or copy.
+  #   mounts:                      # Other mounts, made after the home.
+  #     - { source: /dev/dri, mode: rw }
   # Add a profile of your own, starting from another:
   # node:
   #   description: a Node project

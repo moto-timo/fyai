@@ -651,6 +651,7 @@ struct fyai_catalog_update_request;
 struct fyai_event_loop;
 struct fyai_event_source;
 struct fyai_orphan;
+struct fyai_home;
 
 /* Token and cost totals of the usage that some turns carry. */
 struct fyai_usage_sum {
@@ -928,6 +929,7 @@ struct fyai_ctx {
 	bool scope_open;		/* an exchange runs */
 	struct fyai_orphan *orphans;	/* processes that a tool left, to end with the scope */
 	struct fyai_event_source *orphan_kill;
+	struct fyai_home *home;		/* the home of the tools, when a profile gives them one */
 	bool sandbox_applied;
 	/* Index of the next pre-supplied --answer to hand to ask_user. */
 	size_t answer_next;

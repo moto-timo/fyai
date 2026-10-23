@@ -214,7 +214,8 @@ static int cover_wait_status(pid_t waited, int status)
 				   128 + WTERMSIG(status);
 }
 
-int fyai_cover_join(pid_t holder)
+int fyai_cover_join(pid_t holder, const struct fyai_sandbox_mount *mount,
+		    size_t mount_n)
 {
 	static const struct {
 		const char *name;
@@ -229,6 +230,8 @@ int fyai_cover_join(pid_t holder)
 
 	for (i = 0; i < 3; i++)
 		fd[i] = -1;
+	if (fyai_fsview_outer())
+		return -1;
 	if (!getcwd(cwd, sizeof(cwd)))
 		cwd[0] = '\0';
 	for (i = 0; i < 3; i++) {
@@ -255,6 +258,9 @@ int fyai_cover_join(pid_t holder)
 		} while (waited < 0 && errno == EINTR);
 		_exit(cover_wait_status(waited, status));
 	}
+	/* The joined namespaces may hold these already: a mounted one is kept. */
+	if (fyai_fsview_mounts(mount, mount_n))
+		return -1;
 	return fyai_fsview_drop_capabilities();
 err:
 	saved = errno;
@@ -477,7 +483,7 @@ static bool holder_joinable(pid_t holder)
 	if (child < 0)
 		return false;
 	if (!child)
-		_exit(fyai_cover_join(holder) ? 1 : 0);
+		_exit(fyai_cover_join(holder, NULL, 0) ? 1 : 0);
 	do {
 		waited = waitpid(child, &status, 0);
 	} while (waited < 0 && errno == EINTR);
@@ -650,9 +656,12 @@ bool fyai_cover_covers(const struct fyai_cover *cover, const char *path)
 	return false;
 }
 
-int fyai_cover_join(pid_t holder)
+int fyai_cover_join(pid_t holder, const struct fyai_sandbox_mount *mount,
+		    size_t mount_n)
 {
 	(void)holder;
+	(void)mount;
+	(void)mount_n;
 	errno = ENOTSUP;
 	return -1;
 }

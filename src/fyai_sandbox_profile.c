@@ -168,6 +168,8 @@ static fy_generic overlay(struct fyai_cfg *cfg, fy_generic base, fy_generic over
 	fy_generic onet = fy_get(over, "network", fy_invalid);
 	fy_generic tcp, udp, net, out, view = fy_get(over, "view", fy_invalid);
 	fy_generic list_root = fy_get(over, "list_root", fy_invalid);
+	fy_generic home = fy_get(over, "home", fy_invalid);
+	fy_generic mounts = fy_get(over, "mounts", fy_invalid);
 
 	if (!fy_is_sequence(deny))
 		deny = fy_get(base, "deny", fy_invalid);
@@ -199,6 +201,77 @@ static fy_generic overlay(struct fyai_cfg *cfg, fy_generic base, fy_generic over
 		list_root = fy_get(base, "list_root", fy_invalid);
 	if (fy_is_bool(list_root))
 		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "list_root"), list_root);
+	if (!fy_is_mapping(home))
+		home = fy_get(base, "home", fy_invalid);
+	if (fy_is_mapping(home))
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "home"), home);
+	if (!fy_is_sequence(mounts))
+		mounts = fy_get(base, "mounts", fy_invalid);
+	if (fy_is_sequence(mounts))
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "mounts"), mounts);
+	return out;
+}
+
+/* The mounts of a profile, with the placeholders of each `source` and `target` expanded. */
+static fy_generic expand_mounts(struct fyai_cfg *cfg, fy_generic mounts,
+				const char *profile, bool *ok)
+{
+	static const char *const keys[] = { "source", "target" };
+	fy_generic out = fy_sequence(cfg->gb), e, v, item;
+	char buf[4096], bad[128];
+	const char *s;
+	size_t i;
+
+	if (!fy_is_sequence(mounts))
+		return fy_invalid;
+	fy_foreach(e, mounts) {
+		item = e;
+		for (i = 0; i < 2; i++) {
+			v = fy_get(e, keys[i], fy_invalid);
+			if (!fy_is_string(v))
+				continue;
+			s = fy_castp(&v, "");
+			if (expand_path(s, buf, sizeof(buf), bad, sizeof(bad))) {
+				fyai_cfg_error(cfg, "sandbox profile '%s': unknown placeholder or "
+					       "path too long in '%s'", profile, bad);
+				*ok = false;
+				return out;
+			}
+			item = fy_assoc(cfg->gb, item, fy_value(cfg->gb, keys[i]),
+					fy_value(cfg->gb, buf));
+		}
+		out = fy_append(cfg->gb, out, item);
+	}
+	return out;
+}
+
+/* The `home` of a profile with the placeholders of its `dir` and `copy` expanded. */
+static fy_generic expand_home(struct fyai_cfg *cfg, fy_generic home,
+			      const char *profile, bool *ok)
+{
+	fy_generic dir = fy_get(home, "dir", fy_invalid), out;
+	char buf[4096], bad[128];
+	const char *s;
+
+	if (!fy_is_mapping(home))
+		return fy_invalid;
+	out = fy_mapping(cfg->gb, "private", fy_get(home, "private", false),
+			 "method", fy_get(home, "method", "overlay"),
+			 "copy", expand_list(cfg, fy_get(home, "copy", fy_invalid),
+					     false, profile, ok),
+			 "env", expand_list(cfg, fy_get(home, "env", fy_invalid),
+					    false, profile, ok));
+	if (fy_is_string(dir)) {
+		s = fy_castp(&dir, "");
+		if (expand_path(s, buf, sizeof(buf), bad, sizeof(bad))) {
+			fyai_cfg_error(cfg, "sandbox profile '%s': unknown placeholder or "
+				       "path too long in '%s'", profile, bad);
+			*ok = false;
+			return out;
+		}
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "dir"),
+			       fy_value(cfg->gb, buf));
+	}
 	return out;
 }
 
@@ -254,7 +327,7 @@ fy_generic fyai_sandbox_profile_policy(struct fyai_cfg *cfg, fy_generic root,
 {
 	fy_generic policy;
 	bool ok = true;
-	fy_generic deny, allow;
+	fy_generic deny, allow, home, out, mounts;
 
 	policy = profile_compose(cfg, root, profile_builtin_doc(cfg), name, 0);
 	if (fy_is_invalid(policy))
@@ -263,10 +336,21 @@ fy_generic fyai_sandbox_profile_policy(struct fyai_cfg *cfg, fy_generic root,
 	allow = expand_list(cfg, fy_get(policy, "allow", fy_invalid), true, name, &ok);
 	if (!ok)
 		return fy_invalid;
-	return fy_mapping(cfg->gb, "enabled", true, "deny", deny, "allow", allow,
-			  "network", fy_get(policy, "network", fy_invalid),
-			  "view", fy_get(policy, "view", false),
-			  "list_root", fy_get(policy, "list_root", false));
+	home = expand_home(cfg, fy_get(policy, "home", fy_invalid), name, &ok);
+	if (!ok)
+		return fy_invalid;
+	out = fy_mapping(cfg->gb, "enabled", true, "deny", deny, "allow", allow,
+			 "network", fy_get(policy, "network", fy_invalid),
+			 "view", fy_get(policy, "view", false),
+			 "list_root", fy_get(policy, "list_root", false));
+	if (fy_is_mapping(home))
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "home"), home);
+	mounts = expand_mounts(cfg, fy_get(policy, "mounts", fy_invalid), name, &ok);
+	if (!ok)
+		return fy_invalid;
+	if (fy_is_sequence(mounts))
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "mounts"), mounts);
+	return out;
 }
 
 /* The description of the profile @name, from @user first, else @builtin. */

@@ -48,6 +48,7 @@
 #include "fyai_prof.h"
 #include "fyai_ui.h"
 #include "fyai_tools.h"
+#include "fyai_home.h"
 #include "fyai_orphan.h"
 #include "fyai_view.h"
 #include "fyai_asks.h"
@@ -2678,6 +2679,7 @@ void fyai_cleanup(struct fyai_ctx *ctx)
 	fyai_agents_cleanup(ctx);
 	fyai_skill_dirs_release(ctx);
 	fyai_settings_release(ctx);
+	fyai_home_release(ctx);
 	fyai_cleanup_transient_builder(ctx);
 	fyai_sink_destroy(ctx->sink);
 	ctx->sink = NULL;

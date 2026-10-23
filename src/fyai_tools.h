@@ -317,4 +317,10 @@ fy_generic fyai_tool_run_one(struct fyai_ctx *ctx, const char *name,
  */
 int fyai_run_tool_verb(struct fyai_ctx *ctx);
 
+/*
+ * Resolve a path of the sandbox configuration: absolute as it is, "~" against
+ * $HOME, else against @base. Returns an allocated absolute path, or NULL.
+ */
+char *fyai_sandbox_resolve_path(const char *base, const char *p);
+
 #endif

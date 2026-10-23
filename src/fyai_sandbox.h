@@ -46,6 +46,32 @@ enum fyai_sandbox_mode {
 	FYAI_SB_APPEND,
 };
 
+/* How a mount shows its source. */
+enum fyai_sandbox_mount_kind {
+	/* The target is the source: the same files, writes included. */
+	FYAI_MOUNT_BIND = 0,
+	/*
+	 * The target shows the source, and keeps what the tool writes in @upper, which
+	 * @work supports. The source never changes. Both are directories on one file
+	 * system that holds extended attributes.
+	 */
+	FYAI_MOUNT_OVERLAY,
+};
+
+/*
+ * A mount made in the mount namespace of the tool, before the tool is
+ * confined. @source and @target exist, and a file is a bind only. The caller
+ * owns the strings.
+ */
+struct fyai_sandbox_mount {
+	enum fyai_sandbox_mount_kind kind;
+	const char *source;
+	const char *target;
+	const char *upper;
+	const char *work;
+	bool readonly;
+};
+
 /* One filesystem grant. */
 struct fyai_sandbox_path {
 	const char *path;
@@ -83,6 +109,13 @@ struct fyai_sandbox_spec {
 	 * files. A program that changes to / and opens "." needs it.
 	 */
 	bool list_root;
+
+	/*
+	 * Mounts of the tool, made in order in its mount namespace before it is
+	 * confined. One that exists is kept. A mount that fails fails the tool.
+	 */
+	const struct fyai_sandbox_mount *mount;
+	size_t mount_n;
 
 	/*
 	 * Project root, granted read/write recursively EXCEPT any path in

@@ -510,13 +510,14 @@ int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
 
 	/* The cover comes first: the ruleset then sees the tree as the tool does. */
 	if (spec->cover_holder > 0) {
-		if (fyai_cover_join(spec->cover_holder))
+		if (fyai_cover_join(spec->cover_holder, spec->mount, spec->mount_n))
 			return -1;
-	} else if (spec->hide_n && fyai_fsview_hide(spec->hide, spec->hide_n)) {
+	} else if ((spec->hide_n || spec->mount_n) &&
+		   fyai_fsview_hide(spec->hide, spec->hide_n, spec->mount, spec->mount_n)) {
 		return -1;
 	}
 	/* The processes below are in a namespace: their pids mean nothing outside it. */
-	if (spec->cover_holder > 0 || spec->hide_n)
+	if (spec->cover_holder > 0 || spec->hide_n || spec->mount_n)
 		fyai_orphan_namespaced();
 
 	mask = fs_mask(abi);
