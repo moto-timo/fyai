@@ -802,6 +802,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	enum fyai_sandbox_mode mode;
 	char **cand = NULL;
 	enum fyai_cover_method method;
+	enum fyai_cover_start start;
 	pid_t holder = 0;
 	size_t cn = 0, gn, i;
 	char cwd[4096];
@@ -861,9 +862,18 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	else
 		cand[cn++] = resolved;
 	/* A session in a view keeps the carve-out: the view hides the arena already. */
+	/*
+	 * The invocation starts the holder of the scope of the exchange, and each tool
+	 * child joins it. A scope of one call is made by the tool itself.
+	 */
+	if (!strcmp(ctx->cfg->sandbox_scope, "call"))
+		start = FYAI_COVER_START_CALL;
+	else
+		start = ctx->cfg->tool_child ? FYAI_COVER_JOIN_ONLY :
+					       FYAI_COVER_START_SCOPE;
 	method = ctx->cfg->view_project ? FYAI_COVER_NONE :
 		 fyai_cover_select(&ctx->cover, ctx->cfg->sandbox_cover,
-				   (const char *const *)cand, cn, &holder);
+				   (const char *const *)cand, cn, &holder, start);
 	for (i = 0; i < cn; i++) {
 		if (method == FYAI_COVER_USERNS ||
 		    (method == FYAI_COVER_BWRAP && fyai_cover_covers(&ctx->cover, cand[i]))) {
@@ -3002,6 +3012,7 @@ struct fyai_tool_job {
 struct fyai_shell_session {
 	struct fyai_shell_session *next;
 	struct fyai_ctx *ctx;
+	bool pinned;			/* it holds the scope of its exchange */
 	char *name;
 	char *command;
 	char *branch;
@@ -3455,6 +3466,9 @@ fyai_shell_session_create(struct fyai_ctx *ctx, const char *name,
 	}
 	sess->next = ctx->shell_sessions;
 	ctx->shell_sessions = sess;
+	/* The program of the session outlives the exchange that started it. */
+	sess->pinned = true;
+	fyai_scope_pin(ctx);
 	fyai_shell_session_idle_arm(sess);
 	return sess;
 
@@ -4000,6 +4014,8 @@ static void fyai_shell_session_destroy(struct fyai_shell_session *sess)
 	if (sess->waiter)
 		fyai_event_source_remove(sess->waiter);
 	fyai_terminal_view_destroy(sess->view);
+	if (sess->pinned)
+		fyai_scope_unpin(sess->ctx);
 	free(sess->name);
 	free(sess->command);
 	free(sess->branch);
@@ -5460,6 +5476,8 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	fyai_output_cleanup(ctx);		/* the document it has open */
 	fyai_diag_reset(&ctx->cfg->diag);	/* what the parent has not drained yet */
 	fyai_cover_abandon(&ctx->cover);	/* the holder that it does not own */
+	ctx->scope_pins = 0;
+	ctx->scope_open = false;
 	fyai_skill_dirs_abandon(ctx);		/* the skills it wrote out */
 	fyai_settings_abandon(ctx);		/* and the exports */
 	fyai_diag_trace_tap(NULL, NULL);	/* the recording of the parent */
@@ -6325,6 +6343,59 @@ fyai_tool_job_band_delay(const struct fyai_event *ev)
 	return FYAIEA_CONTINUE;
 }
 
+/* Whether a scope lasts as long as the interactive session. */
+static bool fyai_scope_session(const struct fyai_ctx *ctx)
+{
+	return !strcmp(ctx->cfg->sandbox_scope, "session");
+}
+
+/* End the scope when no exchange runs and no object keeps it. */
+static void fyai_scope_settle(struct fyai_ctx *ctx)
+{
+	if (ctx->scope_open || ctx->scope_pins > 0 || fyai_scope_session(ctx))
+		return;
+	/* A process that did not start the holder does not end it. */
+	if (ctx->cover.owner)
+		fyai_cover_release(&ctx->cover);
+}
+
+void fyai_scope_exchange(struct fyai_ctx *ctx, bool begin)
+{
+	ctx->scope_open = begin;
+	if (!begin)
+		fyai_scope_settle(ctx);
+}
+
+void fyai_scope_pin(struct fyai_ctx *ctx)
+{
+	ctx->scope_pins++;
+}
+
+void fyai_scope_unpin(struct fyai_ctx *ctx)
+{
+	if (ctx->scope_pins > 0)
+		ctx->scope_pins--;
+	fyai_scope_settle(ctx);
+}
+
+/*
+ * Start the holder of the scope of the exchange before a tool child forks, so
+ * that the child joins it and the holder outlives the call. The tool child
+ * and a scope of one call make their own.
+ */
+static void fyai_scope_ensure(struct fyai_ctx *ctx)
+{
+	struct fyai_shell_sandbox sb;
+	const struct fyai_sandbox_spec *spec;
+
+	if (ctx->cfg->tool_child || !ctx->cfg->enable_sandbox ||
+	    ctx->sandbox_applied || !strcmp(ctx->cfg->sandbox_scope, "call"))
+		return;
+	if (fyai_shell_sandbox_begin(ctx, &sb, &spec))
+		return;
+	fyai_shell_sandbox_end(&sb);
+}
+
 struct fyai_tool_job *fyai_tool_job_submit(struct fyai_ctx *ctx,
 					    fy_generic tool_call)
 {
@@ -6476,6 +6547,10 @@ struct fyai_tool_job *fyai_tool_job_submit(struct fyai_ctx *ctx,
 			       "a sub-agent cannot be forked with credential isolation");
 
 	fyai_diag_tracef("tool", "%s start", name);
+	/* The first call of an exchange makes the scope that its calls join. */
+	if (!fy_equal(name, "agent"))
+		fyai_scope_ensure(ctx);
+
 	job = calloc(1, sizeof(*job));
 	fyai_error_check(ctx, job, err,
 			 "could not allocate tool job");

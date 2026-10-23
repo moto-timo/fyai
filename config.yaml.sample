@@ -225,6 +225,11 @@ sandbox_profile: dev
 # bwrap or none (Landlock alone, which stops a tool from creating entries in the
 # project root).
 sandbox_cover: auto
+# How long the processes that a tool starts live. A program that detaches, as a
+# build server does, lives for the exchange (the prompt to the end of the turn),
+# and a terminal session or a monitor keeps it longer. `session` keeps it until
+# the session ends; `call` ends it with the call that started it.
+sandbox_scope: exchange
 # The profiles. This sample is the source of `dev` and `lockdown`: an arena that
 # has none of them uses these, and one that stores them uses its own. A profile
 # has a description, `extends` (the profile it starts from), `deny`, `allow`,

@@ -2457,6 +2457,7 @@ fyai_turn_run_submit(struct fyai_ctx *ctx, fy_generic turn)
 	run->turn = turn;
 	run->turn_in = turn;
 	run->settled = turn;
+	fyai_scope_exchange(ctx, true);
 	run->previous = fy_get(turn, "previous", fy_null);
 	run->tool_calls = fy_null;
 	run->result = fy_invalid;
@@ -2553,6 +2554,7 @@ static void fyai_turn_run_destroy(struct fyai_turn_run *run)
 	run->ctx->tool_diff_tracking = false;
 	fyai_diag_tracef("turn", "end, %s, %d rounds",
 			 fyai_turn_run_state_name(run->state), run->iteration);
+	fyai_scope_exchange(run->ctx, false);
 	free(run);
 }
 

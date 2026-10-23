@@ -410,6 +410,7 @@ struct fyai_cfg {
 	const char *sandbox_profile;	/* profile that made the policy; NULL: `sandbox` */
 	const char *sandbox_reported;	/* what the last report of open egress was for */
 	const char *sandbox_cover;	/* how a tool hides the arena: auto, userns, bwrap, none */
+	const char *sandbox_scope;	/* how long its processes live: exchange, session, call */
 	const char *cast_path;		/* --cast: the file that records the screen, or NULL */
 	bool cast_compat;		/* --cast-compat: write plain asciicast, nothing of ours */
 	bool interactive;
@@ -921,6 +922,8 @@ struct fyai_ctx {
 	 * sanitized and the sandbox applied, so inner steps (the shell tool's
 	 * own fork) do not re-derive and re-apply the confinement. */
 	struct fyai_cover cover;	/* how a tool hides the arena, and the holder of it */
+	int scope_pins;			/* objects that keep the scope of an exchange */
+	bool scope_open;		/* an exchange runs */
 	bool sandbox_applied;
 	/* Index of the next pre-supplied --answer to hand to ask_user. */
 	size_t answer_next;

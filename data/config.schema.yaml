@@ -762,6 +762,19 @@ properties:
       then `bwrap`. `none` leaves it to Landlock. Where a cover is not possible,
       fyai says so at the start and names the fix: `fyai sandbox apparmor`, or
       bubblewrap with its AppArmor profile.
+  sandbox_scope:
+    x-fyai-model: hidden
+    type: string
+    enum: [exchange, session, call]
+    default: exchange
+    description: >-
+      Choose how long the processes that a sandboxed tool starts live. A
+      program can detach, as a build server does, and its next call needs it.
+      `exchange` keeps one scope for all calls of an exchange, from the prompt
+      to the end of the turn, and ends every process in it then. A terminal
+      session or a monitor keeps the scope while it lives. `session` ends the
+      scope when the interactive session ends. `call` ends the processes of a
+      call with the call.
   sandbox_profile:
     x-fyai-model: read
     x-fyai-complete: sandbox-profile

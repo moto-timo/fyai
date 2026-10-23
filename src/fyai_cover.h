@@ -16,10 +16,12 @@
  * Landlock gets no denial for it.
  *
  *  USERNS  the tool makes user, mount and PID namespaces itself.
- *  BWRAP   a holder, a bubblewrap process that this process or an ancestor
- *          started, owns the namespaces, and the tool joins them with setns().
- *          Ubuntu lets bubblewrap make a user namespace when it does not let an
- *          unconfined program do so.
+ *  BWRAP   a holder owns the namespaces, and the tool joins them with setns().
+ *          The holder is the scope of an exchange (doc/exchange-scope.md): a
+ *          process that this process or an ancestor started, either an init
+ *          that this program makes where it may make namespaces, or a
+ *          bubblewrap process. Ubuntu lets bubblewrap make a user namespace
+ *          when it does not let an unconfined program do so.
  *  NONE    no cover: Landlock denies the path, with the cost above.
  */
 enum fyai_cover_method {
@@ -27,6 +29,13 @@ enum fyai_cover_method {
 	FYAI_COVER_USERNS,
 	FYAI_COVER_BWRAP,
 };
+
+/*
+ * Most holders that wait to be reaped. A holder ends after its grace time, so a
+ * holder retires at most once for each exchange; a full list makes the next one
+ * wait for the oldest.
+ */
+#define FYAI_COVER_RETIRED_MAX 8
 
 /*
  * What an invocation knows about covers, owned by its context. A process that
@@ -41,6 +50,16 @@ struct fyai_cover {
 	char *paths;		/* the paths that it covers, one for each line */
 	int userns;		/* a user namespace of the process: -1 unknown, 0 no, 1 yes */
 	bool bwrap_failed;	/* a holder could not be made or joined: do not try again */
+	bool userns_failed;	/* an init holder could not be made or joined */
+	pid_t waiter;		/* the child that runs the holder: reaped after it ends */
+	pid_t retired[FYAI_COVER_RETIRED_MAX];	/* holders that ended and are not reaped yet */
+};
+
+/* Who may start the holder of a scope when a tool chooses its cover. */
+enum fyai_cover_start {
+	FYAI_COVER_JOIN_ONLY,	/* a tool child: use a holder that exists */
+	FYAI_COVER_START_SCOPE,	/* the invocation: start a holder for the exchange */
+	FYAI_COVER_START_CALL,	/* the tool: its own holder, for one call */
 };
 
 /*
@@ -62,7 +81,8 @@ void fyai_cover_release(struct fyai_cover *cover);
  * the process id whose namespaces to join with fyai_cover_join().
  */
 enum fyai_cover_method fyai_cover_select(struct fyai_cover *cover, const char *mode,
-				  const char *const *paths, size_t n, pid_t *holder);
+				  const char *const *paths, size_t n, pid_t *holder,
+				  enum fyai_cover_start start);
 
 /* True when the holder of this process covers @path. */
 bool fyai_cover_covers(const struct fyai_cover *cover, const char *path);

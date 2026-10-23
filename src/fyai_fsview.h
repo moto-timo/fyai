@@ -114,6 +114,20 @@ bool fyai_fsview_hide_usable(void);
  */
 int fyai_fsview_hide(const char *const *paths, size_t n);
 
+/*
+ * Start the holder of a scope: user, mount and PID namespaces with each of the
+ * @n paths covered as fyai_fsview_hide() covers them, and an init that stays
+ * until @hold, the read end of a pipe, reads end of file. @owner is the write
+ * end, which the holder closes: only this process may keep it. The init then
+ * sends SIGTERM to every process of the namespace, waits a grace time, and ends
+ * them with SIGKILL. The holder has a group of its own and ends if this process
+ * does. On success *@waiter is the child that this process must reap, and
+ * *@init is the process whose namespaces fyai_cover_join() joins. Returns 0, or
+ * -1 with errno set.
+ */
+int fyai_fsview_holder(const char *const *paths, size_t n, int hold,
+		       int owner, pid_t *waiter, pid_t *init);
+
 /* Drop every capability of this process and lock the securebits, as a view does. */
 int fyai_fsview_drop_capabilities(void);
 

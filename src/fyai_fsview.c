@@ -30,6 +30,8 @@
 
 #ifdef __linux__
 #include <sched.h>
+#include <poll.h>
+#include <sys/signalfd.h>
 #include <dirent.h>
 #include <libfyaml/libfyaml-blake3.h>
 #include <sys/xattr.h>
@@ -623,6 +625,151 @@ int fyai_fsview_hide(const char *const *paths, size_t n)
 	if (program)
 		view_pid_init(program);
 	return view_drop_capabilities();
+}
+
+/* Time that the init of a scope gives its processes to end after SIGTERM. */
+#define VIEW_HOLDER_GRACE_MS 2000
+
+/*
+ * Reap the zombies of the PID namespace, and say whether any process but this
+ * one is left in it. A process that a tool started has a parent outside the
+ * namespace, so wait() alone does not see it: the procfs of the namespace does.
+ */
+static bool view_holder_children(void)
+{
+	struct dirent *de;
+	DIR *dir;
+	bool alive = false;
+
+	while (waitpid(-1, NULL, WNOHANG) > 0)
+		;
+	dir = opendir("/proc");
+	if (!dir)
+		return false;
+	while ((de = readdir(dir))) {
+		if (de->d_name[0] < '1' || de->d_name[0] > '9' ||
+		    !strcmp(de->d_name, "1"))
+			continue;
+		alive = true;
+		break;
+	}
+	closedir(dir);
+	return alive;
+}
+
+/*
+ * The init of a scope. It reaps what the processes of the namespace leave,
+ * and waits for the pipe to end. Then it asks the processes to stop, gives them
+ * a grace time, and ends them. Never returns.
+ */
+static void view_holder_init(int hold)
+{
+	struct signalfd_siginfo si;
+	struct pollfd fds[2];
+	sigset_t set;
+	char buf[64];
+	ssize_t got;
+	int sfd, left;
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGCHLD);
+	if (sigprocmask(SIG_BLOCK, &set, NULL))
+		_exit(127);
+	sfd = signalfd(-1, &set, SFD_CLOEXEC);
+	if (sfd < 0)
+		_exit(127);
+	fds[0].fd = hold;
+	fds[0].events = POLLIN;
+	fds[1].fd = sfd;
+	fds[1].events = POLLIN;
+	for (;;) {
+		if (poll(fds, 2, -1) < 0 && errno != EINTR)
+			_exit(127);
+		if (fds[1].revents & POLLIN) {
+			if (read(sfd, &si, sizeof(si)) < 0 && errno != EAGAIN)
+				_exit(127);
+			(void)view_holder_children();
+		}
+		if (!(fds[0].revents & (POLLIN | POLLHUP | POLLERR)))
+			continue;
+		got = read(hold, buf, sizeof(buf));
+		if (got < 0 && (errno == EINTR || errno == EAGAIN))
+			continue;
+		if (got > 0)
+			continue;
+		break;
+	}
+	/* The owner is gone: stop the processes, then end them. */
+	(void)kill(-1, SIGTERM);
+	for (left = VIEW_HOLDER_GRACE_MS; left > 0; left -= 20) {
+		if (!view_holder_children())
+			_exit(0);
+		(void)poll(NULL, 0, 20);
+	}
+	(void)kill(-1, SIGKILL);
+	_exit(0);
+}
+
+int fyai_fsview_holder(const char *const *paths, size_t n, int hold,
+		       int owner, pid_t *waiter, pid_t *init)
+{
+	pid_t first, second, waited;
+	int report[2], status, rc;
+	size_t i;
+
+	if (pipe2(report, O_CLOEXEC))
+		return -1;
+	first = fork();
+	if (first < 0) {
+		close(report[0]);
+		close(report[1]);
+		return -1;
+	}
+	if (!first) {
+		close(report[0]);
+		/* The holder must not keep the pipe that ends it: it ends when the owner closes it. */
+		close(owner);
+		/* The terminal sends no signal to the scope: it has a group of its own. */
+		(void)setpgid(0, 0);
+		if (prctl(PR_SET_PDEATHSIG, SIGKILL))
+			_exit(127);
+		if (view_namespace(true))
+			_exit(127);
+		for (i = 0; i < n; i++)
+			if (view_hide_one(paths[i]))
+				_exit(127);
+		second = fork();
+		if (second < 0)
+			_exit(127);
+		if (!second) {
+			if (prctl(PR_SET_PDEATHSIG, SIGKILL))
+				_exit(127);
+			(void)mount("proc", "/proc", "proc",
+				    MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
+			view_holder_init(hold);
+		}
+		/* The pid that the owner joins, as the owner names it. */
+		if (write(report[1], &second, sizeof(second)) != sizeof(second))
+			_exit(127);
+		close(report[1]);
+		do {
+			waited = waitpid(second, &status, 0);
+		} while (waited < 0 && errno == EINTR);
+		_exit(view_wait_status(waited, status));
+	}
+	close(report[1]);
+	do {
+		rc = (int)read(report[0], &second, sizeof(second));
+	} while (rc < 0 && errno == EINTR);
+	close(report[0]);
+	if (rc != (int)sizeof(second) || second <= 0) {
+		(void)waitpid(first, NULL, 0);
+		errno = EPERM;
+		return -1;
+	}
+	*waiter = first;
+	*init = second;
+	return 0;
 }
 
 int fyai_fsview_drop_capabilities(void)
@@ -1595,6 +1742,19 @@ int fyai_fsview_unmount(const struct fyai_fsview *view, const char *target,
 	(void)view;
 	(void)target;
 	(void)identity;
+	errno = ENOTSUP;
+	return -1;
+}
+
+int fyai_fsview_holder(const char *const *paths, size_t n, int hold,
+		       int owner, pid_t *waiter, pid_t *init)
+{
+	(void)paths;
+	(void)n;
+	(void)hold;
+	(void)owner;
+	(void)waiter;
+	(void)init;
 	errno = ENOTSUP;
 	return -1;
 }

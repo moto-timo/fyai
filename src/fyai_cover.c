@@ -60,17 +60,52 @@ void fyai_cover_abandon(struct fyai_cover *cover)
 	cover->owner = false;
 }
 
+/* Reap the holders that ended; the others wait for a later call. */
+static void cover_reap(struct fyai_cover *cover)
+{
+	size_t i;
+
+	for (i = 0; i < FYAI_COVER_RETIRED_MAX; i++) {
+		if (cover->retired[i] > 0 &&
+		    waitpid(cover->retired[i], NULL, WNOHANG) != 0)
+			cover->retired[i] = 0;
+	}
+}
+
+/* Keep the child of an ended holder to reap: it ends after its grace time. */
+static void cover_retire(struct fyai_cover *cover, pid_t pid)
+{
+	size_t i;
+
+	if (pid <= 0)
+		return;
+	for (i = 0; i < FYAI_COVER_RETIRED_MAX; i++) {
+		if (cover->retired[i] <= 0) {
+			cover->retired[i] = pid;
+			return;
+		}
+	}
+	/* The list is full: wait for the oldest, so that no holder stays a zombie. */
+	(void)waitpid(cover->retired[0], NULL, 0);
+	memmove(&cover->retired[0], &cover->retired[1],
+		(FYAI_COVER_RETIRED_MAX - 1) * sizeof(cover->retired[0]));
+	cover->retired[FYAI_COVER_RETIRED_MAX - 1] = pid;
+}
+
 void fyai_cover_release(struct fyai_cover *cover)
 {
 	/* The pipe ends, the holder reads the end, and the namespaces go with it. */
 	if (cover->owner) {
 		(void)unsetenv(COVER_ENV_HOLDER);
 		(void)unsetenv(COVER_ENV_PATHS);
+		cover_retire(cover, cover->waiter);
 	}
+	cover->waiter = 0;
 	fyai_cover_abandon(cover);
 	free(cover->paths);
 	cover->paths = NULL;
 	cover->holder = 0;
+	cover_reap(cover);
 }
 
 static bool holder_alive(pid_t pid)
@@ -351,6 +386,7 @@ static int holder_start(struct fyai_cover *cover, const char *const *paths, size
 	cover->owner = true;
 	cover->hold_fd = hold[1];
 	cover->paths = joined;
+	cover->waiter = child;
 	snprintf(num, sizeof(num), "%d", (int)pid);
 	(void)setenv(COVER_ENV_HOLDER, num, 1);
 	(void)setenv(COVER_ENV_PATHS, joined, 1);
@@ -402,22 +438,80 @@ static bool userns_ok(struct fyai_cover *cover)
 	return cover->userns;
 }
 
+/*
+ * Start a holder that this program makes, where it may make namespaces. The init
+ * of the holder reads a pipe that this process keeps open and ends with it.
+ */
+static int userns_holder_start(struct fyai_cover *cover, const char *const *paths, size_t n)
+{
+	int hold[2] = { -1, -1 };
+	char num[32], *joined;
+	size_t i, len = 1;
+	pid_t waiter, init;
+
+	if (cover_pipe(hold))
+		return -1;
+	if (fyai_fsview_holder(paths, n, hold[0], hold[1], &waiter, &init)) {
+		close(hold[0]);
+		close(hold[1]);
+		return -1;
+	}
+	close(hold[0]);
+	for (i = 0; i < n; i++)
+		len += strlen(paths[i]) + 1;
+	joined = calloc(1, len);
+	if (!joined) {
+		close(hold[1]);
+		cover_retire(cover, waiter);
+		return -1;
+	}
+	for (i = 0; i < n; i++) {
+		strcat(joined, paths[i]);
+		strcat(joined, "\n");
+	}
+	free(cover->paths);
+	cover->holder = init;
+	cover->owner = true;
+	cover->hold_fd = hold[1];
+	cover->paths = joined;
+	cover->waiter = waiter;
+	snprintf(num, sizeof(num), "%d", (int)init);
+	(void)setenv(COVER_ENV_HOLDER, num, 1);
+	(void)setenv(COVER_ENV_PATHS, joined, 1);
+	return 0;
+}
+
 enum fyai_cover_method fyai_cover_select(struct fyai_cover *cover, const char *mode,
-				  const char *const *paths, size_t n, pid_t *holder)
+				  const char *const *paths, size_t n, pid_t *holder,
+				  enum fyai_cover_start start)
 {
 	bool auto_mode = !mode || !strcmp(mode, "auto");
 
 	*holder = 0;
+	cover_reap(cover);
 	if (mode && !strcmp(mode, "none"))
 		return FYAI_COVER_NONE;
 	/* The holder of this process or an ancestor serves each tool that it starts. */
-	if ((auto_mode || !strcmp(mode, "bwrap")) && holder_alive(cover->holder)) {
+	if (holder_alive(cover->holder)) {
 		*holder = cover->holder;
 		return FYAI_COVER_BWRAP;
 	}
-	if ((auto_mode || !strcmp(mode, "userns")) && userns_ok(cover))
+	if ((auto_mode || !strcmp(mode, "userns")) && userns_ok(cover)) {
+		/* The scope of an exchange: one init for every call of it. */
+		if (start == FYAI_COVER_START_SCOPE && !cover->userns_failed) {
+			if (!userns_holder_start(cover, paths, n)) {
+				if (holder_joinable(cover->holder)) {
+					*holder = cover->holder;
+					return FYAI_COVER_BWRAP;
+				}
+				holder_stop(cover);
+			}
+			cover->userns_failed = true;
+		}
 		return FYAI_COVER_USERNS;
-	if ((auto_mode || !strcmp(mode, "bwrap")) && !cover->bwrap_failed) {
+	}
+	if ((auto_mode || !strcmp(mode, "bwrap")) && !cover->bwrap_failed &&
+	    start != FYAI_COVER_JOIN_ONLY) {
 		if (!holder_start(cover, paths, n)) {
 			if (holder_joinable(cover->holder)) {
 				*holder = cover->holder;
@@ -471,12 +565,14 @@ void fyai_cover_release(struct fyai_cover *cover)
 }
 
 enum fyai_cover_method fyai_cover_select(struct fyai_cover *cover, const char *mode,
-				  const char *const *paths, size_t n, pid_t *holder)
+				  const char *const *paths, size_t n, pid_t *holder,
+				  enum fyai_cover_start start)
 {
 	(void)cover;
 	(void)mode;
 	(void)paths;
 	(void)n;
+	(void)start;
 	*holder = 0;
 	return FYAI_COVER_NONE;
 }

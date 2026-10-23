@@ -176,6 +176,16 @@ int fyai_tools_bang(struct fyai_ctx *ctx, const char *command);
  */
 int fyai_tools_confine(struct fyai_ctx *ctx);
 
+/*
+ * The scope of an exchange (doc/exchange-scope.md). fyai_scope_exchange() says
+ * that an exchange begins or ends: the processes of its tools end with it
+ * unless an object keeps the scope. A terminal session, a monitor and a
+ * background sub-agent pin the scope from the time they start until they go.
+ */
+void fyai_scope_exchange(struct fyai_ctx *ctx, bool begin);
+void fyai_scope_pin(struct fyai_ctx *ctx);
+void fyai_scope_unpin(struct fyai_ctx *ctx);
+
 /* Told that a program the user runs through fyai ended: its exit code, or
  * the signal that ended it. */
 typedef void (*fyai_tools_exit_fn)(void *userdata, int exit_code, int signal);

@@ -556,6 +556,9 @@ int fyai_config_apply(struct fyai_cfg *cfg, fy_generic root)
 	v = fy_get(root, "sandbox_cover", fy_invalid);
 	cfg->sandbox_cover = fy_gb_intern_string(cfg->gb,
 			fy_is_string(v) ? fy_castp(&v, "") : "auto");
+	v = fy_get(root, "sandbox_scope", fy_invalid);
+	cfg->sandbox_scope = fy_gb_intern_string(cfg->gb,
+			fy_is_string(v) ? fy_castp(&v, "") : "exchange");
 	sb = fy_get(root, "sandbox");
 	if (cfg->sandbox_profile) {
 		cfg->sandbox = fyai_sandbox_profile_policy(cfg, root,
