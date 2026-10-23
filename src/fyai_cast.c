@@ -52,6 +52,11 @@ struct fyai_cast {
 	/* The start of a character that a write cut: per kind of event. */
 	unsigned char hold[2][CAST_UTF8_MAX];
 	size_t nhold[2];
+	/* A synchronized update that has begun and not ended: held until it ends. */
+	struct response_buffer block;
+	bool in_sync;
+	/* The body of the last update that only put the cursor, as it was recorded. */
+	char *noop;
 };
 
 /* Add the repaired text of @in to the text of the event; keep a cut character. */
@@ -163,9 +168,120 @@ static void event(struct fyai_cast *c, const char *kind, int hold,
 	line_write(c, fy_sequence(t, kind, fy_string_size(text, ntext)));
 }
 
+#define CAST_SYNC_BEGIN "\x1b[?2026h"
+#define CAST_SYNC_END "\x1b[?2026l"
+#define CAST_SYNC_LEN 8
+/* A held update that grows past this is recorded as it is. */
+#define CAST_SYNC_MAX (1024 * 1024)
+
+/*
+ * Whether the body of an update only places the cursor and shows or hides it:
+ * a position, then private mode 25. The display writes such an update at each
+ * wake-up of an idle page, and it changes nothing the viewer sees.
+ */
+static bool cast_body_is_cursor(const char *body, size_t len)
+{
+	size_t i = 0;
+
+	if (i + 2 < len && body[i] == '\x1b' && body[i + 1] == '[') {
+		size_t j = i + 2;
+
+		while (j < len && ((body[j] >= '0' && body[j] <= '9') || body[j] == ';'))
+			j++;
+		if (j < len && body[j] == 'H')
+			i = j + 1;
+	}
+	while (i < len) {
+		if (len - i >= 6 && !memcmp(body + i, "\x1b[?25", 5) &&
+		    (body[i + 5] == 'h' || body[i + 5] == 'l'))
+			i += 6;
+		else
+			return false;
+	}
+	return true;
+}
+
+/* Record a held update, or drop one that repeats the last cursor update. */
+static void cast_sync_done(struct fyai_cast *c, const char *block, size_t len)
+{
+	const char *body = block + CAST_SYNC_LEN;
+	size_t blen = len - 2 * CAST_SYNC_LEN;
+	bool cursor = cast_body_is_cursor(body, blen);
+
+	if (cursor && c->noop && strlen(c->noop) == blen && !memcmp(c->noop, body, blen))
+		return;
+	free(c->noop);
+	c->noop = cursor ? strndup(body, blen) : NULL;
+	event(c, "o", 0, block, len);
+}
+
 void fyai_cast_output(struct fyai_cast *c, const void *data, size_t len)
 {
-	event(c, "o", 0, data, len);
+	const char *p = data, *b, *e;
+	size_t used;
+
+	if (!c || c->failed)
+		return;
+	while (len) {
+		if (!c->in_sync) {
+			b = memmem(p, len, CAST_SYNC_BEGIN, CAST_SYNC_LEN);
+			if (!b) {
+				free(c->noop);
+				c->noop = NULL;
+				event(c, "o", 0, p, len);
+				return;
+			}
+			if (b > p) {
+				free(c->noop);
+				c->noop = NULL;
+				event(c, "o", 0, p, (size_t)(b - p));
+			}
+			len -= (size_t)(b - p);
+			p = b;
+			c->in_sync = true;
+			c->block.len = 0;
+		}
+		/* Look for the end where it can start: the held part and this chunk. */
+		used = c->block.len;
+		if (response_buffer_append_data(&c->block, p, len)) {
+			fyai_warning(c->ctx, "cast: out of memory");
+			c->failed = true;
+			return;
+		}
+		e = memmem(c->block.data + (used > CAST_SYNC_LEN ? used - CAST_SYNC_LEN : 0),
+			   c->block.len - (used > CAST_SYNC_LEN ? used - CAST_SYNC_LEN : 0),
+			   CAST_SYNC_END, CAST_SYNC_LEN);
+		if (!e) {
+			if (c->block.len > CAST_SYNC_MAX) {
+				c->in_sync = false;
+				free(c->noop);
+				c->noop = NULL;
+				event(c, "o", 0, c->block.data, c->block.len);
+			}
+			return;
+		}
+		e += CAST_SYNC_LEN;
+		/* What follows the end of the update is the start of the next output. */
+		used = c->block.len - (size_t)(e - c->block.data);
+		cast_sync_done(c, c->block.data, (size_t)(e - c->block.data));
+		c->in_sync = false;
+		p = e;
+		len = used;
+		/* The tail is in the block buffer: keep a copy that the loop can read. */
+		if (len) {
+			char *tail = malloc(len);
+
+			if (!tail) {
+				fyai_warning(c->ctx, "cast: out of memory");
+				c->failed = true;
+				return;
+			}
+			memcpy(tail, p, len);
+			fyai_cast_output(c, tail, len);
+			free(tail);
+		}
+		return;
+	}
 }
 
 void fyai_cast_input(struct fyai_cast *c, const void *data, size_t len)
@@ -205,6 +321,11 @@ void fyai_cast_close(struct fyai_cast *c)
 {
 	if (!c)
 		return;
+	/* An update that never ended is recorded as it is. */
+	if (c->in_sync && c->block.len && !c->failed) {
+		c->in_sync = false;
+		event(c, "o", 0, c->block.data, c->block.len);
+	}
 	/* A character that was never finished is a replacement. */
 	if (c->nhold[0] && !c->failed) {
 		c->nhold[0] = 0;
@@ -219,6 +340,8 @@ void fyai_cast_close(struct fyai_cast *c)
 	if (c->fp)
 		fclose(c->fp);
 	free(c->text.data);
+	free(c->block.data);
+	free(c->noop);
 	free(c);
 }
 
