@@ -20,6 +20,8 @@ printf 'tool-data\n' >"$HOME/.config/tool/settings"
 printf 'conf-data\n' >"$HOME/conf/main"
 printf 'granted-data\n' >"$HOME/tools/granted"
 printf 'other-data\n' >"$HOME/other/data"
+printf 'machine example login me password hunter2\n' >"$HOME/.netrc"
+printf '[user]\n\tname = Tester\n' >"$HOME/.gitconfig"
 
 # shell_with YAML COMMAND: run a command in the shell tool under a profile.
 shell_with() {
@@ -70,6 +72,17 @@ for method in copy overlay; do
 	[ ! -e "$REAL/written" ] || fail "$method wrote the real home"
 	! ls "${TMPDIR:-/tmp}"/fyai-home-* >/dev/null 2>&1 || fail "$method left a home directory"
 done
+
+# The yocto profile of the sample: the tool can make a user namespace, git finds its
+# configuration, and ~/.netrc is not there, so a program that reads it gets "not found"
+# and not "permission denied".
+printf 'sandbox_profile: yocto\n' >"$TEST_DIR/home.yaml"
+run_fyai --config "$TEST_DIR/home.yaml" tool shell '{"command": "unshare -Ur sh -c \"echo nested-ok\" 2>&1; cat ~/.gitconfig; cat ~/.netrc 2>&1"}'
+assert_stdout_contains nested-ok
+assert_stdout_contains Tester
+assert_stdout_contains 'No such file'
+assert_stdout_not_contains 'Permission denied'
+assert_stdout_not_contains hunter2
 
 # A host that cannot mount stops the tool: there is no fallback.
 printf '%s\n' "$(profile overlay)" >"$TEST_DIR/home.yaml"
