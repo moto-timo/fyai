@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- **`list_root`** is a profile key that lets a tool open and list `/`. The `dev`
+  profile has it: the package scripts of a build change to `/` and open `.`.
+
 ### Fixed
 
 - **A failed turn keeps its work.** An error in the tool loop no longer drops
