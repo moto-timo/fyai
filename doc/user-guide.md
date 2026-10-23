@@ -1397,6 +1397,11 @@ start of each turn and at each interrupt, and the records of the trace
 `scope: begin`, a process that started or ended, and each warning and error.
 `asciinema play` shows them as markers, and `jq` finds them by text.
 
+`fyai cast play FILE` shows a recording again in this terminal, with `--speed`
+and `--idle-limit` (a pause longer than the limit is shortened, 2 seconds by
+default). ^C stops it and puts the terminal back. `fyai cast markers FILE` lists
+the markers with their time, and `fyai cast info FILE` shows the header.
+
 The recording holds all that the screen showed, thus it can hold text that you
 would not share. fyai makes the file with mode 0600. The option is not passed to
 the programs that fyai starts, so they do not record to the same file. The bytes
