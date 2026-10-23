@@ -216,8 +216,9 @@
             Start the command detached and return at once, for a server or any program that runs
             on while you work. The command gets a session of its own, and /dev/null for standard
             input, output and error: redirect its output to a file to read it later. It has no
-            time limit and no terminal, and it ends with the exchange, or earlier if it stops;
-            `list` with kind `daemons` names it. `tty`, `name` and `timeout` do not apply to it.
+            time limit and no terminal, and it ends with the exchange, or earlier if it stops.
+            `name` labels it (letters, digits, '-' or '_'): `list` with kind `daemons` shows the
+            label, and `cancel` with that name stops it. `tty` and `timeout` do not apply to it.
         description:
           type: string
           description: >-
@@ -387,8 +388,10 @@
     name: cancel
     description: >-
       Stop something you started in the background, by its name: a named `wait`, a sub-agent (also
-      one started with `background`), a `monitor`, a question, an agent message receipt, or an
-      open terminal session. Cancelling a receipt stops waiting for its acknowledgement; the
+      one started with `background`), a `monitor`, a question, an agent message receipt, an
+      open terminal session, or a daemon: a command that you started with `background` under a
+      `name` (all processes with that name), or any process that `list` shows under `daemons`, by
+      its pid. A daemon gets SIGTERM, and SIGKILL after the grace time if it stays. Cancelling a receipt stops waiting for its acknowledgement; the
       message may still be queued. Stopping a sub-agent
       also stops the processes it started, and you are told in a new turn that it ended. A terminal
       session is killed at once; use `shell_close` instead if the program should save its work. Use
@@ -402,7 +405,7 @@
             Name of the wait, sub-agent, monitor, question, message receipt or session to cancel.
         kind:
           type: string
-          enum: [wait, agent, shell, monitor, question, message]
+          enum: [wait, agent, shell, monitor, question, message, daemon]
           description: >-
             What the name refers to. Omit it when the name is unique among your waits, sub-agents,
             monitors, questions, message receipts and sessions.

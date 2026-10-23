@@ -3428,8 +3428,11 @@ commands:
           x-fyai-meta: N
 
   - command: kill
-    title: stop a shell session or sub-agent
-    description: Stop the live shell session or sub-agent NAME.
+    title: stop a shell session, a sub-agent or a daemon
+    description: |
+      Stop the live shell session or sub-agent NAME. A name that neither has is
+      a daemon: the label that a `background` call gave it, or the pid that
+      `list daemons` shows. It gets SIGTERM, and SIGKILL after `sandbox_grace_ms`.
     surfaces: [session]
     handler: kill
     render:
@@ -3442,7 +3445,7 @@ commands:
         name:
           type: string
           minLength: 1
-          description: the session or sub-agent
+          description: the session, sub-agent or daemon (its label or pid)
           x-fyai-positional: 0
           x-fyai-meta: NAME
 

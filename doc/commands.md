@@ -6159,17 +6159,20 @@ newest group; the groups of the session are kept, the newest sixteen.
 
 ## /kill
 
-stop a shell session or sub-agent
+stop a shell session, a sub-agent or a daemon
 
 **Usage:** `/kill NAME`
 
-Stop the live shell session or sub-agent NAME.
+Stop the live shell session or sub-agent NAME. A name that neither has is
+a daemon: the label that a `background` call gave it, or the pid that
+`list daemons` shows. It gets SIGTERM, and SIGKILL after `sandbox_grace_ms`.
+
 
 ### Arguments
 
 | Argument | Description |
 | --- | --- |
-| `NAME` | the session or sub-agent |
+| `NAME` | the session, sub-agent or daemon (its label or pid) |
 
 ### Options
 

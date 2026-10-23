@@ -306,12 +306,14 @@ fy_generic fyai_orphan_rows(const struct fyai_ctx *ctx, struct fy_generic_builde
 {
 	const struct fyai_orphan *o;
 	fy_generic rows = fy_sequence(gb);
-	char name[32];
+	char name[32], label[64];
 
 	for (o = ctx->orphans; o; o = o->next) {
 		fyai_orphan_name(o->pid, name, sizeof(name));
+		fyai_orphan_label(o->pid, label, sizeof(label));
 		rows = fy_append(gb, rows, fy_mapping(gb, "pid", (long long)o->pid,
 						      "name", fy_value(gb, name),
+						      "label", fy_value(gb, label),
 						      "held", "tracked"));
 	}
 	return rows;

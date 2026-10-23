@@ -245,6 +245,9 @@ static bool fyai_shell_named_call(struct fyai_ctx *ctx, fy_generic tool_call)
 	args = fyai_tool_call_args(ctx, tool_call);
 	if (!fy_is_mapping(args))
 		return false;
+	/* The name of a command in the background labels its daemon. */
+	if (fy_get(args, "background", false))
+		return false;
 	name = fy_get(args, "name", "");
 	return !fy_str_empty(name);
 }
@@ -269,6 +272,8 @@ bool fyai_shell_session_display(struct fyai_ctx *ctx, fy_generic tool_call)
 		return true;
 	return fyai_shell_session_call(ctx, tool_call);
 }
+
+static bool fyai_shell_session_name_valid(const char *name);
 
 /* Format the invocation Markdown through the same emitter used by history. */
 static char *fyai_format_tool_header(struct fyai_ctx *ctx, const char *tool,
@@ -1334,13 +1339,14 @@ err:
 /*
  * The command that starts @command detached, for a call with `background`. The
  * program gets a session of its own (setsid, where there is one) and /dev/null for
- * standard input, output and error. The shell that starts it waits until it has
+ * standard input, output and error. @label, which is valid and safe to put in a
+ * shell word, is its FYAI_DAEMON: `list daemons` shows it, and a stop can name it. The shell that starts it waits until it has
  * the session and has closed the pipe of the call, so the group of the call, which
  * the call ends when it returns, no longer holds it. Returns an allocated string,
  * or NULL.
  */
 static char *fyai_shell_background_command(const char *shell, bool login,
-					   const char *command)
+					   const char *command, const char *label)
 {
 	struct response_buffer cmd = { 0 };
 	int rc;
@@ -1352,7 +1358,9 @@ static char *fyai_shell_background_command(const char *shell, bool login,
 	 * The program starts in a subshell that this shell waits for: the subshell
 	 * prints "ok" once it has its session, and then closes the pipe of the call.
 	 */
-	rc = rc ?: response_buffer_append(&cmd, ": $( $S /bin/sh -c '"
+	rc = rc ?: response_buffer_append(&cmd, ": $( FYAI_DAEMON=");
+	rc = rc ?: response_buffer_append(&cmd, label);
+	rc = rc ?: response_buffer_append(&cmd, " $S /bin/sh -c '"
 		"echo ok; "				/* the waiting shell reads this */
 		"exec >/dev/null 2>&1 </dev/null; "	/* nothing is shared with the call */
 		"exec \"$0\" \"$1\" \"$2\"' ");	/* the shell, its flag, the command */
@@ -1379,6 +1387,7 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 	fy_generic command, workdir;
 	size_t budget, out_bytes, err_bytes;
 	char *detached = NULL;
+	const char *label;
 	bool background;
 	char why_buf[FYAI_CHILD_START_TEXT_MAX];
 	const char *start_why;
@@ -1402,8 +1411,15 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 	/* A command in the background has no terminal and no limit of its own. */
 	background = fy_get(args, "background", false);
 	if (background) {
+		label = fy_get(args, "name", "");
+		if (!fy_str_empty(label) && !fyai_shell_session_name_valid(label)) {
+			ret = strdup("tool error: the name of a command in the background "
+				     "is letters, digits, '-' or '_'");
+			goto out;
+		}
 		detached = fyai_shell_background_command(opts.shell, opts.login,
-							 fy_castp(&command, ""));
+							 fy_castp(&command, ""),
+							 fy_str_empty(label) ? "''" : label);
 		fyai_error_check(ctx, detached, out,
 				 "shell: could not make the command for the background");
 		command = fy_value(ctx->transient_gb, detached);
@@ -4645,6 +4661,13 @@ static char *fyai_cancel_tool(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 		*okp = true;
 		return strdup(fy_sprintfa("[wait '%s' cancelled]", name));
 	}
+	/* A daemon of the scope, by its label or its pid, when nothing else has the name. */
+	if ((!*kind || !strcmp(kind, "daemon")) && fyai_scope_stop(ctx, name)) {
+		*okp = true;
+		return strdup(fy_sprintfa("[daemon '%s' was asked to stop; it is ended after "
+					  "%lld ms if it stays]", name,
+					  (long long)ctx->cfg->sandbox_grace_ms));
+	}
 	return strdup(fy_sprintfa("tool error: nothing named '%s' is running"
 				  "%s%s; use list to see what is open", name,
 				  *kind ? " as a " : "", kind));
@@ -6066,7 +6089,7 @@ static fy_generic fyai_list_views(struct fyai_ctx *ctx, struct fy_generic_builde
 fy_generic fyai_scope_rows(struct fyai_ctx *ctx, struct fy_generic_builder *gb)
 {
 	pid_t pids[64];
-	char name[32];
+	char name[32], label[64];
 	size_t n, i;
 	fy_generic rows;
 
@@ -6074,8 +6097,10 @@ fy_generic fyai_scope_rows(struct fyai_ctx *ctx, struct fy_generic_builder *gb)
 	n = fyai_cover_members(&ctx->cover, pids, ARRAY_SIZE(pids));
 	for (i = 0; i < n; i++) {
 		fyai_orphan_name(pids[i], name, sizeof(name));
+		fyai_orphan_label(pids[i], label, sizeof(label));
 		rows = fy_append(gb, rows, fy_mapping(gb, "pid", (long long)pids[i],
 						      "name", fy_value(gb, name),
+						      "label", fy_value(gb, label),
 						      "held", "scope"));
 	}
 	return rows;
@@ -7763,7 +7788,11 @@ int fyai_tools_kill(struct fyai_ctx *ctx, const char *name,
 			*actionp = "stopping agent";
 			return 0;
 		}
-		fyai_error(ctx, "kill: no active shell session or sub-agent is "
+		if (fyai_scope_stop(ctx, name)) {
+			*actionp = "stopping daemon";
+			return 0;
+		}
+		fyai_error(ctx, "kill: no active shell session, sub-agent or daemon is "
 			   "called '%s'", name);
 		return -1;
 	}
