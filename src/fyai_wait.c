@@ -499,7 +499,7 @@ static enum fyai_wait_for_kind fyai_wait_for_resolve(struct fyai_ctx *ctx,
 	if (fyai_monitor_running(ctx, target) ||
 	    fyai_event_pending_prefix(ctx, fy_sprintfa("[monitor '%s'", target)))
 		return FYAI_WAIT_FOR_MONITOR;
-	(void)fyai_shell_session_ended_text(ctx, target, &known);
+	free(fyai_shell_session_ended_text(ctx, target, &known));
 	if (known)
 		return FYAI_WAIT_FOR_SHELL;
 	if (fyai_wait_exists(ctx, target) ||
