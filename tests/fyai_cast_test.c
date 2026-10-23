@@ -21,6 +21,7 @@
 
 FYAI_TEST_ENTRY(cast, events, cast_events)
 FYAI_TEST_ENTRY(cast, utf8_repair, cast_utf8_repair)
+FYAI_TEST_ENTRY(cast, idle_frames, cast_idle_frames)
 
 /* Make a recording in a new directory and return its text. */
 static char *record(void (*fill)(struct fyai_cast *), char *path, size_t psz)
@@ -146,6 +147,64 @@ int cast_utf8_repair(void)
 	FYAI_TCHECK(strstr(text, ", \"o\", \"\xe2\x96\x8c\xef\xbf\xbd" "ok\"]\n"));
 	FYAI_TCHECK(strstr(text, ", \"o\", \"\xef\xbf\xbd" "A\"]\n") ||
 		    strstr(text, ", \"o\", \"A\"]\n"));
+	free(text);
+	cleanup(path);
+	return 0;
+}
+
+#define SYNC_BEGIN "\x1b[?2026h"
+#define SYNC_END "\x1b[?2026l"
+#define CURSOR_BODY "\x1b[3;4H\x1b[?25h"
+
+static void idle_frame(struct fyai_cast *c)
+{
+	/* The begin and the rest arrive in two writes, as the terminal writes them. */
+	fyai_cast_output(c, SYNC_BEGIN, strlen(SYNC_BEGIN));
+	fyai_cast_output(c, CURSOR_BODY SYNC_END, strlen(CURSOR_BODY SYNC_END));
+}
+
+static void real_frame(struct fyai_cast *c, const char *text)
+{
+	fyai_cast_output(c, SYNC_BEGIN, strlen(SYNC_BEGIN));
+	fyai_cast_output(c, text, strlen(text));
+	fyai_cast_output(c, SYNC_END, strlen(SYNC_END));
+}
+
+static void fill_idle(struct fyai_cast *c)
+{
+	real_frame(c, "first");
+	idle_frame(c);
+	idle_frame(c);
+	idle_frame(c);
+	real_frame(c, "second");
+	idle_frame(c);
+	idle_frame(c);
+	/* An update that never ends is recorded when the recording closes. */
+	fyai_cast_output(c, SYNC_BEGIN "open", strlen(SYNC_BEGIN "open"));
+}
+
+static size_t count(const char *text, const char *needle)
+{
+	size_t n = 0;
+
+	while ((text = strstr(text, needle))) {
+		n++;
+		text += strlen(needle);
+	}
+	return n;
+}
+
+int cast_idle_frames(void)
+{
+	char path[256];
+	char *text = record(fill_idle, path, sizeof(path));
+
+	check_lines(text);
+	/* The text of an update stays, and a cursor update is recorded once for each change. */
+	FYAI_TCHECK(strstr(text, "first"));
+	FYAI_TCHECK(strstr(text, "second"));
+	FYAI_TCHECK(count(text, "[3;4H") == 2);
+	FYAI_TCHECK(strstr(text, "open"));
 	free(text);
 	cleanup(path);
 	return 0;
