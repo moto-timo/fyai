@@ -1,0 +1,134 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "c1",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t1",
+                  "type": "function",
+                  "function": {
+                    "name": "monitor",
+                    "arguments": "{\"name\": \"long\", \"command\": \"echo watched\", \"timeout\": 1800000}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c2",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t2",
+                  "type": "function",
+                  "function": {
+                    "name": "wait",
+                    "arguments": "{\"for\": \"long\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c3",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t3",
+                  "type": "function",
+                  "function": {
+                    "name": "monitor",
+                    "arguments": "{\"name\": \"short\", \"command\": \"sleep 60\", \"timeout\": 1000}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c4",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t4",
+                  "type": "function",
+                  "function": {
+                    "name": "wait",
+                    "arguments": "{\"for\": \"short\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "f",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "finished."
+            },
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    }
+  ]
+}
