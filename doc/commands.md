@@ -2014,11 +2014,19 @@ shows the header, which says what the program knew when it started.
 
 play a recording in this terminal
 
-**Usage:** `fyai cast play [--speed N] [--idle-limit SECONDS] FILE`
+**Usage:** `fyai cast play [--speed N] [--idle-limit SECONDS] [--plain] FILE`
 
-Write the recording to this terminal with the timing that it has. A
-pause longer than `--idle-limit` is shortened to it. ^C stops the
-playback and puts the terminal back as it was.
+On a terminal, open a player on the alternate screen: space plays and
+pauses, the arrows step a second (with shift, ten), up and down change
+the speed, `[` and `]` jump to the previous and the next marker, `,` and
+`.` step a frame, `e` lists the markers, `c` shows the controls, and `q`
+or Escape leaves. A key or a click shows the controls, which go after a
+time with no input. The mouse works: a click on the timeline seeks, a
+click on a control acts, and the wheel moves through the recording.
+With `--plain`, or when the output is a pipe, write the recording to
+the output with the timing that it has instead. A pause longer than
+`--idle-limit` is shortened to it, and ^C stops and puts the terminal
+back as it was.
 
 
 ### Arguments
@@ -2033,6 +2041,7 @@ playback and puts the terminal back as it was.
 | --- | --- |
 | `--speed N` | how fast to play; 2 is twice as fast; default 1 |
 | `--idle-limit SECONDS` | the longest pause in seconds, 0 for no limit; default 2 |
+| `--plain` | write the bytes with their timing, with no controls |
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 

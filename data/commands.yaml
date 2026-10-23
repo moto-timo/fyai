@@ -2144,9 +2144,17 @@ commands:
       - command: play
         title: play a recording in this terminal
         description: |
-          Write the recording to this terminal with the timing that it has. A
-          pause longer than `--idle-limit` is shortened to it. ^C stops the
-          playback and puts the terminal back as it was.
+          On a terminal, open a player on the alternate screen: space plays and
+          pauses, the arrows step a second (with shift, ten), up and down change
+          the speed, `[` and `]` jump to the previous and the next marker, `,` and
+          `.` step a frame, `e` lists the markers, `c` shows the controls, and `q`
+          or Escape leaves. A key or a click shows the controls, which go after a
+          time with no input. The mouse works: a click on the timeline seeks, a
+          click on a control acts, and the wheel moves through the recording.
+          With `--plain`, or when the output is a pipe, write the recording to
+          the output with the timing that it has instead. A pause longer than
+          `--idle-limit` is shortened to it, and ^C stops and puts the terminal
+          back as it was.
         handler: cast_play
         flags: [no-storage]
         arguments:
@@ -2172,6 +2180,9 @@ commands:
               default: 2
               description: the longest pause in seconds, 0 for no limit
               x-fyai-meta: SECONDS
+            plain:
+              type: boolean
+              description: write the bytes with their timing, with no controls
       - command: markers
         title: list the markers of a recording
         description: List each marker of the recording with the time at which it was recorded.

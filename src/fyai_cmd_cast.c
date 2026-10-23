@@ -21,7 +21,10 @@
 
 #include "fyai.h"
 #include "fyai_cmd.h"
+#include <unistd.h>
+
 #include "fyai_cast_file.h"
+#include "fyai_cast_player.h"
 #include "fyai_cmd_int.h"
 #include "fyai_event.h"
 #include "fyai_sink.h"
@@ -65,6 +68,10 @@ int fyai_cmd_cast_play(struct fyai_cmd_call *call, fy_generic *result)
 	int rc = -1;
 
 	(void)result;
+	/* A person at a terminal gets the player; a pipe or --plain gets the bytes. */
+	if (!fyai_cmd_arg_bool(call, "plain") && isatty(STDIN_FILENO) &&
+	    isatty(STDOUT_FILENO))
+		return fyai_cast_play_interactive(ctx, path, speed);
 	if (fyai_cast_file_open(call->ctx, &f, path, &header))
 		goto out;
 	if (speed <= 0)
