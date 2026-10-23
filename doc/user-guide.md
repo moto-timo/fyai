@@ -1374,24 +1374,34 @@ yourself when you no longer need it.
 
 ### Record the screen
 
-Use `FYAI_CAST` when the display shows a glitch that you cannot see again, such
-as a row that is painted wrong after a resize. The variable names a file, or a
-directory that gets a file for the process. An interactive session records
-what the terminal received as an
+Use `--cast FILE` when the display shows a glitch that you cannot see again,
+such as a row that is painted wrong after a resize. An interactive session
+records what the terminal received as an
 [asciicast](https://docs.asciinema.org/manual/asciicast/v2/) file.
 
 ```sh
-FYAI_CAST=/tmp/casts fyai            # /tmp/casts/fyai-PID-TIME.cast
-asciinema play /tmp/casts/fyai-*.cast
+fyai --cast /tmp/glitch.cast
+asciinema play /tmp/glitch.cast
 ```
 
 The file holds the bytes of the UI, a resize event when the window changes, and
-a marker at the start of each turn and at each interrupt. The keys that you type
-are not recorded. The recording holds all that the screen showed, thus it can
-hold text that you would not share. fyai makes the file with mode 0600 and
-removes the variable from the environment of the programs that it starts, so
-they do not record to the same file. The bytes that fyai writes before the UI
-opens, such as the query of the terminal, are not in the file.
+markers. The keys that you type are not recorded. A page that has nothing new to
+draw writes an update that only places the cursor; the recording leaves out a
+repeat of it, so the file grows with what the screen shows.
+
+The header has a member `fyai` with what the program knew at the start: the
+version, the process, the branch, the model, the sandbox profile and the scope.
+The markers say what the program did while the screen changed: `turn`, at the
+start of each turn and at each interrupt, and the records of the trace
+(`$FYAI_TRACE`), such as `model: request`, `turn: end`, `tool: shell start`,
+`scope: begin`, a process that started or ended, and each warning and error.
+`asciinema play` shows them as markers, and `jq` finds them by text.
+
+The recording holds all that the screen showed, thus it can hold text that you
+would not share. fyai makes the file with mode 0600. The option is not passed to
+the programs that fyai starts, so they do not record to the same file. The bytes
+that fyai writes before the UI opens, such as the query of the terminal, are not
+in the file.
 
 ### Crash backtrace
 

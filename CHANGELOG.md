@@ -9,6 +9,11 @@
 - **The top row of the prompt names the sandbox profile.** The new `{sandbox}` value of
   `display/prompt_top`, which the default row ends with, is ` · sandbox PROFILE`, or
   ` · no sandbox` when nothing confines the tools.
+- **`--cast FILE`** records the screen of an interactive session, and replaces
+  the environment variable `FYAI_CAST`. The recording leaves out a repeated
+  cursor update of an idle page. Its header says what the program knew at the
+  start, and its markers say what the program did: requests, the end of a turn,
+  tool calls, and each warning and error.
 
 ### Fixed
 
