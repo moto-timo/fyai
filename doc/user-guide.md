@@ -1257,6 +1257,31 @@ cannot change it. See `doc/exchange-scope.md`.
 `sandbox_grace_ms` is the time that these processes have to stop after SIGTERM before
 SIGKILL (5000 by default). Give a build server more.
 
+A sandbox profile can give the tools a home of their own. fyai mounts a new tree
+over the real home in the namespace of each tool, so `HOME` and every path under it
+stay as they are, and the tool sees only the tree:
+
+```yaml
+sandbox_profiles:
+  private-home:
+    extends: dev
+    home:
+      private: true            # a new tree over ~, removed at the end
+      copy: [~/.bashrc, ~/.gitconfig, ~/.vimrc, ~/.config/nvim]
+      env: [CARGO_HOME, "GIT_CONFIG_GLOBAL=~/.gitconfig"]
+      method: overlay          # or copy
+    mounts:                    # other mounts, made after the home
+      - { kind: bind, source: /dev/dri, mode: rw }
+```
+
+Each path of `copy` and each variable of `env` gives the tools a private version at the
+same place. A directory is an overlay of the original, so nothing is copied and the
+original never changes; with `method: copy` it is a copy that shares the blocks of the
+original where the file system can. The paths that the sandbox grants under the home,
+the project among them, are mounted into the tree, so they stay visible. A path under a
+`deny` entry is left out. `mounts` makes other binds and overlays. There is no fallback:
+a host that cannot make a namespace stops the tool and says why.
+
 `sandbox_cover` chooses how the tool gets the namespaces. `auto` (the default) tries
 `userns`, where the tool makes them itself, then `bwrap`, where fyai starts one
 bubblewrap process that holds them and each tool joins them. `none` leaves the arena

@@ -26,6 +26,18 @@
   names what a scope holds. See `doc/exchange-scope.md`.
 - **`sandbox_grace_ms`** sets the time that the processes of a scope have to stop
   after SIGTERM.
+- **A home of its own for the tools, and mounts in a profile.** A sandbox profile can
+  set `home: {private: true}`. A new tree is mounted over the real home in the
+  namespace of the tool, so `HOME` and the paths under it are unchanged, and the
+  tool sees only the tree. `copy` names files and directories of the real home, such
+  as `~/.bashrc` or `~/.config/nvim`, and `env` names variables that hold a path,
+  such as `CARGO_HOME`. The tools get a private version of each at the same place. A
+  directory is an overlay of the original, so nothing is copied and the original
+  never changes; `method: copy` copies it and shares blocks where the file system
+  can, with the code of the content store. The paths that the sandbox grants under
+  the home, the project among them, stay visible. A path under a `deny` entry is not
+  given. `mounts` makes other binds and overlays. A host that cannot make a namespace
+  stops the tool: there is no fallback.
 - **`background` for `exec_command`** starts the command detached: a session of its own,
   `/dev/null` for standard input, output and error, and the call returns at once. The
   command lives for the exchange, like any process that a tool leaves, and `list daemons`

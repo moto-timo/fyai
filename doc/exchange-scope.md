@@ -172,6 +172,24 @@ the processes, up to the grace time, before it exits. It waits for no one when
 no process remains. Without this wait the exit of the invocation ended the
 namespace at once, and the processes got SIGKILL with no cleanup.
 
+## The mounts of a profile
+
+A profile can mount paths in the namespace of its tools: `mounts`, and the private
+home (`home`, in `doc/user-guide.md`), which is a tree mounted over the real home.
+The invocation makes the tree and the list of mounts before the first tool call
+(`fyai_home_ensure()`), in the temporary directory unless `dir` names one, and
+removes it at the end. Each tool child makes the mounts when it joins the scope, and
+a mount that exists is kept. A directory of `copy` or `env` is an overlay of the
+original, or with `method: copy` a copy that shares blocks with it
+(`fyai_cas_clone_state()`). Each path that the sandbox grants under the home is
+mounted into the tree first, so it stays visible. There is no fallback: where no
+namespace is possible, the tool stops.
+
+The removal runs outside the namespaces, after the holder has ended
+(`fyai_cover_drain()`), and never inside a mount, which can show the project. The
+`tool` verb joins the namespaces itself, so it forks first and the parent removes the
+tree (`fyai_fsview_outer()`).
+
 ## Interaction with other parts
 
 - **Landlock.** A detached process keeps the Landlock domain of the call that
