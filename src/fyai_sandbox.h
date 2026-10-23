@@ -70,6 +70,8 @@ struct fyai_sandbox_mount {
 	const char *upper;
 	const char *work;
 	bool readonly;
+	/* Make it after the procfs of the namespace is mounted, which hides what is below /proc. */
+	bool late;
 };
 
 /* One filesystem grant. */

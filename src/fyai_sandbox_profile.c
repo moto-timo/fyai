@@ -170,6 +170,7 @@ static fy_generic overlay(struct fyai_cfg *cfg, fy_generic base, fy_generic over
 	fy_generic list_root = fy_get(over, "list_root", fy_invalid);
 	fy_generic home = fy_get(over, "home", fy_invalid);
 	fy_generic mounts = fy_get(over, "mounts", fy_invalid);
+	fy_generic expose = fy_get(base, "expose", fy_invalid);
 
 	if (!fy_is_sequence(deny))
 		deny = fy_get(base, "deny", fy_invalid);
@@ -205,6 +206,13 @@ static fy_generic overlay(struct fyai_cfg *cfg, fy_generic base, fy_generic over
 		home = fy_get(base, "home", fy_invalid);
 	if (fy_is_mapping(home))
 		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "home"), home);
+	if (!fy_is_sequence(expose))
+		expose = fy_sequence(cfg->gb);
+	/* `expose` adds to that of the profile that `extends`, as `allow` does. */
+	fy_foreach(e, fy_get(over, "expose", fy_invalid))
+		expose = fy_append(cfg->gb, expose, e);
+	if (fy_len(expose))
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "expose"), expose);
 	if (!fy_is_sequence(mounts))
 		mounts = fy_get(base, "mounts", fy_invalid);
 	if (fy_is_sequence(mounts))
@@ -327,7 +335,7 @@ fy_generic fyai_sandbox_profile_policy(struct fyai_cfg *cfg, fy_generic root,
 {
 	fy_generic policy;
 	bool ok = true;
-	fy_generic deny, allow, home, out, mounts;
+	fy_generic deny, allow, home, out, mounts, e;
 
 	policy = profile_compose(cfg, root, profile_builtin_doc(cfg), name, 0);
 	if (fy_is_invalid(policy))
@@ -345,6 +353,16 @@ fy_generic fyai_sandbox_profile_policy(struct fyai_cfg *cfg, fy_generic root,
 			 "list_root", fy_get(policy, "list_root", false));
 	if (fy_is_mapping(home))
 		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "home"), home);
+	fy_foreach(e, fy_get(policy, "expose", fy_invalid)) {
+		if (!fy_any_equal(e, "userns")) {
+			fyai_cfg_error(cfg, "sandbox profile '%s': unknown exposure '%s'", name,
+				       fy_str(e) ? fy_str(e) : "?");
+			return fy_invalid;
+		}
+	}
+	if (fy_is_sequence(fy_get(policy, "expose", fy_invalid)))
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "expose"),
+			       fy_get(policy, "expose", fy_invalid));
 	mounts = expand_mounts(cfg, fy_get(policy, "mounts", fy_invalid), name, &ok);
 	if (!ok)
 		return fy_invalid;

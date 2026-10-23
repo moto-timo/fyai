@@ -282,16 +282,20 @@ sandbox_profiles:
     network:
       tcp: { ports: [80, 443, 9418] }     # git and the package registries.
       udp: { ports: [53] }                # DNS on ABI 10.
+  build:
+    description: the dev profile, and a program may make a user namespace (BitBake, Yocto)
+    extends: dev
+    expose: [userns]     # Needs a cover (sandbox_cover): a PID namespace and read-only /proc/sys.
   dev-view:
     description: the dev profile, with the session in a view of the project
     extends: dev
     view: true           # Changes stay in the view until the session ends cleanly.
-  # A home of its own for the tools. A tree is mounted over the real home in the
-  # namespace of the tool: HOME and its paths stay as they are, and the tool sees
-  # only what is listed, and what the sandbox grants. It needs a cover.
-  # build:
+  # A home of its own for the tools, on top of `build`. A tree is mounted over the
+  # real home in the namespace of the tool: HOME and its paths stay as they are, and
+  # the tool sees only what is listed, and what the sandbox grants. It needs a cover.
+  # build-home:
   #   description: a build with a private home
-  #   extends: dev
+  #   extends: build
   #   home:
   #     private: true
   #     copy: [~/.bashrc, ~/.gitconfig, ~/.vimrc, ~/.config/nvim]

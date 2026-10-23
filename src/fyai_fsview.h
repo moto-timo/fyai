@@ -118,12 +118,13 @@ int fyai_fsview_hide(const char *const *paths, size_t n,
 		     const struct fyai_sandbox_mount *mount, size_t mount_n);
 
 /*
- * Make each of the @n mounts in order, in the mount namespace of this process,
- * which must hold the capabilities to mount. A mount that exists is left as it
- * is, so the calls of a scope that share a namespace make it once. Returns 0, or
- * -1 with errno set at the first mount that fails.
+ * Make each of the @n mounts whose `late` is @late, in order, in the mount
+ * namespace of this process, which must hold the capabilities to mount. A
+ * mount that exists is left as it is, so the calls of a scope that share a
+ * namespace make it once. Returns 0, or -1 with errno set at the first mount
+ * that fails.
  */
-int fyai_fsview_mounts(const struct fyai_sandbox_mount *mount, size_t n);
+int fyai_fsview_mounts(const struct fyai_sandbox_mount *mount, size_t n, bool late);
 
 /*
  * Start the holder of a scope: user, mount and PID namespaces with each of the

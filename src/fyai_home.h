@@ -21,10 +21,12 @@ struct fyai_home {
 	size_t mount_n;
 	char **strings;				/* what the mounts point at */
 	size_t strings_n;
+	bool userns;				/* `expose: userns`: the tool may write /proc */
 };
 
 /*
- * Make the mounts of the sandbox profile when it has any: `mounts`, and the
+ * Make the mounts of the sandbox profile when it has any: `mounts`, the `userns`
+ * exposure (a read-only mask of the paths of /proc that change the kernel), and the
  * private home (`home: {private: true}`), and set ctx->home. The private home is
  * a tree that is mounted over the real home, so the tools see the same paths and
  * the real files are hidden. It holds the private versions that `copy` and `env`

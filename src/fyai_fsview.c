@@ -650,12 +650,12 @@ static int view_mount_one(const struct fyai_sandbox_mount *m)
 	return mount(NULL, m->target, NULL, flags, NULL);
 }
 
-int fyai_fsview_mounts(const struct fyai_sandbox_mount *mounts, size_t n)
+int fyai_fsview_mounts(const struct fyai_sandbox_mount *mounts, size_t n, bool late)
 {
 	size_t i;
 
 	for (i = 0; i < n; i++)
-		if (view_mount_one(&mounts[i]))
+		if (mounts[i].late == late && view_mount_one(&mounts[i]))
 			return -1;
 	return 0;
 }
@@ -709,7 +709,7 @@ int fyai_fsview_hide(const char *const *paths, size_t n,
 	for (i = 0; i < n; i++)
 		if (view_hide_one(paths[i]))
 			return -1;
-	if (fyai_fsview_mounts(mounts, mounts_n))
+	if (fyai_fsview_mounts(mounts, mounts_n, false))
 		return -1;
 	/*
 	 * The processes of the tool are the children of this one, in a PID
@@ -735,6 +735,8 @@ int fyai_fsview_hide(const char *const *paths, size_t n,
 	 * confinement of the process still holds.
 	 */
 	(void)mount("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL);
+	if (fyai_fsview_mounts(mounts, mounts_n, true))
+		_exit(127);
 	program = fork();
 	if (program < 0)
 		_exit(127);
@@ -1836,10 +1838,11 @@ int fyai_fsview_hide(const char *const *paths, size_t n,
 	return -1;
 }
 
-int fyai_fsview_mounts(const struct fyai_sandbox_mount *mount, size_t n)
+int fyai_fsview_mounts(const struct fyai_sandbox_mount *mount, size_t n, bool late)
 {
 	(void)mount;
 	(void)n;
+	(void)late;
 	errno = ENOTSUP;
 	return -1;
 }

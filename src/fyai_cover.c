@@ -259,7 +259,7 @@ int fyai_cover_join(pid_t holder, const struct fyai_sandbox_mount *mount,
 		_exit(cover_wait_status(waited, status));
 	}
 	/* The joined namespaces may hold these already: a mounted one is kept. */
-	if (fyai_fsview_mounts(mount, mount_n))
+	if (fyai_fsview_mounts(mount, mount_n, false) || fyai_fsview_mounts(mount, mount_n, true))
 		return -1;
 	return fyai_fsview_drop_capabilities();
 err:

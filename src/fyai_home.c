@@ -523,6 +523,44 @@ err_out:
 	return -1;
 }
 
+/* The paths of /proc that change the kernel: read-only below the write grant. */
+static const char *const home_proc_masked[] = {
+	"/proc/sys", "/proc/sysrq-trigger", "/proc/irq", "/proc/bus", "/proc/fs",
+};
+
+/* True when the profile exposes a user namespace to the tool. */
+static bool home_wants_userns(const struct fyai_ctx *ctx)
+{
+	fy_generic it;
+
+	fy_foreach(it, fy_get(ctx->cfg->sandbox, "expose", fy_invalid))
+		if (fy_equal(it, "userns"))
+			return true;
+	return false;
+}
+
+/* Mount the paths of /proc that change the kernel read-only, after /proc is mounted. */
+static int home_mask_proc(struct home_entry *e)
+{
+	size_t i;
+	int r;
+
+	e->h->userns = true;
+	for (i = 0; i < ARRAY_SIZE(home_proc_masked); i++) {
+		if (access(home_proc_masked[i], F_OK))
+			continue;
+		r = home_mount_add(e->h, FYAI_MOUNT_BIND, home_proc_masked[i],
+				   home_proc_masked[i], NULL, NULL, true);
+		if (!r)
+			e->h->mount[e->h->mount_n - 1].late = true;
+		fyai_error_check(e->ctx, !r, err_out, "sandbox: could not add the mount of '%s'",
+				 home_proc_masked[i]);
+	}
+	return 0;
+err_out:
+	return -1;
+}
+
 int fyai_home_ensure(struct fyai_ctx *ctx)
 {
 	struct home_copy hc = { .state = { .backend = FYAI_CAS_METHOD_NONE } };
@@ -530,7 +568,7 @@ int fyai_home_ensure(struct fyai_ctx *ctx)
 	fy_generic home, mounts;
 	char *root = NULL, *real_copy = NULL;
 	struct fyai_home *h = NULL;
-	bool private;
+	bool private, userns;
 	size_t i;
 	int rc = -1, r;
 
@@ -539,7 +577,8 @@ int fyai_home_ensure(struct fyai_ctx *ctx)
 	home = fy_get(ctx->cfg->sandbox, "home", fy_invalid);
 	mounts = fy_get(ctx->cfg->sandbox, "mounts", fy_invalid);
 	private = fy_get(home, "private", false);
-	if (!private && !(fy_is_sequence(mounts) && fy_len(mounts)))
+	userns = home_wants_userns(ctx);
+	if (!private && !userns && !(fy_is_sequence(mounts) && fy_len(mounts)))
 		return 0;
 
 	h = calloc(1, sizeof(*h));
@@ -569,7 +608,7 @@ int fyai_home_ensure(struct fyai_ctx *ctx)
 		r = home_mount_add(h, FYAI_MOUNT_BIND, h->dir, e.real, NULL, NULL, false);
 		fyai_error_check(ctx, !r, err_out, "sandbox: could not add the home mount");
 	}
-	if (home_profile_mounts(&e, mounts, root))
+	if (home_profile_mounts(&e, mounts, root) || (userns && home_mask_proc(&e)))
 		goto err_out;
 	if (hc.full)
 		fyai_warning(ctx, "sandbox: the copy to the home directory stopped at "

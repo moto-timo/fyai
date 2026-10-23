@@ -959,6 +959,14 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 		if (fyai_shell_sandbox_allow(ctx, sb, resolved, mode))
 			goto err_out;
 	}
+	/* A program that makes a user namespace writes the maps of /proc/self, with O_TRUNC. */
+	if (ctx->home && ctx->home->userns) {
+		resolved = strdup("/proc");
+		fyai_error_check(ctx, resolved, err_out,
+				 "sandbox: could not copy the /proc path");
+		if (fyai_shell_sandbox_allow(ctx, sb, resolved, FYAI_SB_EDIT))
+			goto err_out;
+	}
 	/* The home directory of the tool is its own to write, whatever is denied. */
 	if (ctx->home) {
 		resolved = strdup(ctx->home->dir);
