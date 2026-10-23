@@ -185,6 +185,9 @@ original, or with `method: copy` a copy that shares blocks with it
 mounted into the tree first, so it stays visible. There is no fallback: where no
 namespace is possible, the tool stops.
 
+A mount can be `late`: it is made after the namespace has mounted its procfs, which
+hides what lies below `/proc`. The `userns` exposure uses it for the read-only mask.
+
 The removal runs outside the namespaces, after the holder has ended
 (`fyai_cover_drain()`), and never inside a mount, which can show the project. The
 `tool` verb joins the namespaces itself, so it forks first and the parent removes the
