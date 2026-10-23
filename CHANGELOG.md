@@ -30,6 +30,9 @@
   `/dev/null` for standard input, output and error, and the call returns at once. The
   command lives for the exchange, like any process that a tool leaves, and `list daemons`
   names it.
+- **A daemon can be named and stopped.** `name` on a `background` call labels the daemon
+  in `list daemons`. `cancel` and `/kill` stop it by its label or its pid, with SIGTERM
+  and SIGKILL after `sandbox_grace_ms`.
 
 ### Fixed
 

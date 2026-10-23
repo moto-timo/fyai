@@ -732,8 +732,14 @@ while the model works. The command gets a session of its own and `/dev/null` for
 standard input, output and error, and the call returns at once. Redirect the output to a
 file to read it later. It has no time limit and no terminal, and it ends with the
 exchange, or earlier if it stops, as any process that a tool leaves (see the lifetime of
-the processes of a tool); `list daemons` names it. `tty`, `name` and `timeout` do not
-apply to it.
+the processes of a tool); `list daemons` names it. `tty` and `timeout` do not apply to it.
+
+A `name` (letters, digits, `-` or `_`) labels the daemon: `list daemons` shows it as the
+`label`. The model stops it with `cancel` and the name, or with the pid that `list`
+shows. The user stops it with `/kill NAME-OR-PID`, which tries a shell session and a
+sub-agent of that name first. A daemon gets SIGTERM, and SIGKILL after
+`sandbox_grace_ms` if it stays. All processes with the label stop together, so a server
+and what it started end as one.
 
 ```sh
 fyai tool exec_command '{"command":"python3 -m http.server 8000 > server.log 2>&1","background":true}'

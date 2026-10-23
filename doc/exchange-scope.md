@@ -137,7 +137,12 @@ environment, as it does today.
 - The result of a call that leaves a process running says so, for example:
   `1 daemon still running (bitbake-server); it ends with this exchange`. The model then knows that the process is there and when it ends.
 - `list` has the kind `daemons`, which names the processes that the holder of
-  the scope holds and the ones that the tracker keeps.
+  the scope holds and the ones that the tracker keeps, each with its pid, its
+  name and the `label` that a `background` call gave it (`FYAI_DAEMON` in its
+  environment).
+- `cancel` and `/kill` stop a daemon by its label or its pid
+  (`fyai_scope_stop()`): SIGTERM through a pidfd, and SIGKILL after
+  `sandbox_grace_ms`.
 - The description of `exec_command` says that the processes of an exchange live
   until it ends, and that a process that must live longer belongs in a named
   terminal session.
