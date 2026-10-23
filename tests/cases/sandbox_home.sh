@@ -47,7 +47,7 @@ YAML
 
 # A host that cannot make a namespace stops the tool, and says why. The tool is
 # the probe: `unshare` can fail where the cover of the tool still works.
-shell_with "$(profile overlay)" 'echo marker-7391' || true
+shell_with "$(profile overlay)"$'\nsandbox_on_failure: fail' 'echo marker-7391' || true
 if ! grep -qF marker-7391 "$TEST_DIR/stdout"; then
 	assert_stdout_not_contains marker-7391
 	pass
@@ -86,10 +86,10 @@ assert_stdout_not_contains hunter2
 
 # A host that cannot mount stops the tool: there is no fallback.
 printf '%s\n' "$(profile overlay)" >"$TEST_DIR/home.yaml"
-run_fyai --config "$TEST_DIR/home.yaml" --set sandbox_cover=none tool shell '{"command": "echo marker-5528"}' || true
+run_fyai --config "$TEST_DIR/home.yaml" --set sandbox_cover=none --set sandbox_on_failure=fail tool shell '{"command": "echo marker-5528"}' || true
 assert_stdout_not_contains marker-5528
 # --set is stored: name the cover again.
-run_fyai --set sandbox_cover=auto config get sandbox_cover >/dev/null
+run_fyai --set sandbox_cover=auto --set sandbox_on_failure=warn config get sandbox_cover >/dev/null
 
 # The project under the home stays visible and writable, with its arena hidden.
 mkdir -p "$HOME/proj"
