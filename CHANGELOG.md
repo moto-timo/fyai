@@ -13,6 +13,10 @@
   `shell/max_timeout_ms` and ended early, which the model could not tell from the
   limit it had asked for. The ceiling no longer applies to a monitor, and the end
   of a monitor that reached its limit names the limit.
+- **A program that draws on a pipe.** A command with no terminal can still send
+  control sequences, as a build tool does for its progress. The result is now
+  what the screen of those sequences shows, and not the bytes. Output that does
+  not draw is unchanged.
 
 ## 0.4 - 2026-10-22
 

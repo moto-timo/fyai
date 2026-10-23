@@ -716,6 +716,15 @@ set a fixed size instead, and the model can ask for one with `rows` and
 to put the native `shell_call` of the Responses grammar on a terminal, because
 that grammar has no field the model could ask with.
 
+A command with no terminal writes to pipes, and the result is the bytes that
+it wrote. A program can send control sequences to a pipe anyway: it moves the
+cursor, erases a row, sets a colour, or overwrites a row with a carriage return,
+as a build tool does for its progress. From the first such byte, fyai gives the
+output of that stream to a screen, and the result is what the screen shows, as a
+terminal run gives, with the rows that scrolled off it before. The screen has the
+size that a terminal run of the call gets (`shell/tty_rows` and `shell/tty_cols`,
+else the terminal). Output with no such byte is not changed.
+
 ### The shell a command runs under
 
 A command of the shell tool runs under bash where the system has it (`/bin/bash`,
