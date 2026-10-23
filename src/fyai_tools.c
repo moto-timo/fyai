@@ -1331,6 +1331,42 @@ err:
 	return NULL;
 }
 
+/*
+ * The command that starts @command detached, for a call with `background`. The
+ * program gets a session of its own (setsid, where there is one) and /dev/null for
+ * standard input, output and error. The shell that starts it waits until it has
+ * the session and has closed the pipe of the call, so the group of the call, which
+ * the call ends when it returns, no longer holds it. Returns an allocated string,
+ * or NULL.
+ */
+static char *fyai_shell_background_command(const char *shell, bool login,
+					   const char *command)
+{
+	struct response_buffer cmd = { 0 };
+	int rc;
+
+	/* Use setsid where the host has it: the program leaves the group of the call. */
+	rc = response_buffer_append(&cmd,
+		"if command -v setsid >/dev/null 2>&1; then S=setsid; else S=; fi; ");
+	/*
+	 * The program starts in a subshell that this shell waits for: the subshell
+	 * prints "ok" once it has its session, and then closes the pipe of the call.
+	 */
+	rc = rc ?: response_buffer_append(&cmd, ": $( $S /bin/sh -c '"
+		"echo ok; "				/* the waiting shell reads this */
+		"exec >/dev/null 2>&1 </dev/null; "	/* nothing is shared with the call */
+		"exec \"$0\" \"$1\" \"$2\"' ");	/* the shell, its flag, the command */
+	rc = rc ?: fyai_shell_quote(&cmd, shell);
+	rc = rc ?: response_buffer_append(&cmd, login ? " -lc " : " -c ");
+	rc = rc ?: fyai_shell_quote(&cmd, command);
+	rc = rc ?: response_buffer_append(&cmd, " & )");
+	if (rc) {
+		free(cmd.data);
+		return NULL;
+	}
+	return cmd.data;
+}
+
 static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 				    bool *okp)
 {
@@ -1342,6 +1378,8 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 	const struct fyai_sandbox_spec *sandbox;
 	fy_generic command, workdir;
 	size_t budget, out_bytes, err_bytes;
+	char *detached = NULL;
+	bool background;
 	char why_buf[FYAI_CHILD_START_TEXT_MAX];
 	const char *start_why;
 	const char *msg;
@@ -1361,7 +1399,16 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 	opts.timeout_ms = fyai_shell_timeout_ms(ctx, args, false);
 	opts.shell = fyai_shell_shell_requested(ctx, args);
 	opts.login = fyai_shell_login_requested(ctx, args);
-	if (fyai_shell_tty_requested(ctx, args)) {
+	/* A command in the background has no terminal and no limit of its own. */
+	background = fy_get(args, "background", false);
+	if (background) {
+		detached = fyai_shell_background_command(opts.shell, opts.login,
+							 fy_castp(&command, ""));
+		fyai_error_check(ctx, detached, out,
+				 "shell: could not make the command for the background");
+		command = fy_value(ctx->transient_gb, detached);
+	}
+	if (!background && fyai_shell_tty_requested(ctx, args)) {
 		tty_text = fyai_shell_tty_run(ctx, args, fy_castp(&command, ""),
 					      opts.workdir, sandbox,
 					      opts.timeout_ms, &tty_result);
@@ -1502,6 +1549,13 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 			goto out;
 	} else {
 		*okp = true;
+		if (background &&
+		    response_buffer_append(&buf, "The command runs in the background. Its standard "
+					   "input, output and error are /dev/null, so redirect "
+					   "its output to a file to read it. It ends with this "
+					   "exchange, or earlier if it stops; `list daemons` "
+					   "names it.\n"))
+			goto out;
 	}
 
 	ret = buf.data;
@@ -1509,6 +1563,7 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 out:
 	fyai_shell_live_close(ctx);
 	fyai_shell_sandbox_end(&sb);
+	free(detached);
 	free(buf.data);
 	fyai_terminal_result_cleanup(&tty_result);
 	shell_command_result_cleanup(&result);

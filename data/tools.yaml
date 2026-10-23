@@ -210,6 +210,14 @@
           description: >-
             Optional cap on the output returned. Longer output keeps its end and the result says how
             much was elided. Omit for the configured default.
+        background:
+          type: boolean
+          description: |-
+            Start the command detached and return at once, for a server or any program that runs
+            on while you work. The command gets a session of its own, and /dev/null for standard
+            input, output and error: redirect its output to a file to read it later. It has no
+            time limit and no terminal, and it ends with the exchange, or earlier if it stops;
+            `list` with kind `daemons` names it. `tty`, `name` and `timeout` do not apply to it.
         description:
           type: string
           description: >-
