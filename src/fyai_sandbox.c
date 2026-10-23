@@ -535,6 +535,10 @@ int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
 					    spec->deny, spec->deny_global_n))
 		goto out;
 
+	if (spec->list_root &&
+	    grant_path(fd, "/", FYAI_FS_DIR_LIST & mask))
+		goto out;
+
 	/* Carve configured denies out of every granted hierarchy. */
 	for (p = fyai_sys_ro; *p; p++)
 		if (grant_except(fd, *p, FYAI_FS_READ & mask,

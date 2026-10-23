@@ -244,6 +244,7 @@ sandbox_profiles:
   dev:
     description: project work with toolchains, and TCP to git and package registries
     view: false
+    list_root: true      # A program that changes to / may open and list it.
     deny:
       - ~/.ssh
       - ~/.aws

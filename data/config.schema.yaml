@@ -803,6 +803,14 @@ properties:
             one. `/session profile` puts the session in a view or takes it out
             of one to match, and the changes of a view go into the project
             first, when none conflicts.
+        list_root:
+          type: boolean
+          description: >-
+            Let a tool open and list the directories of the whole file system,
+            their entries only and not the files. A program that changes to `/`
+            and then opens `.` needs it, as the package scripts of a build do.
+            It shows the names in a denied directory that is not hidden by a
+            cover.
         deny:
           type: array
           description: >-

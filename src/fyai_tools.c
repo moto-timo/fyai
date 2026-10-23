@@ -980,6 +980,8 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 		}
 	}
 
+	sp->list_root = fy_get(cs, "list_root", false);
+
 	*specp = sp;
 	return 0;
 err_out:

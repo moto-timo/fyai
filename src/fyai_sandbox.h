@@ -79,6 +79,12 @@ struct fyai_sandbox_spec {
 	bool read_all;
 
 	/*
+	 * Let the tool open and list every directory: the entries, never the
+	 * files. A program that changes to / and opens "." needs it.
+	 */
+	bool list_root;
+
+	/*
 	 * Project root, granted read/write recursively EXCEPT any path in
 	 * @deny that falls beneath it (the arena ".fyai" is always denied).
 	 * NULL skips the project grant.

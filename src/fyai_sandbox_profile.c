@@ -167,6 +167,7 @@ static fy_generic overlay(struct fyai_cfg *cfg, fy_generic base, fy_generic over
 	fy_generic bnet = fy_get(base, "network", fy_invalid);
 	fy_generic onet = fy_get(over, "network", fy_invalid);
 	fy_generic tcp, udp, net, out, view = fy_get(over, "view", fy_invalid);
+	fy_generic list_root = fy_get(over, "list_root", fy_invalid);
 
 	if (!fy_is_sequence(deny))
 		deny = fy_get(base, "deny", fy_invalid);
@@ -194,6 +195,10 @@ static fy_generic overlay(struct fyai_cfg *cfg, fy_generic base, fy_generic over
 		view = fy_get(base, "view", fy_invalid);
 	if (fy_is_bool(view))
 		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "view"), view);
+	if (!fy_is_bool(list_root))
+		list_root = fy_get(base, "list_root", fy_invalid);
+	if (fy_is_bool(list_root))
+		out = fy_assoc(cfg->gb, out, fy_value(cfg->gb, "list_root"), list_root);
 	return out;
 }
 
@@ -260,7 +265,8 @@ fy_generic fyai_sandbox_profile_policy(struct fyai_cfg *cfg, fy_generic root,
 		return fy_invalid;
 	return fy_mapping(cfg->gb, "enabled", true, "deny", deny, "allow", allow,
 			  "network", fy_get(policy, "network", fy_invalid),
-			  "view", fy_get(policy, "view", false));
+			  "view", fy_get(policy, "view", false),
+			  "list_root", fy_get(policy, "list_root", false));
 }
 
 /* The description of the profile @name, from @user first, else @builtin. */
