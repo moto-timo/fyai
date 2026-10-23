@@ -41,6 +41,10 @@ grep -q 9418 "$TEST_DIR/profile.out" || fail 'the dev profile is not in the stor
 (cd fresh && "$FYAI_BIN" -k test-key config get sandbox_profiles/lockdown/view >"$TEST_DIR/profile.out" 2>&1)
 grep -q true "$TEST_DIR/profile.out" || fail 'the lockdown profile is not in the stored configuration'
 
+(cd fresh && "$FYAI_BIN" -k test-key config get sandbox_profiles/build >"$TEST_DIR/profile.out" 2>&1)
+grep -q 'extends: dev' "$TEST_DIR/profile.out" && grep -q 'userns' "$TEST_DIR/profile.out" ||
+	fail 'the build profile is not in the stored configuration'
+
 (cd fresh && "$FYAI_BIN" -k test-key config get sandbox_profiles/dev-view >"$TEST_DIR/profile.out" 2>&1)
 grep -q 'extends: dev' "$TEST_DIR/profile.out" && grep -q 'view: true' "$TEST_DIR/profile.out" ||
 	fail 'the dev-view profile is not in the stored configuration'
