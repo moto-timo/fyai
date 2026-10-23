@@ -725,6 +725,20 @@ terminal run gives, with the rows that scrolled off it before. The screen has th
 size that a terminal run of the call gets (`shell/tty_rows` and `shell/tty_cols`,
 else the terminal). Output with no such byte is not changed.
 
+### A command in the background
+
+`exec_command` takes `background: true` to start a server, or any program that runs on
+while the model works. The command gets a session of its own and `/dev/null` for
+standard input, output and error, and the call returns at once. Redirect the output to a
+file to read it later. It has no time limit and no terminal, and it ends with the
+exchange, or earlier if it stops, as any process that a tool leaves (see the lifetime of
+the processes of a tool); `list daemons` names it. `tty`, `name` and `timeout` do not
+apply to it.
+
+```sh
+fyai tool exec_command '{"command":"python3 -m http.server 8000 > server.log 2>&1","background":true}'
+```
+
 ### The shell a command runs under
 
 A command of the shell tool runs under bash where the system has it (`/bin/bash`,

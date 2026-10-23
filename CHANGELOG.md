@@ -26,6 +26,10 @@
   names what a scope holds. See `doc/exchange-scope.md`.
 - **`sandbox_grace_ms`** sets the time that the processes of a scope have to stop
   after SIGTERM.
+- **`background` for `exec_command`** starts the command detached: a session of its own,
+  `/dev/null` for standard input, output and error, and the call returns at once. The
+  command lives for the exchange, like any process that a tool leaves, and `list daemons`
+  names it.
 
 ### Fixed
 
