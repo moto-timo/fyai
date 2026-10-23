@@ -1038,7 +1038,13 @@ static unsigned int fyai_shell_timeout_ms(struct fyai_ctx *ctx, fy_generic call,
 	ms = fyai_shell_timeout_requested(call, native);
 	if (ms <= 0)
 		ms = cfg->shell_timeout_ms;
-	if (cfg->shell_max_timeout_ms > 0 && ms > cfg->shell_max_timeout_ms)
+	/*
+	 * A monitor does not hold the turn, and the monitor tool has bounded its limit
+	 * already: the ceiling of a foreground call would cut it short, and the
+	 * model was told the limit it asked for.
+	 */
+	if (cfg->shell_max_timeout_ms > 0 && ms > cfg->shell_max_timeout_ms &&
+	    !fy_is_valid(fy_get(call, "_fyai_monitor", fy_invalid)))
 		ms = cfg->shell_max_timeout_ms;
 	return ms > 0 ? (unsigned int)ms : 0;
 }
@@ -6632,6 +6638,7 @@ live_open_done:
 			 "could not attach tool job to event loop");
 
 	job->timeout_ms = fyai_tool_job_timeout_ms(ctx, name, native_call, args);
+	fyai_diag_tracef("tool", "%s limit %u ms", name, job->timeout_ms);
 	job->started_ms = fyai_event_now_ms();
 	if (job->timeout_ms) {
 		el = fyai_ctx_loop(ctx);

@@ -38,6 +38,7 @@
 struct fyai_monitor_run {
 	struct fyai_monitor_run *next;
 	struct fyai_ctx *ctx;
+	long long limit_ms;	/* the time limit that the monitor was started with */
 	struct fyai_tool_job_group *group;
 	char *name;
 	char *partial;		/* the line that has no end yet */
@@ -176,8 +177,8 @@ static void monitor_finish(void *userdata)
 		goto release;
 	if (strstr(text, "timed out after"))
 		monitor_event(run, strdup(fy_sprintfa("[monitor '%s' ended: "
-			"its time limit passed; start it again to go on]",
-			run->name)));
+			"its time limit of %lld seconds passed; start it again "
+			"to go on]", run->name, run->limit_ms / 1000)));
 	else if (rc || !ok)
 		monitor_event(run, strdup(fy_sprintfa("[monitor '%s' ended with "
 			"a failure]", run->name)));
@@ -248,6 +249,7 @@ static fy_generic tool_monitor(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	run = calloc(1, sizeof(*run));
 	fyai_error_check(ctx, run, err, "monitor: could not allocate the run");
 	run->ctx = ctx;
+	run->limit_ms = ms;
 	run->name = strdup(name);
 	fyai_error_check(ctx, run->name, err,
 			 "monitor: could not keep the name");

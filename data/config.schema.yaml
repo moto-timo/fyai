@@ -370,7 +370,8 @@ properties:
         default: 600000
         description: >-
           Limit a shell timeout requested by the model. 0 removes the
-          bound.
+          bound. A monitor has its own limit of at most 30 minutes, which this
+          does not cut.
       max_output_tokens:
         type: integer
         minimum: 0
