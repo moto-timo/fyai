@@ -8,6 +8,11 @@
   the whole turn: the steps up to the last complete tool round are stored. A
   tool call that returns no result gets a tool error, and the turn continues.
   The log of a fullscreen session shows the rows that report errors first.
+- **A monitor ran for the limit that it was given.** A monitor can ask for 30
+  minutes, but its command ran under the 10 minute ceiling of
+  `shell/max_timeout_ms` and ended early, which the model could not tell from the
+  limit it had asked for. The ceiling no longer applies to a monitor, and the end
+  of a monitor that reached its limit names the limit.
 
 ## 0.4 - 2026-10-22
 
