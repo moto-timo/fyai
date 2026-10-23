@@ -13,10 +13,19 @@
   the environment variable `FYAI_CAST`. The recording leaves out a repeated
   cursor update of an idle page. Its header says what the program knew at the
   start, and its markers say what the program did: requests, the end of a turn,
-  tool calls, and each warning and error. `fyai cast play` opens a
+  tool calls, scopes, and each warning and error. `fyai cast play` opens a
   player with play and pause, steps, marker jumps, a list of markers, a timeline
   and the mouse; `markers` and `info` list the markers and show the header.
   `--cast-compat` writes plain asciicast.
+- **A scope for the processes of an exchange.** A program that a tool detaches,
+  such as a build server, stays alive for the later calls of the same exchange
+  and ends with it. A terminal session, a monitor or a background sub-agent keeps
+  the scope while it lives. A host with no namespace tracks the processes and
+  stops them instead. The result of a call says when it left a process.
+  `sandbox_scope` chooses `exchange`, `session` or `call`, and `list daemons`
+  names what a scope holds. See `doc/exchange-scope.md`.
+- **`sandbox_grace_ms`** sets the time that the processes of a scope have to stop
+  after SIGTERM.
 
 ### Fixed
 
@@ -33,6 +42,10 @@
   control sequences, as a build tool does for its progress. The result is now
   what the screen of those sequences shows, and not the bytes. Output that does
   not draw is unchanged.
+- **A process of a scope was killed when the run ended.** The run ended at once
+  and the kernel ended the namespace with SIGKILL, so a build server could not
+  save its state and left a stale lock. The run now waits for the processes to
+  stop, up to `sandbox_grace_ms`, and waits for no one when none runs.
 
 ## 0.4 - 2026-10-22
 

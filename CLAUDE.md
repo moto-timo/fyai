@@ -1823,6 +1823,17 @@ names the fix: the AppArmor profile of `fyai sandbox apparmor`, or bubblewrap
 (`doc/apparmor-userns.md`). A session in a view keeps the carve-out; the view already
 hides the arena.
 
+The processes that the tools of an exchange start belong to its scope
+(`doc/exchange-scope.md`). The invocation starts one holder for the exchange before
+the first tool child forks (`fyai_scope_ensure()`), and each tool child joins it, so a
+program that detaches lives for the next call. `fyai_scope_exchange()` ends the scope
+with the exchange, and `fyai_scope_pin()` and `fyai_scope_unpin()` keep it for a
+terminal session, a monitor and a background sub-agent; a pin ends with the program,
+not with the object. Where no holder is possible, a tool child is a subreaper and names
+its live children in `detached`; the invocation stops them with `fyai_orphan_sweep()`.
+Do not read a pid from a process in a namespace of a scope: it names another process
+outside it. Do not use `tc.args` after a tool ran: the call can have released it.
+
 Fail closed on network egress. The kernel ABI is not the only condition: a
 build made against headers without the network access definitions restricts
 nothing on any kernel. Ask `fyai_sandbox_net_restrictable()`.

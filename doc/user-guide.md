@@ -1222,8 +1222,20 @@ and the `.fyai` arena covered by an empty read-only mount, a directory by an emp
 and a file by `/dev/null`. The host and the other processes are not changed. A path
 that Landlock denies would leave the directory above it only the right to list, so a
 tool could not create entries in the project root; a covered path does not. The tool
-also has a PID namespace of its own: it sees only its own processes, and a process
-that a command left in the background ends with the command.
+also has a PID namespace: it sees only the processes of its scope, and the scope is
+the whole exchange. A program that a command leaves running, such as a build server,
+stays alive for the later calls of the same exchange and ends when the exchange
+ends: the final answer, an error, or an interrupt. The result of a call that left a
+process says so. A named terminal session, a monitor and a background sub-agent keep
+the scope until they end. Where no namespace is possible, a tool child tracks the
+processes that it left and fyai stops them when the exchange ends.
+
+`sandbox_scope` chooses the lifetime: `exchange` (the default), `session` (until the
+interactive session ends) and `call` (the process ends with its call). The model
+cannot change it. See `doc/exchange-scope.md`.
+
+`sandbox_grace_ms` is the time that these processes have to stop after SIGTERM before
+SIGKILL (5000 by default). Give a build server more.
 
 `sandbox_cover` chooses how the tool gets the namespaces. `auto` (the default) tries
 `userns`, where the tool makes them itself, then `bwrap`, where fyai starts one
