@@ -129,6 +129,11 @@ global:
         x-fyai-repeat: true
         x-fyai-meta: PATH
         x-fyai-complete: file
+      cast:
+        type: string
+        description: record the screen of an interactive session to an asciicast file
+        x-fyai-meta: FILE
+        x-fyai-complete: file
       debug:
         type: boolean
         description: increase the debug verbosity

@@ -3194,6 +3194,7 @@ enum {
 	OPT_IMAGE,
 	OPT_COLOR,
 	OPT_THEME,
+	OPT_CAST,
 	OPT_SET,
 	OPT_GET,
 	OPT_DELETE,
@@ -3220,6 +3221,7 @@ static const struct option long_options[] = {
 	{ "sandbox", no_argument, NULL, OPT_SANDBOX },
 	{ "color", required_argument, NULL, OPT_COLOR },
 	{ "theme", required_argument, NULL, OPT_THEME },
+	{ "cast", required_argument, NULL, OPT_CAST },
 	{ "new", no_argument, NULL, OPT_NEW },
 	{ "interactive", no_argument, NULL, 'i' },
 	{ "debug", no_argument, NULL, 'd' },
@@ -3847,6 +3849,9 @@ static int config_parse_cli_options(struct fyai_cfg *cfg, int argc, char *argv[]
 			if (config_queue_set_quoted(cfg, "display/color", optarg,
 						    false, false))
 				return -1;
+			break;
+		case OPT_CAST:
+			cfg->cast_path = fy_gb_intern_string(cfg->gb, optarg);
 			break;
 		case OPT_THEME:
 			if (config_queue_set_quoted(cfg, "display/theme", optarg,

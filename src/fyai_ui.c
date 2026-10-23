@@ -94,7 +94,7 @@ struct ui_log_entry;
 struct fyai_ui {
 	struct fyai_ctx *ctx;
 	struct fytim *ft;
-	struct fyai_cast *cast;		/* $FYAI_CAST: the terminal output */
+	struct fyai_cast *cast;		/* --cast: the terminal output */
 	/* Right-side input-header panel shared by both renderers. */
 	char *panel;
 	int panel_cols;
@@ -3231,32 +3231,17 @@ static void ui_cast_tap(const void *data, size_t len, void *user)
 }
 
 /*
- * $FYAI_CAST names a file, or a directory that gets a file for this process,
- * for an asciicast of what the terminal shows. It records a session of a
- * person, thus it is a debug aid: the file holds the whole screen. The
- * variable is removed so a program that this one starts does not record to the
- * same file.
+ * --cast names a file for an asciicast of what the terminal shows. It records
+ * a session of a person, thus it is a debug aid: the file holds the whole
+ * screen. The option is not passed on, so a program that this one starts does
+ * not record to the same file.
  */
 static void ui_cast_open(struct fyai_ui *ui, int cols, int rows)
 {
-	const char *target = getenv("FYAI_CAST");
-	char path[4096];
-	struct stat st;
-	int n;
+	const char *path = ui->ctx->cfg->cast_path;
 
-	if (!target || !*target)
+	if (!path || !*path)
 		return;
-	n = snprintf(path, sizeof(path), "%s", target);
-	if (n >= 0 && (size_t)n < sizeof(path) &&
-	    !stat(target, &st) && S_ISDIR(st.st_mode))
-		n = snprintf(path, sizeof(path), "%s/fyai-%ld-%lld.cast", target,
-			     (long)getpid(), (long long)time(NULL));
-	if (n < 0 || (size_t)n >= sizeof(path)) {
-		fyai_warning(ui->ctx, "cast: the path of the recording is too long");
-		unsetenv("FYAI_CAST");
-		return;
-	}
-	unsetenv("FYAI_CAST");
 	ui->cast = fyai_cast_open(ui->ctx, path, cols, rows, "fyai");
 	if (ui->cast)
 		(void)fytim_set_output_tap(ui->ft, ui_cast_tap, ui->cast);

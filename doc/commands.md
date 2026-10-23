@@ -29,6 +29,7 @@ Do not edit; run `ninja docs-commands` to write it again.
 | `-i`, `--interactive` | interactive prompt loop |
 | `--answer TEXT` | supply an ask_user answer in advance |
 | `--image PATH` | attach an image from a file to the prompt |
+| `--cast FILE` | record the screen of an interactive session to an asciicast file |
 | `-d`, `--debug` | increase the debug verbosity |
 
 # Verbs

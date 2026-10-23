@@ -19,7 +19,7 @@ typedef void (*fyai_ui_keys_fn)(void *user, const char *data, size_t len);
 
 int fyai_ui_open(struct fyai_ctx *ctx);
 void fyai_ui_close(struct fyai_ctx *ctx);
-/* Name a point of the recording that $FYAI_CAST asks for; no effect without it. */
+/* Name a point of the recording that --cast asks for; no effect without it. */
 void fyai_ui_marker(struct fyai_ctx *ctx, const char *label);
 
 /*
