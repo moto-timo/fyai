@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT
-# Verify that view enter --lockdown confines the command as a tool call of a
+# Verify that view enter --lockdown and --profile confine the command as a tool call of a
 # session under /session lockdown: the lockdown profile denies ~/.ssh and
 # supported network operations, and the command can still change the root of
 # the project.
@@ -54,6 +54,21 @@ else
 		assert_stdout_contains 'udp-denied'
 	fi
 fi
+
+# --profile names any profile: the dev profile denies ~/.ssh, and keeps the project writable.
+run_fyai view enter --profile dev demo sh -c "$probe"
+assert_status 0
+assert_stdout_contains 'ssh-denied'
+assert_stdout_contains 'root-writable'
+if ! grep -q 'cannot restrict network egress' "$TEST_DIR/stderr"; then
+	# Only the ports of the profile are open: the listener is not one of them.
+	assert_stdout_contains 'net-denied'
+fi
+
+# A profile that is not defined stops the run, and it names the profile.
+run_fyai view enter --profile nosuch demo true || true
+assert_stdout_not_contains 'ssh'
+grep -q "nosuch" "$TEST_DIR/stderr" || fail 'an unknown profile is not named'
 
 # The changes stay in the view.
 [ -f project/src/main.c ] || fail 'the view changed the project'
