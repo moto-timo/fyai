@@ -1292,6 +1292,9 @@ cover, which gives the tool a PID namespace of its own, so the program cannot wr
 memory of a process outside it. It is a lax option: the program can write the files of
 its own processes below `/proc`. The `build` profile is `dev` with this exposure, for
 BitBake and other tools that make a namespace for each task: `/session profile build`.
+The `yocto` profile is `build` with a private home that holds a copy of `~/.gitconfig`. A
+program that reads `~/.netrc` then gets "not found" and not "permission denied", which
+the readers of BitBake and Poky handle; the file is denied, so it is never copied.
 
 `sandbox_cover` chooses how the tool gets the namespaces. `auto` (the default) tries
 `userns`, where the tool makes them itself, then `bwrap`, where fyai starts one

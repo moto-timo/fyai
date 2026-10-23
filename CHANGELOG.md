@@ -46,6 +46,9 @@
   its own, as BitBake does for each task. The tool may write `/proc`, with `/proc/sys`
   and the other paths that change the kernel mounted read-only, in a PID namespace.
   The new `build` profile is `dev` with it.
+- **The `yocto` profile** is `build` with a private home and a copy of `~/.gitconfig`.
+  `~/.netrc` is not in that home, so the readers of BitBake and Poky get "not found"
+  and not "permission denied", and a build needs no `HOME` override.
 - **`background` for `exec_command`** starts the command detached: a session of its own,
   `/dev/null` for standard input, output and error, and the call returns at once. The
   command lives for the exchange, like any process that a tool leaves, and `list daemons`
