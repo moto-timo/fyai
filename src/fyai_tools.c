@@ -2056,7 +2056,7 @@ static char *tool_list_format(struct fyai_ctx *ctx,
 {
 	static const char *const kinds[] = {
 		"agents", "views", "shells", "waits", "monitors",
-		"questions", "messages",
+		"daemons", "questions", "messages",
 	};
 	fy_generic data, rows, shown, row, opts;
 	char *out = NULL, *table;
@@ -6007,6 +6007,25 @@ static fy_generic fyai_list_views(struct fyai_ctx *ctx, struct fy_generic_builde
 	return rows;
 }
 
+/* The processes of the scope: the ones its holder holds, and the ones that it tracks. */
+fy_generic fyai_scope_rows(struct fyai_ctx *ctx, struct fy_generic_builder *gb)
+{
+	pid_t pids[64];
+	char name[32];
+	size_t n, i;
+	fy_generic rows;
+
+	rows = fyai_orphan_rows(ctx, gb);
+	n = fyai_cover_members(&ctx->cover, pids, ARRAY_SIZE(pids));
+	for (i = 0; i < n; i++) {
+		fyai_orphan_name(pids[i], name, sizeof(name));
+		rows = fy_append(gb, rows, fy_mapping(gb, "pid", (long long)pids[i],
+						      "name", fy_value(gb, name),
+						      "held", "scope"));
+	}
+	return rows;
+}
+
 /* The named terminal sessions of this run that still have a program. */
 static fy_generic fyai_list_shells(struct fyai_ctx *ctx, struct fy_generic_builder *gb)
 {
@@ -6039,9 +6058,9 @@ static fy_generic fyai_list_tool(struct fyai_ctx *ctx, fy_generic args, bool *ok
 
 	*okp = false;
 	if (!all && !fy_any_equal(kind, "agents", "views", "shells", "waits",
-				  "monitors", "questions", "messages"))
+				  "monitors", "daemons", "questions", "messages"))
 		return fy_value(gb, "tool error: kind is agents, views, shells, "
-				"waits, monitors, questions or messages");
+				"waits, monitors, daemons, questions or messages");
 	if (all || !strcmp(kind, "agents"))
 		result = fy_assoc(gb, result, "agents", fyai_list_agents(ctx, gb));
 	if (all || !strcmp(kind, "views"))
@@ -6053,6 +6072,9 @@ static fy_generic fyai_list_tool(struct fyai_ctx *ctx, fy_generic args, bool *ok
 	if (all || !strcmp(kind, "monitors"))
 		result = fy_assoc(gb, result, "monitors",
 				  fyai_monitors_rows(ctx, gb));
+	if (all || !strcmp(kind, "daemons"))
+		result = fy_assoc(gb, result, "daemons",
+				  fyai_scope_rows(ctx, gb));
 	if (all || !strcmp(kind, "questions"))
 		result = fy_assoc(gb, result, "questions",
 				  fy_concat(gb, fyai_asks_rows(ctx, gb),

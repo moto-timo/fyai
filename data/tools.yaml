@@ -716,7 +716,8 @@
       List what you can name in other calls. `agents`: the sub-agents you started, running or ended,
       with their state and whether they left a view for `project_view`. `views`: those views.
       `shells`: your open terminal sessions. `waits`: your pending named waits. `monitors`: your
-      running monitors. `questions`: the named questions awaiting a user or parent answer.
+      running monitors. `daemons`: the programs that your calls left running after the call ended, which end with the
+      exchange. `questions`: the named questions awaiting a user or parent answer.
       `messages`: agent message receipts awaiting acknowledgement. Each name is
       the one you gave it. You only see your own: those of the user and of other agents are not
       listed. Leave `kind` out to list every kind.
@@ -725,7 +726,7 @@
       properties:
         kind:
           type: string
-          enum: [agents, views, shells, waits, monitors, questions, messages]
+          enum: [agents, views, shells, waits, monitors, daemons, questions, messages]
           description: |-
             What to list. Omit it to list every kind.
       additionalProperties: false

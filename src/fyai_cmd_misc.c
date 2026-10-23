@@ -344,7 +344,8 @@ static fy_generic list_renderopts(struct fy_generic_builder *gb,
 							   "Display")));
 	if (!strcmp(what, "sessions") || !strcmp(what, "shells") ||
 	    !strcmp(what, "agents") || !strcmp(what, "waits") ||
-	    !strcmp(what, "monitors") || !strcmp(what, "questions") ||
+	    !strcmp(what, "monitors") || !strcmp(what, "daemons") ||
+	    !strcmp(what, "questions") ||
 	    !strcmp(what, "messages"))
 		return fy_mapping(gb, "empty", "none");
 	return fy_mapping(gb, "empty", "no providers configured",
@@ -364,6 +365,8 @@ static fy_generic list_live(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 		return fyai_waits_rows(ctx, gb);
 	if (!strcmp(what, "monitors"))
 		return fyai_monitors_rows(ctx, gb);
+	if (!strcmp(what, "daemons"))
+		return fyai_scope_rows(ctx, gb);
 	if (!strcmp(what, "questions"))
 		return fy_concat(gb, fyai_asks_rows(ctx, gb),
 				 fyai_agents_parent_ask_rows(ctx, gb));

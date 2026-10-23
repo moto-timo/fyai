@@ -186,6 +186,9 @@ void fyai_scope_exchange(struct fyai_ctx *ctx, bool begin);
 void fyai_scope_pin(struct fyai_ctx *ctx);
 void fyai_scope_unpin(struct fyai_ctx *ctx);
 
+/* The processes of the scope as rows of pid, name and how the scope holds them. */
+fy_generic fyai_scope_rows(struct fyai_ctx *ctx, struct fy_generic_builder *gb);
+
 /* Told that a program the user runs through fyai ended: its exit code, or
  * the signal that ended it. */
 typedef void (*fyai_tools_exit_fn)(void *userdata, int exit_code, int signal);
