@@ -1405,9 +1405,10 @@ static void session_token_count(char *buf, size_t size, long long tokens)
 void fyai_session_banner_update(struct fyai_ctx *ctx)
 {
 	struct fyai_cfg *cfg = ctx->cfg;
-	struct fyai_tmpl_var vars[16], top_vars[16];
-	char isolation[64], view[64];
-	char *coloured[14];
+	struct fyai_tmpl_var vars[17], top_vars[17];
+	char isolation[64], view[64], sandbox[128];
+	const char *profile;
+	char *coloured[14], *name_c = NULL, *sandbox_c = NULL;
 	const struct fyai_tmpl_var *header_vars;
 	bool colour_ok;
 	fy_generic model_entry;
@@ -1569,6 +1570,12 @@ void fyai_session_banner_update(struct fyai_ctx *ctx)
 	if (fyai_view_session_name(ctx))
 		snprintf(view, sizeof(view), " · view %s", fyai_view_session_name(ctx));
 	vars[15] = (struct fyai_tmpl_var){ "view", view };
+	/* The sandbox of the tools: the profile in use, or that there is none. */
+	profile = !cfg->enable_sandbox ? NULL :
+		  cfg->sandbox_profile ? cfg->sandbox_profile : "on";
+	snprintf(sandbox, sizeof(sandbox), " · %s%s", profile ? "sandbox " : "no sandbox",
+		 profile ? profile : "");
+	vars[16] = (struct fyai_tmpl_var){ "sandbox", sandbox };
 	if (fyai_agents_attached(ctx)) {
 		vars[1].val = "agent";
 		vars[2].val = fyai_agents_state(ctx, fyai_agents_attached(ctx));
@@ -1613,6 +1620,15 @@ void fyai_session_banner_update(struct fyai_ctx *ctx)
 	top_vars[13] = (struct fyai_tmpl_var){ "layout", coloured[13] };
 	top_vars[14] = vars[14];
 	top_vars[15] = vars[15];
+	/* The name of the profile takes a colour, and is escaped, as the layout does. */
+	top_vars[16] = vars[16];
+	if (colour_ok && profile) {
+		name_c = session_series_text(cfg, 13, profile, true);
+		colour_ok = name_c && asprintf(&sandbox_c, " · sandbox %s", name_c) >= 0;
+		if (!colour_ok)
+			fyai_warning(ctx, "cannot colour the sandbox of the prompt header");
+		top_vars[16].val = sandbox_c;
+	}
 	header_vars = colour_ok ? top_vars : vars;
 
 	tmpl = cfg->prompt_bottom && *cfg->prompt_bottom ?
@@ -1631,6 +1647,8 @@ void fyai_session_banner_update(struct fyai_ctx *ctx)
 	free(bottom);
 	for (i = 0; i < 14; i++)
 		free(coloured[i]);
+	free(name_c);
+	free(sandbox_c);
 	free(location);
 	free(directory);
 	free(branch);

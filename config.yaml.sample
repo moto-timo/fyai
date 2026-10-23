@@ -379,11 +379,14 @@ display:
   # either row can place it.
   # {view} is " · view session" while the session runs in a view
   # (view/isolate_session), and empty otherwise.
+  # {sandbox} is " · sandbox PROFILE" for the profile that confines the tools,
+  # " · sandbox on" for the `sandbox` setting alone, and " · no sandbox" when nothing
+  # confines them; the default top row ends with it.
   prompt: "  > "
   # prompt_busy is the glyph of the prompt marker while a line would wait.
   # Empty takes the prompt.busy glyph of the theme, else an ellipsis.
   prompt_busy: ""
-  prompt_top: " {location}"
+  prompt_top: " {location}{sandbox}"
   # Initial /branches view: tree or gitgraph; g cycles the available views.
   branch_view: tree
   # Browser preview placement: auto, right, bottom, or off; p cycles it.

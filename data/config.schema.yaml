@@ -1579,11 +1579,14 @@ properties:
       prompt_top:
         x-fyai-model: review
         type: string
-        default: " {location}"
+        default: " {location}{sandbox}"
         description: >-
           Set the top row of the interactive prompt. It is a {key} template over the
           session vars (model, provider, api, effort, summary, temp, ctx,
-          tokens, cache, cost, branch, cwd, location, layout, isolation, view).
+          tokens, cache, cost, branch, cwd, location, layout, isolation, view,
+          sandbox). {sandbox} is " · sandbox PROFILE" for the profile that
+          confines the tools, " · sandbox on" for the `sandbox` setting alone, and
+          " · no sandbox" when nothing confines them.
           Empty uses the built-in branch and working-directory row.
           A custom template replaces it. May carry SGR colour escapes. Add
           {isolation} to show the credential isolation here; the default
