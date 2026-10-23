@@ -1,0 +1,50 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "c1",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t1",
+                  "type": "function",
+                  "function": {
+                    "name": "shell",
+                    "arguments": "{\"command\": \"(setsid sh -c 'trap \\\"sleep 0.3; echo cleaned > work/term.done; exit 0\\\" TERM; echo $$ > work/term.pid; while :; do sleep 0.05; done' </dev/null >/dev/null 2>&1 &) ; while [ ! -s work/term.pid ]; do :; done; echo STARTED\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "f3",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "finished."
+            },
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    }
+  ]
+}

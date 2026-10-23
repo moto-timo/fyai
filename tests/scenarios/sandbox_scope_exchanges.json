@@ -1,0 +1,318 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "c1",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t1",
+                  "type": "function",
+                  "function": {
+                    "name": "shell",
+                    "arguments": "{\"command\": \"(setsid sh -c 'exec 3>work/scope.lock; flock 3; echo $$ > work/scope.pid; exec sleep 600' </dev/null >/dev/null 2>&1 &) ; while [ ! -s work/scope.pid ]; do :; done; rm work/scope.pid; echo STARTED\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c2",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t2",
+                  "type": "function",
+                  "function": {
+                    "name": "shell",
+                    "arguments": "{\"command\": \"flock -n work/scope.lock true && echo LOCK-FREE || echo LOCK-HELD\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "f3",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "first done."
+            },
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c4",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t4",
+                  "type": "function",
+                  "function": {
+                    "name": "shell",
+                    "arguments": "{\"command\": \"flock -w 20 work/scope.lock true && echo LOCK-FREE\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "f5",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "second done."
+            },
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c6",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t6",
+                  "type": "function",
+                  "function": {
+                    "name": "shell",
+                    "arguments": "{\"command\": \"(setsid sh -c 'exec 3>work/scope.lock; flock 3; echo $$ > work/scope.pid; exec sleep 600' </dev/null >/dev/null 2>&1 &) ; while [ ! -s work/scope.pid ]; do :; done; rm work/scope.pid; echo STARTED\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c7",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t7",
+                  "type": "function",
+                  "function": {
+                    "name": "exec_command",
+                    "arguments": "{\"name\": \"keep\", \"command\": \"sh -i\", \"tty\": true}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "f8",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "third done."
+            },
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c9",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t9",
+                  "type": "function",
+                  "function": {
+                    "name": "shell",
+                    "arguments": "{\"command\": \"flock -n work/scope.lock true && echo LOCK-FREE || echo LOCK-HELD\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c10",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t10",
+                  "type": "function",
+                  "function": {
+                    "name": "shell_close",
+                    "arguments": "{\"name\": \"keep\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "f11",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "fourth done."
+            },
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "c12",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "t12",
+                  "type": "function",
+                  "function": {
+                    "name": "shell",
+                    "arguments": "{\"command\": \"flock -w 20 work/scope.lock true && echo LOCK-FREE\"}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ]
+      }
+    },
+    {
+      "response": {
+        "id": "f13",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "mock-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "fifth done."
+            },
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    }
+  ]
+}
