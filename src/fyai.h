@@ -411,6 +411,7 @@ struct fyai_cfg {
 	const char *sandbox_reported;	/* what the last report of open egress was for */
 	const char *sandbox_cover;	/* how a tool hides the arena: auto, userns, bwrap, none */
 	const char *cast_path;		/* --cast: the file that records the screen, or NULL */
+	bool cast_compat;		/* --cast-compat: write plain asciicast, nothing of ours */
 	bool interactive;
 	int debug;
 	bool pretty;

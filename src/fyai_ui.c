@@ -3264,17 +3264,21 @@ static void ui_cast_open(struct fyai_ui *ui, int cols, int rows)
 
 	if (!path || !*path)
 		return;
-	/* What the program knew at the start, for the reader of the recording. */
-	props = fy_mapping("version", VERSION, "pid", (long long)getpid(),
-			   "branch", fyai_ctx_branch(ctx),
-			   "model", ctx->cfg->model ? ctx->cfg->model : "",
-			   "sandbox_profile", ctx->cfg->sandbox_profile ?
-				ctx->cfg->sandbox_profile : "normal");
+	/* What the program knew at the start, for the reader of the recording. A plain
+	 * asciicast has nothing of ours: the header member and the trace markers stay out. */
+	props = fy_invalid;
+	if (!ctx->cfg->cast_compat)
+		props = fy_mapping("version", VERSION, "pid", (long long)getpid(),
+				   "branch", fyai_ctx_branch(ctx),
+				   "model", ctx->cfg->model ? ctx->cfg->model : "",
+				   "sandbox_profile", ctx->cfg->sandbox_profile ?
+					ctx->cfg->sandbox_profile : "normal");
 	ui->cast = fyai_cast_open(ctx, path, cols, rows, "fyai", props);
 	if (!ui->cast)
 		return;
 	(void)fytim_set_output_tap(ui->ft, ui_cast_tap, ui->cast);
-	fyai_diag_trace_tap(ui_trace_tap, ui);
+	if (!ctx->cfg->cast_compat)
+		fyai_diag_trace_tap(ui_trace_tap, ui);
 }
 
 void fyai_ui_marker(struct fyai_ctx *ctx, const char *label)

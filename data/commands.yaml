@@ -134,6 +134,9 @@ global:
         description: record the screen of an interactive session to an asciicast file
         x-fyai-meta: FILE
         x-fyai-complete: file
+      cast-compat:
+        type: boolean
+        description: write the recording of --cast as plain asciicast, without the header member and the trace markers of fyai
       debug:
         type: boolean
         description: increase the debug verbosity
