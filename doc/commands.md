@@ -30,6 +30,7 @@ Do not edit; run `ninja docs-commands` to write it again.
 | `--answer TEXT` | supply an ask_user answer in advance |
 | `--image PATH` | attach an image from a file to the prompt |
 | `--cast FILE` | record the screen of an interactive session to an asciicast file |
+| `--cast-compat` | write the recording of --cast as plain asciicast, without the header member and the trace markers of fyai |
 | `-d`, `--debug` | increase the debug verbosity |
 
 # Verbs

@@ -1397,10 +1397,22 @@ start of each turn and at each interrupt, and the records of the trace
 `scope: begin`, a process that started or ended, and each warning and error.
 `asciinema play` shows them as markers, and `jq` finds them by text.
 
-`fyai cast play FILE` shows a recording again in this terminal, with `--speed`
-and `--idle-limit` (a pause longer than the limit is shortened, 2 seconds by
-default). ^C stops it and puts the terminal back. `fyai cast markers FILE` lists
+`fyai cast play FILE` opens a player on the alternate screen. Space plays and
+pauses, the left and right arrows step a second (with shift, ten), up and down
+change the speed, `[` and `]` jump to the previous and the next marker, `,` and
+`.` step a frame, `e` lists the markers, and `q` or Escape leaves. A key or a
+click shows the controls at the bottom, and they go after three seconds with no
+input. The mouse works: a click on the timeline seeks, a click on a control acts,
+a click on a marker of the list jumps to it, and the wheel moves through the
+recording. A pause longer than two seconds is shortened while it plays. A seek
+back replays the recording from its start. With `--plain`, or when the output
+is a pipe, the command writes the bytes with their timing instead, with `--speed`
+and `--idle-limit`; ^C stops it and puts the terminal back. `fyai cast markers FILE` lists
 the markers with their time, and `fyai cast info FILE` shows the header.
+
+`--cast-compat` writes plain asciicast: the header has only the members of the
+format, and the markers that come from the trace are left out. Another player,
+such as `asciinema`, then needs nothing of fyai.
 
 The recording holds all that the screen showed, thus it can hold text that you
 would not share. fyai makes the file with mode 0600. The option is not passed to

@@ -13,8 +13,10 @@
   the environment variable `FYAI_CAST`. The recording leaves out a repeated
   cursor update of an idle page. Its header says what the program knew at the
   start, and its markers say what the program did: requests, the end of a turn,
-  tool calls, and each warning and error. `fyai cast play`, `markers`
-  and `info` play a recording again, list its markers, and show its header.
+  tool calls, and each warning and error. `fyai cast play` opens a
+  player with play and pause, steps, marker jumps, a list of markers, a timeline
+  and the mouse; `markers` and `info` list the markers and show the header.
+  `--cast-compat` writes plain asciicast.
 
 ### Fixed
 
