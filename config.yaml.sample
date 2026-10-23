@@ -286,6 +286,12 @@ sandbox_profiles:
     description: the dev profile, and a program may make a user namespace (BitBake, Yocto)
     extends: dev
     expose: [userns]     # Needs a cover (sandbox_cover): a PID namespace and read-only /proc/sys.
+  yocto:
+    description: the build profile, with a home of its own (Yocto, BitBake)
+    extends: build
+    home:
+      private: true      # No ~/.netrc is there, so a reader gets "not found", not EACCES.
+      copy: [~/.gitconfig]
   dev-view:
     description: the dev profile, with the session in a view of the project
     extends: dev
