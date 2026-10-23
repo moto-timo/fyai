@@ -409,6 +409,7 @@ struct fyai_cfg {
 	fy_generic sandbox;	/* policy in force: mapping (allow/deny/network), or invalid */
 	const char *sandbox_profile;	/* profile that made the policy; NULL: `sandbox` */
 	const char *sandbox_reported;	/* what the last report of open egress was for */
+	const char *sandbox_on_failure;	/* a sandbox that cannot be set up: fail or warn */
 	const char *sandbox_cover;	/* how a tool hides the arena: auto, userns, bwrap, none */
 	long long sandbox_grace_ms;	/* time that a process of a scope has to stop after SIGTERM */
 	const char *sandbox_scope;	/* how long its processes live: exchange, session, call */
@@ -931,6 +932,7 @@ struct fyai_ctx {
 	struct fyai_event_source *orphan_kill;
 	struct fyai_home *home;		/* the home of the tools, when a profile gives them one */
 	bool sandbox_applied;
+	bool sandbox_warned;		/* the failure of the sandbox was reported */
 	/* Index of the next pre-supplied --answer to hand to ask_user. */
 	size_t answer_next;
 	/* Set when ask_user needs an answer but none can be obtained

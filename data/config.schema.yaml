@@ -762,6 +762,18 @@ properties:
       then `bwrap`. `none` leaves it to Landlock. Where a cover is not possible,
       fyai says so at the start and names the fix: `fyai sandbox apparmor`, or
       bubblewrap with its AppArmor profile.
+  sandbox_on_failure:
+    x-fyai-model: read
+    type: string
+    enum: [fail, warn]
+    default: warn
+    description: >-
+      Choose what happens when the tool sandbox cannot be set up, for example
+      because the profile makes mounts and the host does not allow user
+      namespaces, or the host cannot restrict network egress. `fail` stops the
+      tool and says why. `warn`, the default, reports the cause once, with
+      the way to fix it, and runs the tool without the confinement that failed.
+      The tool is then not confined: set `fail` where that is not acceptable.
   sandbox_scope:
     x-fyai-model: hidden
     type: string

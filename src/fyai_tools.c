@@ -827,7 +827,7 @@ char *fyai_sandbox_resolve_path(const char *base, const char *p)
  * the arena .fyai plus every config deny entry carved out, the config allow
  * entries added, and the configured TCP and UDP network policies applied.
  */
-static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
+static int fyai_shell_sandbox_build(struct fyai_ctx *ctx,
 				    struct fyai_shell_sandbox *sb,
 				    const struct fyai_sandbox_spec **specp)
 {
@@ -1060,6 +1060,46 @@ err_out:
 	}
 	fyai_shell_sandbox_end(sb);
 	return -1;
+}
+
+/*
+ * Build the sandbox of a tool. With `sandbox_on_failure: warn` a sandbox that
+ * cannot be set up is reported once, with its cause, and the tool runs
+ * without it: @specp is NULL, as for a disabled sandbox.
+ */
+static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
+				    struct fyai_shell_sandbox *sb,
+				    const struct fyai_sandbox_spec **specp)
+{
+	bool had_error;
+	char *cause;
+	size_t len;
+
+	if (!ctx->cfg->sandbox_on_failure ||
+	    strcmp(ctx->cfg->sandbox_on_failure, "warn"))
+		return fyai_shell_sandbox_build(ctx, sb, specp);
+	had_error = fyai_diag_got_error(fyai_ctx_diag(ctx));
+	if (!fyai_shell_sandbox_build(ctx, sb, specp))
+		return 0;
+	/* An error that was pending before the call is not the cause of this one. */
+	cause = had_error ? NULL : fyai_diag_string(fyai_ctx_diag(ctx));
+	if (!had_error)
+		fyai_diag_reset(fyai_ctx_diag(ctx));
+	if (!ctx->sandbox_warned) {
+		len = cause ? strlen(cause) : 0;
+		while (len && (cause[len - 1] == '\n' || cause[len - 1] == ' '))
+			cause[--len] = '\0';
+		fyai_warning(ctx, "the sandbox could not be set up (%s); the tools run "
+			     "without it because `sandbox_on_failure` is `warn`. Set "
+			     "`sandbox_on_failure: fail` to stop the tools instead, or fix the "
+			     "cause (doc/apparmor-userns.md)",
+			     len ? cause : "no cause was reported");
+		ctx->sandbox_warned = true;
+	}
+	free(cause);
+	memset(sb, 0, sizeof(*sb));
+	*specp = NULL;
+	return 0;
 }
 
 static void fyai_shell_sandbox_end(struct fyai_shell_sandbox *sb)

@@ -225,6 +225,10 @@ sandbox_profile: dev
 # bwrap or none (Landlock alone, which stops a tool from creating entries in the
 # project root).
 sandbox_cover: auto
+# What happens when the sandbox cannot be set up on this host, as when the profile
+# makes mounts and user namespaces are not allowed. `warn` says why one time and
+# runs the tool without the sandbox. `fail` stops the tool and says why.
+sandbox_on_failure: warn
 # How long the processes that a tool starts live. A program that detaches, as a
 # build server does, lives for the exchange (the prompt to the end of the turn),
 # and a terminal session or a monitor keeps it longer. `session` keeps it until
