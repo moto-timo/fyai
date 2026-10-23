@@ -1963,7 +1963,7 @@ that owns the mount and unmount before leaving a rootless inspection shell.
 
 enter a private filesystem view
 
-**Usage:** `fyai view enter [--verify] [--lockdown] NAME [COMMAND...]`
+**Usage:** `fyai view enter [--verify] [--lockdown] [--profile PROFILE] NAME [COMMAND...]`
 
 Mount the named view in private namespaces and start a shell in its project
 directory, or execute the remaining command arguments directly. Standard
@@ -1985,7 +1985,8 @@ namespaces, OverlayFS, and Landlock.
 | Option | Description |
 | --- | --- |
 | `--verify` | independently verify copied bytes and hashes serially before publication; default false |
-| `--lockdown` | confine the command as a tool of a session under /session lockdown, for this run only; default false |
+| `--lockdown` | confine the command as a tool of a session under /session lockdown, for this run only; the same as --profile lockdown; default false |
+| `--profile PROFILE` | confine the command by the named sandbox profile, for this run only, as a tool of a session under /session profile NAME is confined |
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 
@@ -5016,7 +5017,7 @@ that owns the mount and unmount before leaving a rootless inspection shell.
 
 enter a private filesystem view
 
-**Usage:** `/view enter [--verify] [--lockdown] NAME [COMMAND...]`
+**Usage:** `/view enter [--verify] [--lockdown] [--profile PROFILE] NAME [COMMAND...]`
 
 Mount the named view in private namespaces and start a shell in its project
 directory, or execute the remaining command arguments directly. Standard
@@ -5038,7 +5039,8 @@ namespaces, OverlayFS, and Landlock.
 | Option | Description |
 | --- | --- |
 | `--verify` | independently verify copied bytes and hashes serially before publication; default false |
-| `--lockdown` | confine the command as a tool of a session under /session lockdown, for this run only; default false |
+| `--lockdown` | confine the command as a tool of a session under /session lockdown, for this run only; the same as --profile lockdown; default false |
+| `--profile PROFILE` | confine the command by the named sandbox profile, for this run only, as a tool of a session under /session profile NAME is confined |
 | `-h`, `--help` | show this help |
 
 ## /catalog

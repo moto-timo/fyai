@@ -215,6 +215,13 @@ int fyai_config_select_resume(struct fyai_cfg *cfg);
 void fyai_config_sandbox_lockdown(struct fyai_cfg *cfg);
 
 /*
+ * Confine the tools of @cfg by the sandbox profile @name, as `/session profile`
+ * does for a session, and enable the sandbox. Returns 0, or -1 after it reported
+ * that the profile is not defined or not valid.
+ */
+int fyai_config_sandbox_select(struct fyai_cfg *cfg, const char *name);
+
+/*
  * Report once, as a warning, a network operation that the sandbox policy names
  * and the kernel cannot restrict. Call it when a process starts to run and when
  * the sandbox profile changes; it says nothing again for the same profile. A tool

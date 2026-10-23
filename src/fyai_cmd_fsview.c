@@ -1952,6 +1952,10 @@ static int view_enter_terminal(struct fyai_cmd_call *call)
 		rc = response_buffer_append(&line, "--verify ");
 	if (!rc && fyai_cmd_arg_bool(call, "lockdown"))
 		rc = response_buffer_append(&line, "--lockdown ");
+	if (!rc && fyai_cmd_arg_str(call, "profile"))
+		rc = response_buffer_append(&line, "--profile ") ||
+		     fyai_shell_quote(&line, fyai_cmd_arg_str(call, "profile")) ||
+		     response_buffer_append(&line, " ");
 	if (!rc)
 		rc = fyai_shell_quote(&line, fyai_cmd_arg_str(call, "name")) ||
 		     response_buffer_append(&line, " --");
@@ -2086,20 +2090,25 @@ int fyai_cmd_view_enter(struct fyai_cmd_call *call, fy_generic *result)
 	char error[PATH_MAX] = "", startup[FYAI_CHILD_START_TEXT_MAX];
 	const char *why;
 	int rc = -1, saved;
-	bool complete = false, lockdown = fyai_cmd_arg_bool(call, "lockdown");
+	bool complete = false, lockdown;
+	const char *profile = fyai_cmd_arg_str(call, "profile");
 
 	if (call->surface == FYAI_CMD_SESSION)
 		return view_enter_terminal(call);
 	if (view_writable(call->ctx))
 		return -1;
-	/* What a tool of a session under /session lockdown gets in its view. */
+	/* What a tool of a session under that profile gets in its view. */
+	if (fyai_cmd_arg_bool(call, "lockdown"))
+		profile = "lockdown";
+	lockdown = profile && *profile;
 	if (lockdown) {
 		if (!fyai_sandbox_available()) {
-			fyai_error(call->ctx, "view '%s': --lockdown needs Landlock, which this "
+			fyai_error(call->ctx, "view '%s': --profile needs Landlock, which this "
 				   "kernel lacks", name);
 			return -1;
 		}
-		fyai_config_sandbox_lockdown(call->ctx->cfg);
+		if (fyai_config_sandbox_select(call->ctx->cfg, profile))
+			return -1;
 		if (!fyai_sandbox_net_restrictable(-1))
 			fyai_warning(call->ctx, "view '%s': this kernel cannot restrict network "
 				     "egress: it stays open", name);

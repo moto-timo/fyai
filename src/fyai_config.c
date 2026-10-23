@@ -376,10 +376,20 @@ static int resolve_secret(struct fyai_cfg *cfg, const char **out, fy_generic v)
 
 void fyai_config_sandbox_lockdown(struct fyai_cfg *cfg)
 {
-	cfg->sandbox_profile = "lockdown";
-	cfg->sandbox = fyai_sandbox_profile_policy(cfg, cfg->config_doc,
-						   "lockdown");
+	(void)fyai_config_sandbox_select(cfg, "lockdown");
+}
+
+int fyai_config_sandbox_select(struct fyai_cfg *cfg, const char *name)
+{
+	fy_generic policy;
+
+	policy = fyai_sandbox_profile_policy(cfg, cfg->config_doc, name);
+	if (fy_is_invalid(policy))
+		return -1;
+	cfg->sandbox_profile = fy_gb_intern_string(cfg->gb, name);
+	cfg->sandbox = policy;
 	cfg->enable_sandbox = true;
+	return 0;
 }
 
 /*

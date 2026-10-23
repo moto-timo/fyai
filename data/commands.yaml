@@ -2118,8 +2118,14 @@ commands:
             lockdown:
               type: boolean
               default: false
-              description: confine the command as a tool of a session under /session lockdown, for this run only
+              description: confine the command as a tool of a session under /session lockdown, for this run only; the same as --profile lockdown
               x-fyai-long: lockdown
+            profile:
+              type: string
+              description: confine the command by the named sandbox profile, for this run only, as a tool of a session under /session profile NAME is confined
+              x-fyai-long: profile
+              x-fyai-meta: PROFILE
+              x-fyai-complete: sandbox-profile
             name:
               type: string
               description: the name of the view to enter

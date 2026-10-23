@@ -931,6 +931,8 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	sp->hide_n = sb->hide_n;
 	mounts = ctx->home ? ctx->home->mount_n : 0;
 	fyai_error_check(ctx, !mounts || method != FYAI_COVER_NONE, err_out,
+			 ctx->cfg->view_project ?
+			 "sandbox: the profile makes mounts, which a view does not support yet" :
 			 "sandbox: the profile makes mounts, which need a user namespace; "
 			 "set sandbox_cover to auto and allow user namespaces (see "
 			 "doc/apparmor-userns.md)");
