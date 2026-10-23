@@ -1296,6 +1296,12 @@ The `yocto` profile is `build` with a private home that holds a copy of `~/.gitc
 program that reads `~/.netrc` then gets "not found" and not "permission denied", which
 the readers of BitBake and Poky handle; the file is denied, so it is never copied.
 
+`sandbox_on_failure` says what happens when the sandbox cannot be set up, for example
+when a profile makes mounts and the host does not allow user namespaces. `warn`, the
+default, reports the cause one time, with the way to fix it, and runs the tool without
+the sandbox. `fail` stops the tool and says why: use it where an unconfined tool is not
+acceptable.
+
 `sandbox_cover` chooses how the tool gets the namespaces. `auto` (the default) tries
 `userns`, where the tool makes them itself, then `bwrap`, where fyai starts one
 bubblewrap process that holds them and each tool joins them. `none` leaves the arena

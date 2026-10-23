@@ -56,6 +56,10 @@
 - **A daemon can be named and stopped.** `name` on a `background` call labels the daemon
   in `list daemons`. `cancel` and `/kill` stop it by its label or its pid, with SIGTERM
   and SIGKILL after `sandbox_grace_ms`.
+- **`sandbox_on_failure`** says what happens when the sandbox cannot be set up on the
+  host, as when a profile makes mounts and user namespaces are not allowed. `warn`, the
+  default, reports the cause one time and runs the tool without the sandbox. `fail`
+  stops the tool and says why. A host with no AppArmor profile for fyai thus still works.
 
 ### Fixed
 
