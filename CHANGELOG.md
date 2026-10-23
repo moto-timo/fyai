@@ -6,6 +6,9 @@
 
 - **`list_root`** is a profile key that lets a tool open and list `/`. The `dev`
   profile has it: the package scripts of a build change to `/` and open `.`.
+- **The top row of the prompt names the sandbox profile.** The new `{sandbox}` value of
+  `display/prompt_top`, which the default row ends with, is ` · sandbox PROFILE`, or
+  ` · no sandbox` when nothing confines the tools.
 
 ### Fixed
 

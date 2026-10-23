@@ -1159,6 +1159,11 @@ the key of the profile it extends, except `allow`, which adds to it. `extends` i
 own name starts from the sample profile of that name. A name that no profile has, or
 a chain of `extends` that is a cycle, is an error.
 
+The top row of the prompt names the profile that confines the tools (`{sandbox}` in
+`display/prompt_top`): ` · sandbox dev`, ` · sandbox on` for the `sandbox` setting
+alone, and ` · no sandbox` when nothing confines them. It changes when `/session profile`
+does.
+
 A profile has a `view` setting: `true` runs the session in a view of the project,
 where this host can make one (`lockdown` and `dev-view` do; `dev` does not, because a
 view is jarring as a default). `dev-view` is `dev` with `view: true`. `/session profile`
