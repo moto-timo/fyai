@@ -51,6 +51,16 @@ sandbox_profile: dev' 'cat ~/.ssh/id_test || echo deny-ok'
 assert_stdout_contains deny-ok
 assert_stdout_not_contains classified
 
+# The dev profile lets a program open and list /, and a profile without list_root does not.
+shell_with 'sandbox_profile: dev' 'ls / >/dev/null && echo root-listed'
+assert_stdout_contains root-listed
+shell_with 'sandbox_profile: nolist
+sandbox_profiles:
+  nolist:
+    extends: dev
+    list_root: false' 'ls / >/dev/null 2>&1 && echo root-listed || echo root-denied'
+assert_stdout_contains root-denied
+
 # The project is readable and writable.
 shell_with 'sandbox_profile: dev' 'cat other/data.txt && echo w > other/made.txt && cat other/made.txt'
 assert_stdout_contains other-data
