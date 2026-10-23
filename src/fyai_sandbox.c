@@ -32,6 +32,7 @@
 #include <sys/stat.h>
 
 #include "fyai_cover.h"
+#include "fyai_orphan.h"
 #include "fyai_fsview.h"
 #include "fyai_sandbox.h"
 
@@ -514,6 +515,9 @@ int fyai_sandbox_apply(const struct fyai_sandbox_spec *spec)
 	} else if (spec->hide_n && fyai_fsview_hide(spec->hide, spec->hide_n)) {
 		return -1;
 	}
+	/* The processes below are in a namespace: their pids mean nothing outside it. */
+	if (spec->cover_holder > 0 || spec->hide_n)
+		fyai_orphan_namespaced();
 
 	mask = fs_mask(abi);
 	attr.handled_access_fs = mask;

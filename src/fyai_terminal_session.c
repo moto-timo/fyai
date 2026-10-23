@@ -37,6 +37,7 @@
 #include "fyai_tools.h"
 #include "fyai_jsonrpc.h"
 #include "fyai_terminal_session.h"
+#include "fyai_orphan.h"
 #include "fyai_ui.h"
 #include "fyai_terminal_view.h"
 #include "utils.h"
@@ -644,11 +645,13 @@ static void relay_finish(struct fyai_terminal_relay *rl)
 	if (WIFSIGNALED(rl->status))
 		relay_notify(rl, "shell/exit",
 			     fy_gb_mapping(gb, "signal",
-					   (long long)WTERMSIG(rl->status)));
+					   (long long)WTERMSIG(rl->status),
+					   "detached", fyai_orphan_children(gb)));
 	else
 		relay_notify(rl, "shell/exit",
 			     fy_gb_mapping(gb, "exit_code",
-					   (long long)WEXITSTATUS(rl->status)));
+					   (long long)WEXITSTATUS(rl->status),
+					   "detached", fyai_orphan_children(gb)));
 }
 
 static void relay_drain_output(struct fyai_terminal_relay *rl)

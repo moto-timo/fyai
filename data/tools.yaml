@@ -130,7 +130,10 @@
   function:
     name: exec_command
     description: |-
-      Run a shell command in the workspace.
+      Run a shell command in the workspace. A program that the command leaves running, such as a
+      build server, stays alive for the later calls of the same exchange, which lasts until you
+      give your final answer; the result says when a call left one. Everything ends then, except
+      a named terminal session, a monitor and a background sub-agent, which keep it until they end.
     parameters:
       type: object
       properties:

@@ -775,6 +775,17 @@ properties:
       session or a monitor keeps the scope while it lives. `session` ends the
       scope when the interactive session ends. `call` ends the processes of a
       call with the call.
+  sandbox_grace_ms:
+    x-fyai-model: hidden
+    type: integer
+    minimum: 0
+    maximum: 600000
+    default: 5000
+    description: >-
+      Set the time, in milliseconds, that the processes of a scope have to stop
+      after SIGTERM, when the scope ends. A build server that must save its state
+      needs time. They are then ended with SIGKILL. A run that ends waits for
+      them this long at most; a run with no such process does not wait.
   sandbox_profile:
     x-fyai-model: read
     x-fyai-complete: sandbox-profile

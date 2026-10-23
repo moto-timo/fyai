@@ -628,7 +628,12 @@ int fyai_fsview_hide(const char *const *paths, size_t n)
 }
 
 /* Time that the init of a scope gives its processes to end after SIGTERM. */
-#define VIEW_HOLDER_GRACE_MS 2000
+static long view_holder_grace_ms = 2000;
+
+void fyai_fsview_set_grace(long ms)
+{
+	view_holder_grace_ms = ms;
+}
 
 /*
  * Reap the zombies of the PID namespace, and say whether any process but this
@@ -701,7 +706,7 @@ static void view_holder_init(int hold)
 	}
 	/* The owner is gone: stop the processes, then end them. */
 	(void)kill(-1, SIGTERM);
-	for (left = VIEW_HOLDER_GRACE_MS; left > 0; left -= 20) {
+	for (left = view_holder_grace_ms; left > 0; left -= 20) {
 		if (!view_holder_children())
 			_exit(0);
 		(void)poll(NULL, 0, 20);
@@ -1717,6 +1722,11 @@ int fyai_fsview_hide(const char *const *paths, size_t n)
 	(void)n;
 	errno = ENOTSUP;
 	return -1;
+}
+
+void fyai_fsview_set_grace(long ms)
+{
+	(void)ms;
 }
 
 int fyai_fsview_metacopy_check(const char *runtime)

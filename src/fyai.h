@@ -410,6 +410,7 @@ struct fyai_cfg {
 	const char *sandbox_profile;	/* profile that made the policy; NULL: `sandbox` */
 	const char *sandbox_reported;	/* what the last report of open egress was for */
 	const char *sandbox_cover;	/* how a tool hides the arena: auto, userns, bwrap, none */
+	long long sandbox_grace_ms;	/* time that a process of a scope has to stop after SIGTERM */
 	const char *sandbox_scope;	/* how long its processes live: exchange, session, call */
 	const char *cast_path;		/* --cast: the file that records the screen, or NULL */
 	bool cast_compat;		/* --cast-compat: write plain asciicast, nothing of ours */
@@ -649,6 +650,7 @@ struct fyai_catalog_update_request;
 
 struct fyai_event_loop;
 struct fyai_event_source;
+struct fyai_orphan;
 
 /* Token and cost totals of the usage that some turns carry. */
 struct fyai_usage_sum {
@@ -924,6 +926,8 @@ struct fyai_ctx {
 	struct fyai_cover cover;	/* how a tool hides the arena, and the holder of it */
 	int scope_pins;			/* objects that keep the scope of an exchange */
 	bool scope_open;		/* an exchange runs */
+	struct fyai_orphan *orphans;	/* processes that a tool left, to end with the scope */
+	struct fyai_event_source *orphan_kill;
 	bool sandbox_applied;
 	/* Index of the next pre-supplied --answer to hand to ask_user. */
 	size_t answer_next;

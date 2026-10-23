@@ -16,6 +16,7 @@
 #include "config.h"
 #endif
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -92,6 +93,23 @@ static void cover_retire(struct fyai_cover *cover, pid_t pid)
 	cover->retired[FYAI_COVER_RETIRED_MAX - 1] = pid;
 }
 
+void fyai_cover_drain(struct fyai_cover *cover)
+{
+	size_t i;
+	pid_t pid;
+	int rc;
+
+	for (i = 0; i < FYAI_COVER_RETIRED_MAX; i++) {
+		pid = cover->retired[i];
+		if (pid <= 0)
+			continue;
+		do {
+			rc = waitpid(pid, NULL, 0);
+		} while (rc < 0 && errno == EINTR);
+		cover->retired[i] = 0;
+	}
+}
+
 void fyai_cover_release(struct fyai_cover *cover)
 {
 	/* The pipe ends, the holder reads the end, and the namespaces go with it. */
@@ -137,6 +155,41 @@ static bool list_has(const char *list, const char *path)
 bool fyai_cover_covers(const struct fyai_cover *cover, const char *path)
 {
 	return cover->holder > 0 && list_has(cover->paths, path);
+}
+
+size_t fyai_cover_members(const struct fyai_cover *cover, pid_t *pids, size_t max)
+{
+	char path[64], want[64], got[64];
+	struct dirent *de;
+	ssize_t n;
+	size_t count = 0;
+	DIR *dir;
+	long pid;
+
+	if (cover->holder <= 0 || !max)
+		return 0;
+	snprintf(path, sizeof(path), "/proc/%d/ns/pid", (int)cover->holder);
+	n = readlink(path, want, sizeof(want) - 1);
+	if (n <= 0)
+		return 0;
+	want[n] = '\0';
+	dir = opendir("/proc");
+	if (!dir)
+		return 0;
+	while (count < max && (de = readdir(dir))) {
+		pid = strtol(de->d_name, NULL, 10);
+		if (pid <= 0 || pid == cover->holder)
+			continue;
+		snprintf(path, sizeof(path), "/proc/%ld/ns/pid", pid);
+		n = readlink(path, got, sizeof(got) - 1);
+		if (n <= 0)
+			continue;
+		got[n] = '\0';
+		if (!strcmp(got, want))
+			pids[count++] = (pid_t)pid;
+	}
+	closedir(dir);
+	return count;
 }
 
 /* Find the bubblewrap program in the usual places; a tool has no PATH to search. */
@@ -564,6 +617,11 @@ void fyai_cover_release(struct fyai_cover *cover)
 	(void)cover;
 }
 
+void fyai_cover_drain(struct fyai_cover *cover)
+{
+	(void)cover;
+}
+
 enum fyai_cover_method fyai_cover_select(struct fyai_cover *cover, const char *mode,
 				  const char *const *paths, size_t n, pid_t *holder,
 				  enum fyai_cover_start start)
@@ -575,6 +633,14 @@ enum fyai_cover_method fyai_cover_select(struct fyai_cover *cover, const char *m
 	(void)start;
 	*holder = 0;
 	return FYAI_COVER_NONE;
+}
+
+size_t fyai_cover_members(const struct fyai_cover *cover, pid_t *pids, size_t max)
+{
+	(void)cover;
+	(void)pids;
+	(void)max;
+	return 0;
 }
 
 bool fyai_cover_covers(const struct fyai_cover *cover, const char *path)

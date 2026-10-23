@@ -75,6 +75,13 @@ void fyai_cover_abandon(struct fyai_cover *cover);
 void fyai_cover_release(struct fyai_cover *cover);
 
 /*
+ * Wait until the holders that fyai_cover_release() ended are gone, and with them
+ * the mounts of their namespaces. A holder gives its processes a grace time, so
+ * this can take that long. A caller removes a mount point only after it.
+ */
+void fyai_cover_drain(struct fyai_cover *cover);
+
+/*
  * Choose the cover for the @n existing @paths. @mode is `sandbox_cover`: auto
  * (USERNS, else BWRAP, else NONE), userns, bwrap or none. A holder that an
  * ancestor started is used before a new one is started. With BWRAP, *@holder is
@@ -83,6 +90,13 @@ void fyai_cover_release(struct fyai_cover *cover);
 enum fyai_cover_method fyai_cover_select(struct fyai_cover *cover, const char *mode,
 				  const char *const *paths, size_t n, pid_t *holder,
 				  enum fyai_cover_start start);
+
+/*
+ * The processes that the holder of this process holds, by pid in the namespace
+ * of this process: the ones with the PID namespace of the holder. Returns how
+ * many it wrote to @pids, at most @max. The holder itself is not one.
+ */
+size_t fyai_cover_members(const struct fyai_cover *cover, pid_t *pids, size_t max);
 
 /* True when the holder of this process covers @path. */
 bool fyai_cover_covers(const struct fyai_cover *cover, const char *path);

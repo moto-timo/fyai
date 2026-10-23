@@ -58,6 +58,7 @@
 #include "fyai_settings.h"
 #include "fyai_todo.h"
 #include "fyai_tools.h"
+#include "fyai_orphan.h"
 #include "fyai_view.h"
 #include "fyai_cover.h"
 #include "fyai_fsview.h"
@@ -871,6 +872,7 @@ static int fyai_shell_sandbox_begin(struct fyai_ctx *ctx,
 	else
 		start = ctx->cfg->tool_child ? FYAI_COVER_JOIN_ONLY :
 					       FYAI_COVER_START_SCOPE;
+	fyai_fsview_set_grace((long)ctx->cfg->sandbox_grace_ms);
 	method = ctx->cfg->view_project ? FYAI_COVER_NONE :
 		 fyai_cover_select(&ctx->cover, ctx->cfg->sandbox_cover,
 				   (const char *const *)cand, cn, &holder, start);
@@ -2426,6 +2428,29 @@ int fyai_tools_confine(struct fyai_ctx *ctx)
 	return fyai_tool_apply_sandbox(ctx);
 }
 
+/*
+ * Tell the model that a call left a process running, and when it ends. A
+ * scope of one call ends the process with the call, so it needs no note.
+ */
+static fy_generic fyai_tool_result_note(struct fyai_ctx *ctx, bool agent_call,
+					fy_generic result)
+{
+	const char *scope = ctx->cfg->sandbox_scope;
+	struct fy_generic_builder *gb;
+	fy_generic note;
+
+	if (!fy_is_string(result) || !strcmp(scope, "call") || agent_call)
+		return result;
+	gb = fyai_ctx_transient_gb(ctx);
+	note = fyai_orphan_note(gb, !strcmp(scope, "session") ?
+				"They end with this session." :
+				"They end with this exchange.");
+	if (!fy_is_string(note))
+		return result;
+	return fy_stringf(gb, "%s\n%s", fy_castp(&result, ""),
+			  fy_castp(&note, ""));
+}
+
 /* These descriptors contain the private JSON-RPC channel. */
 #define FYAI_TOOL_CHILD_REQ_FD 3	/* parent -> child, read by the child */
 #define FYAI_TOOL_CHILD_RSP_FD 4	/* child -> parent, written by the child */
@@ -2836,7 +2861,7 @@ static void fyai_tool_child_serve_loop(struct fyai_ctx *ctx)
 	struct fyai_event_loop *el;
 	struct jsonrpc_conn *conn;
 	fy_generic result, diag;
-	bool ok = false, unconfined;
+	bool ok = false, unconfined, agent_call;
 
 	memset(&tc, 0, sizeof(tc));
 	tc.ctx = ctx;
@@ -2880,8 +2905,15 @@ static void fyai_tool_child_serve_loop(struct fyai_ctx *ctx)
 			 * A sub-agent runtime publishes to the arena that the sandbox
 			 * denies. Each tool that it runs is confined in its own child.
 			 */
+			/* What a program detaches becomes a child of this one. */
+			agent_call = fy_equal(fyai_tool_call_name(ctx, tc.args), "agent");
+			if (!agent_call)
+				fyai_orphan_subreaper();
 			unconfined = !fy_equal(fyai_tool_call_name(ctx, tc.args), "agent") &&
 				     fyai_tool_apply_sandbox(ctx);
+			/* A joined scope forked the program: it is the parent that counts. */
+			if (!agent_call)
+				fyai_orphan_subreaper();
 			if (!unconfined && fyai_shell_session_call(ctx, tc.args)) {
 				fyai_tool_child_session(ctx, &tc, conn);
 				/* Exit according to whether the session opened. */
@@ -2904,6 +2936,7 @@ static void fyai_tool_child_serve_loop(struct fyai_ctx *ctx)
 				result = fyai_execute_tool_call(ctx, tc.args, &ok);
 			}
 			fyai_agents_leave(ctx, ok);
+			result = fyai_tool_result_note(ctx, agent_call, result);
 			/* Return child diagnostics with the tool result. */
 			diag = fyai_diag_take_generic(&ctx->cfg->diag,
 						      fyai_ctx_transient_gb(ctx));
@@ -2913,6 +2946,8 @@ static void fyai_tool_child_serve_loop(struct fyai_ctx *ctx)
 					      "display", ctx->patch_display ?
 						fy_value(ctx->patch_display) :
 						fy_null,
+					      "detached", fyai_orphan_children(
+						fyai_ctx_transient_gb(ctx)),
 					      "diag", diag),
 				fy_invalid);
 			break;
@@ -3954,6 +3989,11 @@ static void fyai_shell_session_exited(struct fyai_shell_session *sess,
 	sess->exited = true;
 	sess->exit_code = exit_code;
 	sess->signal = signal;
+	/* The program has gone, so the session no longer needs the scope. */
+	if (sess->pinned) {
+		sess->pinned = false;
+		fyai_scope_unpin(sess->ctx);
+	}
 	fyai_shell_session_display_finish(sess);
 	if (sess->idle) {
 		fyai_event_source_remove(sess->idle);
@@ -5476,6 +5516,7 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	fyai_output_cleanup(ctx);		/* the document it has open */
 	fyai_diag_reset(&ctx->cfg->diag);	/* what the parent has not drained yet */
 	fyai_cover_abandon(&ctx->cover);	/* the holder that it does not own */
+	fyai_orphan_abandon(ctx);		/* and the processes that the scope keeps */
 	ctx->scope_pins = 0;
 	ctx->scope_open = false;
 	fyai_skill_dirs_abandon(ctx);		/* the skills it wrote out */
@@ -6357,6 +6398,7 @@ static void fyai_scope_settle(struct fyai_ctx *ctx)
 	/* A process that did not start the holder does not end it. */
 	if (ctx->cover.owner)
 		fyai_cover_release(&ctx->cover);
+	fyai_orphan_sweep(ctx);
 }
 
 void fyai_scope_exchange(struct fyai_ctx *ctx, bool begin)
@@ -6877,6 +6919,8 @@ static fy_generic fyai_tool_job_serve(struct jsonrpc_conn *conn,
 		return fy_invalid;
 	}
 	if (!strcmp(method, "shell/exit")) {
+		/* What the program left is tracked before the session lets go of the scope. */
+		fyai_orphan_track(job->ctx, fy_get(params, "detached", fy_invalid));
 		if (job->session)
 			fyai_shell_session_exited(job->session,
 				(int)fy_get(params, "exit_code", 0LL),
@@ -6924,6 +6968,10 @@ static void fyai_tool_job_run_done(struct jsonrpc_request *req, void *userdata)
 		job->result_ok = fy_get(r, "ok", false);
 		job->display = fy_get(r, "display", fy_invalid);
 		job->diag = fy_get(r, "diag", fy_invalid);
+		/* The scope keeps what the call left running. */
+		fyai_orphan_track(job->ctx, fy_get(r, "detached", fy_invalid));
+		if (!strcmp(job->ctx->cfg->sandbox_scope, "call"))
+			fyai_orphan_sweep(job->ctx);
 		/*
 		 * The reply is in the transient builder, which the turn
 		 * releases when it ends. A retained call is collected later,

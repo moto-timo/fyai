@@ -48,6 +48,7 @@
 #include "fyai_prof.h"
 #include "fyai_ui.h"
 #include "fyai_tools.h"
+#include "fyai_orphan.h"
 #include "fyai_view.h"
 #include "fyai_asks.h"
 #include "fyai_wait.h"
@@ -2654,6 +2655,9 @@ void fyai_cleanup(struct fyai_ctx *ctx)
 	cfg = ctx->cfg;
 
 	fyai_cover_release(&ctx->cover);
+	fyai_orphan_release(ctx);
+	/* The holder gives what is left in the scope its time before the process ends. */
+	fyai_cover_drain(&ctx->cover);
 
 	/* Remove the handlers before the context that they name is destroyed. */
 	/* A session cannot outlive the invocation that opened it, and neither

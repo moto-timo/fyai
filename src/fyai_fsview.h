@@ -125,6 +125,9 @@ int fyai_fsview_hide(const char *const *paths, size_t n);
  * *@init is the process whose namespaces fyai_cover_join() joins. Returns 0, or
  * -1 with errno set.
  */
+/* Set the time that the init of a holder gives its processes after SIGTERM. */
+void fyai_fsview_set_grace(long ms);
+
 int fyai_fsview_holder(const char *const *paths, size_t n, int hold,
 		       int owner, pid_t *waiter, pid_t *init);
 
