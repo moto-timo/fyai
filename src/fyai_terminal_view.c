@@ -388,6 +388,28 @@ static bool tty_csi_draws(const char *seq, size_t len, char final)
 }
 
 /* Track the active DEC alternate buffer independently of screen addressing. */
+bool fyai_terminal_sniff(struct fyai_terminal_sniff *sn, const char *data,
+			 size_t len)
+{
+	size_t i;
+	unsigned char c;
+
+	for (i = 0; i < len; i++) {
+		c = (unsigned char)data[i];
+		/* A carriage return that no newline follows overwrites the row. */
+		if (sn->pending_cr) {
+			sn->pending_cr = false;
+			if (c != '\n')
+				return true;
+		}
+		if (c == 0x1b || c == '\b')
+			return true;
+		if (c == '\r')
+			sn->pending_cr = true;
+	}
+	return false;
+}
+
 static void tty_csi_alt_screen(struct fyai_terminal_view *view,
 			       const char *seq, size_t len, char final)
 {

@@ -1406,6 +1406,9 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 		goto out;
 	}
 
+	/* A program that draws on a pipe gets the screen that a terminal run would. */
+	fyai_shell_tty_size(ctx, args, &opts.rows, &opts.cols);
+	opts.max_bytes = fyai_shell_output_bytes(ctx, args);
 	if (run_shell_command_capture_cb(ctx, fy_castp(&command, ""), &result,
 					 fyai_shell_output, ctx, sandbox,
 					 &opts))
@@ -1800,6 +1803,8 @@ fy_generic fyai_execute_tool_call(struct fyai_ctx *ctx,
 		tty_call = fyai_shell_tty_requested(ctx, action);
 		shell_opts.shell = fyai_shell_shell_requested(ctx, action);
 		shell_opts.login = fyai_shell_login_requested(ctx, action);
+		fyai_shell_tty_size(ctx, action, &shell_opts.rows, &shell_opts.cols);
+		shell_opts.max_bytes = fyai_shell_output_bytes(ctx, action);
 		outputs = fy_seq_empty;
 		if (fyai_shell_sandbox_begin(ctx, &sb, &sandbox))
 			return fy_value(ctx->transient_gb,

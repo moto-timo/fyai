@@ -73,6 +73,21 @@ void fyai_terminal_view_size(const struct fyai_terminal_view *view, int *rowsp,
 			     int *colsp);
 
 
+/*
+ * Tell whether a program that writes to a pipe writes for a terminal. A pipe has
+ * none, yet some programs send control sequences to it, move the cursor, or
+ * overwrite a row with a carriage return or a backspace. The sniffer reads the
+ * bytes as they come and says so, so that the owner can give them to a view
+ * from then on.
+ */
+struct fyai_terminal_sniff {
+	bool pending_cr;	/* the last byte was a carriage return */
+};
+
+/* True when @data, with what came before it, holds such a byte. */
+bool fyai_terminal_sniff(struct fyai_terminal_sniff *sniff, const char *data,
+			 size_t len);
+
 /* Public cell and damage types for rendering an interpreted screen. */
 #define FYAI_TERM_CELL_CHARS	6
 

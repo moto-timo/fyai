@@ -42,6 +42,7 @@
 #include "fyai_sandbox.h"
 #include "fyai_fsview.h"
 #include "fyai_terminal.h"
+#include "fyai_terminal_view.h"
 #include "fyai_tools.h"
 #include "fyai_ui.h"
 
@@ -525,29 +526,6 @@ err_out:
 	goto out;
 }
 
-static int read_shell_pipe(int fd, struct response_buffer *buf,
-			   enum shell_output_stream stream,
-			   shell_output_fn output_fn, void *userdata)
-{
-	char tmp[4096];
-	ssize_t nread;
-
-	nread = read(fd, tmp, sizeof(tmp));
-	if (nread < 0)
-		return -1;
-	if (!nread)
-		return 0;
-
-	if (response_buffer_reserve(buf, buf->len + (size_t)nread + 1))
-		return -1;
-	memcpy(buf->data + buf->len, tmp, (size_t)nread);
-	buf->len += (size_t)nread;
-	buf->data[buf->len] = '\0';
-	if (output_fn)
-		output_fn(userdata, stream, tmp, (size_t)nread);
-	return 1;
-}
-
 /* Shell-capture state carried through the event callbacks. */
 /* Each participant owns its own source pointer so that withdrawing is
  * idempotent. */
@@ -560,7 +538,56 @@ struct shell_capture {
 	struct fyai_event_source *src;
 	bool open;
 	bool failed;
+	/* The screen of a program that draws, made when it first does. */
+	struct fyai_terminal_view *view;
+	struct fyai_terminal_sniff sniff;
+	const struct shell_command_opts *opts;
+	struct fyai_ctx *ctx;
 };
+
+/*
+ * Give the bytes that arrived to the capture. Until the program draws they are
+ * the text of the result, and the live display shows them. From the first byte
+ * that draws they go to a screen, made with all that came before, and the
+ * result is what that screen shows.
+ */
+static int read_shell_pipe(int fd, struct shell_capture *cap,
+			   const struct shell_command_opts *opts)
+{
+	char tmp[4096];
+	ssize_t nread;
+
+	nread = read(fd, tmp, sizeof(tmp));
+	if (nread < 0)
+		return -1;
+	if (!nread)
+		return 0;
+
+	if (cap->view)
+		return fyai_terminal_view_feed(cap->view, tmp, (size_t)nread) ? -1 : 1;
+	if (response_buffer_reserve(cap->buf, cap->buf->len + (size_t)nread + 1))
+		return -1;
+	memcpy(cap->buf->data + cap->buf->len, tmp, (size_t)nread);
+	cap->buf->len += (size_t)nread;
+	cap->buf->data[cap->buf->len] = '\0';
+	if (cap->output_fn)
+		cap->output_fn(cap->userdata, cap->stream, tmp, (size_t)nread);
+	if (opts && opts->rows > 0 && opts->cols > 0 &&
+	    fyai_terminal_sniff(&cap->sniff, tmp, (size_t)nread)) {
+		cap->view = fyai_terminal_view_create(cap->ctx, opts->rows,
+						      opts->cols, opts->max_bytes);
+		if (!cap->view)
+			return 1;
+		fyai_terminal_view_cooked(cap->view, true);
+		if (fyai_terminal_view_feed(cap->view, cap->buf->data, cap->buf->len))
+			return -1;
+		free(cap->buf->data);
+		cap->buf->data = NULL;
+		cap->buf->len = 0;
+		cap->buf->cap = 0;
+	}
+	return 1;
+}
 
 struct shell_capture_job {
 	struct shell_capture out;
@@ -601,8 +628,7 @@ static enum fyai_event_action shell_capture_readable(const struct fyai_event *ev
 	if (ev->events & (FYAIEV_READ | FYAIEV_EOF)) {
 		/* Drain greedily rather than one read per wakeup. */
 		for (;;) {
-			rc = read_shell_pipe(ev->fd, cap->buf, cap->stream,
-					     cap->output_fn, cap->userdata);
+			rc = read_shell_pipe(ev->fd, cap, cap->opts);
 			if (rc > 0)
 				continue;
 			if (rc < 0 && errno == EINTR)
@@ -631,8 +657,7 @@ static void shell_capture_drain(struct shell_capture *cap, int fd)
 	int rc;
 
 	for (;;) {
-		rc = read_shell_pipe(fd, cap->buf, cap->stream,
-				     cap->output_fn, cap->userdata);
+		rc = read_shell_pipe(fd, cap, cap->opts);
 		if (rc > 0)
 			continue;
 		if (rc < 0 && errno == EINTR)
@@ -1267,6 +1292,8 @@ int run_shell_command_capture_cb(struct fyai_ctx *ctx, const char *command,
 	job.out.stream = SHELL_OUTPUT_STDOUT;
 	job.err.buf = &stderr_buf;
 	job.err.stream = SHELL_OUTPUT_STDERR;
+	job.out.opts = job.err.opts = opts;
+	job.out.ctx = job.err.ctx = ctx;
 	job.out.output_fn = job.err.output_fn = output_fn;
 	job.out.userdata = job.err.userdata = userdata;
 	job.out.job = job.err.job = &job;
@@ -1315,12 +1342,25 @@ int run_shell_command_capture_cb(struct fyai_ctx *ctx, const char *command,
 
 	status = job.status;
 
-	result->stdout_data = stdout_buf.data ? stdout_buf.data : strdup("");
-	result->stderr_data = stderr_buf.data ? stderr_buf.data : strdup("");
-	result->stdout_len = stdout_buf.len;
-	result->stderr_len = stderr_buf.len;
-	stdout_buf.data = NULL;
-	stderr_buf.data = NULL;
+	/* A stream that drew is what its screen shows. */
+	if (job.out.view)
+		result->stdout_data = fyai_terminal_view_read(job.out.view, FYAITR_ALL,
+							      NULL, &result->stdout_len);
+	else
+		result->stdout_data = stdout_buf.data ? stdout_buf.data : strdup("");
+	if (job.err.view)
+		result->stderr_data = fyai_terminal_view_read(job.err.view, FYAITR_ALL,
+							      NULL, &result->stderr_len);
+	else
+		result->stderr_data = stderr_buf.data ? stderr_buf.data : strdup("");
+	if (!job.out.view)
+		result->stdout_len = stdout_buf.len;
+	if (!job.err.view)
+		result->stderr_len = stderr_buf.len;
+	if (!job.out.view)
+		stdout_buf.data = NULL;
+	if (!job.err.view)
+		stderr_buf.data = NULL;
 	if (!result->stdout_data || !result->stderr_data)
 		goto out;
 
@@ -1361,6 +1401,8 @@ out:
 		close(status_pipe[0]);
 	if (status_pipe[1] >= 0)
 		close(status_pipe[1]);
+	fyai_terminal_view_destroy(job.out.view);
+	fyai_terminal_view_destroy(job.err.view);
 	free(stdout_buf.data);
 	free(stderr_buf.data);
 	if (ret)

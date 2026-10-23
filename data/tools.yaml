@@ -150,6 +150,9 @@
             Without it the command runs on pipes and finds no terminal, which
             is what you want for a command whose output you are reading: a
             program that paginates for a person does not paginate on a pipe.
+            A program that sends control sequences to the pipe anyway, such as a
+            build tool that draws its progress, is rendered on a screen, and you
+            get what the screen shows, without the sequences.
             Ask for a terminal for a program that needs one, such as a
             full-screen editor, and with `name` for a session you will drive.
             A session needs one: `name` without `tty` is refused. A program

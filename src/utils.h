@@ -143,6 +143,14 @@ struct shell_command_opts {
 	const char *shell;		/* the program to run; NULL = /bin/sh */
 	bool login;			/* start @shell as a login shell */
 	const char *const *env_keep;	/* credentials to keep; NULL-terminated */
+	/*
+	 * Output that a program draws, though it writes to a pipe, is rendered on
+	 * a screen of @rows by @cols when the first such byte comes, and the result
+	 * is what the screen shows, as a terminal run gives. Both 0 keeps the bytes.
+	 * @max_bytes bounds the text that the screen retains; 0 is no bound.
+	 */
+	int rows, cols;
+	size_t max_bytes;
 };
 
 /* Exec @command or an interactive shell; return only when exec fails. */
