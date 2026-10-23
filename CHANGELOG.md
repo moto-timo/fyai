@@ -38,6 +38,10 @@
   the home, the project among them, stay visible. A path under a `deny` entry is not
   given. `mounts` makes other binds and overlays. A host that cannot make a namespace
   stops the tool: there is no fallback.
+- **`view enter --profile NAME`** confines the command by any sandbox profile, as a
+  tool of a session under `/session profile NAME` is confined. `--lockdown` is the same
+  as `--profile lockdown`. A profile with mounts is not supported in a view yet, and
+  stops the run.
 - **`background` for `exec_command`** starts the command detached: a session of its own,
   `/dev/null` for standard input, output and error, and the call returns at once. The
   command lives for the exchange, like any process that a tool leaves, and `list daemons`

@@ -1823,7 +1823,9 @@ view hides the arena already. Without user namespaces the carve-out stays.
 
 `view enter --lockdown` runs the command in the view under the lockdown sandbox
 profile, as a tool call of a session under `/session lockdown` runs, for that
-run only. It checks the isolation of such a session by hand.
+run only. It checks the isolation of such a session by hand. `view enter --profile NAME`
+does the same for any sandbox profile. A profile with `home` or `mounts` stops the run:
+a view does not support those mounts yet.
 
 **Sub-agent.** The `agent` tool takes `isolated`; the setting `agent/isolation`
 (`none` or `view`) gives the default. At submission the parent captures the
