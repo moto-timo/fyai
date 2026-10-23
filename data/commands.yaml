@@ -2131,6 +2131,93 @@ commands:
               x-fyai-rest: true
               x-fyai-meta: COMMAND
 
+  - command: cast
+    title: play or inspect a recording of a session
+    description: |
+      A recording is the file that `--cast FILE` writes: what the terminal
+      showed, and markers of what the program did. `play` shows it again in
+      this terminal, `markers` lists the markers with their time, and `info`
+      shows the header, which says what the program knew when it started.
+    surfaces: [cli]
+    see_also: [list]
+    commands:
+      - command: play
+        title: play a recording in this terminal
+        description: |
+          Write the recording to this terminal with the timing that it has. A
+          pause longer than `--idle-limit` is shortened to it. ^C stops the
+          playback and puts the terminal back as it was.
+        handler: cast_play
+        flags: [no-storage]
+        arguments:
+          type: object
+          additionalProperties: false
+          required: [file]
+          properties:
+            file:
+              type: string
+              description: the recording
+              x-fyai-positional: 0
+              x-fyai-meta: FILE
+              x-fyai-complete: file
+            speed:
+              type: number
+              minimum: 0.01
+              default: 1
+              description: how fast to play; 2 is twice as fast
+              x-fyai-meta: N
+            idle_limit:
+              type: number
+              minimum: 0
+              default: 2
+              description: the longest pause in seconds, 0 for no limit
+              x-fyai-meta: SECONDS
+      - command: markers
+        title: list the markers of a recording
+        description: List each marker of the recording with the time at which it was recorded.
+        handler: cast_markers
+        flags: [no-storage]
+        arguments:
+          type: object
+          additionalProperties: false
+          required: [file]
+          properties:
+            file:
+              type: string
+              description: the recording
+              x-fyai-positional: 0
+              x-fyai-meta: FILE
+              x-fyai-complete: file
+        render:
+          table:
+            title: Markers
+            empty: no markers
+            keys: [time, marker]
+            columns:
+              time: {name: Seconds}
+              marker: {name: Marker, align: left}
+      - command: info
+        title: show the header of a recording
+        description: Show the size, the time and the command of the recording, and what the program knew when it started.
+        handler: cast_info
+        flags: [no-storage]
+        arguments:
+          type: object
+          additionalProperties: false
+          required: [file]
+          properties:
+            file:
+              type: string
+              description: the recording
+              x-fyai-positional: 0
+              x-fyai-meta: FILE
+              x-fyai-complete: file
+        render:
+          table:
+            title: Recording
+            key_header: Field
+            value_header: Value
+
   - command: sandbox
     title: show or set the stored sandbox policy
     description: |

@@ -1988,6 +1988,96 @@ namespaces, OverlayFS, and Landlock.
 | `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
 | `-h`, `--help` | show this help |
 
+## fyai cast
+
+play or inspect a recording of a session
+
+**Usage:** `fyai cast {info|markers|play} ...`
+
+A recording is the file that `--cast FILE` writes: what the terminal
+showed, and markers of what the program did. `play` shows it again in
+this terminal, `markers` lists the markers with their time, and `info`
+shows the header, which says what the program knew when it started.
+
+
+### Commands
+
+| Command | Description |
+| --- | --- |
+| `info` | show the header of a recording |
+| `markers` | list the markers of a recording |
+| `play` | play a recording in this terminal |
+
+**See also:** `fyai help list`
+
+## fyai cast play
+
+play a recording in this terminal
+
+**Usage:** `fyai cast play [--speed N] [--idle-limit SECONDS] FILE`
+
+Write the recording to this terminal with the timing that it has. A
+pause longer than `--idle-limit` is shortened to it. ^C stops the
+playback and puts the terminal back as it was.
+
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `FILE` | the recording |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--speed N` | how fast to play; 2 is twice as fast; default 1 |
+| `--idle-limit SECONDS` | the longest pause in seconds, 0 for no limit; default 2 |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai cast markers
+
+list the markers of a recording
+
+**Usage:** `fyai cast markers FILE`
+
+List each marker of the recording with the time at which it was recorded.
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `FILE` | the recording |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
+## fyai cast info
+
+show the header of a recording
+
+**Usage:** `fyai cast info FILE`
+
+Show the size, the time and the command of the recording, and what the program knew when it started.
+
+### Arguments
+
+| Argument | Description |
+| --- | --- |
+| `FILE` | the recording |
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--output FORMAT` | write the result as markdown, json, or yaml; see `help output` |
+| `-h`, `--help` | show this help |
+
 ## fyai sandbox
 
 show or set the stored sandbox policy
