@@ -799,13 +799,6 @@ static int view_drop_capabilities(void)
 	return syscall(SYS_capset, &header, data);
 }
 
-static bool view_beneath(const char *path, const char *parent)
-{
-	size_t length = strlen(parent);
-
-	return !strncmp(path, parent, length) && (!path[length] || path[length] == '/');
-}
-
 char *fyai_fsview_scratch(const char *configured)
 {
 	const char *dir = configured;
@@ -824,8 +817,8 @@ char *fyai_fsview_scratch(const char *configured)
 bool fyai_fsview_project_usable(const char *project, const char *scratch)
 {
 	return strcmp(project, "/") && strcmp(project, scratch) &&
-	       !view_beneath(scratch, project) &&
-	       !view_beneath(project, fy_sprintfa("%s/" FYAI_FSVIEW_BACKING_NAME, scratch));
+	       !fyai_path_beneath(scratch, project) &&
+	       !fyai_path_beneath(project, fy_sprintfa("%s/" FYAI_FSVIEW_BACKING_NAME, scratch));
 }
 
 /* Pseudo filesystems that the view mounts over the host copies. */
@@ -1111,7 +1104,7 @@ int fyai_fsview_enter(struct fyai_cfg *cfg, const struct fyai_fsview *view,
 	rc = chdir(backing);
 	if (rc)
 		goto out;
-	if (view_beneath(view->project, view->scratch)) {
+	if (fyai_path_beneath(view->project, view->scratch)) {
 		rc = fyai_mkdir_p(view->project);
 		if (rc)
 			goto out;
@@ -1138,8 +1131,8 @@ int fyai_fsview_enter(struct fyai_cfg *cfg, const struct fyai_fsview *view,
 		if (rc)
 			goto out;
 	}
-	if (view->agent && !view_beneath(view->arena, protected) &&
-	    !view_beneath(view->arena, view->scratch)) {
+	if (view->agent && !fyai_path_beneath(view->arena, protected) &&
+	    !fyai_path_beneath(view->arena, view->scratch)) {
 		rc = view_cover("cover", view->arena);
 		if (rc)
 			goto out;
@@ -1169,10 +1162,10 @@ int fyai_fsview_enter(struct fyai_cfg *cfg, const struct fyai_fsview *view,
 	rc = view_mount_pseudo();
 	if (rc)
 		goto out;
-	if (!view_beneath(view->storage, protected) && !view_beneath(view->storage, view->scratch))
+	if (!fyai_path_beneath(view->storage, protected) && !fyai_path_beneath(view->storage, view->scratch))
 		deny[denied++] = view->storage;
-	if (!view->agent && !view_beneath(view->arena, protected) &&
-	    !view_beneath(view->arena, view->scratch))
+	if (!view->agent && !fyai_path_beneath(view->arena, protected) &&
+	    !fyai_path_beneath(view->arena, view->scratch))
 		deny[denied++] = view->arena;
 	sandbox.project_root = view->project;
 	sandbox.deny = deny;

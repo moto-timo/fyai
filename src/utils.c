@@ -2270,3 +2270,15 @@ int fyai_shell_quote(struct response_buffer *out, const char *s)
 				  response_buffer_append_data(out, s, 1);
 	return rc ? rc : response_buffer_append(out, "'");
 }
+
+bool fyai_path_beneath(const char *path, const char *root)
+{
+	size_t length = strlen(root);
+
+	while (length > 1 && root[length - 1] == '/')
+		length--;
+	if (length == 1 && root[0] == '/')
+		return path[0] == '/';
+	return !strncmp(path, root, length) &&
+	       (path[length] == '/' || path[length] == '\0');
+}

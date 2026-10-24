@@ -365,5 +365,7 @@ int hex_decode(const char *text, unsigned char *bytes, size_t *count);
 
 /* Append @s to @out in single quotes, so that a shell reads it as one word. */
 int fyai_shell_quote(struct response_buffer *out, const char *s);
+/* True when @path is @root or a path under it. A '/' at the end of @root is ignored. */
+bool fyai_path_beneath(const char *path, const char *root);
 
 #endif
