@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 - 2026-10-24
 
 ### Added
 
@@ -80,6 +80,13 @@
   and the kernel ended the namespace with SIGKILL, so a build server could not
   save its state and left a stale lock. The run now waits for the processes to
   stop, up to `sandbox_grace_ms`, and waits for no one when none runs.
+- **A view removes the work directory that OverlayFS leaves with no mode.** Some
+  kernels leave a work directory with mode 0, which not even its owner can open,
+  and `gc` then could not remove the runtime of a view. A view that cannot change
+  the mode of a directory now stops and gives the cause.
+- **Build warnings.** The player of `fyai cast` keeps its time in buffers that
+  fit the longest value, and the PTY driver uses `snprintf`, which macOS does
+  not deprecate.
 
 ## 0.4 - 2026-10-22
 
