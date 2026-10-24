@@ -13,6 +13,7 @@ FYAI_TEST_ENTRY(utils, wire_text_utf8, utils_wire_text_utf8)
 FYAI_TEST_ENTRY(utils, close_fds_except, utils_close_fds_except)
 FYAI_TEST_ENTRY(utils, utf8_length, utils_utf8_length)
 FYAI_TEST_ENTRY(utils, shell_quote, utils_shell_quote)
+FYAI_TEST_ENTRY(utils, path_beneath, utils_path_beneath)
 
 int utils_wire_text_utf8(void)
 {
@@ -84,5 +85,16 @@ int utils_shell_quote(void)
 	FYAI_TCHECK(!fyai_shell_quote(&out, "it's a $x"));
 	FYAI_TCHECK(!strcmp(out.data, "'it'\\''s a $x'"));
 	free(out.data);
+	return 0;
+}
+
+int utils_path_beneath(void)
+{
+	FYAI_TCHECK(fyai_path_beneath("/a/b", "/a"));
+	FYAI_TCHECK(fyai_path_beneath("/a", "/a"));
+	FYAI_TCHECK(fyai_path_beneath("/a/b", "/a/"));
+	FYAI_TCHECK(fyai_path_beneath("/a/b", "/"));
+	FYAI_TCHECK(!fyai_path_beneath("/ab", "/a"));
+	FYAI_TCHECK(!fyai_path_beneath("/", "/a"));
 	return 0;
 }
