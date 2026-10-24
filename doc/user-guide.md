@@ -52,73 +52,13 @@ fyai init path/to/config.yaml
 
 ### Configure credentials
 
-The default API-key policy is indirect:
-
-```yaml
-api_key: { type: auto }
-```
-
-After the provider is resolved, automatic lookup tries:
+The default is `api_key: { type: auto }`. After the provider is resolved, fyai tries these in order:
 
 1. `--api-key` / `-k`;
-2. the provider's conventional environment variable, such as `OPENAI_API_KEY`;
+2. the provider's environment variable, such as `OPENAI_API_KEY`;
 3. the logical secret `api-key/<provider>`.
 
-Raw API keys are not valid persisted configuration values.
-
-On Linux, a logical key may be placed in the kernel-backed secret store:
-
-```sh
-fyai secret set api-key/openai
-fyai secret status api-key/openai
-fyai secret delete api-key/openai
-```
-
-For OpenAI Responses requests, an eligible ChatGPT subscription may be used instead:
-
-```sh
-fyai auth openai login
-fyai auth openai login --no-browser
-fyai auth openai status
-fyai auth openai usage
-fyai config set auth chatgpt
-```
-
-`auth: auto` prefers an available API key and otherwise falls back to a saved ChatGPT login. `auth: api-key` disables that fallback. `auth: chatgpt` selects subscription access explicitly.
-
-The first login registers fyai with OpenAI and requests permission to use your
-ChatGPT plan. No client ID from a developer dashboard is required. fyai saves
-an opaque host ID before login and saves the issued client ID for later login
-and token refresh. It verifies the ID token and the granted plan-usage scope.
-Old Codex-compatible credentials require a new login.
-
-Use `fyai auth accounts` to list saved registrations. Use
-`fyai auth login --account CLIENT_ID` to authorize one again, or
-`fyai auth login --new-account` to register another account or workspace.
-Logout clears the active registration's tokens and retains its client ID and
-the host ID. A failed login does not replace another account's credentials.
-
-For a browser on another machine, use `fyai auth login --manual` and paste the
-complete callback URL. In a session, use `/auth login --manual`. Open the
-link in your local browser and paste the callback URL from its address bar
-even if the loopback page cannot load. No SSH port forwarding is required.
-A bare authorization code is not accepted. The
-subscription registration flow does not support device-code login.
-
-Subscription requests use the public Responses API with streaming enabled and
-server-side storage disabled. They send the full required history and group
-local tools in a namespace. They do not use ChatGPT's private backend endpoints
-or fall back to an API key after a subscription failure. See
-[OpenAI's registration documentation](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
-and [preview limits](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
-The [authentication flow](chatgpt-auth.md) documents registration, refresh,
-logout, and credential ownership with Mermaid diagrams.
-
-`fyai auth status` shows the configured mode, effective method, and plan
-permission. `fyai auth usage` shows selected-conversation token totals and links to
-ChatGPT Settings, where you can review
-app limits and control whether the app may use credits after plan limits.
-
+Raw API keys are not valid in stored configuration. See chapter 4 for secrets and for the ChatGPT subscription login.
 
 ### Run the first task
 
@@ -136,48 +76,6 @@ Run with no prompt, or pass `-i`, to enter interactive mode:
 fyai
 fyai -i
 ```
-
-### Attaching an image
-
-A message can carry an image or a text file beside its text. Each way to
-attach one is explicit: a path typed into a message is attached only when
-`@` comes before it.
-
-```sh
-fyai --image shot.png "what is wrong in this screenshot?"
-fyai "what is wrong in @shot.png and @~/notes.txt"
-
-fyai -i
-> /image add shot.png       # or: /image paste, from the system clipboard
-> /attach notes.txt         # an image, or a text file the model reads
-> what is wrong in this screenshot?
-```
-
-A path with blanks is quoted, `@"my shot.png"`, or escapes them,
-`@my\ shot.png`; `\@` and `@@` are a literal `@`. Tab completes the path
-after `@`, as it does after `/attach`, `~/` too. A `!` line completes no path.
-A text file of at most 256 KiB, or `media/max_bytes` when that is smaller, goes
-to the model as its text, and the transcript shows one row for it. A file that
-is neither an image nor text is refused. A line with a mention that cannot
-attach is not sent, in a session and in a prompt on the command line alike:
-fix the path and send it again. A prompt that starts with `/` has no
-mention, and neither has the task of `fyai agent`.
-
-An attachment waits for the next message and travels with that message only:
-a line typed later does not send it again. `/image list` shows what is
-waiting, and `/image clear` drops it.
-
-The bytes are kept in the message, in the arena, and the transcript names
-them by digest. They are encoded when a request is built, so a conversation
-that gained an image on one API continues on another. The model must read
-images: `fyai model` and the note that `/image add` prints say whether the
-selected model takes one. The limits are 4 MiB per image and 8 per
-message; nothing is downscaled.
-
-`/image paste` runs a clipboard helper (`wl-paste`, `xclip`, `xsel`, or
-`pngpaste`), because no terminal escape can read a clipboard. Set
-`media/clipboard_command` to a program of your own if the search does not find
-one. The full design is in `doc/media.md`.
 
 ### Sessions
 
@@ -197,11 +95,6 @@ The name is invocation state until the first exchange, so a session that asks
 nothing stores nothing unless `/reload` publishes it. A slash setting or
 `/clear` alone is not an exchange: the session applies it, and stores it only
 with an exchange or `/reload`. Starting a session does not move arena `HEAD`.
-
-> **This changed.** Earlier releases continued the conversation on stored
-> `HEAD`. A script that invokes `fyai -i` and expects the previous
-> conversation must now name its branch, with `--branch`/`-b` or
-> `FYAI_BRANCH`.
 
 Continue a session deliberately with `resume`:
 
@@ -446,6 +339,48 @@ reference is resolved afresh on every invocation and moves as the reflog grows.
 Capture the emitted root handle, as above, when automation must see the same
 state repeatedly.
 
+### Attachments
+
+A message can carry an image or a text file beside its text. Each way to
+attach one is explicit: a path typed into a message is attached only when
+`@` comes before it.
+
+```sh
+fyai --image shot.png "what is wrong in this screenshot?"
+fyai "what is wrong in @shot.png and @~/notes.txt"
+
+fyai -i
+> /image add shot.png       # or: /image paste, from the system clipboard
+> /attach notes.txt         # an image, or a text file the model reads
+> what is wrong in this screenshot?
+```
+
+A path with blanks is quoted, `@"my shot.png"`, or escapes them,
+`@my\ shot.png`; `\@` and `@@` are a literal `@`. Tab completes the path
+after `@`, as it does after `/attach`, `~/` too. A `!` line completes no path.
+A text file of at most 256 KiB, or `media/max_bytes` when that is smaller, goes
+to the model as its text, and the transcript shows one row for it. A file that
+is neither an image nor text is refused. A line with a mention that cannot
+attach is not sent, in a session and in a prompt on the command line alike:
+fix the path and send it again. A prompt that starts with `/` has no
+mention, and neither has the task of `fyai agent`.
+
+An attachment waits for the next message and travels with that message only:
+a line typed later does not send it again. `/image list` shows what is
+waiting, and `/image clear` drops it.
+
+The bytes are kept in the message, in the arena, and the transcript names
+them by digest. They are encoded when a request is built, so a conversation
+that gained an image on one API continues on another. The model must read
+images: `fyai model` and the note that `/image add` prints say whether the
+selected model takes one. The limits are 4 MiB per image and 8 per
+message; nothing is downscaled.
+
+`/image paste` runs a clipboard helper (`wl-paste`, `xclip`, `xsel`, or
+`pngpaste`), because no terminal escape can read a clipboard. Set
+`media/clipboard_command` to a program of your own if the search does not find
+one. The full design is in `doc/media.md`.
+
 ## 4. Models, providers, and authentication
 
 ### Model selection
@@ -526,6 +461,63 @@ fyai \
   -m llama3 \
   "inspect this tree"
 ```
+
+### API keys and secrets
+
+On Linux, a logical key can be stored in the kernel secret store:
+
+```sh
+fyai secret set api-key/openai
+fyai secret status api-key/openai
+fyai secret delete api-key/openai
+```
+
+### ChatGPT subscription login
+
+For OpenAI Responses requests, an eligible ChatGPT subscription may be used instead:
+
+```sh
+fyai auth openai login
+fyai auth openai login --no-browser
+fyai auth openai status
+fyai auth openai usage
+fyai config set auth chatgpt
+```
+
+`auth: auto` prefers an available API key and otherwise falls back to a saved ChatGPT login. `auth: api-key` disables that fallback. `auth: chatgpt` selects subscription access explicitly.
+
+The first login registers fyai with OpenAI and requests permission to use your
+ChatGPT plan. No client ID from a developer dashboard is required. fyai saves
+an opaque host ID before login and saves the issued client ID for later login
+and token refresh. It verifies the ID token and the granted plan-usage scope.
+Old Codex-compatible credentials require a new login.
+
+Use `fyai auth accounts` to list saved registrations. Use
+`fyai auth login --account CLIENT_ID` to authorize one again, or
+`fyai auth login --new-account` to register another account or workspace.
+Logout clears the active registration's tokens and retains its client ID and
+the host ID. A failed login does not replace another account's credentials.
+
+For a browser on another machine, use `fyai auth login --manual` and paste the
+complete callback URL. In a session, use `/auth login --manual`. Open the
+link in your local browser and paste the callback URL from its address bar
+even if the loopback page cannot load. No SSH port forwarding is required.
+A bare authorization code is not accepted. The
+subscription registration flow does not support device-code login.
+
+Subscription requests use the public Responses API with streaming enabled and
+server-side storage disabled. They send the full required history and group
+local tools in a namespace. They do not use ChatGPT's private backend endpoints
+or fall back to an API key after a subscription failure. See
+[OpenAI's registration documentation](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+and [preview limits](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
+The [authentication flow](chatgpt-auth.md) documents registration, refresh,
+logout, and credential ownership with Mermaid diagrams.
+
+`fyai auth status` shows the configured mode, effective method, and plan
+permission. `fyai auth usage` shows selected-conversation token totals and links to
+ChatGPT Settings, where you can review
+app limits and control whether the app may use credits after plan limits.
 
 ### Authentication commands
 
@@ -1347,170 +1339,6 @@ sandbox_lockdown:
     udp: { ports: [], bind_ports: [] }
 ```
 
-### Project views
-
-A view is a private, writable copy of the project. fyai captures the project
-into immutable content-addressed objects under `.fyai` and mounts an OverlayFS
-upper over that baseline in private namespaces. Nothing written in the view
-reaches the project until you apply it. Capture runs in parallel, and an
-unchanged file is stored once.
-
-```sh
-fyai view create try-refactor
-fyai view enter try-refactor make test     # or no command for a shell
-fyai view diff -u try-refactor
-fyai view apply --dry-run try-refactor
-fyai view apply try-refactor src/parser.c
-```
-
-`apply` is a three-way decision per path: a path the project still has as the
-baseline had it takes the result, and a path that both sides changed is
-reported as a conflict and left alone.
-
-A whole session can run in a view:
-
-```yaml
-view:
-  isolate_session: true
-```
-
-A session that ends from an idle prompt applies its view to the project when no path
-conflicts (`view/apply_on_exit`, on by default). Otherwise the changes stay in the
-view, and a new session refuses to start until you run `view apply session` or `view
-remove session`, so nothing is lost without a word.
-
-Sub-agents can each get a view of their own, which lets several of them edit
-the same tree in parallel without touching it:
-
-```yaml
-agent:
-  isolation: view
-```
-
-The model can also ask for this per call with the `isolated` parameter of the
-`agent` tool. The parent reviews and applies the results with the
-`project_view` tool; you can review the same views with `fyai view diff
-agent/NAME`. The views of sub-agents are in the namespace `agent/`: a user
-cannot make a view there, and the tool reaches only the views of the sub-agents
-that the calling agent started, by the name it gave them.
-
-Views belong to a branch, like its conversation and configuration. The same
-views serve the user (`fyai view`, `/view`) and the model (`project_view`), so
-both work on one record of what changed.
-
-A view holds the whole project, build artifacts included, because the agent that
-works in it needs them. What faces you and the project leaves out the paths that
-the `.gitignore` files of the project name, as `git status` does: `view diff`, the
-changes that `project_view` lists, and `view apply` and `/undo`. `view/gitignore`
-(default on) selects the files, and `view/ignore` is a list of more rules, each a
-line of a gitignore file, that outrank them. A file that an agent writes in
-`build/` stays in its view and never lands in the project, and `view ls` still
-shows it. The states that `view/track_project` and `view/tool_diff` record leave
-the ignored paths out when they are taken.
-
-A path of a view is written NAME:PATH, as scp writes a file of a host. The same
-address serves four commands. `view ls NAME[:PATH]` lists a directory of the
-result of a view as `ls` does: sorted, with the names that start with a dot left
-out unless `-a` is given, which also lists `.` and `..`, and `NAME:/` is the root.
-`view diff NAME:PATH` compares only that path. `view rm
-NAME:PATH...` removes paths in the view, and `view cp` copies paths between the
-project and a view: `view cp src/a.c session:src/` puts a file of the project in
-the view, and `view cp session:src/a.c src/a.c` takes the file of the view back,
-with no check of what the project held. A destination that ends in a slash is a
-directory; any other is the new name. A path that the view does not have is an
-error for `ls`, `rm` and `cp`; for `diff` a path that was added or removed is
-selected like any other. Nothing of this changes the project, except a copy to
-it.
-
-A model edits files with a shell command as often as with the edit tools, and a
-command can change anything without saying what. `view/tool_diff` (default off)
-brings you back into that: fyai records the state of the project before a turn and
-after each group of tool calls that can change files, and shows the difference as
-a diff under the calls. A patch then names its files and leaves the change to that
-diff, so it is shown one time. It is stored with the exchange, so the history shows it
-again. The paths that `view/ignore` and the `.gitignore` files name are left out.
-`/undo` takes the newest group back, and `/undo N` the Nth newest: a path that
-still has what the group left takes what it had before, and a path that changed
-since is a conflict and stays. The groups are kept for the session, the newest
-`view/undo_depth` of them (default sixteen). A group costs a scan of the project, and the arena must be in its `.fyai`
-directory. A session that runs in a view (`view/isolate_session`) shows the diffs
-too: the project storage is out of its reach, so it keeps its states in a
-directory of the arena, which it removes when it ends.
-
-With `view/track_project`, each ref-log entry that moves a head also records
-the state of the project files. A state that did not change is shared with
-the entry before it. A reference then names files as well as conversation, and
-rewinding a branch rewinds both:
-
-```sh
-fyai view diff HEAD~2              # what the files did over the last exchange
-fyai view apply main@{3}           # take the files of that point
-fyai reset main@{3}                # conversation and files together
-```
-
-`reset` refuses to overwrite a path that changed since the recorded state;
-`--force` records the project as it is first, so the reset itself can be
-undone through the reflog.
-
-Views need Linux user namespaces, OverlayFS, and Landlock.
-
-### Credential transport
-
-Transport isolation keeps the provider credentials in a separate process. Linux only; experimental.
-
-```yaml
-agent:
-  transport_isolation: auto
-```
-
-With transport isolation on, a separate `fyai transport` process holds the
-provider credentials. The session and its sub-agents run without them and
-send model requests to the transport over a control channel; the transport
-admits each agent by PID and pidfd and sends its requests through a named
-egress profile. Shell commands started by an agent therefore have no key to
-read from the environment. `level-b` installs no filesystem or keyring
-policy, so a tool of the same user can still reach a key stored outside the
-environment; the design document lists these limits.
-
-`/session dev` is the default: the tools run in a sandbox that allows project
-work - the project, the toolchains of the user, and TCP to git and the package
-registries - and denies the secret locations of the platform.
-`/session lockdown` takes the strongest isolation this host can enforce in one
-step: the credential transport (`auto`), the sandbox with TCP egress restricted
-on Landlock ABI 4 and UDP egress restricted on ABI 10, and the session itself in a view of the project
-(`view/isolate_session`), where one can be made. Its sub-agents share that view;
-`agent/isolation`, which gives each sub-agent a view of its own, is yours to set
-and the commands leave it alone. The view is
-made from the project as it is at that moment, and a later change to the project
-reaches it with `view update session`. The command checks that the transport can
-run before it changes anything, refuses while shells or sub-agents are live, and
-restarts the session to start the transport and the view. `fyai view enter
---lockdown NAME` runs a shell or a command in a view as a tool of such a session
-runs, so you can check its isolation by hand. `/session yolo` goes
-the other way: no transport, no sandbox, no view of the session. It stores the keys, and a
-session that runs with the transport or in a view keeps them until fyai starts
-again, because the key lives in the transport and a restart could not give it
-back; the changes of the view are then reviewed and applied with `view diff` and
-`view apply`. `/session` shows the state. A session in a view moves work between
-its view and the project with `/session push` and `/session pull`. `push` writes the
-changes of the session into the project, with the rules of `view apply`: a path that
-the project still has as the view began takes the result, and a path that both
-changed differently is a conflict, reported and left alone. `--dry-run` writes
-nothing, and paths limit the push. The session keeps running. `pull` takes the
-project as it is now: it replaces the view with a fresh capture and starts the
-session again on it, on the same branch. It refuses while a push would still write or
-conflict, so work is never dropped by accident; `--discard` drops it. The project is
-not reachable from inside the view, so the supervisor of the session does both. A
-session that runs in a view shows
-`view session` in the status line (`{view}` in the prompt templates) and in
-`/status`.
-
-`/profiles` lists the egress profiles and whether an agent may use them. The
-status line shows the active level as `isolated LEVEL`. `level-b` is the level
-that runs today; `level-a`, which adds a cgroup v2 boundary, is planned. A
-level the host cannot enforce stops the invocation rather than running
-without it. This feature is Linux only and experimental.
-
 ### Secret handling
 
 Secrets are deliberately kept out of immutable arena data:
@@ -1521,7 +1349,126 @@ Secrets are deliberately kept out of immutable arena data:
 - wire logging can redact API keys;
 - model tools are not given credential material.
 
-## 8. MCP servers
+## 8. Project views
+
+A view is a private, writable copy of the project. Nothing written in a view reaches the project until you apply it. Views need Linux user namespaces, OverlayFS, and Landlock.
+
+fyai captures the project into immutable content-addressed objects under `.fyai`. It mounts an OverlayFS upper layer over that baseline in private namespaces. Capture runs in parallel, and an unchanged file is stored once.
+
+Views belong to a branch, like its conversation and configuration. The user (`fyai view`, `/view`) and the model (`project_view`) use the same views, so both work on one record of what changed.
+
+### Create, review and apply
+
+```sh
+fyai view create try-refactor
+fyai view enter try-refactor make test     # or no command for a shell
+fyai view diff -u try-refactor
+fyai view apply --dry-run try-refactor
+fyai view apply try-refactor src/parser.c
+```
+
+`apply` decides each path by a three-way check. A path that the project still has as the baseline had it takes the result. A path that both sides changed is reported as a conflict and is not changed.
+
+### Paths in a view
+
+A path of a view is written `NAME:PATH`, as `scp` writes the path of a host.
+
+- `view ls NAME[:PATH]` lists a directory of the view. It sorts the names and hides names that start with a dot unless `-a` is given. `NAME:/` is the root.
+- `view diff NAME:PATH` compares one path.
+- `view rm NAME:PATH...` removes paths in the view.
+- `view cp` copies paths between the project and a view. `view cp src/a.c session:src/` puts a project file in the view. `view cp session:src/a.c src/a.c` takes the file back and does not check what the project holds. A destination that ends in a slash is a directory. Any other destination is the new name.
+
+`ls`, `rm` and `cp` report an error for a path that the view does not have. Only a copy to the project changes the project.
+
+### Ignored paths
+
+A view holds the whole project, build output included, because the agent that works in it needs it. The user-facing commands leave out the paths that the `.gitignore` files of the project name, as `git status` does. These are `view diff`, the changes that `project_view` lists, `view apply` and `/undo`.
+
+- `view/gitignore` (default on) selects the `.gitignore` files.
+- `view/ignore` is a list of more rules, each a line of a gitignore file. They take precedence.
+- A file that an agent writes in `build/` stays in its view. `view ls` still shows it.
+- The states that `view/track_project` and `view/tool_diff` record leave out the ignored paths.
+
+### A session in a view
+
+```yaml
+view:
+  isolate_session: true
+```
+
+A session that ends from an idle prompt applies its view to the project when no path conflicts (`view/apply_on_exit`, on by default). Otherwise the changes stay in the view. A new session then refuses to start until you run `view apply session` or `view remove session`.
+
+### Sub-agents in a view
+
+```yaml
+agent:
+  isolation: view
+```
+
+Each sub-agent gets a view of its own, so several agents can edit the same tree in parallel. The model can also ask for this for one call with the `isolated` parameter of the `agent` tool.
+
+The parent reviews and applies the results with the `project_view` tool. You can review them with `fyai view diff agent/NAME`. The views of sub-agents are in the namespace `agent/`. A user cannot make a view there. The tool reaches only the views of the sub-agents that the calling agent started, by the name it gave them.
+
+### Diffs of tool calls and `/undo`
+
+A model changes files with shell commands as often as with the edit tools, and a command can change anything. `view/tool_diff` (default off) records the state of the project before a turn and after each group of tool calls that can change files. It shows the difference as a diff under the calls.
+
+- A patch then names its files and leaves the change to that diff, so the change shows once.
+- The diff is stored with the exchange, so history shows it again.
+- `/undo` takes the newest group back. `/undo N` takes back the Nth newest. A path that still has what the group left gets its previous content. A path that changed since is a conflict and stays.
+- The session keeps the newest `view/undo_depth` groups (default 16).
+- Each group costs a scan of the project. The arena must be in the `.fyai` directory of the project.
+- A session that runs in a view shows the diffs too. It keeps its states in a directory of the arena and removes it when the session ends.
+
+### Project state in the reflog
+
+With `view/track_project`, each reflog entry that moves a head also records the state of the project files. A state that did not change is shared with the entry before it. A reference then names files and conversation, and rewinding a branch rewinds both.
+
+```sh
+fyai view diff HEAD~2              # what the files did over the last exchange
+fyai view apply main@{3}           # take the files of that point
+fyai reset main@{3}                # conversation and files together
+```
+
+`reset` refuses to overwrite a path that changed since the recorded state. `--force` first records the project as it is, so the reflog can undo the reset.
+
+## 9. Credential transport
+
+Transport isolation keeps the provider credentials in a separate process. It is Linux only and experimental.
+
+```yaml
+agent:
+  transport_isolation: auto
+```
+
+With it on, a separate `fyai transport` process holds the credentials. The session and its sub-agents run without them. They send model requests to the transport over a control channel. The transport admits each agent by PID and pidfd and sends its requests through a named egress profile. A shell command that an agent starts has no key to read from its environment.
+
+The level that runs today is `level-b`. It installs no filesystem or keyring policy, so a tool of the same user can still reach a key that is stored outside the environment. `doc/agent-transport-isolation-sdd.md` lists the limits. `level-a`, which adds a cgroup v2 boundary, is planned. A level that the host cannot enforce stops the invocation. `/profiles` lists the egress profiles and whether an agent may use them. The status line shows the level as `isolated LEVEL`.
+
+### Session isolation presets
+
+`/session` shows the state. Three presets set the isolation keys together.
+
+- `/session dev` is the default. Tools run in a sandbox that allows project work: the project, the toolchains of the user, and TCP to git and the package registries. It denies the secret locations of the platform.
+- `/session lockdown` takes the strongest isolation that the host can enforce. It turns on the credential transport (`auto`), the sandbox with TCP egress restricted (Landlock ABI 4) and UDP egress restricted (ABI 10), and runs the session in a view of the project (`view/isolate_session`) where the host can make one. Sub-agents share that view. `agent/isolation` is yours to set, and the preset does not change it.
+- `/session yolo` turns off the transport, the sandbox and the view of the session.
+
+`lockdown` checks that the transport can run before it changes anything. It refuses while shells or sub-agents are live, and it restarts the session to start the transport and the view. The view is made from the project at that moment. `view update session` brings a later change of the project into it.
+
+`yolo` stores the keys. A session that runs with the transport or in a view keeps them until fyai starts again, because the key lives in the transport and a restart cannot give it back. Review and apply the changes of the view with `view diff` and `view apply`.
+
+`fyai view enter --lockdown NAME` runs a shell or command in a view as a tool of a lockdown session runs, so you can check its isolation by hand.
+
+### Moving work between a session view and the project
+
+The project is not reachable from inside the view, so the supervisor of the session does both operations.
+
+- `/session push` writes the changes of the session into the project, with the rules of `view apply`. A conflict is reported and not changed. `--dry-run` writes nothing, and paths limit the push. The session keeps running.
+- `/session pull` replaces the view with a fresh capture of the project and starts the session again on it, on the same branch. It refuses while a push would still write or conflict. `--discard` drops that work.
+
+A session in a view shows `view session` in the status line (`{view}` in the prompt templates) and in `/status`.
+
+## 10. MCP servers
 
 MCP can expose additional tools over Streamable HTTP or local stdio transports.
 
@@ -1563,7 +1510,7 @@ Servers that declare the MCP resources capability also expose `mcp_resource`:
 accepts a concrete URI. Resource responses are limited to 64 KiB.
 
 
-## 9. Observability and maintenance
+## 11. Observability and maintenance
 
 ### Usage and context
 
@@ -1708,7 +1655,7 @@ fyai gc --keep-reflogs N
 
 Garbage collection compacts unreachable arena data and requires arena quiescence. Bounding reflogs may make old branch entries and root handles unreachable.
 
-## 10. Interactive mode
+## 12. Interactive mode
 
 Interactive mode is a line-oriented REPL over the same durable branch state.
 
@@ -1859,7 +1806,7 @@ gives the whole terminal to the editor, as before:
 fyai --set display/editor=terminal -i
 ```
 
-## 11. CLI reference
+## 13. CLI reference
 
 ```text
 fyai [global-options] <verb> [verb-args]
@@ -1925,7 +1872,7 @@ Global parsing stops at the first non-option. A known token is dispatched as a v
 | `--answer TEXT` | Pre-supply the answer to one `ask_user` question; repeatable |
 | `--debug`, `-d` | Increase diagnostic verbosity |
 
-## 12. Architecture and operational notes
+## 14. Architecture and operational notes
 
 - Arena values are immutable after publication.
 - The root is the atomic mutable publication point.
@@ -1943,7 +1890,7 @@ Global parsing stops at the first non-option. A known token is dispatched as a v
 - `history` is optimized for people. Use dump views for exact state inspection.
 - Linux is the primary platform. macOS-specific credential and event backends are supported where implemented; Landlock and the kernel secret store are Linux-specific.
 
-## 13. Where to look next
+## 15. Where to look next
 
 ```sh
 fyai help
