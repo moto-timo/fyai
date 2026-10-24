@@ -1347,6 +1347,170 @@ sandbox_lockdown:
     udp: { ports: [], bind_ports: [] }
 ```
 
+### Project views
+
+A view is a private, writable copy of the project. fyai captures the project
+into immutable content-addressed objects under `.fyai` and mounts an OverlayFS
+upper over that baseline in private namespaces. Nothing written in the view
+reaches the project until you apply it. Capture runs in parallel, and an
+unchanged file is stored once.
+
+```sh
+fyai view create try-refactor
+fyai view enter try-refactor make test     # or no command for a shell
+fyai view diff -u try-refactor
+fyai view apply --dry-run try-refactor
+fyai view apply try-refactor src/parser.c
+```
+
+`apply` is a three-way decision per path: a path the project still has as the
+baseline had it takes the result, and a path that both sides changed is
+reported as a conflict and left alone.
+
+A whole session can run in a view:
+
+```yaml
+view:
+  isolate_session: true
+```
+
+A session that ends from an idle prompt applies its view to the project when no path
+conflicts (`view/apply_on_exit`, on by default). Otherwise the changes stay in the
+view, and a new session refuses to start until you run `view apply session` or `view
+remove session`, so nothing is lost without a word.
+
+Sub-agents can each get a view of their own, which lets several of them edit
+the same tree in parallel without touching it:
+
+```yaml
+agent:
+  isolation: view
+```
+
+The model can also ask for this per call with the `isolated` parameter of the
+`agent` tool. The parent reviews and applies the results with the
+`project_view` tool; you can review the same views with `fyai view diff
+agent/NAME`. The views of sub-agents are in the namespace `agent/`: a user
+cannot make a view there, and the tool reaches only the views of the sub-agents
+that the calling agent started, by the name it gave them.
+
+Views belong to a branch, like its conversation and configuration. The same
+views serve the user (`fyai view`, `/view`) and the model (`project_view`), so
+both work on one record of what changed.
+
+A view holds the whole project, build artifacts included, because the agent that
+works in it needs them. What faces you and the project leaves out the paths that
+the `.gitignore` files of the project name, as `git status` does: `view diff`, the
+changes that `project_view` lists, and `view apply` and `/undo`. `view/gitignore`
+(default on) selects the files, and `view/ignore` is a list of more rules, each a
+line of a gitignore file, that outrank them. A file that an agent writes in
+`build/` stays in its view and never lands in the project, and `view ls` still
+shows it. The states that `view/track_project` and `view/tool_diff` record leave
+the ignored paths out when they are taken.
+
+A path of a view is written NAME:PATH, as scp writes a file of a host. The same
+address serves four commands. `view ls NAME[:PATH]` lists a directory of the
+result of a view as `ls` does: sorted, with the names that start with a dot left
+out unless `-a` is given, which also lists `.` and `..`, and `NAME:/` is the root.
+`view diff NAME:PATH` compares only that path. `view rm
+NAME:PATH...` removes paths in the view, and `view cp` copies paths between the
+project and a view: `view cp src/a.c session:src/` puts a file of the project in
+the view, and `view cp session:src/a.c src/a.c` takes the file of the view back,
+with no check of what the project held. A destination that ends in a slash is a
+directory; any other is the new name. A path that the view does not have is an
+error for `ls`, `rm` and `cp`; for `diff` a path that was added or removed is
+selected like any other. Nothing of this changes the project, except a copy to
+it.
+
+A model edits files with a shell command as often as with the edit tools, and a
+command can change anything without saying what. `view/tool_diff` (default off)
+brings you back into that: fyai records the state of the project before a turn and
+after each group of tool calls that can change files, and shows the difference as
+a diff under the calls. A patch then names its files and leaves the change to that
+diff, so it is shown one time. It is stored with the exchange, so the history shows it
+again. The paths that `view/ignore` and the `.gitignore` files name are left out.
+`/undo` takes the newest group back, and `/undo N` the Nth newest: a path that
+still has what the group left takes what it had before, and a path that changed
+since is a conflict and stays. The groups are kept for the session, the newest
+`view/undo_depth` of them (default sixteen). A group costs a scan of the project, and the arena must be in its `.fyai`
+directory. A session that runs in a view (`view/isolate_session`) shows the diffs
+too: the project storage is out of its reach, so it keeps its states in a
+directory of the arena, which it removes when it ends.
+
+With `view/track_project`, each ref-log entry that moves a head also records
+the state of the project files. A state that did not change is shared with
+the entry before it. A reference then names files as well as conversation, and
+rewinding a branch rewinds both:
+
+```sh
+fyai view diff HEAD~2              # what the files did over the last exchange
+fyai view apply main@{3}           # take the files of that point
+fyai reset main@{3}                # conversation and files together
+```
+
+`reset` refuses to overwrite a path that changed since the recorded state;
+`--force` records the project as it is first, so the reset itself can be
+undone through the reflog.
+
+Views need Linux user namespaces, OverlayFS, and Landlock.
+
+### Credential transport
+
+Transport isolation keeps the provider credentials in a separate process. Linux only; experimental.
+
+```yaml
+agent:
+  transport_isolation: auto
+```
+
+With transport isolation on, a separate `fyai transport` process holds the
+provider credentials. The session and its sub-agents run without them and
+send model requests to the transport over a control channel; the transport
+admits each agent by PID and pidfd and sends its requests through a named
+egress profile. Shell commands started by an agent therefore have no key to
+read from the environment. `level-b` installs no filesystem or keyring
+policy, so a tool of the same user can still reach a key stored outside the
+environment; the design document lists these limits.
+
+`/session dev` is the default: the tools run in a sandbox that allows project
+work - the project, the toolchains of the user, and TCP to git and the package
+registries - and denies the secret locations of the platform.
+`/session lockdown` takes the strongest isolation this host can enforce in one
+step: the credential transport (`auto`), the sandbox with TCP egress restricted
+on Landlock ABI 4 and UDP egress restricted on ABI 10, and the session itself in a view of the project
+(`view/isolate_session`), where one can be made. Its sub-agents share that view;
+`agent/isolation`, which gives each sub-agent a view of its own, is yours to set
+and the commands leave it alone. The view is
+made from the project as it is at that moment, and a later change to the project
+reaches it with `view update session`. The command checks that the transport can
+run before it changes anything, refuses while shells or sub-agents are live, and
+restarts the session to start the transport and the view. `fyai view enter
+--lockdown NAME` runs a shell or a command in a view as a tool of such a session
+runs, so you can check its isolation by hand. `/session yolo` goes
+the other way: no transport, no sandbox, no view of the session. It stores the keys, and a
+session that runs with the transport or in a view keeps them until fyai starts
+again, because the key lives in the transport and a restart could not give it
+back; the changes of the view are then reviewed and applied with `view diff` and
+`view apply`. `/session` shows the state. A session in a view moves work between
+its view and the project with `/session push` and `/session pull`. `push` writes the
+changes of the session into the project, with the rules of `view apply`: a path that
+the project still has as the view began takes the result, and a path that both
+changed differently is a conflict, reported and left alone. `--dry-run` writes
+nothing, and paths limit the push. The session keeps running. `pull` takes the
+project as it is now: it replaces the view with a fresh capture and starts the
+session again on it, on the same branch. It refuses while a push would still write or
+conflict, so work is never dropped by accident; `--discard` drops it. The project is
+not reachable from inside the view, so the supervisor of the session does both. A
+session that runs in a view shows
+`view session` in the status line (`{view}` in the prompt templates) and in
+`/status`.
+
+`/profiles` lists the egress profiles and whether an agent may use them. The
+status line shows the active level as `isolated LEVEL`. `level-b` is the level
+that runs today; `level-a`, which adds a cgroup v2 boundary, is planned. A
+level the host cannot enforce stops the invocation rather than running
+without it. This feature is Linux only and experimental.
+
 ### Secret handling
 
 Secrets are deliberately kept out of immutable arena data:
@@ -1387,6 +1551,17 @@ Tools are exposed as `mcp__<server>__<tool>`.
 ```
 
 Use `fyai help mcp` for the exact management and OAuth-import syntax supported by the current binary.
+
+### Tool search and resources
+
+When more than eight tools are discovered, fyai offers `tool_search` instead
+of sending every MCP schema in the model request. A search matches names and
+descriptions, returns up to eight tools, and makes those tools available for
+the rest of the invocation. Narrow the query if the result reports `more`.
+Servers that declare the MCP resources capability also expose `mcp_resource`:
+`list` and `templates` return one page with any `nextCursor`, and `read`
+accepts a concrete URI. Resource responses are limited to 64 KiB.
+
 
 ## 9. Observability and maintenance
 
@@ -1543,6 +1718,44 @@ fyai -i
 ```
 
 A line beginning with `//` is sent to the model verbatim with one slash removed. Slash command names accept an unambiguous prefix; exact matches win.
+
+### Fullscreen and inline
+
+An interactive session opens fullscreen. It takes the alternate screen of the
+terminal, and it gives the screen back unchanged when it ends. The transcript
+is a view of that screen: the wheel, PageUp and PageDown scroll it. Every live
+shell and sub-agent is a tile of one work pane, which takes half the terminal
+and has the mouse controls of a tile. Selection and copy are then fyai's, which
+copies through the terminal; paste stays the terminal's (`Ctrl-Shift-V`, or
+`Cmd-V` on macOS).
+
+The inline mode keeps the transcript in the scrollback of the terminal, where
+the terminal scrolls it as it scrolls the output of any other program, and the
+prompt stands under it. Use it to keep the conversation in the scrollback, to
+select with the mouse of the terminal, or on a terminal that has no alternate
+screen.
+
+Three settings say which mode a session opens in:
+
+```sh
+fyai config set display/screen inline         # keep the scrollback
+fyai config set display/work_controls none    # leave the mouse to the terminal
+fyai config set display/work_zoom_rows full   # the work pane takes the screen
+```
+
+`display/screen` is the mode: `fullscreen` (the default) or `inline`.
+The live screen is one UI Markdown page whose slots hold the transcript, the
+work pane and the prompt. Put the defaults back with:
+
+```sh
+fyai config set display/screen fullscreen
+fyai config set display/work_controls full
+fyai config set display/work_zoom_rows half
+```
+
+A setting takes effect on the next frame, except `display/screen`, which the
+session reads when it starts. `/config set` does the same from inside a
+session, and each setting belongs to the branch it is set on.
 
 ### Interactive commands
 
