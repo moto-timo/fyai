@@ -5462,6 +5462,7 @@ static void fyai_ctx_fork_disown(struct fyai_ctx *ctx)
 	fyai_cover_abandon(&ctx->cover);	/* the holder that it does not own */
 	fyai_skill_dirs_abandon(ctx);		/* the skills it wrote out */
 	fyai_settings_abandon(ctx);		/* and the exports */
+	fyai_diag_trace_tap(NULL, NULL);	/* the recording of the parent */
 	ctx->ui = NULL;				/* its display */
 	ctx->browser = NULL;
 	ctx->agents = NULL;
@@ -6474,6 +6475,7 @@ struct fyai_tool_job *fyai_tool_job_submit(struct fyai_ctx *ctx,
 	fyai_tool_submit_check(ctx, !ctx->tool_submit_error, err,
 			       "a sub-agent cannot be forked with credential isolation");
 
+	fyai_diag_tracef("tool", "%s start", name);
 	job = calloc(1, sizeof(*job));
 	fyai_error_check(ctx, job, err,
 			 "could not allocate tool job");

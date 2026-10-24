@@ -78,6 +78,8 @@ static int trace_fd = FYAI_TRACE_UNSET;
 static char *trace_file;
 static enum fyai_error_type trace_level = FYAIET_DEBUG;
 static char trace_tag[128];
+static fyai_diag_tap_fn trace_tap;
+static void *trace_tap_user;
 
 static bool trace_off_value(const char *v)
 {
@@ -234,17 +236,28 @@ static void trace_write(const char *head, const char *body)
 	}
 }
 
+void fyai_diag_trace_tap(fyai_diag_tap_fn fn, void *user)
+{
+	trace_tap = fn;
+	trace_tap_user = user;
+}
+
 void fyai_diag_tracef(const char *kind, const char *fmt, ...)
 {
 	va_list ap;
 	char *body;
 	char *head;
 
-	if (trace_open() < 0)
+	/* The tap sees the event even when no file takes it. */
+	if (trace_open() < 0 && !trace_tap)
 		return;
 	va_start(ap, fmt);
 	body = fy_vsprintfa(fmt, ap);
 	va_end(ap);
+	if (trace_tap)
+		trace_tap(kind ? kind : "trace", body, trace_tap_user);
+	if (trace_fd < 0)
+		return;
 	head = fy_sprintfa("%s: ", kind ? kind : "trace");
 	trace_write(head, body);
 }
@@ -257,6 +270,9 @@ static void trace_diag(enum fyai_error_type type, enum fyai_error_module module,
 	const char *modname;
 	char *head, *body;
 
+	if (trace_tap && type >= FYAIET_WARNING)
+		trace_tap(diag_type_names[type] ? diag_type_names[type] : "error",
+			  msg, trace_tap_user);
 	if (trace_open() < 0 || type < trace_level)
 		return;
 	modname = (unsigned int)module < FYAIEM_COUNT ?

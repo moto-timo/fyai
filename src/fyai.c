@@ -1727,6 +1727,7 @@ static int fyai_turn_run_submit_model(struct fyai_turn_run *run)
 	rc = fyai_turn_run_transition(run, FYAITRS_MODEL);
 	fyai_error_check(ctx, !rc, err,
 			 "could not advance turn to model request");
+	fyai_diag_tracef("model", "request, round %d", run->iteration + 1);
 	run->model_step = fyai_model_step_submit(ctx, run->turn, previous,
 						 run->tool_group,
 						 fyai_turn_run_model_complete,
@@ -2550,6 +2551,8 @@ static void fyai_turn_run_destroy(struct fyai_turn_run *run)
 	fyai_turn_run_drop_tool_group(run);
 	fyai_turn_run_gate_clear(run);
 	run->ctx->tool_diff_tracking = false;
+	fyai_diag_tracef("turn", "end, %s, %d rounds",
+			 fyai_turn_run_state_name(run->state), run->iteration);
 	free(run);
 }
 

@@ -33,7 +33,7 @@ static char *record(void (*fill)(struct fyai_cast *), char *path, size_t psz)
 
 	FYAI_TCHECK(mkdtemp(dir));
 	snprintf(path, psz, "%s/run.cast", dir);
-	c = fyai_cast_open(NULL, path, 100, 30, "prog \"x\"");
+	c = fyai_cast_open(NULL, path, 100, 30, "prog \"x\"", fy_invalid);
 	FYAI_TCHECK(c);
 	fill(c);
 	fyai_cast_close(c);

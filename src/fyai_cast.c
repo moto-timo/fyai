@@ -303,17 +303,18 @@ void fyai_cast_marker(struct fyai_cast *c, const char *label)
 
 /* The header: {version, width, height, timestamp, command}. */
 static int header_write(struct fyai_cast *c, int cols, int rows,
-			const char *command)
+			const char *command, fy_generic props)
 {
 	long long now = (long long)time(NULL);
+	fy_generic head;
 
+	head = fy_mapping("version", 2, "width", cols, "height", rows,
+			  "timestamp", now);
 	if (command)
-		line_write(c, fy_mapping("version", 2, "width", cols,
-					 "height", rows, "timestamp", now,
-					 "command", command));
-	else
-		line_write(c, fy_mapping("version", 2, "width", cols,
-					 "height", rows, "timestamp", now));
+		head = fy_assoc(head, "command", command);
+	if (fy_is_mapping(props))
+		head = fy_assoc(head, "fyai", props);
+	line_write(c, head);
 	return c->failed ? -1 : 0;
 }
 
@@ -346,7 +347,8 @@ void fyai_cast_close(struct fyai_cast *c)
 }
 
 struct fyai_cast *fyai_cast_open(struct fyai_ctx *ctx, const char *path,
-				 int cols, int rows, const char *command)
+				 int cols, int rows, const char *command,
+				 fy_generic props)
 {
 	struct fy_emitter_cfg ecfg;
 	struct fyai_cast *c = calloc(1, sizeof(*c));
@@ -373,7 +375,7 @@ struct fyai_cast *fyai_cast_open(struct fyai_ctx *ctx, const char *path,
 	fyai_error_check(ctx, !fy_emit_eventf(c->emit, FYET_STREAM_START), err,
 			 "cast: cannot start the stream");
 	c->t0 = fyai_monotonic_sec();
-	fyai_error_check(ctx, !header_write(c, cols, rows, command), err,
+	fyai_error_check(ctx, !header_write(c, cols, rows, command, props), err,
 			 "cast: cannot write %s", path);
 	return c;
 err:

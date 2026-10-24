@@ -11,6 +11,8 @@
 
 #include <stddef.h>
 
+#include <libfyaml/libfyaml-generic.h>
+
 struct fyai_ctx;
 struct fyai_cast;
 
@@ -18,10 +20,13 @@ struct fyai_cast;
  * Open the recording @path, a file of the asciicast v2 format that
  * `asciinema play` reads. A new file is made for the owner alone:
  * a recording holds all that the terminal showed. @command names the program
- * in the header; it can be NULL. Return NULL with a diagnostic on failure.
+ * in the header; it can be NULL. @props, when it is a mapping, goes into the
+ * header as the member `fyai`: what the program knew when it started, for the
+ * person who reads the recording. Return NULL with a diagnostic on failure.
  */
 struct fyai_cast *fyai_cast_open(struct fyai_ctx *ctx, const char *path,
-				 int cols, int rows, const char *command);
+				 int cols, int rows, const char *command,
+				 fy_generic props);
 
 /*
  * Add an event, stamped with the time since the open. A failed write ends the

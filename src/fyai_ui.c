@@ -31,6 +31,7 @@
 #include "fyai_marker.h"
 #include "fyai_markdown.h"
 #include "fyai_sink.h"
+#include "fyai_branch.h"
 #include "fyai_session.h"
 #include "fyai_terminal.h"
 #include "fyai_terminal_session.h"
@@ -3236,15 +3237,44 @@ static void ui_cast_tap(const void *data, size_t len, void *user)
  * screen. The option is not passed on, so a program that this one starts does
  * not record to the same file.
  */
+/*
+ * The trace records that tell what the program did while the screen changed:
+ * where a turn began and ended, each tool call, each process that started or
+ * ended, and each warning and error. They go to the recording as markers.
+ */
+static void ui_trace_tap(const char *kind, const char *text, void *user)
+{
+	static const char *const quiet[] = {
+		"sinkunit", "flowfence", "page", "workpane",
+	};
+	struct fyai_ui *ui = user;
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(quiet); i++)
+		if (!strcmp(kind, quiet[i]))
+			return;
+	fyai_cast_marker(ui->cast, fy_sprintfa("%s: %.200s", kind, text));
+}
+
 static void ui_cast_open(struct fyai_ui *ui, int cols, int rows)
 {
-	const char *path = ui->ctx->cfg->cast_path;
+	struct fyai_ctx *ctx = ui->ctx;
+	const char *path = ctx->cfg->cast_path;
+	fy_generic props;
 
 	if (!path || !*path)
 		return;
-	ui->cast = fyai_cast_open(ui->ctx, path, cols, rows, "fyai");
-	if (ui->cast)
-		(void)fytim_set_output_tap(ui->ft, ui_cast_tap, ui->cast);
+	/* What the program knew at the start, for the reader of the recording. */
+	props = fy_mapping("version", VERSION, "pid", (long long)getpid(),
+			   "branch", fyai_ctx_branch(ctx),
+			   "model", ctx->cfg->model ? ctx->cfg->model : "",
+			   "sandbox_profile", ctx->cfg->sandbox_profile ?
+				ctx->cfg->sandbox_profile : "normal");
+	ui->cast = fyai_cast_open(ctx, path, cols, rows, "fyai", props);
+	if (!ui->cast)
+		return;
+	(void)fytim_set_output_tap(ui->ft, ui_cast_tap, ui->cast);
+	fyai_diag_trace_tap(ui_trace_tap, ui);
 }
 
 void fyai_ui_marker(struct fyai_ctx *ctx, const char *label)
@@ -3447,6 +3477,7 @@ void fyai_ui_close(struct fyai_ctx *ctx)
 	}
 	fymd_set_glyph_width(NULL);
 	fytim_destroy(ui->ft);
+	fyai_diag_trace_tap(NULL, NULL);
 	fyai_cast_close(ui->cast);
 	fymd_renderer_destroy(ui->chrome_renderer);
 	if (ui->tty_fd >= 0)

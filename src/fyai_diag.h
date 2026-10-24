@@ -172,6 +172,15 @@ void fyai_diag_trace_reopen(void);
 /* The trace file this process writes, or NULL when tracing is off. */
 const char *fyai_diag_trace_path(void);
 
+/*
+ * Give each trace record to @fn, whether or not the trace file is on: the kind
+ * (`error`, `warning`, or the kind of an event), and its text. The recording of
+ * a session takes the records as markers. The tap belongs to this process: a
+ * forked child clears it. NULL removes it.
+ */
+typedef void (*fyai_diag_tap_fn)(const char *kind, const char *text, void *user);
+void fyai_diag_trace_tap(fyai_diag_tap_fn fn, void *user);
+
 /* Record a non-diagnostic process event. */
 void fyai_diag_tracef(const char *kind, const char *fmt, ...)
 	FY_FORMAT(printf, 2, 3);

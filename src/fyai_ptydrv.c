@@ -1711,7 +1711,7 @@ int fyai_ptydrv_run(struct fyai_ctx *ctx, struct fy_generic_builder *gb,
 				d.snapshot_taken = true;
 	}
 	if (cast) {
-		d.cast = fyai_cast_open(ctx, cast, d.cols, d.rows, argv[0]);
+		d.cast = fyai_cast_open(ctx, cast, d.cols, d.rows, argv[0], fy_invalid);
 		if (!d.cast)
 			goto out;
 	}
