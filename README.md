@@ -66,9 +66,12 @@ terminal](doc/img/demo.gif)
 - `monitor` for a long-running command. Each output line reaches the model as
   an event.
 - `wait`, `cancel`, `list` and `time` for work that the model started.
-- `ask_user` for questions with options and previews, and `ask_parent` for
-  sub-agents.
-- `todo_write`, `skill`, `settings` and `structured_output`.
+- `ask_user` asks one to four questions with two to four options each, with
+  multiple choice, Markdown previews and background questions. `ask_parent`
+  is the same for sub-agents.
+- `todo_write` keeps a task list on the branch. The terminal UI shows it as a
+  panel, and `fyai todo` prints it.
+- `skill`, `settings` and `structured_output`.
 - `fyai tool` runs one built-in tool from the command line.
 
 ### Sub-agents
@@ -82,7 +85,8 @@ terminal](doc/img/demo.gif)
   result.
 - `fyai agent` runs one transient agent. `fyai agent --rpc` serves it over
   JSON-RPC.
-- Compatibility with the Claude Agent SDK protocol and with ACP.
+- `fyai acp` serves the Agent Client Protocol to an editor. `fyai claude-sdk`
+  serves the Claude Agent SDK protocol.
 
 ### Sandbox (Linux)
 
@@ -117,7 +121,8 @@ terminal](doc/img/demo.gif)
 - Work pane with one tile for each live shell or sub-agent, with mouse
   controls, scroll, zoom and a header panel.
 - `!` runs a command of your own in a tile.
-- Progressive Markdown, syntax highlighting, tables and Mermaid diagrams.
+- Progressive Markdown, syntax highlighting and tables. Mermaid diagrams are
+  drawn in the terminal, also in question previews. `fyai render` draws a file.
 - Palette themes, configurable keys, prompt templates and completion
   (bash, zsh, fish).
 - Slash commands for every verb, session settings, queued input during a turn,

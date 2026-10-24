@@ -1195,6 +1195,44 @@ turn. Attachment preserves stored `HEAD` and the main conversation's draft.
 read-only until detached. `/zoom`, `/kill`, and `/sessions` also reach nested
 agents. A short agent name must be unambiguous; a full branch name is exact.
 
+### The todo list
+
+The model keeps a task list for a job of several steps with the `todo_write`
+tool. Each call replaces the whole list. An item has a `content` text (at most
+512 characters), a `status` and a `priority`:
+
+| Field | Values |
+| --- | --- |
+| `status` | `pending`, `in_progress`, `completed`, `cancelled` |
+| `priority` | `high`, `medium`, `low` |
+
+A list holds at most 64 items. The tool tells the model to keep one item
+`in_progress` at a time.
+
+The list is branch state, like the configuration, so it survives a restart. A
+sub-agent branch starts with a copy of the list of its parent and then keeps
+its own.
+
+In the terminal UI the list is a panel of the page. It shows each item with
+the mark of its state, and it stays while the branch holds a list. Outside the
+UI, and in a session, you read it with a command:
+
+```sh
+fyai todo            # show the list
+fyai todo clear      # drop the list
+```
+
+`/todo` and `/todo clear` do the same in a session.
+
+### A structured final answer
+
+A program that uses fyai as the CLI of the Claude Agent SDK can ask for an
+answer in a shape. With `output_format` of type `json_schema`, the model gets
+the tool `structured_output`, whose parameters are your schema. A call whose
+arguments match the schema is the answer, and the turn ends. A call that does
+not match gets the problems back and can correct them. `doc/claude-sdk-compat.md`
+has the details.
+
 ### Skills
 
 A skill is a set of instructions for one kind of task, such as a review
@@ -1863,6 +1901,70 @@ History selectors include:
 /history range A,B
 /history --tool-detail full last N
 ```
+
+### Markdown and diagrams
+
+fyai renders the Markdown of the model as it arrives: headings, lists, quotes,
+tables, links and fenced code with syntax highlighting. Tables fit the width
+of the terminal. A fenced `mermaid` block is drawn as a diagram in the
+terminal, in the transcript, in a question preview and in `fyai render`:
+
+````markdown
+```mermaid
+flowchart LR
+  A[prompt] --> B{tool call?}
+  B -- yes --> C[run tool] --> A
+  B -- no --> D[answer]
+```
+````
+
+The renderer is libfymermaid. It draws flowcharts, sequence, class, state,
+entity-relationship and Gantt diagrams, git graphs, pie and XY charts, mind
+maps, timelines, kanban boards, C4 diagrams and others. A source that does not
+parse stays a code block.
+
+| Setting | Effect |
+| --- | --- |
+| `display/markdown` | `false` writes the Markdown source with the colours of the theme and draws no diagram. `/markdown` changes it for a session. |
+| `display/markdown_mode` | `line`, `stream` or `oneshot`: how a streamed answer is drawn. |
+| `display/theme` | The theme of the Markdown, the code and the diagrams. |
+| `display/diagram_theme` | The theme of the diagrams. Empty follows the light or dark variant of the display. |
+| `display/diagram_charset` | `auto`, `ascii`, `unicode` or `rich`. `ascii` for a terminal without box-drawing characters. |
+| `display/diagram_fit` | `legend`, `shrink` or `clip`: what happens when a diagram is wider than the pane. |
+| `display/table_border` | `theme`, `grid` or `none`. |
+
+`fyai render [FILE]` draws a Markdown file, or standard input, with the same
+renderer. Use it to check a diagram or a theme.
+
+```sh
+fyai render notes.md
+echo '```mermaid
+pie
+  "a" : 3
+  "b" : 1
+```' | fyai render
+```
+
+### Side questions
+
+`/btw QUESTION` asks a question while a turn runs, and it does not change the
+conversation. It starts a sub-agent on a side branch `agent:btw-N`, forked
+from the current head, and shows the answer in a tile of the work pane. The
+tile stays until you close it with Escape, its close button or `/kill`.
+
+### Editors and other clients
+
+`fyai acp` serves the Agent Client Protocol (versions 1 and 2) on standard
+input and output, so an editor can use fyai as its agent. Each editor session
+is stored on an `acp/` branch, and a later process can list and resume it.
+
+```sh
+fyai -m MODEL acp
+```
+
+`doc/acp.md` shows how to set up VS Code. `fyai claude-sdk` serves the
+protocol of the Claude Agent SDK, so an SDK program can use fyai as its CLI
+(`doc/claude-sdk-compat.md`).
 
 ### Interactive settings
 
