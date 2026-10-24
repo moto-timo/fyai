@@ -6418,8 +6418,13 @@ static void fyai_scope_settle(struct fyai_ctx *ctx)
 	if (ctx->scope_open || ctx->scope_pins > 0 || fyai_scope_session(ctx))
 		return;
 	/* A process that did not start the holder does not end it. */
-	if (ctx->cover.owner)
+	if (ctx->cover.owner) {
+		fyai_diag_tracef("scope", "end, holder %ld", (long)ctx->cover.holder);
 		fyai_cover_release(&ctx->cover);
+	}
+	if (fyai_orphan_count(ctx))
+		fyai_diag_tracef("scope", "stop %zu tracked daemons",
+				 fyai_orphan_count(ctx));
 	fyai_orphan_sweep(ctx);
 }
 
@@ -6451,13 +6456,17 @@ static void fyai_scope_ensure(struct fyai_ctx *ctx)
 {
 	struct fyai_shell_sandbox sb;
 	const struct fyai_sandbox_spec *spec;
+	pid_t holder;
 
 	if (ctx->cfg->tool_child || !ctx->cfg->enable_sandbox ||
 	    ctx->sandbox_applied || !strcmp(ctx->cfg->sandbox_scope, "call"))
 		return;
+	holder = ctx->cover.holder;
 	if (fyai_shell_sandbox_begin(ctx, &sb, &spec))
 		return;
 	fyai_shell_sandbox_end(&sb);
+	if (ctx->cover.holder && ctx->cover.holder != holder)
+		fyai_diag_tracef("scope", "begin, holder %ld", (long)ctx->cover.holder);
 }
 
 struct fyai_tool_job *fyai_tool_job_submit(struct fyai_ctx *ctx,

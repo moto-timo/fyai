@@ -3272,7 +3272,8 @@ static void ui_cast_open(struct fyai_ui *ui, int cols, int rows)
 				   "branch", fyai_ctx_branch(ctx),
 				   "model", ctx->cfg->model ? ctx->cfg->model : "",
 				   "sandbox_profile", ctx->cfg->sandbox_profile ?
-					ctx->cfg->sandbox_profile : "normal");
+					ctx->cfg->sandbox_profile : "normal",
+				   "sandbox_scope", ctx->cfg->sandbox_scope);
 	ui->cast = fyai_cast_open(ctx, path, cols, rows, "fyai", props);
 	if (!ui->cast)
 		return;
