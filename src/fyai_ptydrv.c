@@ -235,17 +235,17 @@ static char *repr_bytes(const unsigned char *p, size_t n)
 	*o++ = '\'';
 	for (i = 0; i < n; i++) {
 		if (p[i] == '\\' || p[i] == '\'')
-			o += sprintf(o, "\\%c", p[i]);
+			o += snprintf(o, 3, "\\%c", p[i]);
 		else if (p[i] == '\n')
-			o += sprintf(o, "\\n");
+			o += snprintf(o, 3, "\\n");
 		else if (p[i] == '\r')
-			o += sprintf(o, "\\r");
+			o += snprintf(o, 3, "\\r");
 		else if (p[i] >= 0x20 && p[i] < 0x7f)
 			*o++ = (char)p[i];
 		else if (p[i] >= 0x80)
 			*o++ = (char)p[i];
 		else
-			o += sprintf(o, "\\x%02x", p[i]);
+			o += snprintf(o, 5, "\\x%02x", p[i]);
 	}
 	*o++ = '\'';
 	*o = '\0';
@@ -282,7 +282,7 @@ static char *screen_repr(const struct driver *d)
 			break;
 		}
 		out = grown;
-		used += (size_t)sprintf(out + used, "%s|", row);
+		used += (size_t)snprintf(out + used, n + 4, "%s|", row);
 	}
 	free(row);
 	return out;
