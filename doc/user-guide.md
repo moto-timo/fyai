@@ -1719,43 +1719,9 @@ fyai -i
 
 A line beginning with `//` is sent to the model verbatim with one slash removed. Slash command names accept an unambiguous prefix; exact matches win.
 
-### Fullscreen and inline
+A session opens fullscreen on the alternate screen of the terminal and returns the screen when it ends. The wheel, PageUp and PageDown scroll the transcript. Live shells and sub-agents are tiles of one work pane. With the mouse grabbed, selection and copy are fyai's, and paste stays the terminal's.
 
-An interactive session opens fullscreen. It takes the alternate screen of the
-terminal, and it gives the screen back unchanged when it ends. The transcript
-is a view of that screen: the wheel, PageUp and PageDown scroll it. Every live
-shell and sub-agent is a tile of one work pane, which takes half the terminal
-and has the mouse controls of a tile. Selection and copy are then fyai's, which
-copies through the terminal; paste stays the terminal's (`Ctrl-Shift-V`, or
-`Cmd-V` on macOS).
-
-The inline mode keeps the transcript in the scrollback of the terminal, where
-the terminal scrolls it as it scrolls the output of any other program, and the
-prompt stands under it. Use it to keep the conversation in the scrollback, to
-select with the mouse of the terminal, or on a terminal that has no alternate
-screen.
-
-Three settings say which mode a session opens in:
-
-```sh
-fyai config set display/screen inline         # keep the scrollback
-fyai config set display/work_controls none    # leave the mouse to the terminal
-fyai config set display/work_zoom_rows full   # the work pane takes the screen
-```
-
-`display/screen` is the mode: `fullscreen` (the default) or `inline`.
-The live screen is one UI Markdown page whose slots hold the transcript, the
-work pane and the prompt. Put the defaults back with:
-
-```sh
-fyai config set display/screen fullscreen
-fyai config set display/work_controls full
-fyai config set display/work_zoom_rows half
-```
-
-A setting takes effect on the next frame, except `display/screen`, which the
-session reads when it starts. `/config set` does the same from inside a
-session, and each setting belongs to the branch it is set on.
+`fyai config set display/screen inline` keeps the transcript in the terminal scrollback instead. `display/screen` is read when the session starts. `display/work_controls none` leaves the mouse to the terminal, and `display/work_zoom_rows` sets the height of the work pane (`full`, `half`, `quarter` or a row count). Other display settings take effect on the next frame and belong to the branch they are set on.
 
 ### Interactive commands
 
