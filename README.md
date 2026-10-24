@@ -116,7 +116,7 @@ terminal](doc/img/demo.gif)
   scrollback.
 - Work pane with one tile for each live shell or sub-agent, with mouse
   controls, scroll, zoom and a header panel.
-- `!` runs a command of your own in a tile. `fyai term` runs a terminal.
+- `!` runs a command of your own in a tile.
 - Progressive Markdown, syntax highlighting, tables and Mermaid diagrams.
 - Palette themes, configurable keys, prompt templates and completion
   (bash, zsh, fish).

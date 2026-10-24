@@ -1644,33 +1644,6 @@ While a turn runs, the prompt mark is an ellipsis instead of the usual arrow. A 
 
 `doc/pty-driver.md` says how a PTY test script waits for the mark.
 
-### A terminal for the user: `fyai term`
-
-`fyai term` runs a program on a pseudo-terminal for the user. libfyvterm interprets what the program draws, and fyai draws that screen with a state row of its own. The bytes of the program do not reach the terminal. The user sees the same screen that a model reads from a terminal session.
-
-```sh
-fyai term                       # a shell
-fyai term --login               # a login shell
-fyai term -c htop               # one program
-```
-
-The keys are the program's while it runs, so its own line discipline decides
-what Ctrl-C means. Ctrl-\ is the one key fyai keeps:
-
-| Key | What it does |
-| --- | --- |
-| `Ctrl-\ q` | Leave. The program receives a hangup, as from a closing terminal, and is killed if it stays. |
-| `Ctrl-\ r` | Draw the whole screen again. |
-| `Ctrl-\ Ctrl-\` | Type one Ctrl-\ into the program. |
-
-There is no prompt while the program runs, because the keys are the program's. The state row under the screen is the only row that the program does not own. When the terminal is resized, the program receives the new size. When the program ends, the transcript keeps its last screen.
-
-`--hold` waits for a key before leaving. `--rows` and `--cols` fix the size for
-a run with no terminal, and `--screen` writes the final screen as plain text.
-
-There is no sandbox here. The user at the keyboard runs the shell, and
-confinement is for a command that the model asked for.
-
 ### Interactive commands
 
 | Command | Purpose |
