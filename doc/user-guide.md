@@ -1,12 +1,24 @@
 # fyai User Guide
 
-This guide describes the current user-facing behaviour of `fyai`. It is organized around the way people use the program: getting started, understanding durable state, working interactively, configuring providers and tools, securing execution, and consulting the command reference.
+This guide describes how to use `fyai`. For the list of features, see the [README](../README.md).
 
-The implementation and tests are authoritative. Use `fyai help VERB` for
-detailed CLI syntax, `/help` for the interactive command list, and `fyai config
-schema` or `fyai config describe` for the configuration nodes covered by the
-schema. The schema is intentionally permissive rather than a closed vocabulary;
-`config.yaml.sample` remains the annotated catalogue of supported keys.
+Authority, in order: the implementation and its tests, `fyai help VERB` for the syntax of a command, `/help` for the commands of a session, `fyai config describe [PATH]` for the configuration schema, and `config.yaml.sample` for annotated examples.
+
+1. [Getting started](#1-getting-started)
+2. [The mental model](#2-the-mental-model)
+3. [Core workflows](#3-core-workflows)
+4. [Models, providers, and authentication](#4-models-providers-and-authentication)
+5. [Configuration](#5-configuration)
+6. [Tools and sub-agents](#6-tools-and-sub-agents)
+7. [Sandboxing and secret boundaries](#7-sandboxing-and-secret-boundaries)
+8. [Project views](#8-project-views)
+9. [Credential transport](#9-credential-transport)
+10. [MCP servers](#10-mcp-servers)
+11. [Observability and maintenance](#11-observability-and-maintenance)
+12. [Interactive mode](#12-interactive-mode)
+13. [CLI reference](#13-cli-reference)
+14. [Architecture and operational notes](#14-architecture-and-operational-notes)
+15. [Where to look next](#15-where-to-look-next)
 
 ## 1. Getting started
 
@@ -674,11 +686,22 @@ An export of the configuration leaves the hidden keys out.
 
 ## 6. Tools and sub-agents
 
-The built-in agent tool surface includes file reading, structured file writing and patching, shell execution, user questions, and delegated sub-agents where enabled.
+The model has these built-in tools. `fyai catalog tools` lists them with their descriptions (`/tools` in a session; add `--full` for the complete text).
 
-The shell tool is called `exec_command`, the name the other agents use for
-it. `shell` is the name it had, and a call under that name still reaches it,
-so a stored conversation from an older arena replays.
+| Tool | Purpose |
+| --- | --- |
+| `read_file`, `write_file`, `apply_patch` | Read, write and patch files in the workspace. |
+| `exec_command` | Run a shell command, in the background or in a named terminal session. |
+| `shell_input`, `shell_output`, `shell_close` | Type into, read and end a terminal session. |
+| `monitor` | Watch a long-running command. Each output line is an event. |
+| `wait`, `time` | Wait for a time or for background work, and read the clock. |
+| `cancel`, `list` | Stop background work and list what the model owns. |
+| `agent`, `agent_message`, `agent_input`, `project_view` | Delegate work, talk to a running sub-agent, and review its view. |
+| `ask_user`, `ask_parent` | Ask the user, or the delegating agent, a question. |
+| `todo_write`, `skill`, `settings`, `structured_output` | Task list, skills, configuration and structured final answer. |
+| `tool_search`, `mcp_resource` | Find MCP tools and read MCP resources. |
+
+The shell tool is called `exec_command`. A call under its old name, `shell`, still works, so a stored conversation replays.
 
 Run one tool directly, without a model call:
 
@@ -937,56 +960,6 @@ the user, or an open terminal session. Give `kind` (`wait`, `agent`, `monitor`,
 object. A session is killed at once; use `shell_close` when the program must
 save its work. The user can stop a sub-agent with `/kill`.
 
-### A terminal for the user: `fyai term`
-
-The same terminal, drawn for a user. `fyai term` runs a program on a
-pseudo-terminal. libfyvterm interprets what the program draws. fyai
-publishes that screen to a libfytimui surface, which draws it beside the
-transcript and the prompt, with a state row of its own. The bytes of the
-program do not reach the terminal. The user sees the screen that fyai holds,
-which is the screen that a model reads.
-
-```sh
-fyai term                       # a shell
-fyai term --login               # a login shell
-fyai term -c htop               # one program
-```
-
-The keys are the program's while it runs, so its own line discipline decides
-what Ctrl-C means. Ctrl-\ is the one key fyai keeps:
-
-| Key | What it does |
-| --- | --- |
-| `Ctrl-\ q` | Leave. The program receives a hangup, as from a closing terminal, and is killed if it stays. |
-| `Ctrl-\ r` | Draw the whole screen again. |
-| `Ctrl-\ Ctrl-\` | Type one Ctrl-\ into the program. |
-
-The screen belongs to the program. There is no prompt while the program runs,
-because the keys are its own. The state row beneath the screen is the only row
-that the program does not have. The screen follows the window. Resize the
-terminal, and the program receives its new size in rows and in columns. When
-the program ends, the transcript keeps its last screen.
-
-`--hold` waits for a key before leaving. `--rows` and `--cols` fix the size for
-a run with no terminal, and `--screen` writes the final screen as plain text.
-
-There is no sandbox here. The user at the keyboard runs the shell, and
-confinement is for a command that the model asked for.
-
-List catalogue-defined agent tool sets:
-
-```sh
-fyai catalog tools
-fyai catalog tools fyai --full
-```
-
-Interactive equivalent:
-
-```text
-/tools
-/tools fyai --full
-```
-
 ### Delegated agents and persistent branches
 
 A sub-agent started by the model's `agent` tool is a proper arena branch, not a
@@ -1008,7 +981,9 @@ A forked sub-agent is fixed to the same model as its parent. This preserves the 
 
 The parent controls delegation and receives the agent's report, while the agent branch retains its durable conversation and metadata for later inspection, comparison, or continuation.
 
-**A sub-agent is reached again by its name.** A sub-agent commits its
+### Reaching a sub-agent again
+
+A sub-agent commits its
 conversation on its own branch, under the name that the call gave it. A later
 `agent` call with that name continues that conversation, and the sub-agent
 keeps what it learned. Ask it what it found, or give it the next step, and it
@@ -1016,6 +991,8 @@ does not repeat its earlier work. A new name starts a new sub-agent.
 
 A name that belongs to a sub-agent that still runs is refused, because that
 sub-agent owns its conversation. Wait for its report, then call it again.
+
+### Transient and persona agents
 
 Run one transient agent explicitly with:
 
@@ -1040,19 +1017,6 @@ descendant counts. `/branches` shows the complete branch tree and live states.
 The tile header of a sub-agent shows the branch, the model, the execution id,
 and the running time after the agent description. While a turn runs, the input
 pane header shows the running time of the turn.
-
-While a turn runs, the prompt mark is an ellipsis in place of the usual
-arrow: a line typed then waits. The lines that wait stand on top of the input
-pane, under **pending**, as they were typed, and the next request takes them.
-The arrow comes back when a line is taken at once. The ellipsis has the columns
-of the arrow, so the input does not move. The theme can give another glyph
-(`prompt.busy`), and `display/prompt_busy` replaces both. A PTY script waits for the mark as
-`doc/pty-driver.md` says.
-
-A long queue does not push the page away. The lines that wait take a third of
-the screen at most, and never a row of the input pane. When they do not fit,
-the oldest lines go: **pending** keeps the count of all the lines, and the
-newest lines stand under it, with the header and the status.
 
 ### Questions to the user
 
@@ -1132,15 +1096,15 @@ agents. A short agent name must be unambiguous; a full branch name is exact.
 
 ## 7. Sandboxing and secret boundaries
 
-### Landlock sandbox
+The sandbox confines the commands that tools run. It is Linux only. It uses Landlock for paths and ports, and mount, PID and user namespaces for the arena and the processes of an exchange. `doc/sandbox-namespaces.md` explains the namespaces.
+
+### The policy
 
 ```sh
-fyai sandbox
+fyai sandbox          # show the stored policy
 fyai sandbox on
 fyai sandbox off
 ```
-
-Example policy:
 
 ```yaml
 sandbox:
@@ -1156,51 +1120,34 @@ sandbox:
     udp: { ports: [], bind_ports: [] }
 ```
 
-The `.fyai` arena is denied to sandboxed tools. Landlock is best-effort on unsupported systems; the portable tool policy remains in force.
+- The `.fyai` arena is always denied to sandboxed tools.
+- Path modes are `rw`, `ro`, `edit` and `append`.
+- `network.tcp.ports` and `network.udp.ports` list the permitted destination ports. `bind_ports` lists the permitted local ports. An empty list denies the operation. A protocol that is not listed is unrestricted in the normal profile.
+- A UDP send also permits an ephemeral source bind. Local Unix sockets stay available.
+- TCP limits need Landlock ABI 4. UDP limits need ABI 10. On an older ABI, fyai reports that the restriction is not available. A kernel with no network rights leaves egress open, and fyai warns once for each process.
+- On a system without Landlock, the portable tool policy stays in force.
 
-Supported path modes include `rw`, `ro`, `edit`, and `append`. `network.tcp.ports` and `network.udp.ports` list permitted destination ports independently. `bind_ports` under each protocol lists permitted local ports. An empty list denies that operation; omitting a protocol leaves it unrestricted in the normal profile. UDP sends also permit an ephemeral source bind. TCP needs Landlock ABI 4 and UDP needs ABI 10. On older ABIs fyai reports that the requested UDP restriction is unavailable. Local Unix sockets remain available.
+### Profiles
 
-`sandbox_profile` names the policy: `normal` uses `sandbox`, and any other name
-is a profile. The profile enables the sandbox whatever `sandbox` says. `dev` is the
-default. The profiles are the `sandbox_profiles` key. `dev` and `lockdown` are in
-`config.yaml.sample`, so an arena that starts from the sample stores them and
-`fyai config show` lists them; an arena that stores none of them uses those of the
-sample. A profile has a `description`, `extends` (the profile it starts from, or
-nothing), `deny`, `allow`, `network` and `view`. A key that a profile names replaces
-the key of the profile it extends, except `allow`, which adds to it. `extends` its
-own name starts from the sample profile of that name. A name that no profile has, or
-a chain of `extends` that is a cycle, is an error.
+`sandbox_profile` names the policy. `normal` uses the `sandbox` key. Any other name is a profile, and a profile enables the sandbox whatever `sandbox` says. The default is `dev`.
 
-The top row of the prompt names the profile that confines the tools (`{sandbox}` in
-`display/prompt_top`): ` · sandbox dev`, ` · sandbox on` for the `sandbox` setting
-alone, and ` · no sandbox` when nothing confines them. It changes when `/session profile`
-does.
+Profiles are the `sandbox_profiles` key. `config.yaml.sample` has `dev` and `lockdown`. An arena that starts from the sample stores them, and `fyai config show` lists them. An arena that stores none of them uses those of the sample.
 
-A profile has a `view` setting: `true` runs the session in a view of the project,
-where this host can make one (`lockdown` and `dev-view` do; `dev` does not, because a
-view is jarring as a default). `dev-view` is `dev` with `view: true`. `/session profile`
-lists the profiles and marks the current one. `/session profile NAME` stores the
-profile and its view setting, and starts the session again to apply them, as
-`/reload` does: live shells and sub-agents must finish first. A session that runs in
-a view is started again by its supervisor, which stays outside the view. The
-supervisor first applies the changes of the view to the project, as `/session push`
-does, and refuses the switch when a path conflicts with the project: nothing changes
-then, and the stored profile is put back. The new session runs in a view or outside
-one as the profile says. A session that runs outside a view starts again in one for
-a profile that asks for it. A session that ends from an idle prompt applies its view
-to the project when no path conflicts (`view/apply_on_exit`); a new session refuses to
-start while the view holds a change that the project does not have, and names `view
-apply session` and `view remove session`. The credential must then come from the environment or
-`fyai auth`, not from `-k`, because the new session has no command line to carry it.
-`/session dev`,
-`/session lockdown` and `/session yolo` select `dev`, `lockdown` and `normal` and set
-the credential transport and the view too. The profile is stored, so a restart keeps
-it, and it leaves the `sandbox` policy as it was.
+A profile has these keys:
 
-A path of a profile may use `{{hostname}}`, `{{os}}`, `{{arch}}` and
-`{{host_specific}}`, which is `~/.fyai/hosts/{{hostname}}`. One configuration then
-serves hosts that differ, for example a toolchain directory that exists on one host
-and not on another. A placeholder that is not one of these is an error.
+| Key | Meaning |
+| --- | --- |
+| `description` | Text for `/session profile`. |
+| `extends` | The profile to start from, or nothing. |
+| `deny`, `allow`, `network` | As in the policy. `allow` adds to the parent. The other keys replace the parent's. |
+| `view` | `true` runs the session in a view. |
+| `home`, `mounts` | A private home and extra mounts. |
+| `expose` | What the tool needs from the host. Adds to the parent. |
+| `list_root` | Lets the tool open and list `/`. `dev` has it. |
+
+`extends` with the name of the profile itself starts from the sample profile of that name. An unknown name, or a cycle of `extends`, is an error.
+
+A path can use `{{hostname}}`, `{{os}}`, `{{arch}}` and `{{host_specific}}` (`~/.fyai/hosts/{{hostname}}`). One configuration can then serve hosts that differ. Any other placeholder is an error.
 
 ```yaml
 sandbox_profile: node
@@ -1214,44 +1161,102 @@ sandbox_profiles:
       tcp: { ports: [80, 443, 3000] }
 ```
 
-The `dev` profile confines a tool to project work. It reads and writes the
-project, runs the toolchains of the user, and reads the git configuration. The
-grants are `~/.cargo/bin`, `~/.rustup`, `~/.nvm`, `~/.local/share/pnpm`, `~/go/bin`
-(read and execute); `~/.cargo/registry`, `~/.cargo/git`, `~/.npm`, `~/.cache/yarn`,
-`~/.cache/pip`, `~/.cache/ccache`, `~/.cache/go-build`, `~/go/pkg` (read and
-write); and `~/.gitconfig` and `~/.config/git` (read). A path that does not exist
-is skipped. It denies the secret locations: `~/.ssh`, `~/.aws`, `~/.gnupg`,
-`~/.netrc`, `~/.config/gh`, `~/.docker`, `~/.kube`, `~/.npmrc` and
-`~/.cargo/credentials.toml`. The default `network` lets TCP connect to ports
-80, 443 and 9418, which git and the package registries use, and UDP send to port 53
-for DNS on Landlock ABI 10 or newer. Binds are not restricted. Git over SSH does not
-work, because `~/.ssh` is denied. A server on a local port needs that port in
-`network.tcp.ports`, because Landlock does not tell loopback from other addresses.
+The top row of the prompt names the profile (`{sandbox}` in `display/prompt_top`): ` · sandbox dev`, ` · sandbox on` when only `sandbox` is set, or ` · no sandbox`.
 
-Where the host allows it, a sandboxed tool does not get its denied paths from
-Landlock. The tool runs in a private mount namespace, with each existing denied path
-and the `.fyai` arena covered by an empty read-only mount, a directory by an empty one
-and a file by `/dev/null`. The host and the other processes are not changed. A path
-that Landlock denies would leave the directory above it only the right to list, so a
-tool could not create entries in the project root; a covered path does not. The tool
-also has a PID namespace: it sees only the processes of its scope, and the scope is
-the whole exchange. A program that a command leaves running, such as a build server,
-stays alive for the later calls of the same exchange and ends when the exchange
-ends: the final answer, an error, or an interrupt. The result of a call that left a
-process says so. A named terminal session, a monitor and a background sub-agent keep
-the scope until they end. Where no namespace is possible, a tool child tracks the
-processes that it left and fyai stops them when the exchange ends.
+### Built-in profiles
 
-`sandbox_scope` chooses the lifetime: `exchange` (the default), `session` (until the
-interactive session ends) and `call` (the process ends with its call). The model
-cannot change it. See `doc/exchange-scope.md`.
+| Profile | What it is |
+| --- | --- |
+| `dev` | Project work. The default. |
+| `dev-view` | `dev` with the session in a view. |
+| `lockdown` | The project and nothing else, no network, session in a view. |
+| `build` | `dev` with `expose: [userns]`, for BitBake and tools that make a namespace for each task. |
+| `yocto` | `build` with a private home that holds a copy of `~/.gitconfig`. |
 
-`sandbox_grace_ms` is the time that these processes have to stop after SIGTERM before
-SIGKILL (5000 by default). Give a build server more.
+`dev` reads and writes the project, runs the toolchains of the user and reads the git configuration.
 
-A sandbox profile can give the tools a home of their own. fyai mounts a new tree
-over the real home in the namespace of each tool, so `HOME` and every path under it
-stay as they are, and the tool sees only the tree:
+- Read and execute: `~/.cargo/bin`, `~/.rustup`, `~/.nvm`, `~/.local/share/pnpm`, `~/go/bin`.
+- Read and write: `~/.cargo/registry`, `~/.cargo/git`, `~/.npm`, `~/.cache/yarn`, `~/.cache/pip`, `~/.cache/ccache`, `~/.cache/go-build`, `~/go/pkg`.
+- Read: `~/.gitconfig`, `~/.config/git`.
+- A path that does not exist is skipped.
+- Denied: `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker`, `~/.kube`, `~/.npmrc`, `~/.cargo/credentials.toml`.
+- TCP connects to ports 80, 443 and 9418 (git and registries). UDP sends to port 53 for DNS on Landlock ABI 10 or newer. Binds are not restricted.
+- Git over SSH does not work, because `~/.ssh` is denied.
+- A server on a local port needs that port in `network.tcp.ports`. Landlock does not tell loopback from other addresses.
+
+`lockdown` takes the same keys. A key that it omits keeps its default. `deny` lists `~/.ssh` and the secret location of the platform. `network` has an empty port list: TCP connects and binds are denied, and on ABI 10 or newer UDP sends and binds are denied. Each omitted protocol keeps its lockdown default. The older key `sandbox_lockdown` also changes it.
+
+```yaml
+sandbox_profile: lockdown
+sandbox_lockdown:
+  deny: [~/.ssh, ~/.aws]
+  network:
+    tcp: { ports: [443], bind_ports: [] }
+    udp: { ports: [], bind_ports: [] }
+```
+
+### Switching profiles in a session
+
+- `/session profile` lists the profiles and marks the current one.
+- `/session profile NAME` stores the profile and its `view` setting and restarts the session, as `/reload` does. Live shells and sub-agents must finish first.
+- `/session dev`, `/session lockdown` and `/session yolo` select `dev`, `lockdown` and `normal`. They also set the credential transport and the view (chapter 9). The `sandbox` policy is not changed.
+- A session in a view is restarted by its supervisor, which stays outside the view. The supervisor first applies the changes of the view to the project, as `/session push` does. If a path conflicts, nothing changes and the stored profile is put back.
+- The new session runs in a view or outside one as the profile says. A session outside a view restarts in one for a profile that asks for it.
+- The credential must come from the environment or `fyai auth`, not from `-k`, because the new session has no command line to carry it.
+
+### The cover: arena and namespaces
+
+Landlock cannot hide `.fyai` from a tool and still let the tool create files in the project root. Where the host allows it, a tool therefore runs in a private mount namespace:
+
+- Each existing denied path and the arena are covered. A directory is covered by an empty read-only mount, a file by `/dev/null`. Landlock gets no deny for them.
+- The tool has a PID namespace and sees only the processes of its scope.
+- The host and other processes are not changed.
+
+`sandbox_cover` chooses how the tool gets the namespaces:
+
+| Value | Meaning |
+| --- | --- |
+| `auto` | The default. Try `userns`, then `bwrap`. |
+| `userns` | The tool makes the namespaces itself. Needs unprivileged user namespaces. |
+| `bwrap` | fyai starts one bubblewrap process that holds the namespaces. Each tool joins them. |
+| `none` | Landlock denies the arena. A tool cannot create files directly in the project root. |
+
+If neither works, fyai warns at the start and when the profile changes, and falls back to Landlock for the arena. Ubuntu 24.04 and later restrict user namespaces with AppArmor, so a stock install is in this case. Either of these fixes is enough.
+
+Install the AppArmor profile of fyai:
+
+```sh
+fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
+sudo apparmor_parser -r /etc/apparmor.d/fyai
+```
+
+The profile is for the binary that runs. It grants `userns` and confines nothing else.
+
+Or install bubblewrap with its AppArmor profile. On Ubuntu 24.04 the profile is in the `apparmor-profiles` package, not in the bubblewrap package:
+
+```sh
+sudo apt install bubblewrap apparmor-profiles
+sudo install -m 644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/
+sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+```
+
+`doc/apparmor-userns.md` has the details and the checks.
+
+### Processes of an exchange
+
+All tool calls of an exchange run in one scope. A program that a command leaves running, such as a build server, stays alive for the later calls of the same exchange. It ends when the exchange ends: the final answer, an error or an interrupt. The result of a call that left a process says so, and `list daemons` shows it.
+
+A named terminal session, a monitor and a background sub-agent keep the scope until they end. Where no namespace is possible, the tool child tracks the processes it left, and fyai stops them when the exchange ends.
+
+- `sandbox_scope` chooses the lifetime: `exchange` (default), `session` (until the interactive session ends) or `call` (the process ends with its call). The model cannot change it.
+- `sandbox_grace_ms` is the time that the processes have to stop after SIGTERM before SIGKILL. The default is 5000. Give a build server more.
+- `exec_command` with `background` starts a detached command. `name` labels it in `list daemons`. `cancel` and `/kill` stop it by label or pid.
+
+See `doc/exchange-scope.md`.
+
+### Private home and mounts
+
+A profile can give the tools a home of their own. fyai mounts a new tree over the real home in the namespace of each tool. `HOME` and the paths under it do not change, and the tool sees only the tree.
 
 ```yaml
 sandbox_profiles:
@@ -1266,88 +1271,45 @@ sandbox_profiles:
       - { kind: bind, source: /dev/dri, mode: rw }
 ```
 
-Each path of `copy` and each variable of `env` gives the tools a private version at the
-same place. A directory is an overlay of the original, so nothing is copied and the
-original never changes; with `method: copy` it is a copy that shares the blocks of the
-original where the file system can. The paths that the sandbox grants under the home,
-the project among them, are mounted into the tree, so they stay visible. A path under a
-`deny` entry is left out. `mounts` makes other binds and overlays. There is no fallback:
-a host that cannot make a namespace stops the tool and says why.
+- Each path of `copy` and each variable of `env` gives the tools a private version at the same place.
+- A directory is an overlay of the original. Nothing is copied, and the original does not change. With `method: copy` it is a copy that shares blocks with the original where the file system can.
+- The paths that the sandbox grants under the home, the project among them, are mounted into the tree and stay visible.
+- A path under a `deny` entry is left out.
+- `mounts` makes other binds and overlays.
+- A host that cannot make a namespace cannot make the home. `sandbox_on_failure` then chooses between a warning and a stop.
 
-`expose` names what a tool needs from the host. It adds to the exposures of the profile
-that this one extends. `userns` lets a program make a user namespace of its own, as
-BitBake does to cut off the network of a task. Without it the write to
-`/proc/self/uid_map` is denied, and the program stops with a message about user
-namespaces. The exposure grants a write and a truncate on `/proc` and mounts `/proc/sys`,
-`/proc/sysrq-trigger`, `/proc/irq`, `/proc/bus` and `/proc/fs` read-only. It needs a
-cover, which gives the tool a PID namespace of its own, so the program cannot write the
-memory of a process outside it. It is a lax option: the program can write the files of
-its own processes below `/proc`. The `build` profile is `dev` with this exposure, for
-BitBake and other tools that make a namespace for each task: `/session profile build`.
-The `yocto` profile is `build` with a private home that holds a copy of `~/.gitconfig`. A
-program that reads `~/.netrc` then gets "not found" and not "permission denied", which
-the readers of BitBake and Poky handle; the file is denied, so it is never copied.
+### Exposures
 
-`sandbox_on_failure` says what happens when the sandbox cannot be set up, for example
-when a profile makes mounts and the host does not allow user namespaces. `warn`, the
-default, reports the cause one time, with the way to fix it, and runs the tool without
-the sandbox. `fail` stops the tool and says why: use it where an unconfined tool is not
-acceptable.
+`expose` names what a tool needs from the host. It adds to the exposures of the parent profile.
 
-`sandbox_cover` chooses how the tool gets the namespaces. `auto` (the default) tries
-`userns`, where the tool makes them itself, then `bwrap`, where fyai starts one
-bubblewrap process that holds them and each tool joins them. `none` leaves the arena
-to Landlock. If neither works, which is the case on Ubuntu 24.04 and later unless the
-host allows it, fyai warns at the start and when the profile changes, and Landlock
-denies the arena as before: a tool cannot create files directly in the project root.
-Two fixes are available, and either is enough:
+`userns` lets a program make a user namespace of its own, as BitBake does to cut off the network of a task. Without it, the write to `/proc/self/uid_map` is denied and the program stops with a message about user namespaces.
 
-```sh
-fyai sandbox apparmor | sudo tee /etc/apparmor.d/fyai >/dev/null
-sudo apparmor_parser -r /etc/apparmor.d/fyai
-```
+- The exposure grants write and truncate on `/proc` and mounts `/proc/sys`, `/proc/sysrq-trigger`, `/proc/irq`, `/proc/bus` and `/proc/fs` read-only.
+- It needs a cover, which gives the tool a PID namespace, so the program cannot write the memory of a process outside it.
+- It is a lax option: the program can write the files of its own processes below `/proc`.
 
-or bubblewrap with its AppArmor profile, which on Ubuntu 24.04 is in the
-`apparmor-profiles` package and not in the bubblewrap package:
+The `yocto` profile has a private home, so a program that reads `~/.netrc` gets "not found" and not "permission denied". BitBake and Poky handle "not found". The file is denied, so it is never copied.
 
-```sh
-sudo apt install bubblewrap apparmor-profiles
-sudo install -m 644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/
-sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
-```
+### When the sandbox cannot start
 
-`fyai sandbox apparmor` writes an AppArmor profile for the binary that runs. It grants
-`userns` and confines nothing else. `doc/apparmor-userns.md` has the details and the
-checks.
+`sandbox_on_failure` says what happens when the sandbox cannot be set up, for example when a profile makes mounts and the host does not allow user namespaces.
 
-In every profile that uses Landlock, PATH keeps only the directories that the
-grants reach: an entry that is relative or empty, under a denied path, or outside the
-system, scratch, project and `allow` trees is removed. A tool then does not find a
-program that it could not run. If no entry is left, PATH is `/usr/local/bin:/usr/bin:/bin`.
+- `warn` (default) reports the cause once, with the fix, and runs the tool without the sandbox.
+- `fail` stops the tool and says why. Use it where an unconfined tool is not acceptable.
 
-The `lockdown` profile takes the same keys; `sandbox_lockdown` is the older key
-that changes it. A key that it omits keeps its default: `deny` lists `~/.ssh`,
-the secret location of the platform, and `network` has an empty port list, which
-denies TCP connects and binds and, on Landlock ABI 10 or newer, UDP sends and binds. On older ABIs UDP remains unrestricted. A kernel without network rights leaves egress open. Each omitted protocol entry keeps its lockdown default. A kernel that cannot restrict an operation gets one warning for each process.
+### PATH
 
-```yaml
-sandbox_profile: lockdown
-sandbox_lockdown:
-  deny: [~/.ssh, ~/.aws]
-  network:
-    tcp: { ports: [443], bind_ports: [] }
-    udp: { ports: [], bind_ports: [] }
-```
+In every profile that uses Landlock, PATH keeps only the directories that the grants reach. An entry is removed when it is relative or empty, is under a denied path, or is outside the system, scratch, project and `allow` trees. A tool then does not find a program that it could not run. If no entry is left, PATH is `/usr/local/bin:/usr/bin:/bin`.
 
 ### Secret handling
 
-Secrets are deliberately kept out of immutable arena data:
+Secrets stay out of immutable arena data:
 
-- API keys are resolved indirectly;
-- interactive secret entry is read separately from the slash line;
-- subscription credentials use machine-local credential storage;
-- wire logging can redact API keys;
-- model tools are not given credential material.
+- API keys are resolved indirectly.
+- Interactive secret entry is read separately from the slash line.
+- Subscription credentials use machine-local credential storage.
+- Wire logging can redact API keys.
+- Model tools are not given credential material.
 
 ## 8. Project views
 
@@ -1669,6 +1631,57 @@ A line beginning with `//` is sent to the model verbatim with one slash removed.
 A session opens fullscreen on the alternate screen of the terminal and returns the screen when it ends. The wheel, PageUp and PageDown scroll the transcript. Live shells and sub-agents are tiles of one work pane. With the mouse grabbed, selection and copy are fyai's, and paste stays the terminal's.
 
 `fyai config set display/screen inline` keeps the transcript in the terminal scrollback instead. `display/screen` is read when the session starts. `display/work_controls none` leaves the mouse to the terminal, and `display/work_zoom_rows` sets the height of the work pane (`full`, `half`, `quarter` or a row count). Other display settings take effect on the next frame and belong to the branch they are set on.
+
+### Input during a turn
+
+While a turn runs, the prompt mark is an ellipsis in place of the usual
+arrow: a line typed then waits. The lines that wait stand on top of the input
+pane, under **pending**, as they were typed, and the next request takes them.
+The arrow comes back when a line is taken at once. The ellipsis has the columns
+of the arrow, so the input does not move. The theme can give another glyph
+(`prompt.busy`), and `display/prompt_busy` replaces both. A PTY script waits for the mark as
+`doc/pty-driver.md` says.
+
+A long queue does not push the page away. The lines that wait take a third of
+the screen at most, and never a row of the input pane. When they do not fit,
+the oldest lines go: **pending** keeps the count of all the lines, and the
+newest lines stand under it, with the header and the status.
+
+### A terminal for the user: `fyai term`
+
+The same terminal, drawn for a user. `fyai term` runs a program on a
+pseudo-terminal. libfyvterm interprets what the program draws. fyai
+publishes that screen to a libfytimui surface, which draws it beside the
+transcript and the prompt, with a state row of its own. The bytes of the
+program do not reach the terminal. The user sees the screen that fyai holds,
+which is the screen that a model reads.
+
+```sh
+fyai term                       # a shell
+fyai term --login               # a login shell
+fyai term -c htop               # one program
+```
+
+The keys are the program's while it runs, so its own line discipline decides
+what Ctrl-C means. Ctrl-\ is the one key fyai keeps:
+
+| Key | What it does |
+| --- | --- |
+| `Ctrl-\ q` | Leave. The program receives a hangup, as from a closing terminal, and is killed if it stays. |
+| `Ctrl-\ r` | Draw the whole screen again. |
+| `Ctrl-\ Ctrl-\` | Type one Ctrl-\ into the program. |
+
+The screen belongs to the program. There is no prompt while the program runs,
+because the keys are its own. The state row beneath the screen is the only row
+that the program does not have. The screen follows the window. Resize the
+terminal, and the program receives its new size in rows and in columns. When
+the program ends, the transcript keeps its last screen.
+
+`--hold` waits for a key before leaving. `--rows` and `--cols` fix the size for
+a run with no terminal, and `--screen` writes the final screen as plain text.
+
+There is no sandbox here. The user at the keyboard runs the shell, and
+confinement is for a command that the model asked for.
 
 ### Interactive commands
 
