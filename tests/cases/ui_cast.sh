@@ -41,6 +41,7 @@ assert any(e[1] == "r" and e[2] == "80x24" for e in events), events
 # What the program knew at the start, and what it did while the screen changed.
 props = head["fyai"]
 assert props["version"] and props["pid"] > 0 and props["model"] == "mock-model", props
+assert props["sandbox_scope"] == "exchange", props
 marks = [e[2] for e in events if e[1] == "m"]
 assert any(m.startswith("model: request") for m in marks), marks
 assert any(m.startswith("turn: end") for m in marks), marks
