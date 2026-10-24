@@ -664,17 +664,12 @@ int fyai_catalog_reset(struct fyai_ctx *ctx)
 			   fy_invalid);
 }
 
-/* Quote @s for /bin/sh into @out. */
+/* Append a blank and @s quoted for /bin/sh to @out. */
 static int catalog_shell_quote(struct response_buffer *out, const char *s)
 {
-	if (response_buffer_append(out, " '"))
+	if (response_buffer_append(out, " "))
 		return -1;
-	for (; *s; s++) {
-		if (*s == '\'' ? response_buffer_append(out, "'\\''") :
-				 response_buffer_append_data(out, s, 1))
-			return -1;
-	}
-	return response_buffer_append(out, "'");
+	return fyai_shell_quote(out, s);
 }
 
 /* Return @seq with item @idx replaced by @item. */

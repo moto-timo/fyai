@@ -363,4 +363,7 @@ int hex_nibble(char c);
  */
 int hex_decode(const char *text, unsigned char *bytes, size_t *count);
 
+/* Append @s to @out in single quotes, so that a shell reads it as one word. */
+int fyai_shell_quote(struct response_buffer *out, const char *s);
+
 #endif

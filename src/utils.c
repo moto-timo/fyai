@@ -2260,3 +2260,13 @@ int hex_decode(const char *text, unsigned char *bytes, size_t *count)
 	*count = length / 2;
 	return 0;
 }
+
+int fyai_shell_quote(struct response_buffer *out, const char *s)
+{
+	int rc = response_buffer_append(out, "'");
+
+	for (; !rc && *s; s++)
+		rc = *s == '\'' ? response_buffer_append(out, "'\\''") :
+				  response_buffer_append_data(out, s, 1);
+	return rc ? rc : response_buffer_append(out, "'");
+}

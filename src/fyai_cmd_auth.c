@@ -152,16 +152,6 @@ struct auth_child {
 	struct fyai_shell_session *session;
 };
 
-static int auth_quote(struct response_buffer *line, const char *s)
-{
-	int rc = response_buffer_append(line, "'");
-
-	for (; !rc && *s; s++)
-		rc = *s == '\'' ? response_buffer_append(line, "'\\''") :
-		     response_buffer_append_data(line, s, 1);
-	return rc ? rc : response_buffer_append(line, "'");
-}
-
 static void auth_child_exited(void *userdata, int exit_code, int signal)
 {
 	struct auth_child *child = userdata;
@@ -211,7 +201,7 @@ static int auth_login_child(struct fyai_cmd_call *call)
 	child = calloc(1, sizeof(*child));
 	fyai_error_check(call->ctx, child, err, "login: out of memory");
 	child->call = call;
-	rc = auth_quote(&line, exe) ||
+	rc = fyai_shell_quote(&line, exe) ||
 	     response_buffer_append(&line, " auth openai login");
 	if (!rc && fyai_cmd_arg_bool(call, "no_browser"))
 		rc = response_buffer_append(&line, " --no-browser");
@@ -223,7 +213,7 @@ static int auth_login_child(struct fyai_cmd_call *call)
 		rc = response_buffer_append(&line, " --new-account");
 	if (!rc && account && *account)
 		rc = response_buffer_append(&line, " --account ") ||
-		     auth_quote(&line, account);
+		     fyai_shell_quote(&line, account);
 	fyai_error_check(call->ctx, !rc, err_child, "login: out of memory");
 	call->priv = child;
 	call->cleanup = auth_child_cleanup;

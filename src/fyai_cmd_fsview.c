@@ -1905,16 +1905,6 @@ static int view_exec(struct fyai_ctx *ctx, struct fyai_fsview *view, char *const
 	return rc;
 }
 
-static int view_terminal_quote(struct response_buffer *line, const char *text)
-{
-	int rc = response_buffer_append(line, "'");
-
-	for (; !rc && *text; text++)
-		rc = *text == '\'' ? response_buffer_append(line, "'\\''") :
-				     response_buffer_append_data(line, text, 1);
-	return rc ? rc : response_buffer_append(line, "'");
-}
-
 static void view_terminal_exited(void *userdata, int exit_code, int signal)
 {
 	struct fyai_ctx *ctx = userdata;
@@ -1953,22 +1943,22 @@ static int view_enter_terminal(struct fyai_cmd_call *call)
 		fyai_error(call->ctx, "view: cannot encode the terminal child's arena path");
 		return -1;
 	}
-	rc = view_terminal_quote(&line, executable) || response_buffer_append(&line, " --set ") ||
-	     view_terminal_quote(&line, fy_sprintfa("arena_dir=%s", fy_castp(&arena, ""))) ||
+	rc = fyai_shell_quote(&line, executable) || response_buffer_append(&line, " --set ") ||
+	     fyai_shell_quote(&line, fy_sprintfa("arena_dir=%s", fy_castp(&arena, ""))) ||
 	     response_buffer_append(&line, " --branch ") ||
-	     view_terminal_quote(&line, fyai_ctx_branch(call->ctx)) ||
+	     fyai_shell_quote(&line, fyai_ctx_branch(call->ctx)) ||
 	     response_buffer_append(&line, " view enter ");
 	if (!rc && fyai_cmd_arg_bool(call, "verify"))
 		rc = response_buffer_append(&line, "--verify ");
 	if (!rc && fyai_cmd_arg_bool(call, "lockdown"))
 		rc = response_buffer_append(&line, "--lockdown ");
 	if (!rc)
-		rc = view_terminal_quote(&line, fyai_cmd_arg_str(call, "name")) ||
+		rc = fyai_shell_quote(&line, fyai_cmd_arg_str(call, "name")) ||
 		     response_buffer_append(&line, " --");
 	fy_foreach(argument, fy_get(call->args, "command", fy_seq_empty))
 		if (!rc)
 			rc = response_buffer_append(&line, " ") ||
-			     view_terminal_quote(&line, argument);
+			     fyai_shell_quote(&line, argument);
 	if (rc) {
 		fyai_error(call->ctx, "view: cannot allocate the terminal command");
 		free(line.data);
