@@ -80,7 +80,7 @@ fyai "inspect this repository and suggest the next cleanup"
 
 A prompt invocation may call the model several times and use tools until it reaches a final answer, the configured iteration limit, an interrupt, or an unrecoverable error.
 
-An error in the tool loop does not discard the turn. The turn keeps the steps up to the last tool round that has all its results, and the report names the cause. A tool call that returns no result gets a tool error, and the turn continues. When the log of a fullscreen session shows an entry with an error, the rows that report errors stand first.
+An error in the tool loop does not discard the turn. The turn keeps the steps up to the last tool round that has all its results, and the report names the cause. A tool call that returns no result gets a tool error, and the turn continues. The log of a fullscreen session shows the rows that report errors first.
 
 Run with no prompt, or pass `-i`, to enter interactive mode:
 
@@ -108,7 +108,7 @@ nothing stores nothing unless `/reload` publishes it. A slash setting or
 `/clear` alone is not an exchange: the session applies it, and stores it only
 with an exchange or `/reload`. Starting a session does not move arena `HEAD`.
 
-Continue a session deliberately with `resume`:
+Continue a session with `resume`:
 
 ```sh
 fyai resume                  # choose a session from the picker
@@ -147,7 +147,7 @@ or use `--last`.
 
 ## 2. The mental model
 
-### The process is temporary; the arena is durable
+### Durable state
 
 The running process is not the source of truth. Durable state is stored as immutable values in a libfyaml content-addressed arena. Publication replaces the arena root atomically; unchanged values are shared structurally.
 
@@ -165,7 +165,7 @@ Provider request and response details may be retained for inspection, but the du
 
 Capabilities still vary by provider and model. Model resolution determines the provider, endpoint, API grammar, wire model identifier, context window, token limit, and relevant feature support.
 
-### A branch is a line of agent work
+### Branches
 
 Each branch owns:
 
@@ -276,7 +276,7 @@ main/parser
 main/parser/review
 ```
 
-Configuration follows the branch. Different branches may deliberately use different models, API grammars, reasoning settings, and tool policies.
+Configuration follows the branch. Different branches can use different models, API grammars, reasoning settings, and tool policies.
 
 ### Inspect and recover branch movement
 
@@ -305,7 +305,13 @@ fyai diff before main
 
 `diff` compares the exports of the two entries, so it shows the turns and the changes of the branch store between them. `<from>` is `HEAD@{1}` and `<to>` is `HEAD` when omitted: a bare `diff` shows the last change. A reference is `<branch>` or `<branch>@{N}`; `<branch>~N` names a turn and is refused. `/diff` does the same in a session.
 
-A terminal shows the diff view of the Markdown renderer, with line numbers and the file syntax highlighted. It stands on the background of the terminal: a palette theme washes a changed row with a colour mixed with the background that the terminal reports. With `display/markdown=false` a terminal gets the rows in the colours of the theme. `-u`/`--unified` shows the unified diff instead, in colour as `git diff` does. A file or a pipe always gets the plain unified diff. With `--root`, both references are read in that root, so the diff of a root does not change when the arena does.
+On a terminal, `diff` shows line numbers and syntax highlighting.
+
+- A palette theme colours a changed row with a colour mixed with the background that the terminal reports.
+- With `display/markdown=false`, a terminal gets the rows in the colours of the theme.
+- `-u` or `--unified` shows the unified diff in colour, as `git diff` does.
+- A file or a pipe always gets the plain unified diff.
+- With `--root`, both references are read in that root, so the result does not change when the arena changes.
 
 ```sh
 fyai branch rename old new
@@ -444,8 +450,7 @@ A path is slash-separated. An item of a sequence is named by its index or by its
 projection is enforced: a prompt that cannot fit the model's context window is
 refused before it reaches the provider, and the output allowance is reduced to
 the room the prompt leaves. Compact or clear the conversation to recover.
-Tool results are bounded for the same reason, so one large file or one chatty
-command cannot fill the window: `read/max_bytes` bounds a `read_file` result
+Tool results have limits for the same reason, so one large file or one command with long output cannot fill the window: `read/max_bytes` bounds a `read_file` result
 (which also takes `offset` and `limit` to read a window of lines), and
 `shell/max_output_tokens` bounds shell output. Use a reported `offset_bytes`
 to continue after a byte-limited read. See `doc/context-compaction.md`.
@@ -611,7 +616,7 @@ fyai config describe sandbox/network
 ```
 
 These commands describe and validate the configuration nodes covered by the
-schema. The validator deliberately accepts unknown keys, and some transport
+schema. The validator accepts unknown keys, and some transport
 extensions are not enumerated there, so consult `config.yaml.sample` for the
 annotated supported-key catalogue as well.
 
@@ -710,7 +715,7 @@ fyai tool read_file '{"path":"README.md"}'
 fyai tool exec_command '{"command":"git status --short"}'
 ```
 
-### A shell command on a terminal
+### Shell commands on a terminal
 
 `exec_command` takes `tty: true`. The command then runs on a pseudo-terminal.
 The result is the screen that libfyvterm interprets from the byte stream,
@@ -740,7 +745,7 @@ terminal run gives, with the rows that scrolled off it before. The screen has th
 size that a terminal run of the call gets (`shell/tty_rows` and `shell/tty_cols`,
 else the terminal). Output with no such byte is not changed.
 
-### A command in the background
+### Background commands
 
 `exec_command` takes `background: true` to start a server, or any program that runs on
 while the model works. The command gets a session of its own and `/dev/null` for
@@ -813,16 +818,12 @@ as lines, whole and in the order of arrival. A program that draws, such as an
 editor, is read as the screen that it drew. Its bytes are cursor movements and
 give nothing on their own.
 
-How a session is shown. The session is the display, and not the calls that
-drive it. The call that opens a session shows its screen, live and marked
-running while the program is there. That screen is committed to the transcript
-when the program stops. `shell_input` and `shell_output` show nothing of their
-own, because their work is on that screen. Each row of the screen carries a
-margin, so the screen reads as one object and as the screen of that call. It
-starts under the name of the call, and `display/session_margin` gives the
-margin, where an empty string draws none. The calls stay recorded as they were.
-This is what the user sees and not what the arena keeps, and the model still
-receives each result.
+How a session is shown:
+
+- The call that opens a session shows its screen live, marked running while the program runs. The screen is committed to the transcript when the program stops.
+- `shell_input` and `shell_output` show nothing of their own, because their work appears on that screen.
+- Each row of the screen has a margin under the name of the call. `display/session_margin` sets the margin. An empty string draws none.
+- This is what the user sees. The arena keeps the calls as they were, and the model receives each result.
 
 A session lives for one invocation. A later invocation cannot reach it. It
 ends with the invocation, with `shell_close`, when its program ends, or after
@@ -850,13 +851,19 @@ The value 0 stops the question.
 
 ### Listing what the model owns
 
-`list` gives the model the objects that it can name in another call: `agents`
-(the sub-agents it started, running or ended), `views` (the views that isolated
-sub-agents left), `shells` (its open terminal sessions), `waits` (its pending
-named waits), `monitors` (its running monitors) and `questions` (the questions
-it put to the user in the background that still wait for an answer). A row has the name that the model gave the object. The tool lists
-only what the calling agent owns: your views and branches, and the objects of
-other agents, are not rows. Branches are not a kind.
+`list` gives the model the objects that it can name in another call. A row has the name that the model gave the object.
+
+| Kind | Objects |
+| --- | --- |
+| `agents` | The sub-agents it started, running or ended. |
+| `views` | The views that isolated sub-agents left. |
+| `shells` | Its open terminal sessions. |
+| `waits` | Its pending named waits. |
+| `monitors` | Its running monitors. |
+| `questions` | Its background questions that still wait for an answer. |
+| `daemons` | The processes that the scope of the exchange holds. |
+
+The tool lists only what the calling agent owns. The views and branches of the user, and the objects of other agents, are not rows. Branches are not a kind.
 
 ### Telling the time, and waiting
 
@@ -891,8 +898,7 @@ arrives while the session is idle starts a turn of its own:
 `seconds` and `until` are exclusive, but an empty argument is not an argument:
 a call that sends `until: ""` beside `seconds` asks for the seconds.
 
-A wait lives for one invocation, as a terminal session does. No daemon can
-receive it, so a wait that did not fire is dropped when the run ends.
+A wait lives for one invocation, as a terminal session does. fyai has no daemon to receive it, so a wait that did not fire is dropped when the run ends.
 
 ### Waiting for what the model started
 
@@ -914,7 +920,7 @@ that stops to ask for input ends its part of the wait.
 Waits in one response run at the same time, and an event that several of them
 wait for reaches each of them: both results hold the report. A wait does not
 poll. The event loop wakes it when an event is queued, when what it waits for
-changes, or at its time limit, and the interface and interrupts stay live.
+changes, or at its time limit, and the interface and interrupts keep working.
 
 Background work belongs to the conversation that started it. `/clear`,
 `/resume`, `/checkout` and `/reset` end the background sub-agents, monitors and
@@ -975,7 +981,7 @@ Normal branch listings may hide agent branches to keep the primary workspace con
 The calling model controls how the sub-agent context starts:
 
 - **Fresh context:** the agent begins with a new context suited to the delegated task. Its work is still recorded on its own persistent agent branch.
-- **Forked context:** the agent is a true continuation from the parent branch at the delegation point—a fork in the road with the parent's conversation available as its starting history.
+- **Forked context:** the agent is a true continuation from the parent branch at the delegation point—the parent's conversation is its starting history.
 
 A forked sub-agent is fixed to the same model as its parent. This preserves the semantics of a true continuation rather than silently changing the model at the branch point. A fresh-context agent may use the persona and model policy selected for that delegated role.
 
@@ -1535,20 +1541,14 @@ yourself when you no longer need it.
 
 ### Record the screen
 
-Use `--cast FILE` when the display shows a glitch that you cannot see again,
-such as a row that is painted wrong after a resize. An interactive session
-records what the terminal received as an
-[asciicast](https://docs.asciinema.org/manual/asciicast/v2/) file.
+`--cast FILE` records an interactive session as an [asciicast](https://docs.asciinema.org/manual/asciicast/v2/) file. Use it to keep a display fault that you cannot reproduce, such as a row that is painted wrong after a resize.
 
 ```sh
 fyai --cast /tmp/glitch.cast
 asciinema play /tmp/glitch.cast
 ```
 
-The file holds the bytes of the UI, a resize event when the window changes, and
-markers. The keys that you type are not recorded. A page that has nothing new to
-draw writes an update that only places the cursor; the recording leaves out a
-repeat of it, so the file grows with what the screen shows.
+The file holds the bytes of the UI, a resize event when the window changes, and markers. The keys that you type are not recorded. The recording leaves out a repeated cursor-only update of an idle page, so the file grows with what the screen shows.
 
 The header has a member `fyai` with what the program knew at the start: the
 version, the process, the branch, the model, the sandbox profile and the scope.
@@ -1634,27 +1634,19 @@ A session opens fullscreen on the alternate screen of the terminal and returns t
 
 ### Input during a turn
 
-While a turn runs, the prompt mark is an ellipsis in place of the usual
-arrow: a line typed then waits. The lines that wait stand on top of the input
-pane, under **pending**, as they were typed, and the next request takes them.
-The arrow comes back when a line is taken at once. The ellipsis has the columns
-of the arrow, so the input does not move. The theme can give another glyph
-(`prompt.busy`), and `display/prompt_busy` replaces both. A PTY script waits for the mark as
-`doc/pty-driver.md` says.
+While a turn runs, the prompt mark is an ellipsis instead of the usual arrow. A line typed then waits, and the next request takes it.
 
-A long queue does not push the page away. The lines that wait take a third of
-the screen at most, and never a row of the input pane. When they do not fit,
-the oldest lines go: **pending** keeps the count of all the lines, and the
-newest lines stand under it, with the header and the status.
+- The waiting lines are shown above the input, under **pending**, in the order typed.
+- The arrow returns when a line is taken at once.
+- The ellipsis has the width of the arrow, so the input does not move.
+- The theme can set another glyph (`prompt.busy`). `display/prompt_busy` replaces both.
+- The waiting lines take at most a third of the screen and never a row of the input. When they do not fit, the oldest lines are not shown. **pending** keeps the count of all lines.
+
+`doc/pty-driver.md` says how a PTY test script waits for the mark.
 
 ### A terminal for the user: `fyai term`
 
-The same terminal, drawn for a user. `fyai term` runs a program on a
-pseudo-terminal. libfyvterm interprets what the program draws. fyai
-publishes that screen to a libfytimui surface, which draws it beside the
-transcript and the prompt, with a state row of its own. The bytes of the
-program do not reach the terminal. The user sees the screen that fyai holds,
-which is the screen that a model reads.
+`fyai term` runs a program on a pseudo-terminal for the user. libfyvterm interprets what the program draws, and fyai draws that screen with a state row of its own. The bytes of the program do not reach the terminal. The user sees the same screen that a model reads from a terminal session.
 
 ```sh
 fyai term                       # a shell
@@ -1671,11 +1663,7 @@ what Ctrl-C means. Ctrl-\ is the one key fyai keeps:
 | `Ctrl-\ r` | Draw the whole screen again. |
 | `Ctrl-\ Ctrl-\` | Type one Ctrl-\ into the program. |
 
-The screen belongs to the program. There is no prompt while the program runs,
-because the keys are its own. The state row beneath the screen is the only row
-that the program does not have. The screen follows the window. Resize the
-terminal, and the program receives its new size in rows and in columns. When
-the program ends, the transcript keeps its last screen.
+There is no prompt while the program runs, because the keys are the program's. The state row under the screen is the only row that the program does not own. When the terminal is resized, the program receives the new size. When the program ends, the transcript keeps its last screen.
 
 `--hold` waits for a key before leaving. `--rows` and `--cols` fix the size for
 a run with no terminal, and `--screen` writes the final screen as plain text.
@@ -1828,80 +1816,94 @@ fyai [global-options] <prompt...>
 
 Global parsing stops at the first non-option. A known token is dispatched as a verb; otherwise the remaining arguments form the prompt. A lone `-` reads the prompt from standard input.
 
-### Main verbs
+### Verbs
+
+The list follows `fyai help`. `fyai help VERB` gives the syntax of one verb, and [commands.md](commands.md) is the full reference. Every verb takes `--output json|yaml`.
 
 | Verb | Purpose |
 | --- | --- |
-| `init [path]` | Initialize the repository arena |
-| `dump [state\|anchors\|providers]` | Inspect canonical or provider state |
-| `transcript [opts]` | Human-facing conversation view |
-| `history [opts]` | Alias for `transcript` |
-| `display [opts]` | Alias for `transcript` |
-| `stats [--raw\|--json\|--yaml]` | Cumulative token and cost usage |
-| `config ...` | Show, validate, import, export, and edit config |
-| `list ...` | List providers, models, turns, exchanges, or reflog |
-| `branch ...` | Manage branches; `--all` includes agent branches |
-| `checkout [-b] ...` | Move arena `HEAD` |
-| `reset REF` | Move the selected branch head |
-| `diff [-u] [FROM [TO]]` | Compare the exports of two reflog entries |
-| `root [print\|show]` | Print or explain an exact arena root |
-| `rebase BRANCH` | Reorder branch exchanges with current work last |
-| `merge BRANCH` | Interleave branch exchanges by time |
-| `clear` | Publish an empty conversation |
-| `compact [hint]` | Summarize into a new chain |
-| `context` | Report context fill |
-| `api [mode]` | Show or store API grammar |
-| `catalog ...` | Inspect, edit, or update the catalogue of the branch |
-| `agent TASK` | Run one transient sub-agent and print its final report |
-| `auth ...` | Manage provider authentication |
-| `secret ...` | Manage logical secrets |
-| `log ...` | Manage trace logs |
-| `sandbox ...` | Show or configure sandbox policy |
-| `mcp ...` | MCP management and OAuth import |
-| `gc ...` | Compact arena storage |
-| `tool NAME [json]` | Execute one tool without a model call |
-| `help [verb]` | Current command reference |
+| `acp` | Serve the Agent Client Protocol. |
+| `agent TASK` | Run one transient sub-agent and print its final report. |
+| `api [mode]` | Show or select the API grammar. |
+| `attach, image` | Attach a file or an image to the next message. |
+| `auth ...` | Manage the subscription login of a provider. |
+| `branch ...` | List, create and manage branches. `--all` includes agent branches. |
+| `cast ...` | Play or inspect a recording of a session. |
+| `catalog ...` | Inspect, edit or update the model catalogue of the branch. |
+| `checkout [-b] ...` | Switch to a branch, or fork a reference. |
+| `clear` | Start a fresh conversation. |
+| `compact [hint]` | Summarize the conversation into a new chain. |
+| `completion bash|zsh|fish` | Write a shell completion script. |
+| `config ...` | Show, validate, import, export and edit the configuration. |
+| `context` | Show the context fill and the token estimate. |
+| `diff [-u] [FROM [TO]]` | Compare two reflog entries. |
+| `dump [state|anchors|providers]` | Write the stored conversation as YAML. |
+| `export, import` | Write or read a conversation in the textual format. |
+| `gc` | Collect the garbage of the arena and the project storage. |
+| `help [verb|topic]` | Describe commands and topics. |
+| `history, transcript, display` | Show the conversation of the branch. |
+| `init [path]` | Create the arena in this directory. |
+| `list ...` | List providers, models, turns, exchanges, the reflog or live work. |
+| `log ...` | Control the trace logs. |
+| `mcp ...` | Inspect and control the MCP servers. |
+| `merge BRANCH` | Interleave the exchanges of two branches by time. |
+| `model [name]` | Show or select the model. |
+| `page` | Show and review the page of the screen. |
+| `rebase BRANCH` | Put the exchanges of this branch after those of another. |
+| `render` | Render Markdown in the terminal. |
+| `replay` | Send the user turns of the branch again. |
+| `reset, rewind REF` | Move the head of the branch to a reference. |
+| `resume, switch` | Resume another session. |
+| `root [print|show]` | Print or explain an arena root handle. |
+| `sandbox ...` | Show or set the sandbox policy. `sandbox apparmor` writes the AppArmor profile. |
+| `schema` | Export the supported schemas. |
+| `secret ...` | Manage secrets without showing their values. |
+| `skill ...` | Import, show or remove the skills of the branch. |
+| `stats [--raw|--json|--yaml]` | Show token use and cost. |
+| `term` | Run a program in a terminal that fyai draws. |
+| `todo` | Show or clear the todo list of the branch. |
+| `tool NAME [json]` | Run one built-in tool without a model call. |
+| `transport` | Serve model requests for isolated agents. |
+| `view ...` | Create, enter, diff and apply project views. |
 
 ### Global options
 
 | Option | Purpose |
 | --- | --- |
-| `--version` | Print version |
-| `--config`, `-C FILE` | Overlay an explicit configuration file |
-| `--env`, `-e FILE` | Read literal `.env` assignments used by fyai |
-| `--model`, `-m MODEL` | Select model or provider/model |
-| `--branch`, `-b NAME` | Select a branch for this invocation |
-| `--root VALUE` | Read an exact root in read-only mode |
-| `--set KEY[=VALUE]` | Apply a typed configuration delta |
-| `--get KEY` | Print a key in one-line flow form |
-| `--delete KEY` | Delete a configuration key |
-| `--transient` | Do not publish ordinary invocation state |
-| `--api-key`, `-k KEY` | Supply an API key explicitly |
-| `--new` | Start a new conversation |
-| `--sandbox` | Enable shell-tool confinement |
-| `--color MODE` | `auto`, `off`, or `on` |
-| `--theme THEME` | Select markdown theme |
-| `--interactive`, `-i` | Start interactive mode |
-| `--answer TEXT` | Pre-supply the answer to one `ask_user` question; repeatable |
-| `--debug`, `-d` | Increase diagnostic verbosity |
+| `-h`, `--help` | Show the help. |
+| `-v`, `--version` | Print the version. |
+| `-C`, `--config FILE` | Overlay an explicit configuration file. |
+| `-e`, `--env FILE` | Read the variables that fyai uses from a `.env` file. |
+| `-m`, `--model MODEL` | Select the model, as `model` or `provider/model`. |
+| `-b`, `--branch NAME` | Select a branch for this invocation (else `$FYAI_BRANCH`, else `HEAD`). |
+| `--root HANDLE` | Read one exact state, read-only. |
+| `--set KEY=VALUE` | Set a configuration key and store it. |
+| `--get KEY` | Print a key in one-line flow form. |
+| `--delete KEY` | Delete a configuration key. |
+| `--transient` | Keep the edits and the state of this run in memory. |
+| `-k`, `--api-key KEY` | Give an API key for this run. |
+| `--new` | Start a new conversation. |
+| `--sandbox` | Confine shell tools with Landlock (Linux). |
+| `--color VALUE` | `auto`, `off` or `on`. |
+| `--theme THEME` | Select the Markdown theme. |
+| `-i`, `--interactive` | Start interactive mode. |
+| `--answer TEXT` | Give the answer to one `ask_user` question in advance. Repeatable. |
+| `--image PATH` | Attach an image to the prompt. |
+| `--cast FILE` | Record the screen of an interactive session. |
+| `--cast-compat` | Write the recording as plain asciicast. |
+| `-d`, `--debug` | Increase the debug verbosity. |
 
 ## 14. Architecture and operational notes
 
 - Arena values are immutable after publication.
-- The root is the atomic mutable publication point.
-- Concurrent work on different branches can publish independently; same-branch movement follows the configured conflict policy.
-- Model-delegated sub-agent work is represented by persistent agent branches.
-  `fyai branch --all` exposes them; the standalone `fyai agent` verb is
-  transient.
-- Fresh-context delegated agents start a new task context; forked agents
-  continue from the parent branch and use the parent's model.
-- fyai adds repository instructions such as `AGENTS.md` and `CLAUDE.md` to
-  the system prompt when it creates a conversation. A continuation uses the
-  stored system turn. If the files have identical content, fyai adds the
-  content only once. fyai compares the content hash, not the path.
-- Streaming output is observable, not authoritative. Completed canonical state is what gets published.
-- `history` is optimized for people. Use dump views for exact state inspection.
-- Linux is the primary platform. macOS-specific credential and event backends are supported where implemented; Landlock and the kernel secret store are Linux-specific.
+- The root is the one mutable publication point, and it changes atomically.
+- Work on different branches can publish at the same time. A move of the same branch follows the configured conflict policy (`branch/on_conflict`).
+- Work that the model delegates to a sub-agent is stored on a persistent agent branch. `fyai branch --all` lists those branches. The `fyai agent` verb is transient.
+- A fresh-context agent starts a new task context. A forked agent continues from the parent branch and uses the parent's model.
+- When fyai creates a conversation, it adds repository instructions such as `AGENTS.md` and `CLAUDE.md` to the system prompt. A continuation uses the stored system turn. Files with identical content are added once, by content hash and not by path.
+- Streamed output is for display. Only completed canonical state is published.
+- `history` is for people. Use the `dump` views to inspect exact state.
+- Linux is the primary platform. macOS has its own credential and event backends. Landlock, namespaces and the kernel secret store are Linux only.
 
 ## 15. Where to look next
 
@@ -1912,16 +1914,11 @@ fyai config schema
 fyai config describe [PATH]
 ```
 
-Repository references:
+- `config.yaml.sample`: annotated configuration examples.
+- `data/config.schema.yaml`: the accepted configuration structure.
+- `doc/declarative-state.md`: the declarative documents, their schemas, layers and rollback, and model access to them.
+- `doc/branching.md`: branch and root semantics.
+- `doc/srd/fyai-srd.md`: the storage and provider contract.
+- The unit and functional tests show exact behaviour.
 
-- `config.yaml.sample` — annotated configuration examples;
-- `data/config.schema.yaml` — accepted configuration structure;
-- `doc/declarative-state.md` — the declarative documents, their schemas,
-  layers and rollback, and the plan for model access to them;
-- `doc/branching.md` — detailed branch and root semantics;
-- `doc/srd/fyai-srd.md` — storage and provider contract;
-- unit and functional tests — executable behaviour and edge cases.
-
-When prose disagrees with the implementation, treat the command handlers and
-tests as authoritative. Detailed per-verb help and the configuration schema are
-useful generated views of the portions they cover.
+If this text and the implementation differ, the command handlers and tests are correct.
