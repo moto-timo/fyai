@@ -89,6 +89,34 @@ fyai
 fyai -i
 ```
 
+### Shell completion
+
+`fyai completion SHELL` writes a completion script to standard output. The
+supported shells are `bash`, `zsh` and `fish`. Other shells, such as `ash` and
+`dash`, have no programmable completion.
+
+To load the script in each new shell, add one line to the start-up file:
+
+| Shell | Start-up file | Line |
+| --- | --- | --- |
+| bash | `~/.bashrc` | `source <(fyai completion bash)` |
+| zsh | `~/.zshrc` | `source <(fyai completion zsh)` |
+| fish | `~/.config/fish/config.fish` | `fyai completion fish \| source` |
+
+To install the script once instead, write it to the completion directory of
+the shell:
+
+```sh
+fyai completion bash > ~/.local/share/bash-completion/completions/fyai
+fyai completion zsh  > "${fpath[1]}/_fyai"
+fyai completion fish > ~/.config/fish/completions/fyai.fish
+```
+
+The script asks `fyai __complete` for the candidates, so it completes verbs,
+slash-command words, options, branch names, models and configuration paths
+from the stored state. It completes in the project of the current directory,
+and it needs no network access and no credential.
+
 ### Sessions
 
 An interactive invocation that names no branch starts a **new session**. It
