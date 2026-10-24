@@ -64,6 +64,8 @@ little gain.
 
 ## Mechanism
 
+`doc/sandbox-namespaces.md` describes the namespaces, the holder and the way a tool joins it.
+
 Two mechanisms give the scope. The first is chosen when the host allows it.
 
 ### Namespace scope
