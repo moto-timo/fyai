@@ -12,6 +12,7 @@
 FYAI_TEST_ENTRY(utils, wire_text_utf8, utils_wire_text_utf8)
 FYAI_TEST_ENTRY(utils, close_fds_except, utils_close_fds_except)
 FYAI_TEST_ENTRY(utils, utf8_length, utils_utf8_length)
+FYAI_TEST_ENTRY(utils, shell_quote, utils_shell_quote)
 
 int utils_wire_text_utf8(void)
 {
@@ -73,5 +74,15 @@ int utils_utf8_length(void)
 	FYAI_TCHECK(fyai_utf8_length("\xc3\xa9") == 1);
 	FYAI_TCHECK(fyai_utf8_length("a\xe2\x86\x92" "b") == 3);
 	FYAI_TCHECK(fyai_utf8_length("\xf0\x9f\x98\x80") == 1);
+	return 0;
+}
+
+int utils_shell_quote(void)
+{
+	struct response_buffer out = { 0 };
+
+	FYAI_TCHECK(!fyai_shell_quote(&out, "it's a $x"));
+	FYAI_TCHECK(!strcmp(out.data, "'it'\\''s a $x'"));
+	free(out.data);
 	return 0;
 }
