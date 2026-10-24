@@ -320,12 +320,15 @@ static void player_frame_step(struct player *p, int dir)
 
 static void format_time(char *out, size_t size, double t)
 {
-	long s = (long)t;
+	/* Up to 99:59:59, so that the text fits the callers' buffers. */
+	unsigned long s = t > 0 ? (unsigned long)t : 0;
 
+	if (s > 359999)
+		s = 359999;
 	if (s >= 3600)
-		snprintf(out, size, "%ld:%02ld:%02ld", s / 3600, (s / 60) % 60, s % 60);
+		snprintf(out, size, "%lu:%02lu:%02lu", s / 3600, (s / 60) % 60, s % 60);
 	else
-		snprintf(out, size, "%02ld:%02ld", s / 60, s % 60);
+		snprintf(out, size, "%02lu:%02lu", s / 60, s % 60);
 }
 
 /* ---- drawing -------------------------------------------------------------- */
