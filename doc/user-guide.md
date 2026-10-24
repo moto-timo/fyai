@@ -427,6 +427,73 @@ message; nothing is downscaled.
 `media/clipboard_command` to a program of your own if the search does not find
 one. The full design is in `doc/media.md`.
 
+### Export and import
+
+`fyai export` writes a branch as one Markdown document. The document holds the
+provider-independent conversation and the history of the branch store: the
+configuration, the catalogue and the skills. It leaves out provider request
+IDs, tool-call IDs, timestamps and stream data. `fyai import` reads it back.
+
+```sh
+fyai export -o conversation.md            # the current branch
+fyai export -b main -o main.md            # another branch
+fyai export -o before.md 'main@{1}'       # a branch as it was at a reflog entry
+fyai import -i conversation.md            # replaces the active branch
+fyai -b copy import -i conversation.md    # into an empty branch
+fyai export | ssh host fyai import        # to another machine
+```
+
+- Export and import use standard output and standard input unless you give
+  `-o FILE` or `-i FILE`.
+- `--branch` selects the source on export. On import it selects an empty
+  destination. Without it, import replaces the active branch.
+- A reference is `BRANCH` or `BRANCH@{N}`. `BRANCH~N` names a turn, not a
+  reflog entry, and export refuses it.
+- An image in a message is exported with its bytes, so another arena can
+  restore it.
+- A compaction is exported as the operation and its instructions. Import makes
+  the model request again with the current model. `--ignore-compact` skips
+  these requests.
+- `--dry-run` checks a file and stores nothing.
+
+`doc/textual-export-format.md` describes the format.
+
+#### Foreign sessions (experimental)
+
+`fyai import --from` reads the sessions of other programs. The supported
+sources are Claude Code (`claude-code`) and Codex (`codex`). This feature is
+experimental. The converted conversation can differ from the original, and
+the options can change.
+
+```sh
+fyai import --list                                   # sessions of this directory
+fyai import --list --all --from codex                # in every directory
+fyai import --from claude-code --session ID          # import one session
+fyai import --from codex -i rollout.jsonl            # import a file
+fyai import --from auto -i session.jsonl --dry-run   # check, store nothing
+```
+
+- `--from auto` detects the source from the file.
+- `--source-root DIR` names the state directory of the source. The defaults are
+  `$CLAUDE_CONFIG_DIR` or `~/.claude`, and `$CODEX_HOME` or `~/.codex`.
+- The import creates the branch `import/SOURCE/SESSION-ID`. An import of the
+  same session again continues that branch.
+- Import is offline. It sends no request and runs no recorded tool call.
+  Recorded calls are history only.
+- The conversation continues with your current model, system prompt, tools and
+  permissions. The instructions, model choices, permissions, hooks and
+  credentials of the source are not taken over.
+- Compactions and rewinds of the source are applied, so the branch holds the
+  context that the source had at the end.
+- Content that fyai cannot represent becomes a labeled placeholder. The import
+  succeeds and reports each loss as a warning.
+- A file with a malformed record, a cycle or an unclear source is refused
+  before anything is stored. A partial last record is skipped with a warning.
+- `--root` allows `--list` and `--dry-run` only.
+
+The resume picker (`fyai resume`, `/resume`) lists these sessions too. Press
+`f` to show them. Choosing one imports it and continues it.
+
 ## 4. Models, providers, and authentication
 
 ### Model selection
@@ -1127,6 +1194,86 @@ turn. Attachment preserves stored `HEAD` and the main conversation's draft.
 `/branch detach` returns to the main conversation. A completed attachment stays
 read-only until detached. `/zoom`, `/kill`, and `/sessions` also reach nested
 agents. A short agent name must be unambiguous; a full branch name is exact.
+
+### Skills
+
+A skill is a set of instructions for one kind of task, such as a review
+checklist or the conventions of a project. It is a `SKILL.md` file with a YAML
+front matter and the text files beside it, in the Agent Skills format that
+Claude Code reads.
+
+```markdown
+---
+name: review
+description: Review the staged change against the conventions of the project.
+argument-hint: "[path]"
+context: fork
+allowed-tools: Read, Bash(git:*)
+---
+Review the staged change in $ARGUMENTS. Read `skill:review/checklist.md` first.
+```
+
+Skills are branch state, like the configuration. A new session, a new branch
+and a sub-agent take the skills of the branch they start from. fyai does not
+look for skills in the file system: a `SKILL.md` in the repository changes
+nothing until you import it.
+
+```sh
+fyai skill import path/to/review          # a directory with SKILL.md and its files
+fyai skill import path/to/skills          # a directory of such directories
+fyai skill import --claude all            # the skills and commands of Claude Code
+fyai skill list
+fyai skill show review
+fyai skill new review                     # write one in $EDITOR
+fyai skill exec review src/main.c         # run one turn with the skill
+fyai skill export review ./out            # write it back to files
+```
+
+The model and the user run a skill in two ways:
+
+- The model sees the skills in the description of the `skill` tool. It loads a
+  skill when the task fits the `description`, and reads a supporting file with
+  `{skill, file}`.
+- You run a skill with `/NAME ARGS` in a session, `fyai skill exec NAME ARGS`
+  or `fyai "/NAME ARGS"`. A command with the exact name wins over a skill. Use
+  `/skill exec NAME` to reach the skill. Tab completes the names.
+
+The body takes `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` (word N from 0), `${CLAUDE_SKILL_DIR}` and
+`${CLAUDE_SESSION_ID}`.
+
+| Front matter | Effect |
+| --- | --- |
+| `name` | Lowercase letters, digits and `-`, at most 64. |
+| `description` | Required. The model chooses a skill from this text. |
+| `when_to_use` | More text for the choice. |
+| `argument-hint` | The arguments, shown in the lists and in completion. |
+| `disable-model-invocation` | `true`: the model does not see the skill. |
+| `user-invocable` | `false`: `/NAME` does not run the skill. |
+| `context` | `fork` runs the skill as a sub-agent. `inline` is the default. |
+| `agent`, `model`, `allowed-tools` | The persona, the model and the tools of a forked skill. |
+| `isolated`, `background`, `timeout` | fyai only: run a forked skill in a private view, without holding the turn, with a time limit in milliseconds. |
+
+Other commands:
+
+| Command | Purpose |
+| --- | --- |
+| `skill files NAME` | List the supporting files. |
+| `skill edit NAME [FILE]` | Edit the skill or a file in an editor. |
+| `skill enable NAME...`, `skill disable NAME...` | Keep a skill stored and unused, or use it again. |
+| `skill remove NAME... [--file REL]` | Remove skills, or one supporting file. |
+| `skill import PATH --into NAME [--as REL]` | Store one text file as a supporting file. |
+| `skill import --claude SCOPE` | `project`, `user`, `plugins` or `all`. |
+
+An import with an existing name keeps the stored skill, unless you give
+`--force`. An import reads text files only, to a depth of 8: at most 256 KiB
+for each text, 256 files and 8 MiB for one skill. A skill with files is
+written to a private temporary directory when it loads, so a command such as
+`python scripts/check.py` works. The directory is removed when the invocation
+ends.
+
+fyai does not support discovery at run time, `!`command`` preprocessing of the
+body, `model` and `allowed-tools` for an inline skill, and binary supporting
+files. `doc/skills.md` has the details.
 
 ## 7. Sandboxing and secret boundaries
 
