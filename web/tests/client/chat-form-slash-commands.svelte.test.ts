@@ -47,6 +47,28 @@ describe('slash command dispatch', () => {
 		expect(pickers.isCommandPickerOpen).toBe(false);
 	});
 
+	it('selects the model that /model names, without opening the selector', async () => {
+		const screen = render(ChatFormPickersHarness);
+
+		await tick();
+
+		screen.component.setKnownModels(['claude-haiku-5.5']);
+		screen.component.type('/model claude-haiku-5.5');
+		await tick();
+
+		const pickers = screen.component.getPickers();
+		const model = pickers.availableCommands.find((c) => c.name === 'model');
+
+		if (!model) throw new Error('model command missing');
+
+		pickers.handleCommandSelect(model);
+		await tick();
+
+		expect(screen.component.getValue()).toBe('');
+		expect(screen.component.getCalls()).toContain('selectModel:claude-haiku-5.5');
+		expect(screen.component.getCalls()).not.toContain('openModelSelector');
+	});
+
 	it('seeds the prompt picker search from the token args on selection', async () => {
 		const screen = render(ChatFormPickersHarness);
 
