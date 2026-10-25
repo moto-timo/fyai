@@ -240,6 +240,14 @@ int fyai_media_attach_fd(struct fyai_ctx *ctx, int fd, const char *declared,
 int fyai_media_attach_path(struct fyai_ctx *ctx, const char *path,
 			   const char *declared, const char *name);
 
+/*
+ * Copy @len bytes at @data and add them to the next user message as an image.
+ * @declared is the type the caller states, or NULL to take the type of the
+ * bytes; @name is what the image is called, or NULL.
+ */
+int fyai_media_attach_bytes(struct fyai_ctx *ctx, const void *data,
+			    size_t len, const char *declared, const char *name);
+
 /* @path with a leading "~" or "~/" taken from $HOME, malloc'd, or NULL. */
 char *fyai_media_path(const char *path);
 

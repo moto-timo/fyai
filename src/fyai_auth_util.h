@@ -14,6 +14,7 @@ struct fyai_ctx;
 char *fyai_base64_encode(const unsigned char *data, size_t len);
 char *fyai_base64url_encode(const unsigned char *data, size_t len);
 unsigned char *fyai_base64url_decode(const char *text, size_t *lenp);
+unsigned char *fyai_base64_decode(const char *text, size_t *lenp);
 const char *fyai_auth_state_path(struct fyai_ctx *ctx, const char *name,
 				 bool create);
 int fyai_auth_store_lock(struct fyai_ctx *ctx, bool nonblock);

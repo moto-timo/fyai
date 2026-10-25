@@ -27,6 +27,7 @@
 #include <openssl/rand.h>
 
 #include "fyai.h"
+#include "fyai_auth_util.h"
 #include "fyai_branch.h"
 #include "fyai_claude_sdk.h"
 #include "fyai_cmd.h"
@@ -34,6 +35,7 @@
 #include "fyai_config.h"
 #include "fyai_event.h"
 #include "fyai_jsonrpc.h"
+#include "fyai_media.h"
 #include "fyai_output.h"
 #include "fyai_provider.h"
 #include "fyai_session.h"
@@ -50,10 +52,20 @@
 #define SDK_BRANCH_PREFIX	"sdk/"
 #define SDK_ID_MAX		64
 
+/* An image block of a user message: the bytes, decoded. */
+struct sdk_image {
+	struct sdk_image *next;
+	char *media_type;
+	char *name;
+	unsigned char *data;
+	size_t len;
+};
+
 /* One user message that waits for its turn. */
 struct sdk_input {
 	struct sdk_input *next;
 	char *text;
+	struct sdk_image *images;	/* the image blocks, in order */
 	char *origin_json;		/* the origin that the SDK stamped */
 	bool composed;			/* the text goes as written */
 };
@@ -2002,6 +2014,66 @@ static void sdk_control(struct sdk_server *srv, fy_generic frame)
 				subtype));
 }
 
+static void sdk_images_free(struct sdk_image *images)
+{
+	struct sdk_image *img;
+
+	while ((img = images)) {
+		images = img->next;
+		free(img->media_type);
+		free(img->name);
+		free(img->data);
+		free(img);
+	}
+}
+
+/*
+ * Keep the image blocks of the content of a user message, as the Claude
+ * Agent SDK sends them: {type: image, source: {type: base64, media_type,
+ * data}}. A block of another source is reported and left out. Return 0, or -1
+ * after a report.
+ */
+static int sdk_user_images(struct sdk_server *srv, fy_generic content,
+			   struct sdk_image **headp)
+{
+	struct sdk_image **tail = headp, *img;
+	fy_generic block, source;
+	const char *type, *data;
+
+	if (!fy_is_sequence(content))
+		return 0;
+	fy_foreach(block, content) {
+		if (!fy_equal(fy_get(block, "type", fy_invalid), "image"))
+			continue;
+		source = fy_get(block, "source", fy_invalid);
+		type = fy_get(source, "type", "");
+		data = fy_get(source, "data", (const char *)NULL);
+		if (strcmp(type, "base64") || !data) {
+			fyai_warning(srv->ctx, "claude-sdk: an image block with "
+				     "the source '%s' is not supported; it is "
+				     "left out", *type ? type : "?");
+			continue;
+		}
+		img = calloc(1, sizeof(*img));
+		fyai_error_check(srv->ctx, img, err,
+				 "claude-sdk: cannot keep an image");
+		img->data = fyai_base64_decode(data, &img->len);
+		img->media_type = strdup(fy_get(source, "media_type", ""));
+		img->name = strdup(fy_get(block, "name", "image"));
+		fyai_error_check(srv->ctx, img->data && img->media_type &&
+				 img->name, err_free,
+				 "claude-sdk: an image block holds no valid "
+				 "base64 data");
+		*tail = img;
+		tail = &img->next;
+	}
+	return 0;
+err_free:
+	sdk_images_free(img);
+err:
+	return -1;
+}
+
 /* The text of the content of a user message, or NULL. Owned by the caller. */
 static char *sdk_user_text(struct sdk_server *srv, fy_generic content)
 {
@@ -2015,6 +2087,8 @@ static char *sdk_user_text(struct sdk_server *srv, fy_generic content)
 		return NULL;
 	fy_foreach(block, content) {
 		type = fy_get(block, "type", fy_invalid);
+		if (fy_equal(type, "image"))	/* see sdk_user_images() */
+			continue;
 		if (!fy_equal(type, "text")) {
 			fyai_warning(srv->ctx,
 				     "claude-sdk: a '%s' block of a user message "
@@ -2115,13 +2189,19 @@ static const char *sdk_mentions(struct sdk_server *srv, const char *prompt)
 static void sdk_user(struct sdk_server *srv, fy_generic frame)
 {
 	struct sdk_input *in;
-	fy_generic origin;
+	struct sdk_image *images = NULL;
+	fy_generic origin, content;
 	const char *json;
 	char *text;
 
-	text = sdk_user_text(srv,
-		fy_get_at_path(frame, "message", "content"));
-	if (!text || !*text) {
+	content = fy_get_at_path(frame, "message", "content");
+	text = sdk_user_text(srv, content);
+	if (sdk_user_images(srv, content, &images)) {
+		sdk_images_free(images);
+		free(text);
+		return;
+	}
+	if ((!text || !*text) && !images) {
 		fyai_warning(srv->ctx, "claude-sdk: a user message has no text");
 		free(text);
 		return;
@@ -2129,11 +2209,21 @@ static void sdk_user(struct sdk_server *srv, fy_generic frame)
 	in = calloc(1, sizeof(*in));
 	if (!in) {
 		fyai_error(srv->ctx, "claude-sdk: cannot queue a user message");
+		sdk_images_free(images);
 		free(text);
 		srv->failed = true;
 		return;
 	}
-	in->text = text;
+	in->text = text ? text : strdup("");
+	in->images = images;
+	if (!in->text) {
+		fyai_error(srv->ctx, "claude-sdk: cannot queue a user message");
+		sdk_images_free(images);
+		free(in);
+		free(text);
+		srv->failed = true;
+		return;
+	}
 	in->composed = fy_get(frame, "client_composed", false);
 	origin = fy_get(frame, "origin", fy_invalid);
 	if (fy_is_mapping(origin)) {
@@ -2450,11 +2540,22 @@ static int sdk_add_user(struct sdk_server *srv, const char *text)
 	struct fyai_ctx *ctx = srv->ctx;
 	struct fy_generic_builder *gb = fyai_ctx_transient_gb(ctx);
 	fy_generic user, turn;
+	char *shown;
 	int rc;
 
-	user = fyai_make_instruction_message(ctx, text);
+	/*
+	 * The images that the user message carries are pending. They go with
+	 * this message and no other; a message that the program writes carries
+	 * none.
+	 */
+	shown = fyai_media_pending_display(ctx, text);
+	user = fyai_media_pending_any(ctx) ?
+		fyai_make_user_message(ctx, text) :
+		fyai_make_instruction_message(ctx, text);
 	turn = fyai_turn_append(ctx, ctx->last_message, fy_sequence(gb, user));
-	turn = fyai_output_record(ctx, turn, FYAI_OUTPUT_USER, text);
+	turn = fyai_output_record(ctx, turn, FYAI_OUTPUT_USER,
+				  shown ? shown : text);
+	free(shown);
 	fyai_error_check(ctx, fy_is_valid(turn), err,
 			 "claude-sdk: cannot add the user message");
 	ctx->last_message = fy_gb_internalize(ctx->gb, turn);
@@ -2516,6 +2617,7 @@ out:
 static void sdk_turn(struct sdk_server *srv, const struct sdk_input *in)
 {
 	const char *text = in->text;
+	const struct sdk_image *img;
 	struct fyai_ctx *ctx = srv->ctx;
 	struct fyai_cfg *cfg = ctx->cfg;
 	struct fy_generic_builder *gb;
@@ -2570,6 +2672,20 @@ static void sdk_turn(struct sdk_server *srv, const struct sdk_input *in)
 	}
 	if (!in->composed)
 		prompt = sdk_mentions(srv, prompt);
+	/* The attachments of the message wait for sdk_add_user(). */
+	fyai_media_pending_clear(ctx);
+	for (img = in->images; img; img = img->next) {
+		rc = fyai_media_attach_bytes(ctx, img->data, img->len,
+					     *img->media_type ?
+						img->media_type : NULL,
+					     img->name);
+		if (rc) {	/* the attach says why */
+			fyai_media_pending_clear(ctx);
+			cause = strdup("an image of the message cannot be "
+				       "attached");
+			goto done;
+		}
+	}
 	rc = sdk_add_user(srv, prompt);
 	if (rc)		/* sdk_add_user() says why */
 		goto done;
@@ -2948,6 +3064,7 @@ int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
 			else
 				sdk_turn(&srv, in);
 			free(in->text);
+			sdk_images_free(in->images);
 			free(in->origin_json);
 			free(in);
 			continue;
@@ -2984,6 +3101,7 @@ done:
 	while ((in = srv.head)) {
 		srv.head = in->next;
 		free(in->text);
+		sdk_images_free(in->images);
 		free(in->origin_json);
 		free(in);
 	}

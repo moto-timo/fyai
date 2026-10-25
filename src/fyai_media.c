@@ -860,9 +860,8 @@ int fyai_media_attach_fd(struct fyai_ctx *ctx, int fd, const char *declared,
 	return media_attach_image(ctx, &image);
 }
 
-/* Add @len bytes at @data to the next user message. */
-static int media_attach_bytes(struct fyai_ctx *ctx, const void *data,
-			      size_t len, const char *name)
+int fyai_media_attach_bytes(struct fyai_ctx *ctx, const void *data,
+			    size_t len, const char *declared, const char *name)
 {
 	struct fyai_media_image image;
 	uint64_t max_bytes;
@@ -875,7 +874,8 @@ static int media_attach_bytes(struct fyai_ctx *ctx, const void *data,
 			   "%llu byte limit", len, (unsigned long long)max_bytes);
 		return -1;
 	}
-	if (fyai_media_image_bytes(ctx, ctx->gb, data, len, NULL, name, &image))
+	if (fyai_media_image_bytes(ctx, ctx->gb, data, len, declared, name,
+				   &image))
 		return -1;
 	return media_attach_image(ctx, &image);
 }
@@ -1413,7 +1413,8 @@ static int media_clipboard_try(struct fyai_ctx *ctx, const char *command,
 		snprintf(why, whysz, "%s wrote nothing", what);
 		goto out;
 	}
-	rc = media_attach_bytes(ctx, result.stdout_data, len, "clipboard");
+	rc = fyai_media_attach_bytes(ctx, result.stdout_data, len, NULL,
+				     "clipboard");
 	if (rc)
 		snprintf(why, whysz, "%s did not write an image", what);
 out:

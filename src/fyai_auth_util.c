@@ -304,6 +304,57 @@ unsigned char *fyai_base64url_decode(const char *text, size_t *lenp)
 	return out;
 }
 
+/*
+ * Decode base64 @text in the standard or the URL alphabet, with or without
+ * padding. White space is skipped. The result is a buffer that the caller
+ * owns, NUL terminated past @lenp. Return NULL for text that is not base64
+ * or that holds no byte.
+ */
+unsigned char *fyai_base64_decode(const char *text, size_t *lenp)
+{
+	unsigned char *out;
+	size_t n = 0, bits = 0;
+	unsigned int acc = 0;
+	int v;
+
+	if (!text || !lenp)
+		return NULL;
+	out = malloc(strlen(text) / 4 * 3 + 4);
+	if (!out)
+		return NULL;
+	for (; *text && *text != '='; text++) {
+		if (*text >= 'A' && *text <= 'Z')
+			v = *text - 'A';
+		else if (*text >= 'a' && *text <= 'z')
+			v = *text - 'a' + 26;
+		else if (*text >= '0' && *text <= '9')
+			v = *text - '0' + 52;
+		else if (*text == '+' || *text == '-')
+			v = 62;
+		else if (*text == '/' || *text == '_')
+			v = 63;
+		else if (strchr(" \t\r\n", *text))
+			continue;
+		else
+			goto err;
+		acc = acc << 6 | (unsigned int)v;
+		bits += 6;
+		if (bits >= 8) {
+			bits -= 8;
+			out[n++] = (unsigned char)(acc >> bits);
+			acc &= (1u << bits) - 1;
+		}
+	}
+	if (!n)
+		goto err;
+	out[n] = '\0';
+	*lenp = n;
+	return out;
+err:
+	free(out);
+	return NULL;
+}
+
 bool fyai_auth_scope_has(const char *scopes, const char *scope)
 {
 	const char *end;
