@@ -502,10 +502,12 @@ dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
   goes to the reasoning block of the message.
 - Each message stores the token counts of its own `assistant` frame. The
   `result` frame still sets the counts of the turn for the context gauge.
-- Open: a todo block for `TodoWrite`, a card for `apply_patch` (a patch is not
-  an `edit_file`), the tool list of `system/init` and the cost of `result`,
-  which the page shows nowhere, and `input_json_delta`, so a call shows only
-  when its message is complete.
+- A call of the task list tool (`TodoWrite`, stored as `todo_write`) shows as a
+  list with a mark for each state and the count that is done
+  (`ChatMessageToolCallBlockTodo.svelte`).
+- Open: a card for `apply_patch` (a patch is not an `edit_file`), the tool list
+  of `system/init` and the cost of `result`, which the page shows nowhere, and
+  `input_json_delta`, so a call shows only when its message is complete.
 
 **W8. Attachments.** Done, and not checked in a browser.
 

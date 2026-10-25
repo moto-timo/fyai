@@ -38,7 +38,7 @@ New files, none of which exists upstream:
 - `src/lib/services/backend/` (the backend seam and the llama-server
   backend), `src/lib/stores/backend.svelte.ts`,
   `src/lib/stores/fyai-backend.svelte.ts`, `src/lib/services/fyai.service.ts`,
-  `src/lib/services/fyai.turn.ts`, `src/lib/services/fyai.tools.ts`, `src/lib/services/fyai.conversations.ts`, `src/lib/utils/backend-settings.ts` and
+  `src/lib/services/fyai.turn.ts`, `src/lib/services/fyai.tools.ts`, `src/lib/services/fyai.conversations.ts`, `src/lib/services/backend/forced.ts`, `ChatMessageToolCallBlockTodo.svelte`, `src/lib/utils/backend-settings.ts` and
   `src/lib/constants/backend-capabilities.constants.ts`.
 - `README.fyai.md`, the manual of the fyai build. `README.md` is upstream's.
 
@@ -48,9 +48,10 @@ calls into a new file; merge them first when upstream moves:
 | File | Hook |
 | ---- | ---- |
 | `src/lib/stores/chat/index.svelte.ts` | `backendStore.active.runTurn` before the agentic loop; `handleLine` at the start of `sendMessage`; `titleFor` in `generateTitleWithLLM`; the agentic loop and the plain path only with the `agenticLoop` capability |
-| `src/lib/stores/init.ts` | registers the fyai backend and detects the backend at start |
+| `src/lib/stores/init.ts` | registers the fyai backend and detects the backend at start, or takes the forced kind |
 | `src/lib/stores/index.ts` | exports `backendStore` |
 | `src/lib/stores/conversations/index.svelte.ts` | the backend syncs the conversations before the list loads, and hears of a delete and a rename |
+| `src/lib/components/app/chat/ChatMessages/ChatMessage/ChatMessageToolCall/ChatMessageToolCallBlock.svelte` | the task list tool has its block |
 | `src/lib/stores/ui.svelte.ts` | `openModelsManager` needs `modelManager` |
 | `src/lib/stores/models/index.svelte.ts` | `findModelByName` ignores provider prefix and punctuation |
 | `src/lib/components/app/chat/ChatForm/ChatForm.svelte` | `selectModel` for `/model NAME` |
