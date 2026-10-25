@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 import { MessageRole } from '$lib/enums';
 import {
+	deleteFyaiConversation,
 	fyaiConversationRows,
 	fyaiSessionId,
+	renameFyaiConversation,
 	storedImageBytes
 } from '$lib/services/fyai.conversations';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const ids = () => {
 	let n = 0;
@@ -192,5 +194,39 @@ describe('the images of a stored message', () => {
 
 		expect(messages[1].extra).toBeUndefined();
 		expect(messages[2].extra).toBeUndefined();
+	});
+});
+
+describe('a rename or a delete of a conversation with no branch', () => {
+	const answer = (status: number, message = 'no such branch') =>
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(JSON.stringify({ error: { message } }), { status }))
+		);
+
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('is not a failure: there is nothing to change', async () => {
+		answer(404);
+
+		await expect(renameFyaiConversation('c1', 'name')).resolves.toBeUndefined();
+		await expect(deleteFyaiConversation('c1')).resolves.toBeUndefined();
+	});
+
+	it('reports any other failure with its cause', async () => {
+		answer(502, 'fyai is gone');
+
+		await expect(renameFyaiConversation('c1', 'name')).rejects.toThrow('fyai is gone');
+		await expect(deleteFyaiConversation('c1')).rejects.toThrow('fyai is gone');
+	});
+
+	it('names the conversation in the path and sends the title as JSON', async () => {
+		answer(200);
+		await renameFyaiConversation('a b', 'Title');
+
+		const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+
+		expect(url).toBe('/api/fyai/conversations/a%20b');
+		expect(init).toMatchObject({ body: '{"name":"Title"}', method: 'PATCH' });
 	});
 });
