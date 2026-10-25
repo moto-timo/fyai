@@ -34,7 +34,15 @@ page.on('console', (msg) => {
 	if (msg.text().includes('[fyai]')) logs.push(msg.text());
 });
 
-await page.goto(base, { timeout: 60000, waitUntil: 'domcontentloaded' });
+/* The bridge answers its API only after a login with the token it started with. */
+if (process.env.FYAI_BRIDGE_TOKEN) {
+	await page.goto(`${base}/api/fyai/login?token=${process.env.FYAI_BRIDGE_TOKEN}`, {
+		timeout: 60000,
+		waitUntil: 'domcontentloaded'
+	});
+} else {
+	await page.goto(base, { timeout: 60000, waitUntil: 'domcontentloaded' });
+}
 
 /* The composer is a textarea of the chat form. */
 const input = page.locator('textarea').first();

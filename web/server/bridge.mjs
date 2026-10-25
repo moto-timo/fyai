@@ -15,6 +15,17 @@
  */
 
 import {
+	corsHeaders,
+	hostAllowed,
+	LOGIN_PATH,
+	makeToken,
+	originAllowed,
+	safeNext,
+	tokenCookie,
+	tokenFromHeaders,
+	tokensEqual
+} from './auth.mjs';
+import {
 	catalogueModelName,
 	commandsFromSchema,
 	fencedOutput,
@@ -56,6 +67,16 @@ function parseArgs(argv) {
 const argv = parseArgs(process.argv.slice(2));
 const env = process.env;
 const config = {
+	/* Host names other than loopback that a loopback bridge answers to, such as a tunnel. */
+	allowHosts: (argv['allow-host'] ?? env.FYAI_BRIDGE_ALLOW_HOST ?? '')
+		.split(',')
+		.map((v) => v.trim().toLowerCase())
+		.filter(Boolean),
+	/* Origins other than the bridge's own that may call it, such as the dev server of the page. */
+	allowOrigins: (argv['allow-origin'] ?? env.FYAI_BRIDGE_ALLOW_ORIGIN ?? '')
+		.split(',')
+		.map((v) => v.trim())
+		.filter(Boolean),
 	bin: argv.bin ?? env.FYAI_BIN ?? 'fyai',
 	cwd: resolve(argv.cwd ?? env.FYAI_BRIDGE_CWD ?? process.cwd()),
 	extraArgs: (argv['extra-arg'] ?? env.FYAI_BRIDGE_ARGS ?? '').split(/\s+/).filter(Boolean),
@@ -70,10 +91,23 @@ const config = {
 	permissionMode: argv['permission-mode'] ?? env.FYAI_PERMISSION_MODE ?? 'bypassPermissions',
 	port: Number(argv.port ?? env.FYAI_BRIDGE_PORT ?? 9331),
 	staticDir: resolve(argv.static ?? env.FYAI_BRIDGE_STATIC ?? join(HERE, '..', 'dist')),
+	/*
+	 * Every API request needs this token. The program that starts the bridge
+	 * may give one, so that it knows the link to open; otherwise a new one is
+	 * made at each start.
+	 */
+	token: argv.token ?? env.FYAI_BRIDGE_TOKEN ?? makeToken(),
 	/* A turn that runs longer than this is stopped. 0 disables the limit. */
 	turnTimeoutMs: Number(argv['turn-timeout-ms'] ?? env.FYAI_BRIDGE_TURN_TIMEOUT_MS ?? 0),
 	verbose: (argv.verbose ?? env.FYAI_BRIDGE_VERBOSE ?? '') === 'true'
 };
+
+/*
+ * The token is the key of this bridge. A program that the bridge starts, and so
+ * a tool that fyai runs, must not find it in its environment.
+ */
+delete process.env.FYAI_BRIDGE_TOKEN;
+
 const SDKMODES = new Set(['default', 'acceptEdits', 'bypassPermissions', 'dontAsk', 'auto']);
 
 function log(...args) {
@@ -206,7 +240,7 @@ function sendJson(res, status, value) {
 	const body = JSON.stringify(value);
 
 	res.writeHead(status, {
-		'access-control-allow-origin': '*',
+		...res.cors,
 		'cache-control': 'no-store',
 		'content-length': Buffer.byteLength(body),
 		'content-type': 'application/json; charset=utf-8'
@@ -247,7 +281,7 @@ class EventStream {
 	constructor(req, res) {
 		this.closed = false;
 		res.writeHead(200, {
-			'access-control-allow-origin': '*',
+			...res.cors,
 			'cache-control': 'no-cache, no-transform',
 			connection: 'keep-alive',
 			'content-type': 'text/event-stream; charset=utf-8',
@@ -993,6 +1027,18 @@ async function serveStatic(req, res, pathname) {
 	}
 }
 
+/** True for the paths that run fyai or reveal its state: everything but the page files. */
+function isApiPath(pathname) {
+	return (
+		pathname.startsWith('/api/') ||
+		pathname.startsWith('/v1/') ||
+		pathname.startsWith('/models') ||
+		pathname === '/props' ||
+		pathname === '/slots' ||
+		pathname === '/tools'
+	);
+}
+
 server = createServer(async (req, res) => {
 	const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 	const pathname = url.pathname;
@@ -1000,21 +1046,70 @@ server = createServer(async (req, res) => {
 	if (config.verbose) log(req.method, pathname);
 
 	try {
+		const host = String(req.headers.host ?? '');
+		const origin = req.headers.origin;
+
+		if (!hostAllowed(host, config.host, config.allowHosts)) {
+			sendError(res, 403, `the host ${host} is not one of this bridge`);
+
+			return;
+		}
+
+		/* A page of another site gets no answer it can read, and no request of it runs. */
+		if (!originAllowed(origin, host, config.allowOrigins)) {
+			sendError(res, 403, `the origin ${origin} is not allowed`);
+
+			return;
+		}
+
+		res.cors = corsHeaders(origin, host, config.allowOrigins);
+
 		if (req.method === 'OPTIONS') {
-			res.writeHead(204, {
-				'access-control-allow-headers': '*',
-				'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
-				'access-control-allow-origin': '*'
+			res.writeHead(204, res.cors);
+			res.end();
+
+			return;
+		}
+
+		/* The link that the bridge printed carries the token; the browser keeps it as a cookie. */
+		if (pathname === LOGIN_PATH && req.method === 'GET') {
+			if (!tokensEqual(url.searchParams.get('token') ?? '', config.token)) {
+				sendError(res, 401, 'the token is wrong: open the link that the bridge printed');
+
+				return;
+			}
+
+			res.writeHead(302, {
+				'cache-control': 'no-store',
+				location: safeNext(url.searchParams.get('next')),
+				'set-cookie': tokenCookie(config.token)
 			});
 			res.end();
 
 			return;
 		}
 
+		const authenticated = tokensEqual(tokenFromHeaders(req.headers), config.token);
+
+		/* The page itself holds nothing private, so it loads before a login. The API does not. */
+		if (!authenticated && pathname !== '/api/fyai/info' && isApiPath(pathname)) {
+			sendError(res, 401, 'the token is missing: open the link that the bridge printed');
+
+			return;
+		}
+
 		if (pathname === '/api/fyai/info') {
+			/* Before a login the page learns only what kind of server this is. */
+			if (!authenticated) {
+				sendJson(res, 200, { authenticated: false, backend: 'fyai', protocol: 1 });
+
+				return;
+			}
+
 			const models = await listModels();
 
 			sendJson(res, 200, {
+				authenticated: true,
 				backend: 'fyai',
 				bin: config.bin,
 				cwd: config.cwd,
@@ -1168,6 +1263,7 @@ server.listen(config.port, config.host, () => {
 
 	config.port = port;
 	log(`listening on http://${config.host}:${port}`);
+	log(`open http://${config.host}:${port}${LOGIN_PATH}?token=${config.token}`);
 	log(`fyai: ${config.bin}  cwd: ${config.cwd}  static: ${config.staticDir}`);
 	log(`permission mode: ${config.permissionMode}`);
 });

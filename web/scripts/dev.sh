@@ -99,6 +99,11 @@ if [ ${#CWD_ARGS[@]} -eq 0 ]; then
 	fi
 fi
 
+# Every API request needs this token. The link carries it once; the browser
+# keeps it as a cookie of the dev server, which forwards /api to the bridge.
+FYAI_BRIDGE_TOKEN="${FYAI_BRIDGE_TOKEN:-$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")}"
+export FYAI_BRIDGE_TOKEN
+
 # The page forwards to the bridge through Vite's proxy.
 export VITE_PUBLIC_BRIDGE_ORIGIN="http://$BRIDGE_HOST:$BRIDGE_PORT"
 
@@ -125,6 +130,7 @@ if ! kill -0 "$BRIDGE_PID" 2>/dev/null; then
 fi
 
 echo "dev.sh: page http://127.0.0.1:$DEV_PORT   bridge http://$BRIDGE_HOST:$BRIDGE_PORT"
+echo "dev.sh: open http://127.0.0.1:$DEV_PORT/api/fyai/login?token=$FYAI_BRIDGE_TOKEN"
 echo "dev.sh: fyai $("$FYAI" --version 2>/dev/null | head -1)"
 echo "dev.sh: fyai path $FYAI"
 echo "dev.sh: project ${CWD_ARGS[1]}"

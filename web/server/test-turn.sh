@@ -55,10 +55,11 @@ EOF
 "$FY" catalog import cat.yaml >/dev/null 2>&1 || true
 "$FY" --set api=chat-completions --set api_url="http://127.0.0.1:$PORT/v1/chat/completions" >/dev/null 2>&1 || true
 
+export FYAI_BRIDGE_TOKEN=${FYAI_BRIDGE_TOKEN:-test-token}
 FYAI_BIN=$FY FYAI_BRIDGE_CWD=$TD/work FYAI_BRIDGE_STATIC=$REPO/web/dist \
 	FYAI_BRIDGE_PORT=9331 node "$REPO/web/server/bridge.mjs" --model cat-model \
 	>"$TD/bridge.log" 2>&1 &
-for _ in $(seq 100); do curl -sf http://127.0.0.1:9331/props >/dev/null && break; sleep 0.05; done
+for _ in $(seq 100); do curl -sf -H "x-fyai-token: $FYAI_BRIDGE_TOKEN" http://127.0.0.1:9331/props >/dev/null && break; sleep 0.05; done
 
 if [ "$PROMPT" = "-" ]; then
 	echo "--- ready (no turn) ---"
@@ -68,5 +69,6 @@ fi
 echo "--- turn ---"
 curl -sS -N -X POST http://127.0.0.1:9331/api/fyai/chat \
 	-H 'content-type: application/json' \
+	-H "x-fyai-token: $FYAI_BRIDGE_TOKEN" \
 	-d "{\"conversationId\":\"$SESSION\",\"fresh\":${FRESH:-true},\"model\":\"cat-model\",\"prompt\":\"$PROMPT\"}" |
 	sed 's/^data: //' | grep -v '^$'

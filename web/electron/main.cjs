@@ -16,6 +16,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { app, BrowserWindow, dialog, Menu, shell } = require('electron');
 const { spawn, spawnSync } = require('node:child_process');
+const { randomBytes } = require('node:crypto');
 const { existsSync, mkdirSync } = require('node:fs');
 const { homedir } = require('node:os');
 const { basename, dirname, join, resolve, sep } = require('node:path');
@@ -185,7 +186,7 @@ function startBridge(project) {
 	 */
 	const bridge = spawn(process.execPath, args, {
 		cwd: project.dir,
-		env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+		env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', FYAI_BRIDGE_TOKEN: project.token },
 		/*
 		 * stdin stays open for as long as this process lives: the bridge
 		 * reads it to notice that it was left behind.
@@ -278,12 +279,12 @@ function stopAllBridges() {
 }
 
 /** Wait until the bridge answers, or give up after a few seconds. */
-async function waitForBridge(address, ms = 20000) {
+async function waitForBridge(address, token, ms = 20000) {
 	const started = Date.now();
 
 	while (Date.now() - started < ms) {
 		try {
-			const res = await fetch(`${address}/props`);
+			const res = await fetch(`${address}/props`, { headers: { 'x-fyai-token': token } });
 
 			if (res.ok) return true;
 		} catch {
@@ -337,7 +338,8 @@ async function openProject(dir) {
 		return;
 	}
 
-	const project = { bridge: null, dir: key, window: null };
+	/* The token of this bridge: only this app knows it, and the window logs in with it. */
+	const project = { bridge: null, dir: key, token: randomBytes(32).toString('hex'), window: null };
 
 	/* Registered at once: a second request for the project must not start another bridge. */
 	projects.set(key, project);
@@ -360,7 +362,7 @@ async function openProject(dir) {
 		return;
 	}
 
-	if (!(await waitForBridge(address))) {
+	if (!(await waitForBridge(address, project.token))) {
 		fail(
 			'fyai did not start',
 			`The bridge did not answer at ${address}. Run "npm run bridge" to see why.`
@@ -393,6 +395,14 @@ async function openProject(dir) {
 		project.window = null;
 	});
 
+	/* The window shows this bridge only: any other address opens in the browser. */
+	window.webContents.on('will-navigate', (event, url) => {
+		if (url.startsWith(`${address}/`)) return;
+
+		event.preventDefault();
+		shell.openExternal(url);
+	});
+
 	/* A link to the outside opens in the browser, not in the app. */
 	window.webContents.setWindowOpenHandler(({ url }) => {
 		shell.openExternal(url);
@@ -403,7 +413,8 @@ async function openProject(dir) {
 	rememberProject(key);
 
 	try {
-		await window.loadURL(`${address}/`);
+		/* The login link turns the token into a cookie of the window and goes on to the page. */
+		await window.loadURL(`${address}/api/fyai/login?token=${project.token}`);
 	} catch (error) {
 		dialog.showErrorBox(
 			'Cannot load the page',

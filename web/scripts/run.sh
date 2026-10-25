@@ -103,23 +103,29 @@ if [ "$BUILD" = 1 ] || [ ! -f dist/index.html ]; then
 fi
 
 # An earlier bridge holds the port: say so rather than fail on the bind.
-if curl -sf "http://$HOST:$PORT/props" >/dev/null 2>&1; then
+if curl -sf "http://$HOST:$PORT/api/fyai/info" >/dev/null 2>&1; then
 	echo "run.sh: a bridge already answers on http://$HOST:$PORT" >&2
 	exit 1
 fi
 
+# Every API request needs this token. The link carries it once; the browser
+# keeps it as a cookie.
+FYAI_BRIDGE_TOKEN="${FYAI_BRIDGE_TOKEN:-$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")}"
+export FYAI_BRIDGE_TOKEN
+
 URL="http://$HOST:$PORT"
+LOGIN_URL="$URL/api/fyai/login?token=$FYAI_BRIDGE_TOKEN"
 
 if [ "$OPEN" = 1 ]; then
 	(
 		for _ in $(seq 100); do
-			curl -sf "$URL/props" >/dev/null 2>&1 && break
+			curl -sf "$URL/api/fyai/info" >/dev/null 2>&1 && break
 			sleep 0.1
 		done
 		if command -v xdg-open >/dev/null 2>&1; then
-			xdg-open "$URL" >/dev/null 2>&1 || true
+			xdg-open "$LOGIN_URL" >/dev/null 2>&1 || true
 		elif command -v open >/dev/null 2>&1; then
-			open "$URL" >/dev/null 2>&1 || true
+			open "$LOGIN_URL" >/dev/null 2>&1 || true
 		fi
 	) &
 fi

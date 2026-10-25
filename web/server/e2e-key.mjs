@@ -53,7 +53,14 @@ await page.addInitScript(
 	{ map: useProviderMap, secret: key }
 );
 
-await page.goto(base, { waitUntil: 'domcontentloaded' });
+/* The bridge answers its API only after a login with the token it started with. */
+if (process.env.FYAI_BRIDGE_TOKEN) {
+	await page.goto(`${base}/api/fyai/login?token=${process.env.FYAI_BRIDGE_TOKEN}`, {
+		waitUntil: 'domcontentloaded'
+	});
+} else {
+	await page.goto(base, { waitUntil: 'domcontentloaded' });
+}
 
 const input = page.locator('textarea').first();
 
