@@ -30,7 +30,7 @@
 
 	let { initialSection, onClose, onSectionChange }: Props = $props();
 
-	const SETTINGS_CHAT_SECTIONS = $derived(visibleSettingsSections(ALL_SECTIONS, backendStore.kind));
+	const SETTINGS_CHAT_SECTIONS = $derived(visibleSettingsSections(ALL_SECTIONS, backendStore.active));
 
 	let activeSlug = $derived(initialSection ?? 'general');
 

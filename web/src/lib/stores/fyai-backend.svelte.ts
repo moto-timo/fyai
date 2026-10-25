@@ -127,12 +127,16 @@ async function loadCommands(): Promise<BackendCommand[]> {
 }
 
 export const fyaiBackend: Backend = {
+	/*
+	 * fyai runs the tool loop, holds the tools and the MCP servers, picks the
+	 * model from its catalogue and ignores the sampling fields of the page.
+	 */
 	capabilities: {
-		agenticLoop: true,
-		browserMcp: true,
-		browserTools: true,
-		modelManager: true,
-		sampling: true
+		agenticLoop: false,
+		browserMcp: false,
+		browserTools: false,
+		modelManager: false,
+		sampling: false
 	},
 	/*
 	 * Each conversation is its own fyai session, so a new conversation is what

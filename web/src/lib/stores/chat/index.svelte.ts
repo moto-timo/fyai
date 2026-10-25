@@ -1161,9 +1161,21 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 
 				return;
 			}
+
+			/*
+			 * The generic paths below speak to llama-server. A backend that
+			 * cannot serve them has nothing to send for this message.
+			 */
+			if (backendResult === 'skip' && !backendStore.supports('agenticLoop')) {
+				streamCallbacks.onError?.(
+					new Error('This message has no text to send. Add text to the message and send it again.')
+				);
+
+				return;
+			}
 		}
 
-		{
+		if (backendStore.supports('agenticLoop')) {
 			const agenticResult = await agenticStore.runAgenticFlow({
 				callbacks: streamCallbacks,
 				conversationId: convId,

@@ -30,8 +30,9 @@ export interface BackendTurnRequest {
 }
 
 /**
- * `ok` and `error` end the turn. `skip` leaves it to the generic path, as
- * when the last message has nothing the backend can send.
+ * `ok` and `error` end the turn. `skip` leaves it to the generic request
+ * paths when the backend has the `agenticLoop` capability, and is an error
+ * for the user when it has not: the last message had nothing to send.
  */
 export type BackendTurnResult = 'error' | 'ok' | 'skip';
 

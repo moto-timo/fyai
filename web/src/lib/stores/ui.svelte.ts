@@ -6,6 +6,7 @@
  * controls and the chat tab bar reacts to).
  */
 
+import { backendStore } from './backend.svelte';
 import type { ModelOption } from '$lib/types/models';
 
 class UiStore {
@@ -38,6 +39,8 @@ class UiStore {
 
 	/** Open the models manager, optionally focused on one model. */
 	openModelsManager(focus?: string): void {
+		if (!backendStore.supports('modelManager')) return;
+
 		this.manageModelFocus = focus ?? null;
 		this.manageModelsOpen = true;
 	}

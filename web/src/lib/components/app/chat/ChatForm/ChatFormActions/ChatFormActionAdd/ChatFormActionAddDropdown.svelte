@@ -15,6 +15,7 @@
 	import { getChatFormActionsContext } from '$lib/contexts';
 	import { AttachmentAction, AttachmentItemEnabledWhen } from '$lib/enums';
 	import { useAttachmentMenu } from '$lib/hooks/use-attachment-menu.svelte';
+	import { backendStore } from '$lib/stores';
 
 	interface Props {
 		class?: string;
@@ -143,7 +144,9 @@
 				<span>{ATTACHMENT_MENU_TEXT.SYSTEM_MESSAGE}</span>
 			</DropdownMenu.Item>
 
-			<ChatFormActionAddToolsSubmenu />
+			{#if backendStore.supports('browserTools')}
+				<ChatFormActionAddToolsSubmenu />
+			{/if}
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
 </div>
