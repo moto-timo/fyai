@@ -128,7 +128,8 @@ range 20000 to 29999 below the ports that the system gives to outgoing
 connections, so each launch of a project finds its conversations again and two
 projects never share a cache. A port that is taken, by a development bridge or
 a stale one, falls back to a free port, and that launch starts with an empty
-cache. W4 makes fyai the history and the cache only a copy.
+cache. W4 makes the cache a copy of what fyai holds: an empty cache is filled
+from the branches at the next start.
 
 ## Backends
 
@@ -323,7 +324,7 @@ classes.
 
 | Part                                       | Conflict                                                                                   |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Conversation store (`database.service.ts`) | IndexedDB holds the history that the page shows. The branches are not listed. A deleted conversation leaves its branch. A second browser sees no conversation. |
+| Conversation store (`database.service.ts`) | IndexedDB holds the copy that the page shows. W4 syncs it with the branches at start and passes a delete or a rename on. A fork of the page has no branch. |
 | Regenerate, edit, message branches         | fyai appends to the session, so the tree of the page and the branch differ. An edit of the first message resumes the old context. |
 | Agentic loop (`stores/agentic/*`)          | a message with no text, such as an image alone, falls through to it and gets a 501.       |
 | MCP client in the browser (`services/mcp.service.ts`) | the browser connects to MCP servers; fyai never gets their tools. `/cors-proxy` is not served. |
@@ -415,17 +416,29 @@ Each item states what changes, why, and which fyai interface it uses.
 Keep each part, unchanged, for llama-server. The gate is one predicate,
 `backendIs('fyai')`, at the hook points of W2.
 
-**W4. Conversations are branches.**
+**W4. Conversations are branches.** Done in part: the page keeps a copy, and the
+copy follows fyai. It is not checked in a browser.
 
-- The bridge lists, renames and deletes `sdk/*` branches through fyai verbs
-  with `--output json` (`branch list`, `branch rename`, `branch delete`).
-- The conversation list comes from that list. IndexedDB is a cache that a
-  start refreshes.
-- The history of a conversation comes from the stored transcript (`history
-  --output json`), not from rows that the page wrote.
-- Search asks fyai.
-- Import and export use the textual export of fyai
-  (`doc/textual-export-format.md`), so an imported conversation has a session.
+- The bridge serves `GET /api/fyai/conversations` (the `sdk/*` branches from
+  `branch list --output json`, newest first), `GET .../ID/messages` (`history
+  --output json`), `PATCH .../ID` (`branch describe`, so the title is the
+  description of the branch) and `DELETE .../ID` (`branch delete --force`). The
+  ID becomes a branch name below `sdk/` as for a turn, so no ID reaches another
+  branch. A change waits for a turn that runs (409).
+- At start the page makes its copy match fyai (`syncConversations`, before it
+  loads its list): a branch that the page lacks is added from its stored
+  messages (`fyaiConversationRows`: a root and a chain, a call on the assistant
+  message before it, its result as a tool message); a title that was changed
+  elsewhere is taken; a conversation that has an answer and no branch is
+  removed. A list that cannot be read changes nothing. A second browser, or a
+  launch with an empty cache, therefore sees the conversations of the project.
+- Delete and rename in the page reach the branch through the one place that
+  tells the page of a deletion (`notifyConversationsDeleted`) and through
+  `updateConversationName`.
+- Open: the sync reads each missing history one at a time at start; an image
+  of a message and the reasoning of a stored message are not restored; search
+  and the export and import of the page still use the copy; the sync runs once
+  at start, so a change made elsewhere shows at the next load.
 
 **W5. Edit and regenerate move the branch.**
 

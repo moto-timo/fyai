@@ -278,6 +278,16 @@ several assistant messages. Each becomes its own chat message, and the tool
 results sit between them, which is why the page does not run an agent loop of
 its own.
 
+## Conversations
+
+fyai holds each conversation as the branch `sdk/ID` of the project. The page
+keeps a copy in the browser and makes it match the branches when it starts: a
+conversation that fyai has and the page lacks, such as one made in another
+browser or before the cache was cleared, is added with its messages; deleting
+or renaming one in the page deletes or renames the branch. The bridge serves
+this at `/api/fyai/conversations`. Editing or regenerating a message and forking
+a conversation still work on the copy only.
+
 ## Provider keys
 
 fyai reads a key from its own configuration, its environment, or the secret
