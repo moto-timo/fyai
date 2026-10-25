@@ -28,10 +28,10 @@ import {
 import {
 	catalogueModelName,
 	checkImages,
+	commandMarkdown,
 	commandsFromSchema,
 	conversationBranch,
 	conversationsFromBranches,
-	fencedOutput,
 	findCatalogueModel,
 	inputModalities,
 	pageCapabilities,
@@ -1066,7 +1066,7 @@ async function handleChat(req, res) {
 	const stream = new EventStream(req, res);
 	/*
 	 * A slash command is not a turn: it runs a verb and shows what it wrote.
-	 * The output is fenced so a table of the terminal keeps its columns.
+	 * The output is Markdown source, which the page renders.
 	 */
 	const command = parseSlashCommand(prompt);
 
@@ -1091,7 +1091,7 @@ async function handleChat(req, res) {
 		const frame = {
 			ok: result.ok,
 			subtype: 'command',
-			text: fencedOutput(result),
+			text: commandMarkdown(result),
 			type: 'bridge'
 		};
 

@@ -115,7 +115,13 @@ export function slashCommandArgs(sessionId, command, model, extraArgs = [], comm
 	 */
 	const setsModel = entry.name === 'model';
 	/* Global options come before the command, as fyai reads them there. */
-	const args = [...extraArgs, '--branch', `${SDK_BRANCH_PREFIX}${sessionId}`];
+	const args = [
+		...extraArgs,
+		'--set',
+		'display/markdown=false',
+		'--branch',
+		`${SDK_BRANCH_PREFIX}${sessionId}`
+	];
 
 	if (model && !setsModel) args.push('--model', model);
 
@@ -218,19 +224,16 @@ export function providerKeyEnvName(provider) {
 }
 
 /**
- * The output of a verb in a fenced block. A command result is text of the
- * terminal, and a fence keeps its columns and stops its markup rendering.
+ * The output of a verb as Markdown. The verb writes it as source when
+ * `display/markdown` is off, tables included.
  *
  * @param {{ ok: boolean, text: string }} result
  * @returns {string}
  */
-export function fencedOutput(result) {
-	const body = (result.text || (result.ok ? 'done' : 'the command wrote nothing')).replace(
-		/```/g,
-		"'''"
-	);
+export function commandMarkdown(result) {
+	const body = result.text || (result.ok ? 'done' : 'the command wrote nothing');
 
-	return `${result.ok ? '' : '**The command failed.**\n\n'}\`\`\`text\n${body}\n\`\`\``;
+	return `${result.ok ? '' : '**The command failed.**\n\n'}${body}`;
 }
 
 /*

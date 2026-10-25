@@ -2,10 +2,10 @@
 import {
 	catalogueModelName,
 	checkImages,
+	commandMarkdown,
 	commandsFromSchema,
 	conversationBranch,
 	conversationsFromBranches,
-	fencedOutput,
 	inputModalities,
 	messageTextOf,
 	pageCapabilities,
@@ -93,6 +93,8 @@ describe('commandsFromSchema', () => {
 describe('slashCommandArgs', () => {
 	it('names the session branch and the verb', () => {
 		expect(slashCommandArgs('c1', { name: 'context', rest: [] }, 'gpt-5.5', [], COMMANDS)).toEqual([
+			'--set',
+			'display/markdown=false',
 			'--branch',
 			'sdk/c1',
 			'--model',
@@ -103,18 +105,20 @@ describe('slashCommandArgs', () => {
 
 	it('passes the words of the user as separate arguments', () => {
 		expect(slashCommandArgs('c1', { name: 'compact', rest: ['a', 'b'] }, '', [], COMMANDS)).toEqual(
-			['--branch', 'sdk/c1', 'compact', 'a', 'b']
+			['--set', 'display/markdown=false', '--branch', 'sdk/c1', 'compact', 'a', 'b']
 		);
 	});
 
 	it('does not override the model that /model stores', () => {
 		expect(
 			slashCommandArgs('c1', { name: 'model', rest: ['gpt-5.5'] }, 'other', [], COMMANDS)
-		).toEqual(['--branch', 'sdk/c1', 'model', 'gpt-5.5']);
+		).toEqual(['--set', 'display/markdown=false', '--branch', 'sdk/c1', 'model', 'gpt-5.5']);
 	});
 
 	it('reports the model of the session when /model has no name', () => {
 		expect(slashCommandArgs('c1', { name: 'model', rest: [] }, 'other', [], COMMANDS)).toEqual([
+			'--set',
+			'display/markdown=false',
 			'--branch',
 			'sdk/c1',
 			'model'
@@ -128,7 +132,7 @@ describe('slashCommandArgs', () => {
 	it('puts the extra arguments of the bridge before the command', () => {
 		expect(
 			slashCommandArgs('c1', { name: 'todo', rest: [] }, '', ['--set', 'a=b'], COMMANDS)
-		).toEqual(['--set', 'a=b', '--branch', 'sdk/c1', 'todo']);
+		).toEqual(['--set', 'a=b', '--set', 'display/markdown=false', '--branch', 'sdk/c1', 'todo']);
 	});
 });
 
@@ -185,23 +189,19 @@ describe('providerKeyEnvName', () => {
 	});
 });
 
-describe('fencedOutput', () => {
-	it('fences the output of a command', () => {
-		expect(fencedOutput({ ok: true, text: 'rows' })).toBe('```text\nrows\n```');
-	});
-
-	it('marks a failure', () => {
-		expect(fencedOutput({ ok: false, text: 'gone' })).toBe(
-			'**The command failed.**\n\n```text\ngone\n```'
+describe('commandMarkdown', () => {
+	it('leaves the Markdown of a command as it is', () => {
+		expect(commandMarkdown({ ok: true, text: '## Title\n\n| a |\n|---|\n| 1 |' })).toBe(
+			'## Title\n\n| a |\n|---|\n| 1 |'
 		);
 	});
 
-	it('cannot be closed by the output itself', () => {
-		expect(fencedOutput({ ok: true, text: 'a ``` b' })).toBe("```text\na ''' b\n```");
+	it('marks a failure', () => {
+		expect(commandMarkdown({ ok: false, text: 'gone' })).toBe('**The command failed.**\n\ngone');
 	});
 
 	it('says something for an empty result', () => {
-		expect(fencedOutput({ ok: true, text: '' })).toBe('```text\ndone\n```');
+		expect(commandMarkdown({ ok: true, text: '' })).toBe('done');
 	});
 });
 
