@@ -584,7 +584,7 @@ int fyai_cmd_claude_sdk_early(struct fyai_cfg *cfg, fy_generic args)
 	const char *prompt, *path, *encoded, *tool, *config, *why, *text;
 	char cwd[PATH_MAX], from[sizeof(SDK_BRANCH_PREFIX) + SDK_ID_MAX + 1];
 	char *last;
-	bool fork;
+	bool fork, named;
 	char id[SDK_ID_MAX + 1], name[sizeof(SDK_BRANCH_PREFIX) + SDK_ID_MAX];
 	char *file = NULL;
 	char opt[64];
@@ -656,6 +656,26 @@ int fyai_cmd_claude_sdk_early(struct fyai_cfg *cfg, fy_generic args)
 				     "claude-sdk: cannot keep the session name");
 		resume = NULL;
 	}
+	/*
+	 * A named branch (-b, $FYAI_BRANCH) is the session, whatever its name:
+	 * one that exists continues, one that does not starts at that name.
+	 */
+	named = !resume && !sid && cfg->branch_explicit && cfg->branch;
+	if (named) {
+		rc = fyai_peek_arena_config(cfg->arena_dir, cfg->branch,
+					    cfg->root_spec, cfg->gb, &stored,
+					    NULL, NULL, NULL);
+		if (rc || fy_is_invalid(stored)) {
+			/* A new session starts from the configuration of HEAD. */
+			cfg->branch_explicit = false;
+			cfg->fresh_session = true;
+			cfg->fresh_session_name = strdup(cfg->branch);
+			fyai_cfg_error_check(cfg, cfg->fresh_session_name, err,
+					     "claude-sdk: cannot keep the "
+					     "session name");
+		}
+		goto system_prompt;
+	}
 	if (resume || sid) {
 		valid = sdk_id_valid(resume ? resume : sid);
 		fyai_cfg_error_check(cfg, valid, err,
@@ -684,6 +704,7 @@ int fyai_cmd_claude_sdk_early(struct fyai_cfg *cfg, fy_generic args)
 				     "claude-sdk: cannot keep the session name");
 	}
 
+system_prompt:
 	prompt = fy_get(args, "system_prompt", (const char *)NULL);
 	path = fy_get(args, "system_prompt_file", (const char *)NULL);
 	if (path) {
@@ -2951,10 +2972,10 @@ int fyai_cmd_claude_sdk(struct fyai_cmd_call *call, fy_generic *result)
 	fyai_error_check(ctx, el, out, "claude-sdk: no event loop");
 
 	branch = fyai_ctx_branch(ctx);
+	/* The ID of an sdk/ branch is its name below the prefix. */
 	found = !strncmp(branch, SDK_BRANCH_PREFIX, strlen(SDK_BRANCH_PREFIX));
-	fyai_error_check(ctx, found, out,
-			 "claude-sdk: branch '%s' is not a session", branch);
-	srv.session_id = strdup(branch + strlen(SDK_BRANCH_PREFIX));
+	srv.session_id = strdup(found ? branch + strlen(SDK_BRANCH_PREFIX) :
+				branch);
 	fyai_error_check(ctx, srv.session_id, out,
 			 "claude-sdk: cannot keep the session ID");
 	mode = fyai_cmd_arg_str(call, "permission_mode");
