@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 import type { FyaiFrame } from '$lib/services/fyai.service';
-import { fyaiToolView, toolResultForCard } from '$lib/services/fyai.tools';
+import {
+	FYAI_TODO_TOOLS,
+	fyaiToolView,
+	parseTodos,
+	toolResultForCard
+} from '$lib/services/fyai.tools';
 import { FyaiTurnAssembler, type TurnMessage } from '$lib/services/fyai.turn';
 import { describe, expect, it } from 'vitest';
 
@@ -176,5 +181,43 @@ describe('the assembler and the fidelity of a turn', () => {
 		expect(out.messages[0].toolCalls).toEqual([
 			{ arguments: '{"command":"ls"}', id: 'c1', name: 'exec_shell_command' }
 		]);
+	});
+});
+
+describe('parseTodos', () => {
+	it('reads the items of a task list', () => {
+		const args = JSON.stringify({
+			todos: [
+				{ content: 'Read the code', priority: 'high', status: 'completed' },
+				{ content: ' Fix it ', priority: 'low', status: 'in_progress' },
+				{ content: 'Test', priority: 'low', status: 'cancelled' }
+			]
+		});
+
+		expect(parseTodos(args)).toEqual([
+			{ content: 'Read the code', status: 'completed' },
+			{ content: 'Fix it', status: 'in_progress' },
+			{ content: 'Test', status: 'cancelled' }
+		]);
+	});
+
+	it('takes a status that is not one of the four as pending and leaves out an empty item', () => {
+		const args = JSON.stringify({
+			todos: [{ content: 'a', status: 'blocked' }, { content: '  ' }, null, { status: 'pending' }]
+		});
+
+		expect(parseTodos(args)).toEqual([{ content: 'a', status: 'pending' }]);
+	});
+
+	it('gives no item for arguments that are not complete or hold no list', () => {
+		expect(parseTodos('{"todos":[{"content":"a"')).toEqual([]);
+		expect(parseTodos('{"todos":"x"}')).toEqual([]);
+		expect(parseTodos('null')).toEqual([]);
+		expect(parseTodos(undefined)).toEqual([]);
+	});
+
+	it('is shown for the SDK name and the stored name of the tool', () => {
+		expect(FYAI_TODO_TOOLS).toEqual(['TodoWrite', 'todo_write']);
+		expect(fyaiToolView('TodoWrite', { todos: [] }).name).toBe('TodoWrite');
 	});
 });
