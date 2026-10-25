@@ -12,7 +12,7 @@
 		SIDEBAR_ACTIONS_ITEMS
 	} from '$lib/constants';
 	import { SidebarAction, TooltipSide } from '$lib/enums';
-	import { conversationsStore, deviceStore } from '$lib/stores';
+	import { backendStore, conversationsStore, deviceStore } from '$lib/stores';
 	import type { DesktopIconStripItem } from '$lib/types';
 	import type { Component } from 'svelte';
 	import { onMount } from 'svelte';
@@ -45,10 +45,14 @@
 		searchQuery = $bindable('')
 	}: Props = $props();
 
-	// the models manager stays desktop-only: a phone picks its models in the selector
+	// the models manager stays desktop-only: a phone picks its models in the selector;
+	// a backend that has no manager or no browser MCP client has no entry for it
 	const actions = $derived(
 		SIDEBAR_ACTIONS_ITEMS.filter(
-			(item) => item.action !== SidebarAction.MANAGE_MODELS || !deviceStore.isMobile
+			(item) =>
+				(item.action !== SidebarAction.MANAGE_MODELS ||
+					(!deviceStore.isMobile && backendStore.supports('modelManager'))) &&
+				(item.action !== SidebarAction.MCP || backendStore.supports('browserMcp'))
 		)
 	);
 	let initialized = $state(false);

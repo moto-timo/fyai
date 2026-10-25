@@ -14,7 +14,7 @@
 	import { KeyboardKey, ServerModelStatus } from '$lib/enums';
 	import type { UseModelsSelectorReturn } from '$lib/hooks/use-models-selector.svelte';
 	import { ModelsService } from '$lib/services/models.service';
-	import { modelsStore, uiStore } from '$lib/stores';
+	import { backendStore, modelsStore, uiStore } from '$lib/stores';
 	import type { ModelOption, ModelSidecarBadge } from '$lib/types/models';
 	import type { ModelItem } from '$lib/utils';
 	import { modelLoadFraction, repoOf } from '$lib/utils';
@@ -194,13 +194,15 @@
 			{@render pickerContent('px-1.5')}
 
 			{#snippet footer()}
-				<DropdownMenu.Group class="px-2">
-					<DropdownMenu.Item class="gap-2" onSelect={handleManageModels}>
-						<MODEL_ICON class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+				{#if backendStore.supports('modelManager')}
+					<DropdownMenu.Group class="px-2">
+						<DropdownMenu.Item class="gap-2" onSelect={handleManageModels}>
+							<MODEL_ICON class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 
-						Manage models
-					</DropdownMenu.Item>
-				</DropdownMenu.Group>
+							Manage models
+						</DropdownMenu.Item>
+					</DropdownMenu.Group>
+				{/if}
 			{/snippet}
 		</DropdownMenuSearchable>
 	</DropdownMenu.Content>
