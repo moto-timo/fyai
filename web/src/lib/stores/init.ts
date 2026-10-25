@@ -8,6 +8,7 @@ import { tabsStore } from './tabs.svelte';
 import { toolsStore } from './tools.svelte';
 import { versionStore } from './version.svelte';
 import { browser } from '$app/environment';
+import { forcedBackend } from '$lib/services/backend/forced';
 import { MigrationService } from '$lib/services/migration.service';
 
 let startup: Promise<void> | null = null;
@@ -17,7 +18,13 @@ export function initStores(): Promise<void> {
 
 	startup ??= (async () => {
 		await MigrationService.runAllMigrations();
-		await backendStore.detect();
+		await backendStore.detect(
+			forcedBackend({
+				build: import.meta.env?.VITE_PUBLIC_BACKEND,
+				search: window.location.search,
+				storage: (key) => localStorage.getItem(key)
+			})
+		);
 
 		settingsStore.initialize();
 		permissionsStore.initialize();
