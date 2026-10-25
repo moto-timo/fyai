@@ -26,7 +26,8 @@ const browserBaseConfig: any = {
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), 'VITE_PUBLIC_');
-	const SERVER_ORIGIN = env.VITE_PUBLIC_SERVER_ORIGIN || 'http://localhost:9931';
+	/* The bridge owns every fyai process; the dev server forwards to it. */
+	const BRIDGE_ORIGIN = env.VITE_PUBLIC_BRIDGE_ORIGIN || 'http://localhost:9331';
 
 	return {
 		build: {
@@ -60,12 +61,10 @@ export default defineConfig(({ mode }) => {
 				'Cross-Origin-Opener-Policy': 'same-origin'
 			},
 			proxy: {
-				'/cors-proxy': SERVER_ORIGIN,
-				'/models': SERVER_ORIGIN,
-				'/props': SERVER_ORIGIN,
-				'/slots': SERVER_ORIGIN,
-				'/tools': SERVER_ORIGIN,
-				'/v1': SERVER_ORIGIN
+				'/api': BRIDGE_ORIGIN,
+				'/props': BRIDGE_ORIGIN,
+				'/slots': BRIDGE_ORIGIN,
+				'/v1': BRIDGE_ORIGIN
 			}
 		},
 
