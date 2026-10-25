@@ -1,8 +1,8 @@
 # fyai web
 
 Status: the page for the bridge is done and the page for the session protocol
-is not. W1 to W8 and W12 have landed (none of the page work is checked in a
-browser yet), W9 is dropped, and W10 and W11 wait for `fyai serve`. The
+is not. W1 to W8 and W12 have landed (the browser test of the page against the mock
+provider covers the main paths), W9 is dropped, and W10 and W11 wait for `fyai serve`. The
 sections "Architecture", "Backends", "Changes on top of llama.cpp" and
 "Upstream surface that remains" describe the tree as it is; the work items say
 what each step did and what stays open.
@@ -428,7 +428,8 @@ Keep each part, unchanged, for llama-server. The gate is one predicate,
 `backendIs('fyai')`, at the hook points of W2.
 
 **W4. Conversations are branches.** Done in part: the page keeps a copy, and the
-copy follows fyai. It is not checked in a browser.
+copy follows fyai. The browser test checks a turn, the copy coming back from fyai
+when the page has lost its own, the tool cards and an image.
 
 - The bridge serves `GET /api/fyai/conversations` (the `sdk/*` branches from
   `branch list --output json`, newest first), `GET .../ID/messages` (`history
@@ -454,7 +455,8 @@ copy follows fyai. It is not checked in a browser.
   and the export and import of the page still use the copy; the sync runs once
   at start, so a change made elsewhere shows at the next load.
 
-**W5. Edit and regenerate move the branch.** Done, and not checked in a browser.
+**W5. Edit and regenerate move the branch.** Done. The browser test regenerates and edits and
+checks the requests that the mock got.
 
 The page keeps a tree of messages and can start a turn from any node of it,
 while a branch of fyai is one line. So each turn carries an anchor: the last
@@ -503,7 +505,8 @@ dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
   or `write` for the model, and the remote design needs the same split for a
   client (`x-fyai-remote`, SDD 11).
 
-**W7. Tool cards from fyai names.** Done in part, and not checked in a browser.
+**W7. Tool cards from fyai names.** Done in part. The browser test checks the task list
+and the shell card, live and from a restored conversation.
 
 - `Bash`, `Read`, `Write` and `Edit` are shown under the name and arguments of
   the cards that fit them (`exec_shell_command`, `read_file`, `write_file`,
@@ -522,7 +525,9 @@ dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
   of `system/init` and the cost of `result`, which the page shows nowhere, and
   `input_json_delta`, so a call shows only when its message is complete.
 
-**W8. Attachments.** Done, and not checked in a browser.
+**W8. Attachments.** Done. The browser test attaches an image and checks the request.
+It found that the bridge told the page every model took text only, which refused the
+image; the bridge now reports the input types of each model.
 
 - An image of the last user message goes to the bridge as base64 with its
   type, and the bridge makes it an `image` block of the user message, as the
