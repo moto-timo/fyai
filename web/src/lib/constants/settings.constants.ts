@@ -1,4 +1,5 @@
 import { DEFAULT_AGENTIC_CONFIG } from './agentic.constants';
+import { CLI_FLAGS } from './cli-flags.constants';
 import { DEFAULT_MCP_CONFIG } from './mcp.constants';
 import { SETTINGS_KEYS } from './settings-keys.constants';
 import { TITLE_GENERATION } from './title-generation.constants';
@@ -75,19 +76,11 @@ export const SETTINGS_REGISTRY: SettingsSectionEntry[] = [
 			},
 			{
 				defaultValue: '',
-				help: 'The provider key of this page, for the provider of the selected model. fyai reads it as <CODE>&lt;PROVIDER&gt;_API_KEY</CODE> for each turn. A second provider goes in "Provider API keys" below.',
+				help: `Set the API Key if you are using <code> ${CLI_FLAGS.API_KEY} </code> option for the server.`,
 				isPrivate: true,
 				key: SETTINGS_KEYS.API_KEY,
 				label: 'API Key',
 				type: SettingsFieldType.INPUT
-			},
-			{
-				defaultValue: '',
-				help: 'Keys of other providers, one <CODE>provider = key</CODE> a line, such as <CODE>openai = sk-...</CODE>. The provider name is the one in the catalogue (anthropic, openai, openrouter, deepseek, fireworks, ...). The bridge sets <CODE>&lt;PROVIDER&gt;_API_KEY</CODE> for each line, so a conversation can move between providers.',
-				isPrivate: true,
-				key: SETTINGS_KEYS.PROVIDER_API_KEYS,
-				label: 'Provider API keys',
-				type: SettingsFieldType.TEXTAREA
 			},
 			{
 				defaultValue: '',

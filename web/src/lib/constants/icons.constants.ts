@@ -21,7 +21,6 @@ import {
 	Power as LoadIcon,
 	RotateCw as RetryIcon,
 	Sparkles as PromptCommandIcon,
-	SquareTerminal as FyaiCommandIcon,
 	Video as VideoIcon,
 	Wrench as ToolUseIcon
 } from '@lucide/svelte';
@@ -106,7 +105,6 @@ export const CAPABILITY_FLAG_KEYS: Record<ModelCapability, keyof ModelCapabiliti
 /** Icons of the slash-command picker, one per chat-form command. */
 export const CHAT_FORM_COMMAND_ICONS: Record<ChatFormCommandAction, Component> = {
 	[ChatFormCommandAction.CWD]: CwdCommandIcon,
-	[ChatFormCommandAction.FYAI]: FyaiCommandIcon,
 	[ChatFormCommandAction.MODEL]: MODEL_ICON,
 	[ChatFormCommandAction.PROMPT]: PromptCommandIcon
 };

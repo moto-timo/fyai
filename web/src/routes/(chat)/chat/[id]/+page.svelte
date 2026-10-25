@@ -78,18 +78,6 @@
 		}, 100);
 	});
 
-	/*
-	 * A conversation that has no answer yet names no model, and the composer
-	 * cannot send until one is selected. The new-chat page does this for a
-	 * conversation it creates; a reload of an empty one, or one whose first
-	 * turn failed, has to reach the first model of the catalogue the same way.
-	 */
-	$effect(() => {
-		if (!modelsStore.models.length || modelsStore.selectedModelName) return;
-
-		void modelsStore.ensureFirstModelSelected();
-	});
-
 	$effect(() => {
 		if (chatId && chatId !== currentChatId) {
 			currentChatId = chatId;

@@ -1,385 +1,756 @@
-# fyai web UI
+# llama-ui
 
-A browser chat interface for `fyai`, installable as a PWA. It is a fork of
-the llama.cpp web UI (`tools/ui`), which supplies the chat shell, streaming
-Markdown rendering, attachments, conversation store and the PWA assets. The
-transport is replaced: instead of llama-server, the page talks to a local
-bridge that runs `fyai claude-sdk` and streams the Claude Agent SDK protocol.
+A modern, feature-rich web interface for llama-server built with SvelteKit. This UI provides an intuitive chat interface with advanced file handling, conversation management, and comprehensive model interaction capabilities.
+
+Llama UI supports two server operation modes:
+
+- **MODEL mode** - Single model operation (standard llama-server)
+- **ROUTER mode** - Multi-model operation with dynamic model loading/unloading
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Tech Stack](#tech-stack)
+- [Build Pipeline](#build-pipeline)
+- [Architecture](#architecture)
+- [Data Flows](#data-flows)
+- [Architectural Patterns](#architectural-patterns)
+- [Testing](#testing)
+
+---
+
+## Features
+
+### Chat Interface
+
+- **Streaming responses** with real-time updates
+- **Reasoning content** - Support for models with thinking/reasoning blocks
+- **Dark/light theme** with system preference detection
+- **Responsive design** for desktop and mobile
+
+### File Attachments
+
+- **Images** - JPEG, PNG, GIF, WebP, SVG (with PNG conversion)
+- **Documents** - PDF (text extraction or image conversion for vision models)
+- **Audio** - MP3, WAV for audio-capable models
+- **Text files** - Source code, markdown, and other text formats
+- **Drag-and-drop** and paste support with rich previews
+
+### Conversation Management
+
+- **Branching** - Branch messages conversations at any point by editing messages or regenerating responses, navigate between branches
+- **Regeneration** - Regenerate responses with optional model switching (ROUTER mode)
+- **Import/Export** - JSON format for backup and sharing
+- **Search** - Find conversations by title or content
+
+### Advanced Rendering
+
+- **Syntax highlighting** - Code blocks with language detection
+- **Math formulas** - KaTeX rendering for LaTeX expressions
+- **Markdown** - Full GFM support with tables, lists, and more
+
+### Multi-Model Support (ROUTER mode)
+
+- **Models manager** - one table for every model the server can serve, split into loaded, downloading, favorites, local and hidden sections, with search, context/capability/modality filters, sorting, load/unload, delete from disk and hide. It opens from the sidebar, from a model row or from the selector.
+- **Model selector** with Loaded/Available groups
+- **Automatic loading** - Models load on selection
+- **Modality validation** - Prevents sending images to non-vision models
+- **LRU unloading** - Server auto-manages model cache
+- **Downloads** - In-flight downloads stay visible above the selector and can be paused, resumed or cancelled from the manager
+- **Hub metadata** - Avatars, context length and chat template come from the Hugging Face Hub only while the `Use Hugging Face Hub API for models metadata` setting is on. It is off by default, and the UI then shows what the server reports for `/v1/models`
+
+### Keyboard Shortcuts
+
+| Shortcut           | Action               |
+| ------------------ | -------------------- |
+| `Shift+Ctrl/Cmd+O` | New chat             |
+| `Shift+Ctrl/Cmd+E` | Edit conversation    |
+| `Shift+Ctrl/Cmd+D` | Delete conversation  |
+| `Ctrl/Cmd+K`       | Search conversations |
+| `Ctrl/Cmd+B`       | Toggle sidebar       |
+
+### Developer Experience
+
+- **Request tracking** - Monitor token generation with `/slots` endpoint
+- **Storybook** - Component library with visual testing
+- **Hot reload** - Instant updates during development
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+ (20+ recommended)
+- **npm** 9+
+- **llama-server** running locally (for API access)
+
+### 1. Install Dependencies
+
+```bash
+cd tools/ui
+npm ci
+```
+
+### 2. Start llama-server
+
+In a separate terminal, start the backend server:
+
+```bash
+# Single model (MODEL mode)
+./llama-server -m model.gguf
+
+# Multi-model (ROUTER mode)
+./llama-server --models-dir /path/to/models
+```
+
+### 3. Start Development Servers
+
+```bash
+npm run dev
+```
+
+This starts:
+
+- **Vite dev server** at `http://localhost:5173` - The main UI frontend app
+- **Storybook** at `http://localhost:6006` - Component documentation
+
+The Vite dev server proxies API requests to `SERVER_ORIGIN` (with fallback to default llama-server `9931` port):
+
+```typescript
+// vite.config.ts proxy configuration
+proxy: {
+	'/v1': SERVER_ORIGIN,
+	'/props': SERVER_ORIGIN,
+	'/models': SERVER_ORIGIN,
+	'/tools': SERVER_ORIGIN,
+	'/slots': SERVER_ORIGIN,
+	'/cors-proxy': SERVER_ORIGIN
+},
+```
+
+### Development Workflow
+
+1. Open `http://localhost:5173` in your browser
+2. Make changes to `.svelte`, `.ts`, or `.css` files
+3. Changes hot-reload instantly
+4. Use Storybook at `http://localhost:6006` for isolated component development
+
+---
+
+## Tech Stack
+
+| Layer             | Technology                      | Purpose                                                  |
+| ----------------- | ------------------------------- | -------------------------------------------------------- |
+| **Framework**     | SvelteKit + Svelte 5            | Reactive UI with runes (`$state`, `$derived`, `$effect`) |
+| **UI Components** | shadcn-svelte + bits-ui         | Accessible, customizable component library               |
+| **Drawers**       | vaul-svelte                     | Draggable drawer overlays (mobile pickers, model pane)   |
+| **Styling**       | TailwindCSS 4                   | Utility-first CSS with design tokens                     |
+| **Database**      | IndexedDB (Dexie)               | Client-side storage for conversations and messages       |
+| **Build**         | Vite                            | Fast bundling with static adapter                        |
+| **Testing**       | Playwright + Vitest + Storybook | E2E, unit, and visual testing                            |
+| **Markdown**      | remark + rehype                 | Markdown processing with KaTeX and syntax highlighting   |
+
+### Key Dependencies
+
+```json
+{
+	"svelte": "^5.0.0",
+	"bits-ui": "^2.8.11",
+	"dexie": "^4.0.11",
+	"pdfjs-dist": "^5.4.54",
+	"highlight.js": "^11.11.1",
+	"rehype-katex": "^7.0.1"
+}
+```
+
+---
+
+## Build Pipeline
+
+### Development Build
+
+```bash
+npm run dev
+```
+
+Runs Vite in development mode with:
+
+- Hot Module Replacement (HMR)
+- Source maps
+- Proxy to llama-server
+
+### Production Build
+
+```bash
+npm run build
+```
+
+The build process:
+
+1. **Vite Build** - Bundles all TypeScript, Svelte, and CSS
+2. **Static Adapter** - Outputs to `../../build/tools/ui/dist` (llama-server's static file directory)
+3. **Post-Build Script** - Cleans up intermediate files
+4. **Custom Plugin** - Creates `index.html` with:
+   - Inlined favicon as base64
+   - GZIP compression (level 9)
+   - Deterministic output (zeroed timestamps)
 
 ```text
-browser (SvelteKit SPA, PWA)
-        │  POST /api/fyai/chat      SSE of SDK frames
-        ▼
-bridge (web/server/bridge.mjs, Node, no dependencies)
-        │  stdin/stdout JSON lines
-        ▼
-fyai claude-sdk  ──►  provider, tools, branches, arena
+tools/ui/        →  build  →  build/tools/ui/dist/
+├── src/                                 ├── index.html  (served by llama-server)
+├── static/                              └── (favicon inlined)
+└── ...
 ```
 
-## Why a bridge
+### SvelteKit Configuration
 
-The browser cannot start a process and fyai has no daemon. The bridge is a
-small program that you run yourself; it holds no conversation state. Each
-turn starts one `fyai claude-sdk` process with the session of the
-conversation, and fyai stores the turn in the branch `sdk/<conversation-id>`.
-The session ID is the conversation ID of the page, so a turn only sends the
-new message and the conversation survives a bridge restart.
-
-## Choosing the model
-
-fyai serves every model of the project catalogue, so the bridge answers the
-page as a llama.cpp _router_: the picker at the composer lists the catalogue,
-and the model a conversation picks travels with each turn. fyai has no load
-step, so every model is reported as loaded.
-
-- Only the models of a provider that has a key are listed
-  (`fyai catalog list models --available`): the key is in the environment of
-  the bridge, in the keyring, or behind a credential transport. When no
-  provider has one, the whole catalogue is listed, so a key can be entered in
-  the settings.
-- The model of the project (`fyai --get model`) is the first row, and the one
-  a new conversation starts with.
-- `/model NAME` selects a model as well. Typed in full it is resolved by the
-  page; when the prompt reaches fyai instead (pick the command from the list,
-  or press Escape and then Enter), its output is shown as a message and the
-  page takes the model it names.
-- An answer records the model that produced it, so a conversation reopened
-  from history returns the picker to that model.
-
-## Requirements
-
-- Node 20 or later.
-- `fyai` on `PATH`, or `FYAI_BIN` set to its path.
-- A provider and model configured for the project where fyai runs
-  (`fyai model`, `fyai auth`, or the environment).
-
-## Run
-
-There are two scripts. Both take the fyai program from `--fyai PATH`, else
-`$FYAI_BIN`, else `../build/fyai` (the project above this one), else `PATH`,
-and both install the page's dependencies on the first run. Each run prints
-the program it chose, so there is no doubt which fyai the page drives.
-
-**`scripts/run.sh`** serves the built page: it builds when `dist/` is missing,
-then starts the bridge.
-
-```sh
-cd web
-./scripts/run.sh                     # http://127.0.0.1:9331
-./scripts/run.sh --cwd ~/project     # another project for fyai
-./scripts/run.sh --fyai /usr/local/bin/fyai
-./scripts/run.sh --port 8080 --open  # another port, and a browser
-./scripts/run.sh --build             # build the page again first
+```javascript
+// svelte.config.js
+adapter: adapter({
+  pages: '../../build/tools/ui/dist',      // Output directory
+  assets: '../../build/tools/ui/dist',     // Static assets
+  fallback: 'index.html',  // SPA fallback
+  strict: true
+}),
+output: {
+  bundleStrategy: 'inline' // Single-file bundle
+}
 ```
 
-**`scripts/dev.sh`** is the edit loop: the bridge runs fyai and Vite serves
-the page in front of it, forwarding `/api`, `/v1`, `/props` and `/slots`.
-A change to a source file reloads the page and leaves the bridge alone.
+### Integration with llama-server
 
-```sh
-cd web
-./scripts/dev.sh                     # page on http://127.0.0.1:5173
-./scripts/dev.sh --bridge-port 9440 --cwd ~/project
-./scripts/dev.sh --fyai ~/work/fyai/build/fyai
-```
+llama-ui is embedded directly into the llama-server binary:
 
-Ctrl-C stops both. `npm start` and `npm run dev` run these scripts.
+1. `npm run build` outputs `index.html` to `build/tools/ui/dist/`
+2. llama-server compiles this into the binary at build time
+3. When accessing `/`, llama-server serves the bundled HTML
 
-fyai works in the fyai project above `web/`. A copy of the page elsewhere
-works in the directory the script was started from. A project with no
-`.fyai/arena` gets a warning, and its model list is empty until `fyai init`
-runs there.
+This results in a **single portable binary** with the full Llama UI included.
 
-A bridge started by hand has the same choice as `--bin`:
+---
 
-```sh
-node server/bridge.mjs --bin /usr/local/bin/fyai --cwd ~/project
-```
+## Architecture
 
-## Desktop app
-
-`scripts/desktop.sh` opens the page in an Electron window. The bridge runs
-as a child of the app, so nothing else has to be started:
-
-```sh
-cd web
-./scripts/desktop.sh                     # the repo build, or fyai on PATH
-./scripts/desktop.sh --fyai ~/bin/fyai   # another fyai
-./scripts/desktop.sh --cwd ~/project     # another project
-```
-
-The app works in the project of fyai that it finds. The `FYAI_BRIDGE_CWD`
-directory wins, then the directory the app was started in. A launcher starts
-it in the bundle, in `/` or in the home directory, which is no place for an
-arena, so the app then uses a directory of its own under the data directory of
-the platform (`~/.config/fyai/project` on Linux, `~/Library/Application
-Support/fyai/project` on macOS). A directory with no project gets one from
-`fyai init`.
-
-The window loads the built page, so run `npm run build` after you change it.
-Electron needs Node 20 or later, and a graphical session.
-
-The window asks the bridge for a free loopback port and reads the address it
-reports, so a second window, a development bridge on 9331, or a bridge left
-behind by an earlier run does not stop it. `FYAI_BRIDGE_PORT` pins the port
-when something else, such as a browser, has to reach the same bridge.
-
-The bridge stops with the app: the window tells it to quit, and it also
-watches the app's process and its standard input, so an app that is killed
-rather than closed still leaves nothing behind. A turn that is running when
-that happens is stopped too, with the tools it started.
-
-### Open the macOS app
-
-`scripts/package.sh` signs the macOS app ad hoc, so that its signature verifies.
-Without that step the packager leaves a signature that no longer matches the
-bundle, and macOS reports a downloaded app as damaged. An ad hoc signature is
-not a Developer ID, and the app is not notarized, so the first start of a
-downloaded app is refused with a message that the developer cannot be
-verified. Open it with a right click and Open, or with System Settings,
-Privacy & Security, Open Anyway, or remove the quarantine mark:
-
-```sh
-xattr -dr com.apple.quarantine fyai.app
-```
-
-### Bundle it with fyai
-
-`scripts/package.sh` writes a self-contained app to `dist-app/fyai-linux-<arch>/`.
-With a standalone fyai in `fyai-bundle/fyai` it travels inside the bundle and
-the app looks for it before the project build and `PATH`:
-
-```sh
-scripts/package.sh --bundle-fyai   # build a portable fyai first
-scripts/package.sh                 # package the page as it stands
-```
-
-`scripts/bundle-fyai.sh` makes that binary for the platform that runs it. The
-default mode is `mostly`: the fyai dependencies are static and only the system
-libraries are needed (libSystem and the frameworks on macOS, the glibc on
-Linux). It runs `scripts/build-static-native.sh` of the fyai repository, the
-build that the release workflow and the Docker image also use. `--mode musl`
-gives a fully static Linux binary for a musl or an older machine, built with
-Docker.
-
-```sh
-scripts/bundle-fyai.sh                 # native build, mode mostly
-scripts/bundle-fyai.sh --mode musl     # fully static, with Docker
-scripts/bundle-fyai.sh --from PATH     # copy a binary you built already
-scripts/bundle-fyai.sh --check         # what a bundle would carry
-```
-
-The build builds the fyai repository above `web/`; set `FYAI_SRC` for another
-checkout. Its files go to `fyai-static-build/` (`FYAI_STATIC_BUILD`).
-
-## Build system
-
-The fyai build has targets for this tree. They build nothing unless you ask
-for them, and `FYAI_WEB=ON` makes the page part of a plain `ninja`:
-
-| Target                 | What it does                          |
-| ---------------------- | ------------------------------------- |
-| `fyai-web-install`     | `npm ci`                              |
-| `fyai-web`             | builds the page into `web/dist`       |
-| `fyai-web-dev`         | the bridge and Vite, for editing      |
-| `fyai-web-test`        | the unit tests                        |
-| `fyai-web-turn`        | one turn against fyai's mock provider |
-| `fyai-desktop`         | opens the desktop window              |
-| `fyai-desktop-package` | `dist-app/`, with a bundled fyai      |
-
-```sh
-ninja -C build fyai-web            # build the page
-ninja -C build fyai-web-test       # its tests
-ctest --test-dir build -R fyai/web-test
-cmake -S . -B build -DFYAI_WEB=ON  # or make it part of the build
-```
-
-The targets never write the source tree, which can be read-only. They link
-`web/` into `<build>/web` (`fyai-web-stage`, which needs `rsync`) and run npm,
-Vite and the packager there. The page is in `<build>/web/dist`, the bundled
-fyai in `<build>/web/fyai-bundle`, and the app in `<build>/web/dist-app`. Files are
-hard links to the source when both are on one filesystem, else copies. The
-links are made again by each target, so an edit of `web/` takes on the next
-build, and `fyai-web-dev` serves the copy: restart it after an edit.
-
-The unit tests are registered with CTest only when `FYAI_WEB=ON`, and they
-carry the label `web`, so a C-only run stays quick:
-`ctest --test-dir build -LE web`.
-
-With `FYAI_WEB=ON`, `make install` also installs the built page and the
-bridge under `share/fyai/web`, and a `fyai-web` launcher in `bin`. The launcher
-serves the page on `http://127.0.0.1:9331` and runs fyai in the current
-directory; it needs only `node` at run time. The page needs node 20 or later
-to build: with an older node, `FYAI_WEB=ON` leaves the page out and says so.
-Build first and install second (`make && sudo make install`): the page and
-`node_modules` are rebuilt only when a source is newer, so an up-to-date build
-runs no `npm` as root. When `npm` does run, it runs with the node that
-configured the build in front of the `PATH`, whatever `PATH` a root shell has.
-
-`FYAI_DESKTOP=ON` (Linux, with `FYAI_WEB=ON`) also packages the desktop app
-and installs it under `share/fyai/desktop`, with a `fyai-desktop` launcher, a
-menu entry and an icon. The app is about 350 MB and `npm` downloads Electron
-to build it. It carries no fyai: the launcher points it at the fyai installed
-beside it. `chrome-sandbox` is installed setuid root, as Electron expects
-where the kernel gives a user no namespace of its own. The macOS app is built
-by `fyai-desktop-package` and the release workflow, and is not installed.
-
-## Bridge options
-
-| Option              | Environment                   | Default             | Meaning                                 |
-| ------------------- | ----------------------------- | ------------------- | --------------------------------------- |
-| `--port`            | `FYAI_BRIDGE_PORT`            | `9331`              | listen port; 0 picks a free one         |
-| `--host`            | `FYAI_BRIDGE_HOST`            | `127.0.0.1`         | listen address                          |
-| `--bin`             | `FYAI_BIN`                    | `fyai`              | the fyai program (`--fyai` on a script) |
-| `--cwd`             | `FYAI_BRIDGE_CWD`             | current directory   | project fyai works in                   |
-| `--model`           | `FYAI_BRIDGE_MODEL`           |                     | default model of a session              |
-| `--parent-pid`      | `FYAI_BRIDGE_PARENT_PID`      |                     | stop when this process stops            |
-| `--permission-mode` | `FYAI_PERMISSION_MODE`        | `bypassPermissions` | how fyai decides on tool calls          |
-| `--extra-arg`       | `FYAI_BRIDGE_ARGS`            |                     | extra arguments for `fyai claude-sdk`   |
-| `--turn-timeout-ms` | `FYAI_BRIDGE_TURN_TIMEOUT_MS` | `0`                 | stop a turn after this; 0 is no limit   |
-| `--static`          | `FYAI_BRIDGE_STATIC`          | `dist`              | built page to serve                     |
-| `--verbose`         | `FYAI_BRIDGE_VERBOSE`         | off                 | log each process and request            |
-
-The bridge listens on loopback only by default. It runs tools in the project
-without asking, so do not bind it to a public address.
-
-## How a turn becomes a page
-
-| SDK frame                            | Shown as                                    |
-| ------------------------------------ | ------------------------------------------- |
-| `system`/`init`                      | the model name and the tool list            |
-| `stream_event` `content_block_delta` | assistant text, appended live               |
-| `assistant` with `text`              | the finished assistant message              |
-| `assistant` with `tool_use`          | a tool call card                            |
-| `user` with `tool_result`            | the result of that card                     |
-| `result`                             | token counts, cost, and the end of the turn |
-
-fyai runs the whole tool loop of a turn itself, so one HTTP response carries
-several assistant messages. Each becomes its own chat message, and the tool
-results sit between them, which is why the page does not run an agent loop of
-its own.
-
-## Provider keys
-
-fyai reads a key from its own configuration, its environment, or the secret
-store. The page adds a fourth source, in its settings:
-
-- **API Key**: one key, for the provider of the model the conversation uses.
-  The bridge asks fyai which provider that is (`fyai model --output json`) and
-  sets `<PROVIDER>_API_KEY` for the turn.
-- **Provider API keys**: one `provider = key` a line, for several providers at
-  once. The provider name is the catalogue's, lower case:
-
-  ```text
-  anthropic = sk-ant-...
-  openai = sk-...
-  openrouter = sk-or-...
-  ```
-
-The bridge puts each key in the environment of the fyai process it starts, as
-`<PROVIDER>_API_KEY`, so a conversation keeps working when you switch model to
-another provider. A key already in the environment of the bridge is replaced
-by the one from the page, and a provider the page does not name keeps
-whatever fyai's own configuration or environment gives it.
-
-The keys are stored in the browser (its local storage, on your machine) and
-sent with each turn; the bridge keeps them for the length of the process it
-starts and writes them nowhere. The settings field is a password field, so the
-value is not shown on the screen.
-
-## Slash commands
-
-fyai's `claude-sdk` sends a `/` line to the model as text, except `/clear`.
-This page therefore runs a command itself, as an fyai verb on the
-conversation's session branch. It keeps no list of commands: the bridge reads
-them from `fyai schema commands --output json` and serves them at
-`/api/fyai/commands`, and the `/` picker of the page offers that list. A
-command qualifies when it exists both as a verb and as a slash command and
-needs no terminal. `/model` and `/cwd` keep the pickers of the page, and
-`/clear` starts a new conversation, which is a new fyai session.
-
-The output arrives as one fenced block in a message row, so a table keeps its
-columns. A command runs as a child process with the words as argv; no shell
-sees them. Anything else that starts with `/` is answered as unknown and does
-not reach the model. An fyai without `schema` exports no commands, and the
-page then serves none of them.
-
-## What is not wired yet
-
-- **Permissions**: `can_use_tool` round-trips are not shown. The bridge
-  starts fyai with `--permission-mode bypassPermissions` by default; choose
-  `default` to deny every call that no rule allows, or `acceptEdits`.
-- **Images and audio**: the composer accepts them, but only text and text
-  files reach the model. fyai media attachments (`@PATH`, `--image`) are not
-  mapped yet.
-- **Working directory per conversation**: the bridge runs every session in
-  one directory, given by `--cwd`.
-- **Regenerate and edit**: fyai appends to the stored session, so a
-  regenerated answer continues the conversation instead of replacing the
-  last turn. Use `/clear` or a new chat for a fresh session.
-- **Resume after reload**: the page keeps its own conversation store; a turn
-  in flight is not reattached.
-- **Keys of an MCP server**: only provider keys travel from the page. An MCP
-  server that needs a token takes it from the fyai configuration.
-
-## Test a turn
-
-These need no provider key: they run fyai against its mock provider.
-
-`server/test-turn.sh` starts the mock and the bridge, then sends one turn and
-prints the frames. A prompt of `-` starts them without a turn.
-
-```sh
-bash server/test-turn.sh chat_stream.json "hello" conv-1
-bash server/test-turn.sh chat_stream.json -
-```
-
-`server/e2e.mjs` drives the built page in Chrome and waits for the answer:
-
-```sh
-node server/e2e.mjs http://127.0.0.1:9331 "hello" "Streaming hello from the mock."
-```
-
-Arguments come in pairs of what to type and the text that must appear, so a
-conversation is two pairs:
-
-```sh
-node server/e2e.mjs http://127.0.0.1:9331 "first" "Alpha beta." "second" "Gamma."
-```
-
-`server/e2e-key.mjs` puts a key in the page's settings the way a person does
-and checks that the turn is answered. It needs a real key and a real project:
-
-```sh
-KEY=sk-ant-... node server/e2e-key.mjs http://127.0.0.1:9331 1   # Provider API keys
-KEY=sk-ant-... node server/e2e-key.mjs http://127.0.0.1:9331 0   # API Key
-```
-
-The unit tests cover the frame assembly, the prompt and the bridge's
-decisions:
-
-```sh
-npx vitest --project=unit --run
-```
-
-## Layout
+Llama UI follows a layered architecture with unidirectional data flow:
 
 ```text
-web/
-├── scripts/run.sh           build and serve the page
-├── scripts/dev.sh           bridge and Vite, for editing
-├── server/bridge.mjs        HTTP, SSE, fyai processes, catalogue
-├── server/protocol.mjs      session IDs and slash commands
-├── server/test-turn.sh      one turn against the mock provider
-├── server/e2e.mjs           the built page in Chrome
-├── src/lib/services/fyai.service.ts   turn transport and prompt
-├── src/lib/services/fyai.turn.ts      frames to messages
-├── src/lib/stores/chat/index.svelte.ts  maps frames to messages
-└── src/…                    the fork of the llama.cpp UI
+Routes → Components → Hooks → Stores → Services → Storage/API
 ```
 
-## Upstream
+### High-Level Architecture
 
-The interface is a fork of `tools/ui` in
-[llama.cpp](https://github.com/ggml-org/llama.cpp), MIT licensed. See
-`NOTICE.md`.
+```mermaid
+flowchart TB
+    subgraph Routes["📍 Routes"]
+        R1["/ (Welcome)"]
+        R2["/chat/[id]"]
+        R3["/mcp-servers"]
+        R4["/search"]
+        R5["/settings"]
+        RL["+layout.svelte"]
+    end
+
+    subgraph Components["🧩 Components"]
+        C_Screen["ChatScreen"]
+        C_Form["ChatForm"]
+        C_Messages["ChatMessages"]
+        C_Sidebar["ChatSidebar"]
+        C_Models["ModelsSelector"]
+        C_Settings["ChatSettings"]
+        C_Mcp["McpServers"]
+    end
+
+    subgraph Hooks["🔌 Hooks"]
+        H1["use-chat-screen-active-model"]
+        H2["use-processing-state"]
+        H3["use-context-gauge"]
+        H4["use-models-selector"]
+        H5["use-tools-panel"]
+    end
+
+    subgraph Stores["🗄️ Stores"]
+        S1["chatStore"]
+        S2["conversationsStore"]
+        S3["modelsStore"]
+        S4["mcpStore"]
+        S5["agenticStore"]
+        S6["serverStore"]
+        S7["settingsStore"]
+        S8["toolsStore"]
+    end
+
+    subgraph Services["⚙️ Services"]
+        SV1["ChatService"]
+        SV2["ModelsService"]
+        SV3["PropsService"]
+        SV4["DatabaseService"]
+        SV5["MCPService"]
+        SV6["ToolsService"]
+        SV7["SandboxService"]
+    end
+
+    subgraph Storage["💾 Storage"]
+        ST1["IndexedDB"]
+        ST2["LocalStorage"]
+    end
+
+    subgraph APIs["🌐 llama-server"]
+        API1["/v1/chat/completions"]
+        API2["/props"]
+        API3["/models/*"]
+        API4["/tools"]
+    end
+
+    R1 & R2 --> C_Screen
+    RL --> C_Sidebar
+    C_Screen --> C_Form & C_Messages & C_Settings
+    C_Screen --> H1 & H2 & H3
+    C_Models --> H4
+    C_Mcp --> S4
+    C_Screen --> S1 & S2 & S3
+    C_Models --> S3
+    H1 --> S3
+    S1 --> SV1 & SV4
+    S2 --> SV4
+    S3 --> SV2 & SV3
+    S4 --> SV5
+    S5 --> SV1 & SV5 & SV6 & SV7
+    SV4 --> ST1
+    SV1 --> API1
+    SV2 --> API3
+    SV3 --> API2
+    SV6 --> API4
+```
+
+### Layer Breakdown
+
+#### Routes (`src/routes/`)
+
+- **`/`** - Welcome screen, creates new conversation
+- **`/chat/[id]`** - Active chat interface
+- **`/mcp-servers`** - MCP server management
+- **`/search`** - Conversation search
+- **`/settings`** - Settings (optional `[[section]]`)
+- **`+layout.svelte`** - Sidebar, navigation, global initialization
+
+#### Components (`src/lib/components/`)
+
+Components are organized in `app/` (application-specific) and `ui/` (shadcn-svelte primitives).
+
+**Chat Components** (`app/chat/`):
+
+| Component          | Responsibility                                                              |
+| ------------------ | --------------------------------------------------------------------------- |
+| `ChatScreen/`      | Main chat container, coordinates message list, input form, and attachments  |
+| `ChatForm/`        | Message input textarea with file upload, paste handling, keyboard shortcuts |
+| `ChatMessages/`    | Message list with branch navigation, regenerate/continue/edit actions       |
+| `ChatAttachments/` | File attachment previews, drag-and-drop, PDF/image/audio handling           |
+| `ChatSettings/`    | Parameter sliders (temperature, top-p, etc.) with server default sync       |
+| `ChatSidebar/`     | Conversation list, search, import/export, navigation                        |
+
+**Dialog Components** (`app/dialogs/`):
+
+| Component                      | Responsibility                                           |
+| ------------------------------ | -------------------------------------------------------- |
+| `DialogChatSettings`           | Full-screen settings configuration                       |
+| `DialogManageModels`           | Models manager: browse, load, download and delete models |
+| `DialogModelInformation`       | Model details (context size, modalities, parallel slots) |
+| `DialogChatAttachmentsPreview` | Full preview for images, PDFs (text or page view), code  |
+| `DialogConfirmation`           | Generic confirmation for destructive actions             |
+| `DialogConversationRename`     | Edit conversation title                                  |
+
+**Server/Model Components** (`app/server/`, `app/models/`):
+
+| Component                           | Responsibility                                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ServerErrorSplash`                 | Error display when server is unreachable                                                                      |
+| `ModelsSelector/`                   | Model dropdown and mobile sheet: favorites, loaded and local sections, rows windowed and folded into families |
+| `ModelsManager/`                    | Models manager table and model pane: sections, filters, sorting, quants folded per repo, downloads            |
+| `ModelAvatar`                       | Org avatar of a model, with the quantizer badge; follows the family grouping of the list                      |
+| `ModelId`, `ModelBadge`             | Model name, aliases, tags, quantization and draft sidecar badges                                              |
+| `ModelContext`, `ModelCapabilities` | Context window and capability icons, filled from the Hub when it is enabled                                   |
+
+**Shared UI Components** (`app/misc/`):
+
+| Component                                 | Responsibility                                                          |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| `MarkdownContent`                         | Markdown rendering with KaTeX, syntax highlighting, copy buttons        |
+| `SyntaxHighlightedCode`                   | Code blocks with language detection and highlighting                    |
+| `ActionIcon`, `DropdownMenuActions`       | Reusable action button and action menu                                  |
+| `BadgesModality`, `BadgeInfo`             | Status and capability badges                                            |
+| `CollapsibleSection`, `CollapsibleRegion` | Section header with a trigger that expands in place                     |
+| `GroupedList`                             | Grouped rows with foldable groups, per-group windows and show-more rows |
+| `ScrollCarousel`, `TruncatedText`         | Horizontal scroll strip and single-line truncation with tooltip         |
+
+#### Hooks (`src/lib/hooks/`)
+
+Hooks are the thin view-layer between components and stores: they own UI concerns (scroll, drag-and-drop, keyboard shortcuts, pickers, selection) and translate store state into view state.
+
+| Hook                            | Responsibility                                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `use-chat-screen-active-model`  | Active model resolution + modality capability detection                                         |
+| `use-processing-state`          | View over `chatStore.processing` for streaming progress/tokens                                  |
+| `use-context-gauge`             | View over `contextStatsStore` for the context usage gauge                                       |
+| `use-models-selector`           | Model selector state: hidden models, family grouping, windowed rows, selection and load on pick |
+| `use-tools-panel`               | Tools panel state                                                                               |
+| `use-reasoning-menu`            | Reasoning-effort menu state                                                                     |
+| `use-attachment-menu`           | Attachment menu + modality flags                                                                |
+| `use-draft-messages`            | Per-chat draft message/files persistence                                                        |
+| `use-chat-form-pickers`         | Chat form pickers (commands, mentions)                                                          |
+| `use-debounced-search`          | Shared debounced async search for pickers                                                       |
+| `use-picker-navigation`         | Picker keyboard navigation                                                                      |
+| `use-chat-message-edit-context` | Message edit context (content + extras)                                                         |
+| `use-chat-screen-drag-and-drop` | Drag-and-drop state machine                                                                     |
+| `use-chat-screen-file-upload`   | File upload queue + capability validation                                                       |
+| `use-chat-screen-scroll`        | Scroll container binding + navigation guard                                                     |
+| `use-auto-scroll`               | Auto-scroll controller for streaming                                                            |
+| `use-marquee-selection`         | Shift+click / marquee range selection                                                           |
+| `use-keyboard-shortcuts`        | Global keyboard shortcuts                                                                       |
+| `use-settings-navigation`       | Settings section navigation                                                                     |
+| `use-pwa`                       | PWA install/update + version mismatch detection                                                 |
+
+#### Stores (`src/lib/stores/`)
+
+Stores own reactive application state as Svelte 5 runes. Larger stores are split into directories and compose focused sub-stores behind a narrow host interface (see Architectural Patterns).
+
+| Store                | Responsibility                                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `chatStore`          | Chat lifecycle, streaming, abort control, error handling; composes `processing`, `activity`, `streams`, `flows`                           |
+| `conversationsStore` | Conversation CRUD, message branching, navigation, import/export; composes `preferences`                                                   |
+| `modelsStore`        | Model list, selection, loading/unloading (ROUTER), recent picks, favorites, hidden models and list open state; composes `props`, `status` |
+| `mcpStore`           | MCP host role: multi-server lifecycle, tool routing, server icons; composes `health`, `resources`                                         |
+| `agenticStore`       | Multi-turn agentic loop orchestration, tool execution; composes `gates`                                                                   |
+| `serverStore`        | Server connection state, `/props`, role detection, modalities                                                                             |
+| `settingsStore`      | User preferences, theme, parameter sync with server defaults                                                                              |
+| `toolsStore`         | Tool registry: server + MCP tools, enabled set for the LLM                                                                                |
+| `permissionsStore`   | Persisted tool permission grants                                                                                                          |
+| `contextStatsStore`  | Context window usage for the active conversation                                                                                          |
+| `draftMessagesStore` | Per-chat draft message/files                                                                                                              |
+| `deviceStore`        | Browser environment signals (mobile, OS, theme)                                                                                           |
+| `versionStore`       | Build version information                                                                                                                 |
+
+#### Services (`src/lib/services/`)
+
+Services are a stateless protocol layer: static methods, pure I/O, no reactive state. Stores consume them for all API and storage access.
+
+| Service                       | Responsibility                                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `ChatService`                 | `/v1/chat/completions` streaming + SSE parsing, message format conversion                                                     |
+| `ModelsService`               | `/models`, `/models/load`, `/models/unload`                                                                                   |
+| `PropsService`                | `/props`, `/props?model=`                                                                                                     |
+| `HuggingFaceService`          | Hugging Face Hub metadata: model details, avatars, README and file tree, cached per repo and off unless the Hub setting is on |
+| `DatabaseService`             | IndexedDB operations via Dexie                                                                                                |
+| `MCPService`                  | MCP protocol: transports, connect, list/execute tools, prompts, resources                                                     |
+| `ToolsService`                | Server tool list/execute/stream (`/tools`)                                                                                    |
+| `SandboxService`              | Browser JS execution in a sandboxed worker                                                                                    |
+| `ParameterSyncService`        | Syncs settings with server defaults                                                                                           |
+| `ConversationTransferService` | Conversation import/export JSONL + ZIP format                                                                                 |
+| `MigrationService`            | Non-destructive localStorage/IndexedDB migrations                                                                             |
+| `RouterService`               | Dynamic route URL construction                                                                                                |
+
+---
+
+## Data Flows
+
+### MODEL Mode (Single Model)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI
+    participant Stores
+    participant DB as IndexedDB
+    participant API as llama-server
+
+    Note over User,API: Initialization
+    UI->>Stores: initStores() (awaited by route loads)
+    Stores->>Stores: run migrations
+    Stores->>DB: load conversations (background)
+    Stores->>API: GET /props
+    API-->>Stores: server config
+    Stores->>API: GET /v1/models
+    API-->>Stores: single model (auto-selected)
+
+    Note over User,API: Chat Flow
+    User->>UI: send message
+    Stores->>DB: save user message
+    Stores->>API: POST /v1/chat/completions (stream)
+    loop streaming
+        API-->>Stores: SSE chunks
+        Stores-->>UI: reactive update
+    end
+    Stores->>DB: save assistant message
+```
+
+### ROUTER Mode (Multi-Model)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI
+    participant Stores
+    participant API as llama-server
+
+    Note over User,API: Initialization
+    Stores->>API: GET /props
+    API-->>Stores: {role: "router"}
+    Stores->>API: GET /models
+    API-->>Stores: models[] with status
+
+    Note over User,API: Model Selection
+    User->>UI: select model
+    alt model not loaded
+        Stores->>API: POST /models/load
+        loop poll status
+            Stores->>API: GET /models
+        end
+        Stores->>API: GET /props?model=X
+    end
+    Stores->>Stores: validate modalities
+
+    Note over User,API: Chat Flow
+    Stores->>API: POST /v1/chat/completions {model: X}
+    loop streaming
+        API-->>Stores: SSE chunks + model info
+    end
+```
+
+---
+
+## Architectural Patterns
+
+### 1. Reactive State with Svelte 5 Runes
+
+All stores use Svelte 5's fine-grained reactivity:
+
+```typescript
+// Store with reactive state
+class ChatStore {
+	#isLoading = $state(false);
+	#currentResponse = $state('');
+
+	// Derived values auto-update
+	get isStreaming() {
+		return $derived(this.#isLoading && this.#currentResponse.length > 0);
+	}
+}
+
+// Exported reactive accessors
+export const isLoading = () => chatStore.isLoading;
+export const currentResponse = () => chatStore.currentResponse;
+```
+
+### 2. Unidirectional Data Flow
+
+Data flows in one direction, making state predictable:
+
+```mermaid
+flowchart LR
+    subgraph UI["UI Layer"]
+        A[User Action] --> B[Component]
+    end
+
+    subgraph State["State Layer"]
+        B --> C[Store Method]
+        C --> D[State Update]
+    end
+
+    subgraph IO["I/O Layer"]
+        C --> E[Service]
+        E --> F[API / IndexedDB]
+        F -.->|Response| D
+    end
+
+    D -->|Reactive| B
+```
+
+Components dispatch actions to stores, stores coordinate with services for I/O, and state updates reactively propagate back to the UI.
+
+### 3. Per-Conversation State
+
+Enables concurrent streaming across multiple conversations. Loading is tracked
+per conversation by the activity ledger (`chatStore.activity`), while streaming
+state and abort controllers live in per-conversation maps:
+
+```typescript
+class ChatStore {
+	chatStreamingStates = new SvelteMap<string, { response: string; messageId: string }>();
+	abortControllers = new SvelteMap<string, AbortController>();
+}
+```
+
+### 4. Message Branching with Tree Structure
+
+Conversations are stored as a tree, not a linear list:
+
+```typescript
+interface DatabaseMessage {
+	id: string;
+	parent: string | null; // Points to parent message
+	children: string[]; // List of child message IDs
+	// ...
+}
+
+interface DatabaseConversation {
+	currentNode: string; // Currently viewed branch tip
+	// ...
+}
+```
+
+Navigation between branches updates `currentNode` without losing history.
+
+### 5. Layered Service Architecture
+
+Stores handle state; services handle I/O:
+
+```text
+┌─────────────────┐
+│     Stores      │  Business logic, state management
+├─────────────────┤
+│    Services     │  API calls, database operations
+├─────────────────┤
+│   Storage/API   │  IndexedDB, LocalStorage, HTTP
+└─────────────────┘
+```
+
+### 6. Server Role Abstraction
+
+Single codebase handles both MODEL and ROUTER modes:
+
+```typescript
+// serverStore.ts
+get isRouterMode() {
+  return this.role === ServerRole.ROUTER;
+}
+
+// Components conditionally render based on mode
+{#if isRouterMode()}
+  <ModelsSelector />
+{/if}
+```
+
+### 7. Modality Validation
+
+Prevents sending attachments to incompatible models. The
+`use-chat-screen-active-model` hook derives the active model's capabilities
+from `modelsStore.props`:
+
+```typescript
+// use-chat-screen-active-model hook
+const hasVisionModality = $derived.by(() => modelsStore.props.modelSupportsVision(activeModelId));
+const hasAudioModality = $derived.by(() => modelsStore.props.modelSupportsAudio(activeModelId));
+```
+
+### 8. Persistent Storage Strategy
+
+Data is persisted across sessions using two storage mechanisms:
+
+```mermaid
+flowchart TB
+    subgraph Browser["Browser Storage"]
+        subgraph IDB["IndexedDB (Dexie)"]
+            C[Conversations]
+            M[Messages]
+        end
+        subgraph LS["LocalStorage"]
+            S[Settings Config]
+            O[User Overrides]
+            T[Theme Preference]
+        end
+    end
+
+    subgraph Stores["Svelte Stores"]
+        CS[conversationsStore] --> C
+        CS --> M
+        SS[settingsStore] --> S
+        SS --> O
+        SS --> T
+    end
+```
+
+- **IndexedDB**: Conversations and messages (large, structured data)
+- **LocalStorage**: Settings, user parameter overrides, theme, model favorites, recent picks, hidden models and model list open state (small key-value data)
+- **Memory only**: Server props, model list (fetched fresh on each session), Hugging Face Hub details (cached per repo for the session)
+
+### 9. Remote Assets Under Cross-Origin Isolation
+
+llama-server serves the UI with `Cross-Origin-Embedder-Policy: require-corp` and `Cross-Origin-Opener-Policy: same-origin`, so a cross-origin subresource has to be allowed by the target origin. The UI handles that per asset kind:
+
+- **Hub avatars** are requested in CORS mode (`crossorigin="anonymous"`), which the Hub allows
+- **Hub metadata** is fetched with `fetch()`, which is a CORS request by default, and only while the Hub setting is on
+- **MCP server icons and web-search result favicons** have no CORS guarantee, so they go through the server's `/cors-proxy` when the user started llama-server with `--ui-mcp-proxy`; without it they fall back to the bundled glyph
+- **Per-row Hub lookups** wait until the row is near the viewport (the `nearViewport` action), so a long model list does not fire one request per row on mount
+
+---
+
+## Testing
+
+### Test Types
+
+| Type          | Tool               | Location         | Command             |
+| ------------- | ------------------ | ---------------- | ------------------- |
+| **Unit**      | Vitest             | `tests/unit/`    | `npm run test:unit` |
+| **UI/Visual** | Storybook + Vitest | `tests/stories/` | `npm run test:ui`   |
+| **E2E**       | Playwright         | `tests/e2e/`     | `npm run test:e2e`  |
+| **Client**    | Vitest             | `tests/client/`. | `npm run test:unit` |
+
+### Running Tests
+
+```bash
+# All tests
+npm run test
+
+# Individual test suites
+npm run test:e2e      # End-to-end (requires llama-server)
+npm run test:client   # Client-side unit tests
+npm run test:server   # Server-side unit tests
+npm run test:ui       # Storybook visual tests
+```
+
+### Storybook Development
+
+```bash
+npm run storybook     # Start Storybook dev server on :6006
+npm run build-storybook  # Build static Storybook
+```
+
+### Linting and Formatting
+
+```bash
+npm run lint          # Check code style
+npm run format        # Auto-format with Prettier
+npm run check         # TypeScript type checking
+```
+
+---
+
+## Project Structure
+
+```text
+tools/ui/
+├── src/
+│   ├── lib/
+│   │   ├── components/   # UI components (app/, ui/)
+│   │   ├── hooks/        # Svelte hooks
+│   │   ├── stores/       # State management
+│   │   ├── services/     # API and database services
+│   │   ├── types/        # TypeScript interfaces
+│   │   └── utils/        # Utility functions
+│   ├── routes/           # SvelteKit routes
+│   └── styles/           # Global styles
+├── static/               # Static assets
+├── tests/                # Test files
+└── .storybook/           # Storybook configuration
+```
+
+---
+
+## Related Documentation
+
+- [llama.cpp Server README](../server/README.md) - Full server documentation
+- [Multimodal Documentation](../../docs/multimodal.md) - Image and audio support
+- [Function Calling](../../docs/function-calling.md) - Tool use capabilities

@@ -40,10 +40,3 @@ storybook-static
 # Vitest browser mode failure artifacts
 .vitest-attachments/
 tests/**/__screenshots__/
-
-# The desktop bundle: built output, the fyai copied into it, and the
-# archives of a release run
-dist-app
-fyai-bundle
-fyai-static-build
-fyai-app-*

@@ -38,19 +38,6 @@ const MAX_GROUP_OPEN_ENTRIES = 200;
  */
 const HUB_WARM_LIMIT = 12;
 
-/**
- * A model name as it compares to another one: without a provider prefix, in
- * one case, and without the punctuation that fyai and the catalogue spell
- * differently (`claude-haiku-5-5` is `claude-haiku-5.5`). A `:tag` suffix is
- * kept, so `gpt-oss-120b` and `gpt-oss-120b:batch` stay apart.
- */
-function modelKey(name: string): string {
-	const text = `${name ?? ''}`.trim().toLowerCase();
-	const bare = text.slice(text.lastIndexOf('/') + 1);
-
-	return bare.replace(/[^a-z0-9:]/g, '');
-}
-
 /** Models kept out of the selector. */
 function loadHiddenModels(): Set<string> {
 	if (!browser) return new SvelteSet<string>();
@@ -326,20 +313,10 @@ class ModelsStore implements ModelPropsHost, ModelStatusHost {
 	}
 
 	findModelByName(modelName: string): ModelOption | null {
-		const exact = this.models.find(
-			(model) =>
-				model.model === modelName || model.id === modelName || model.aliases?.includes(modelName)
-		);
-
-		if (exact) return exact;
-
-		const key = modelKey(modelName);
-
-		if (!key) return null;
-
 		return (
-			this.models.find((model) =>
-				[model.model, model.id, ...(model.aliases ?? [])].some((name) => modelKey(name) === key)
+			this.models.find(
+				(model) =>
+					model.model === modelName || model.id === modelName || model.aliases?.includes(modelName)
 			) ?? null
 		);
 	}
