@@ -335,7 +335,7 @@ classes.
 | Context gauge                              | `prompt_n` is the input of the whole tool loop, and the usage is not stored with the message. |
 | Conversation import and export             | moves database rows only. An imported conversation has no fyai session.                   |
 | Search (`routes/search`)                   | searches IndexedDB, not the branches.                                                     |
-| Images, audio and video                    | the composer takes them; the prompt drops them without a message.                         |
+| Audio and video                            | the composer takes them; fyai takes images and text files only, so the page says so (W8). |
 
 ### Defects in the current tree
 
@@ -506,9 +506,23 @@ dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
   which the page shows nowhere, and `input_json_delta`, so a call shows only
   when its message is complete.
 
-**W8. Attachments.** Send images as SDK `image` content blocks. fyai stores them
-as media parts (`doc/media.md`). An unsupported kind gets a message, not a
-silent drop.
+**W8. Attachments.** Done, and not checked in a browser.
+
+- An image of the last user message goes to the bridge as base64 with its
+  type, and the bridge makes it an `image` block of the user message, as the
+  Claude Agent SDK does. This needed support in fyai: the SDK front took the
+  text blocks only and left the others out (`doc/claude-sdk-compat.md`). It
+  now attaches each image block to its message, so the session stores the
+  bytes and the request carries them in the form of the API.
+- A message of images alone is a prompt. The types are PNG, JPEG, GIF and
+  WebP; the bridge refuses another type and data that is not base64.
+- Text files and PDFs go as text, as before. Audio and video are refused with
+  a message, not dropped.
+- The anchor of W5 is the text of the message, so an edit or a regenerate of a
+  message that has images finds its place by the text alone.
+- Open: the images of a stored message are not restored when the page makes
+  its copy from fyai (W4), and the page does not check the image modality of
+  the model; fyai refuses an image for a model that takes none.
 
 **W9. A working directory for each conversation.** The desktop app has the project choice (one window for each project). The per-request `cwd` of the bridge is open. The directory of a session
 is `cwd` in the branch store. The bridge runs each turn in the directory of its

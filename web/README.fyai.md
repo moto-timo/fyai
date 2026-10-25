@@ -341,9 +341,10 @@ page then serves none of them.
   and the page shows no prompt. The page does not show the profile yet; run
   `/session lockdown` or `/sandbox on` (when the command picker lists them),
   or `fyai sandbox` in the project, to change it.
-- **Images and audio**: the composer accepts them, but only text and text
-  files reach the model. fyai media attachments (`@PATH`, `--image`) are not
-  mapped yet.
+- **Audio and video**: the composer accepts them, but fyai takes images (PNG,
+  JPEG, GIF, WebP) and text files only, so the page refuses the message and
+  says so. An image reaches a model that takes images; for any other model
+  fyai refuses it with its cause.
 - **Working directory per conversation**: the bridge runs every session in
   one directory, given by `--cwd`.
 - **Regenerate and edit**: fyai appends to the stored session, so a
