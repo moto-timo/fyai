@@ -1,0 +1,446 @@
+# fyai web
+
+Status: implemented in part. The sections "Architecture", "Changes on top of
+llama.cpp" and "Upstream surface that remains" describe the tree as it is.
+The sections after them are a plan.
+
+Related design: `doc/remote-sessions-sdd.md` (the session protocol that the
+page will use), `doc/claude-sdk-compat.md` (the protocol that the page uses
+now), `web/README.md` (how to build, run and package the page).
+
+## Purpose
+
+fyai web is a browser and desktop interface for fyai. It is a fork of the web
+UI of llama.cpp (`tools/ui`, MIT license, `web/NOTICE.md`). The fork supplies
+the chat shell, the streaming Markdown renderer, the attachments, the
+conversation list and the PWA assets. fyai supplies the model, the tools, the
+conversation state and the branches.
+
+This document records:
+
+1. what the fork is and how it talks to fyai;
+2. what fyai changed on top of the upstream tree;
+3. which upstream parts still remain, and how each fits fyai;
+4. what to change so that the page matches the model of fyai; and
+5. how the fork stays a clean patch series on top of upstream.
+
+`web/README.md` is the operator manual. This document is the design.
+
+## Terms
+
+- **Page**: the SvelteKit single-page application in `web/src`, built into
+  `web/dist`. It is installable as a PWA.
+- **Bridge**: `web/server/bridge.mjs`, a Node program with no dependencies. It
+  serves the page and runs fyai.
+- **Desktop app**: `web/electron/main.cjs`, an Electron window that runs the
+  bridge as a child and loads the page from it.
+- **Backend**: the server that the page talks to. Upstream, this is
+  llama-server. In fyai web, it is the bridge.
+- **Upstream**: the llama.cpp `tools/ui` tree, imported at commit d7ac555e.
+
+## Architecture
+
+```text
+browser or Electron window (SvelteKit SPA, PWA)
+        │  POST /api/fyai/chat        SSE: SDK frames and bridge/* frames
+        │  GET  /api/fyai/commands    slash commands from fyai schema
+        │  GET  /v1/models, /props, /slots, /models/sse   router emulation
+        ▼
+bridge (web/server/bridge.mjs)
+        │  one process for each turn; stdin/stdout JSON lines
+        ▼
+fyai claude-sdk --session-id|--resume ID   ──►  branch sdk/<conversation-id>
+```
+
+### The bridge
+
+The bridge holds no conversation state. A turn starts one `fyai claude-sdk`
+process (`spawnTurn`, `bridge.mjs:292`). The arguments are
+`--input-format stream-json --output-format stream-json --verbose
+--include-partial-messages --permission-mode M`, and `--session-id ID` for a
+new conversation or `--resume ID` after it. The bridge writes one `user` frame,
+forwards each output frame to the page, and closes standard input when the
+`result` frame arrives. It does not answer a `control_request` frame.
+
+The session ID is the conversation ID of the page (`sessionIdFor`,
+`protocol.mjs:70`). fyai stores the conversation in branch
+`sdk/<conversation-id>` (`SDK_BRANCH_PREFIX`, `protocol.mjs:9`). Thus a turn
+sends only the new message, and a conversation survives a restart of the
+bridge.
+
+If fyai reports that the session does not exist, the bridge tries again with
+`--session-id`. If fyai reports that it exists, the bridge tries again with
+`--resume` (`bridge.mjs:913-934`). An aborted request stops the child.
+
+| Endpoint                       | Handler                     | Result                                                           |
+| ------------------------------ | --------------------------- | ---------------------------------------------------------------- |
+| `POST /api/fyai/chat`          | `handleChat`, :804          | SSE of SDK frames between `bridge/start` and `bridge/done`       |
+| `GET /api/fyai/commands`       | `listCommands`, :457        | the commands of `fyai schema commands`, cached for 60 s          |
+| `GET /api/fyai/info`           | :1014                       | the binary, directory, model, permission mode (no caller)        |
+| `GET /v1/models`               | `modelsPayload`, :702       | the catalogue in the shape of a llama.cpp router                 |
+| `GET /props`                   | `propsPayload`, :730        | a router `props`; `n_ctx` from the catalogue                     |
+| `GET /models/sse`, `POST /models/load\|unload` | :1052, :1061 | a status map in memory; fyai has no load step             |
+| `GET /slots`, `GET /tools`, `GET /v1/streams/lookup` | :1089-1106 | constant empty answers                                  |
+| `/v1/chat/completions`         | :1112                       | 501                                                              |
+| other paths                    | `serveStatic`, :956         | the built page, with a fallback to `index.html`                  |
+
+A prompt that starts with `/` does not go to the model. The bridge runs it as
+an fyai verb on the branch of the conversation (`runSlashCommand`, :515), with
+the words as `argv` and no shell (`slashCommandArgs`, `protocol.mjs:106`). The
+output arrives as one `bridge/command` frame, in a text fence.
+
+The page sends provider keys with each turn. The bridge puts each key in the
+environment of the child as `<PROVIDER>_API_KEY` (`turnEnv`, :612). The bridge
+writes no key to a file.
+
+### The desktop app
+
+`electron/main.cjs` finds fyai in `FYAI_BIN`, then in `resources/fyai` of the
+bundle, then in the build tree, then on `PATH`. It selects the project
+directory: `FYAI_BRIDGE_CWD`, else the start directory, else a directory under
+the data directory of the platform. It runs `fyai init` where no arena exists.
+
+The app starts the bridge with `ELECTRON_RUN_AS_NODE=1`, `--port 0` and
+`--parent-pid`, and reads the address from the `listening on` line of its
+standard error. The window has context isolation, no Node integration, no
+preload script and no IPC. The bridge stops with the app.
+
+## Changes on top of llama.cpp
+
+`git diff d7ac555e HEAD -- web/` holds the complete delta.
+
+### Transport
+
+| Change                                   | Files                                                  |
+| ---------------------------------------- | ------------------------------------------------------ |
+| Turn transport over SSE from the bridge  | `src/lib/services/fyai.service.ts` (new)               |
+| SDK frames to chat messages              | `src/lib/services/fyai.turn.ts` (new)                  |
+| The chat store runs fyai turns           | `src/lib/stores/chat/index.svelte.ts`                  |
+| Bridge and its decisions                 | `server/bridge.mjs`, `server/protocol.mjs` (new)       |
+| Dev proxy to the bridge                  | `vite.config.ts`, `.env.example`                       |
+
+`buildFyaiPrompt` (`fyai.service.ts:194`) sends only the last user message and
+its text attachments. fyai holds the earlier messages. The page sends no
+system message and no sampling parameter.
+
+`FyaiTurnAssembler` (`fyai.turn.ts:64`) maps the frames:
+
+| Frame                                 | Result in the page                                 |
+| ------------------------------------- | -------------------------------------------------- |
+| `system`/`init`                       | the model of the answer                            |
+| `stream_event` `text_delta`           | text added to the open assistant message           |
+| `assistant`                           | the message ends; each `tool_use` becomes a call   |
+| `user` with `tool_result`             | the result row of that call                        |
+| `result`                              | input and output token counts; an error mark       |
+| `bridge/command`                      | one message with the fenced output of the command  |
+| `bridge/error`                        | the turn fails                                     |
+
+Each assistant message after the first becomes a new message row. Thus the
+tool loop of one turn shows as several messages with the results between
+them.
+
+### Chat store
+
+- `runFyaiTurn` (`chat/index.svelte.ts:1349`) runs before the upstream agentic
+  and plain paths, and replaces them for a message with text.
+- `/clear` starts a new conversation and sends nothing (:616).
+- The title is the first line of the first message (:1319). No model request
+  makes a title.
+
+### Models
+
+- The bridge acts as a llama.cpp router. The picker lists the catalogue, and
+  each model reports as loaded.
+- The list holds only the models of a provider that has a key
+  (`fyai catalog list models --available`). With no key, it holds the whole
+  catalogue, so that the user can enter a key.
+- The model of the project is the first row.
+- `modelKey()` (`stores/models/index.svelte.ts:41`) matches a model name
+  without its provider prefix.
+- `/model NAME` selects a model in the page.
+
+### Commands
+
+- `fyaiCommandsStore` (`stores/fyai-commands.svelte.ts`) loads the commands
+  from the bridge one time.
+- `commandsFromSchema` (`protocol.mjs:29`) keeps a command that has the surfaces
+  `cli` and `session` and is not `interactive`.
+- The picker lists them after `prompt`, `cwd` and `model`
+  (`utils/chat-commands.ts`, `hooks/use-chat-form-pickers.svelte.ts`).
+
+### Settings
+
+- **API Key** is the key for the provider of the selected model.
+- **Provider API keys** (new) holds one `provider = key` line for each provider.
+
+### Desktop, packaging and build
+
+| Change                                         | Files                                                   |
+| ---------------------------------------------- | ------------------------------------------------------- |
+| Electron window, bridge child, project choice  | `electron/main.cjs`                                     |
+| Run and edit scripts                           | `scripts/run.sh`, `scripts/dev.sh`, `scripts/desktop.sh`|
+| App packaging, ad hoc macOS signature          | `scripts/package.sh`                                    |
+| Static fyai inside the app                     | `scripts/bundle-fyai.sh`                                |
+| Launchers and menu entry                       | `scripts/fyai-web.in`, `fyai-desktop.in`, `fyai.desktop.in` |
+| CMake targets `fyai-web*`, `fyai-desktop*`     | `cmake/web.cmake`, `CMakeLists.txt` (`FYAI_WEB`, `FYAI_DESKTOP`) |
+| Release of the desktop app                     | `.github/workflows/web-release.yaml`                    |
+| llama-server embedding removed                 | `CMakeLists.txt`, `sources.cmake`, `ui.cpp.in`, `ui.h.in` |
+
+### Tests
+
+| Test                                             | What it checks                                         |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| `tests/unit/fyai-bridge.test.ts`                 | all decisions of `protocol.mjs`                        |
+| `tests/unit/fyai-prompt.test.ts`                 | the prompt and the key lines                           |
+| `tests/unit/fyai-turn.test.ts`                   | frame assembly                                         |
+| `tests/unit/chat-commands.test.ts`               | the fyai commands in the picker                        |
+| `tests/client/chat-form-slash-commands.svelte.test.ts` | `/model NAME`                                    |
+| `server/test-turn.sh`                            | one turn through the bridge against the mock provider  |
+| `server/e2e.mjs`, `e2e-key.mjs`, `e2e-electron.mjs` | the built page and the window, in Chrome            |
+
+CTest runs `npm run test:unit` as `fyai/web-test` when `FYAI_WEB=ON`. The
+bridge handlers, `runFyaiTurn`, the command store and Electron have no unit
+test.
+
+## Upstream surface that remains
+
+The fork keeps most of the upstream tree. Each part is in one of three
+classes.
+
+### Parts that fit fyai
+
+| Part                                   | Files                                                    |
+| -------------------------------------- | -------------------------------------------------------- |
+| Chat screen and streaming Markdown     | `components/app/chat/*`                                  |
+| Tool call cards; an edit diff renderer | `ChatMessageToolCallBlock*.svelte`, `utils/compute-line-diff.ts` |
+| Model picker in router mode            | `components/app/models/ModelsSelector/*`                 |
+| Conversation list and tabs             | `SidebarNavigation/*`, `stores/tabs.svelte.ts`           |
+| Settings dialog                        | `constants/settings.constants.ts`, `SettingsChat/*`      |
+| Text and PDF attachments               | `utils/process-uploaded-files.ts`, `fyai.service.ts`     |
+| Stop                                   | the abort controller; the bridge stops the child         |
+
+### Parts that do nothing against the bridge
+
+| Part                                      | Why                                                        |
+| ----------------------------------------- | ---------------------------------------------------------- |
+| Stream resume (`stores/chat/streams.svelte.ts`) | `/v1/streams/lookup` is empty; `/v1/stream` is 404   |
+| Pre-encode                                | only `onFlowComplete` starts it, and the fyai path does not call it |
+| Continue generation (`flows.svelte.ts`)   | it calls `/v1/chat/completions`, which is 501              |
+| Reasoning budget and reasoning blocks     | no control endpoint; the assembler ignores thinking        |
+| Server tools, `/cwd`, `@` mentions        | `/tools` is empty                                          |
+| Sampling, penalties, parameter sync       | read from a constant `/props`, never sent                  |
+| System message, model titles              | stored or shown, never sent                                |
+| Model load and unload                     | a status map in the bridge; Vite does not forward `/models` |
+| `/health`, `/metrics`, `/build.json`      | not served                                                 |
+| API key splash (`ServerErrorSplash.svelte`) | the bridge never returns 401                             |
+
+### Parts that conflict with fyai
+
+| Part                                       | Conflict                                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Conversation store (`database.service.ts`) | IndexedDB holds the history that the page shows. The branches are not listed. A deleted conversation leaves its branch. A second browser sees no conversation. |
+| Regenerate, edit, message branches         | fyai appends to the session, so the tree of the page and the branch differ. An edit of the first message resumes the old context. |
+| Agentic loop (`stores/agentic/*`)          | a message with no text, such as an image alone, falls through to it and gets a 501.       |
+| MCP client in the browser (`services/mcp.service.ts`) | the browser connects to MCP servers; fyai never gets their tools. `/cors-proxy` is not served. |
+| JavaScript sandbox and browser tools       | listed and switchable; they never run on the fyai path.                                   |
+| Tool store and per-conversation tool choice | built but not sent; the bridge never passes `--tools`.                                  |
+| Permission store and permission card       | fyai never asks the page; the bridge runs `bypassPermissions`.                            |
+| Hugging Face discovery and model manager   | GGUF files, quantizations and downloads have no meaning for fyai.                         |
+| Context gauge                              | `prompt_n` is the input of the whole tool loop, and the usage is not stored with the message. |
+| Conversation import and export             | moves database rows only. An imported conversation has no fyai session.                   |
+| Search (`routes/search`)                   | searches IndexedDB, not the branches.                                                     |
+| Images, audio and video                    | the composer takes them; the prompt drops them without a message.                         |
+
+### Defects in the current tree
+
+- **The bridge has no authentication.** It answers every origin with
+  `access-control-allow-origin: *` (`bridge.mjs:209`, :250, :1007), and the
+  default permission mode is `bypassPermissions`. A web page that the same
+  user opens in any browser can post to `127.0.0.1:9331` and run tools in the
+  project. `--host` puts the same endpoint on the network.
+- The README says that the page shows the tool list of `system/init` and the
+  cost of `result`. It shows neither.
+- The assembler ignores `thinking_delta`, `input_json_delta` and the `is_error`
+  flag of a tool result.
+- The usage of a turn usually arrives after the last message closes, so the
+  token counts are not stored.
+- About 85 upstream unit and client tests cover code that does not run against
+  the bridge. The Storybook project calls `pnpm`.
+
+## Plan
+
+### Rules
+
+1. **fyai is the source of truth.** A conversation is a branch. The page keeps
+   a cache, not a history of its own.
+2. **One build serves both backends.** The page detects the backend at start
+   and enables the fyai parts at run time. The upstream parts stay for
+   llama-server. Nothing upstream is deleted.
+3. **The fork is a patch series.** Each patch is one logical change on a
+   recorded upstream base, and it builds. A patch adds a module or a narrow
+   hook. It does not rewrite an upstream file.
+4. **The page uses a protocol, not a process.** The page talks to an fyai
+   session endpoint (`doc/remote-sessions-sdd.md`). The bridge that starts a
+   process for each turn is a step to that, not the destination.
+5. **The page gets no credential that it does not need.** A provider key that
+   the page holds goes into the environment of one fyai process. It never goes
+   into the arena and never back to a page.
+
+### Work items
+
+Each item states what changes, why, and which fyai interface it uses.
+
+**W1. Secure the bridge.** This item comes first, before any other.
+
+- Generate a token at each start. Serve the page with the token, and accept an
+  API request only with it.
+- Accept only the origin of the bridge. Remove `access-control-allow-origin:
+  *`.
+- Make `default` the default permission mode. Keep `bypassPermissions` as an
+  explicit option.
+- Refuse a non-loopback `--host` without a token.
+
+**W2. Detect the backend at run time.**
+
+- `GET /api/fyai/info` returns `{backend: "fyai", protocol, extensions}`. The
+  page asks it at start. A 404 means llama-server.
+- `src/lib/services/backend/` holds the seam: one interface for a turn, the
+  models, the commands and the conversations, with an upstream implementation
+  and an fyai implementation.
+- A setting can force the backend kind.
+- The fyai parts register through this seam. Upstream files call the seam at
+  a small number of hook points, and `web/NOTICE.md` lists each hook point.
+
+**W3. Gate the llama.cpp surface.** With the fyai backend, hide the parts in
+"Parts that do nothing" and the following parts of "Parts that conflict":
+
+- Hugging Face discovery and the model manager
+- sampling and parameter sync
+- the JavaScript sandbox and browser tools
+- the agentic loop
+- the MCP client in the browser
+
+Keep each part, unchanged, for llama-server. The gate is one predicate,
+`backendIs('fyai')`, at the hook points of W2.
+
+**W4. Conversations are branches.**
+
+- The bridge lists, renames and deletes `sdk/*` branches through fyai verbs
+  with `--output json` (`branch list`, `branch rename`, `branch delete`).
+- The conversation list comes from that list. IndexedDB is a cache that a
+  start refreshes.
+- The history of a conversation comes from the stored transcript (`history
+  --output json`), not from rows that the page wrote.
+- Search asks fyai.
+- Import and export use the textual export of fyai
+  (`doc/textual-export-format.md`), so an imported conversation has a session.
+
+**W5. Edit and regenerate move the branch.**
+
+- Regenerate is `reset <branch>~2` followed by the same prompt.
+- An edit of message N creates a new branch at the state before that message
+  (`checkout -b NAME <branch>~K`), then sends the edited text.
+- The message tree of the page shows the branches that fyai made. It does not
+  hold its own tree.
+
+**W6. Permissions round-trip.**
+
+- Start fyai with `--permission-prompt-tool stdio`. fyai then sends
+  `can_use_tool` (`fyai_claude_sdk.c:1302`).
+- The bridge keeps standard input open after `result`, and forwards a
+  `control_request` to the page.
+- The page answers through a new request, `POST /api/fyai/control`, which the
+  bridge writes to the child as a `control_response`.
+- The existing `ChatMessageActionCardPermissionRequest.svelte` shows the
+  request. Its choices map to `allow`, `deny`, and an "always" rule that the
+  page sends as `updatedPermissions`.
+
+**W7. Tool cards from fyai names.**
+
+- Map Claude tool names (`Bash`, `Read`, `Write`, `Edit`, `TodoWrite`, `Task`)
+  and fyai names (`apply_patch`, `shell`) to the existing renderers: the edit
+  diff, the terminal block, the file view.
+- Add a todo block for `TodoWrite`.
+- Show a failed result as failed (`is_error`).
+- Show thinking in the reasoning block that upstream has.
+- Show the tool list of `system/init` and the cost of `result`.
+- Store the usage on the last message of the turn.
+
+**W8. Attachments.** Send images as SDK `image` content blocks. fyai stores them
+as media parts (`doc/media.md`). An unsupported kind gets a message, not a
+silent drop.
+
+**W9. A working directory for each conversation.** The directory of a session
+is `cwd` in the branch store. The bridge runs each turn in the directory of its
+branch, and `/cwd` changes it for a new conversation.
+
+**W10. Move to the session protocol.** This item depends on
+`doc/remote-sessions-sdd.md`.
+
+- The page connects to `fyai serve` over a WebSocket and speaks the Agent SDK
+  protocol with the fyai extensions.
+- The bridge becomes a static file server. In the desktop app, the main process
+  starts `fyai serve` and connects to it.
+- The page gets the parts that a process for each turn cannot give: a running
+  turn that survives a reload, `ask_user`, the todo panel, sub-agents, the
+  terminals of the work pane, and a mirror of the terminal screen.
+
+**W11. Mobile.**
+
+- First, the page as an installed PWA over a paired connection (SDD,
+  "Authentication and pairing").
+- Then a Capacitor (or equivalent) wrapper for iOS and Android. It carries the
+  same build, with secure storage for the device token, and a QR scanner for
+  pairing.
+- Without a relay there is no push notification. The app reconnects and
+  resynchronizes when it comes to the foreground.
+
+**W12. Restructure the existing patches.** The fyai commits change upstream
+files directly: the chat store, the pickers and the settings. Move this code
+behind the seam of W2 and rewrite the series in the order below.
+
+### Patch series order
+
+1. The upstream import, unchanged, with the base commit in `web/NOTICE.md`.
+2. The backend seam (W2), with upstream as the only implementation. This patch
+   could go upstream.
+3. The bridge and the fyai backend.
+4. Each later feature as its own patch: W1, W3 to W9.
+5. The desktop app and packaging.
+6. Tests, then documentation, as `CLAUDE.md` orders them.
+
+A patch that could go upstream has no fyai name in it. It adds a generic
+ability, such as a backend interface, a permission request from the server,
+or a list of conversations from the server.
+
+### Rebase on a new upstream
+
+1. Import the new upstream tree on a branch at the old base.
+2. Rebase the series on it.
+3. Fix each hook point that moved. The list in `web/NOTICE.md` names all of
+   them.
+4. Run the unit tests, the client tests, `fyai-web-turn` and the e2e scripts
+   for both backends.
+
+## Tests
+
+| Work item | Tests                                                                                   |
+| --------- | --------------------------------------------------------------------------------------- |
+| W1        | the bridge refuses no token, another origin, and a public host without a token          |
+| W2, W3    | the client tests run with the fyai backend and with a mock llama backend                |
+| W4, W5    | a bridge test against the mock provider: list, rename, delete, regenerate, edit         |
+| W6        | `test-turn.sh` with a scenario that asks for a tool; allow and deny                     |
+| W7        | assembler tests for each mapped tool, thinking, `is_error`, usage                       |
+| W8        | an image turn against the mock provider                                                 |
+| W10       | the protocol tests of the SDD; the page against `fyai serve`                            |
+
+Each upstream test runs against the upstream backend, so a gated part keeps
+its tests.
+
+## Open questions
+
+- Is the bridge still necessary after W10, or does `fyai serve` also serve the
+  page files?
+- Which wrapper for mobile: Capacitor, or a smaller WebView shell?
+- Do provider keys stay in the page, or does the page only name a key that the
+  host already has (`api_key: {type: env, ...}`)?
