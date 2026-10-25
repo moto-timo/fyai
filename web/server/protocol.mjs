@@ -358,3 +358,67 @@ export function rewindPlan(history, anchor) {
 
 	return next === undefined ? { action: 'none' } : { action: 'reset', keep: next };
 }
+
+/*
+ * Images. The turn carries each image as a block of the user message, as the
+ * Claude Agent SDK sends it: {type: image, source: {type: base64, media_type,
+ * data}}. fyai keeps the bytes with the message.
+ */
+
+/** The image types that fyai takes (`doc/media.md`). */
+export const IMAGE_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
+
+/**
+ * The images of a request, checked. Each is `{mediaType, data, name}` with the
+ * data as base64 text.
+ *
+ * @param {unknown} images
+ * @returns {{ images: { mediaType: string, data: string, name: string }[] } | { error: string }}
+ */
+export function checkImages(images) {
+	if (images === undefined) return { images: [] };
+
+	if (!Array.isArray(images)) return { error: 'images must be a list' };
+
+	const checked = [];
+
+	for (const image of images) {
+		if (!IMAGE_TYPES.has(image?.mediaType))
+			return {
+				error: `an image of type '${image?.mediaType}' is not supported: use PNG, JPEG, GIF or WebP`
+			};
+
+		if (typeof image.data !== 'string' || !image.data || !/^[A-Za-z0-9+/]*={0,2}$/.test(image.data))
+			return { error: 'the data of an image must be base64 text' };
+
+		checked.push({
+			data: image.data,
+			mediaType: image.mediaType,
+			name: typeof image.name === 'string' && image.name ? image.name : 'image'
+		});
+	}
+
+	return { images: checked };
+}
+
+/**
+ * The content of the user message of a turn: the text, when there is any, and
+ * a block for each image.
+ *
+ * @param {string} prompt
+ * @param {{ mediaType: string, data: string, name: string }[]} images
+ */
+export function userContent(prompt, images) {
+	const content = [];
+
+	if (prompt.trim()) content.push({ text: prompt, type: 'text' });
+
+	for (const image of images)
+		content.push({
+			name: image.name,
+			source: { data: image.data, media_type: image.mediaType, type: 'base64' },
+			type: 'image'
+		});
+
+	return content;
+}

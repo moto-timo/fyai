@@ -27,6 +27,7 @@ import {
 } from './auth.mjs';
 import {
 	catalogueModelName,
+	checkImages,
 	commandsFromSchema,
 	conversationBranch,
 	conversationsFromBranches,
@@ -38,7 +39,8 @@ import {
 	rewindPlan,
 	sessionIdFor,
 	slashCommandArgs,
-	unknownCommandMessage
+	unknownCommandMessage,
+	userContent
 } from './protocol.mjs';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
@@ -331,6 +333,7 @@ function spawnTurn(options) {
 	const {
 		env = process.env,
 		fresh = false,
+		images = [],
 		model = '',
 		onExit = () => {},
 		onFrame = () => {},
@@ -467,9 +470,9 @@ function spawnTurn(options) {
 		timer.unref?.();
 	}
 
-	if (prompt) {
+	if (prompt || images.length) {
 		const frame = {
-			message: { content: [{ text: prompt, type: 'text' }], role: 'user' },
+			message: { content: userContent(prompt, images), role: 'user' },
 			type: 'user'
 		};
 
@@ -1016,8 +1019,15 @@ async function handleChat(req, res) {
 	const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
 	const providerKeys =
 		body.providerKeys && typeof body.providerKeys === 'object' ? body.providerKeys : {};
+	const attached = checkImages(body.images);
 
-	if (!prompt.trim()) {
+	if ('error' in attached) {
+		sendError(res, 400, attached.error);
+
+		return;
+	}
+
+	if (!prompt.trim() && !attached.images.length) {
 		sendError(res, 400, 'prompt is required');
 
 		return;
@@ -1115,6 +1125,7 @@ async function handleChat(req, res) {
 		/* The environment of this request, which carries the provider keys. */
 		env,
 		fresh: !!body.fresh,
+		images: attached.images,
 		model,
 		onExit: (summary) => {
 			if (config.verbose)

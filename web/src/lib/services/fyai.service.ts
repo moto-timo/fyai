@@ -25,6 +25,14 @@ export interface FyaiAnchor {
 	text: string;
 }
 
+/** An image of the last user message, as the bridge takes it. */
+export interface FyaiImage {
+	/** The bytes as base64 text, without the `data:` prefix. */
+	data: string;
+	mediaType: string;
+	name: string;
+}
+
 export interface FyaiTurnRequest {
 	conversationId: string;
 	/**
@@ -45,6 +53,8 @@ export interface FyaiTurnRequest {
 	 * the branch of fyai back to the end of this message's exchange first.
 	 */
 	anchor?: FyaiAnchor | null;
+	/** The images of the last user message; the bridge hands them to fyai as files. */
+	images?: FyaiImage[];
 	/** The session does not exist yet: start it rather than resume it. */
 	fresh: boolean;
 	model?: string | null;
@@ -234,6 +244,36 @@ export function fyaiAnchor(messages: DatabaseMessage[]): FyaiAnchor | null {
 	}
 
 	return null;
+}
+
+/** The last user message of the path, or undefined. */
+function lastUserMessage(messages: DatabaseMessage[]): DatabaseMessage | undefined {
+	return messages.findLast((m) => m.role === 'user');
+}
+
+/** The images that the last user message carries, as the bridge takes them. */
+export function fyaiImages(messages: DatabaseMessage[]): FyaiImage[] {
+	const images: FyaiImage[] = [];
+
+	for (const extra of lastUserMessage(messages)?.extra ?? []) {
+		if (extra.type !== AttachmentType.IMAGE) continue;
+
+		const match = /^data:([^;,]+);base64,(.*)$/s.exec(extra.base64Url);
+
+		if (match) images.push({ data: match[2], mediaType: match[1], name: extra.name });
+	}
+
+	return images;
+}
+
+/**
+ * What the last user message carries that fyai cannot take: audio and video.
+ * The page says so and sends nothing, so that it is not dropped without a word.
+ */
+export function fyaiUnsupportedAttachments(messages: DatabaseMessage[]): string[] {
+	return (lastUserMessage(messages)?.extra ?? [])
+		.filter((e) => e.type === AttachmentType.AUDIO || e.type === AttachmentType.VIDEO)
+		.map((e) => (e as { name: string }).name);
 }
 
 /**

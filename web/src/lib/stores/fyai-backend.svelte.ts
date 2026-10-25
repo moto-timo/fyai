@@ -33,6 +33,8 @@ import {
 import {
 	buildFyaiPrompt,
 	fyaiAnchor,
+	fyaiImages,
+	fyaiUnsupportedAttachments,
 	parseProviderKeys,
 	streamFyaiTurn
 } from '$lib/services/fyai.service';
@@ -46,10 +48,25 @@ export { FYAI_BRIDGE_KIND };
 const TITLE_MAX = 80;
 
 async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> {
-	const prompt = buildFyaiPrompt(request.allMessages);
 	const { callbacks, convId } = request;
+	const images = fyaiImages(request.allMessages);
+	const unsupported = fyaiUnsupportedAttachments(request.allMessages);
 
-	if (!prompt) return 'skip';
+	if (unsupported.length) {
+		callbacks.onError?.(
+			new Error(
+				`fyai takes images and text files, not audio or video: ${unsupported.join(', ')}. ` +
+					'Remove the attachment and send the message again.'
+			)
+		);
+
+		return 'error';
+	}
+
+	/* A message of images alone has no text and is still a prompt. */
+	const prompt = buildFyaiPrompt(request.allMessages) ?? (images.length ? '' : null);
+
+	if (prompt === null) return 'skip';
 
 	/*
 	 * The session ID is the conversation ID. fyai stores the turns, so a
@@ -115,6 +132,7 @@ async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> 
 				apiKey: settingsStore.config.apiKey?.toString().trim() ?? '',
 				conversationId: convId,
 				fresh,
+				images,
 				model: request.model,
 				prompt,
 				providerKeys: parseProviderKeys(settingsStore.config.providerApiKeys?.toString() ?? '')
