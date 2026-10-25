@@ -1015,6 +1015,7 @@ server = createServer(async (req, res) => {
 			const models = await listModels();
 
 			sendJson(res, 200, {
+				backend: 'fyai',
 				bin: config.bin,
 				cwd: config.cwd,
 				model: config.model,

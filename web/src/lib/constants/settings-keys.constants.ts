@@ -45,6 +45,7 @@ export const SETTINGS_KEYS = {
 	// Performance
 	PRE_ENCODE_CONVERSATION: 'preEncodeConversation',
 	PRESENCE_PENALTY: 'presence_penalty',
+	PROVIDER_API_KEYS: 'providerApiKeys',
 	RENDER_THINKING_AS_MARKDOWN: 'renderThinkingAsMarkdown',
 	RENDER_USER_CONTENT_AS_MARKDOWN: 'renderUserContentAsMarkdown',
 	// Penalties

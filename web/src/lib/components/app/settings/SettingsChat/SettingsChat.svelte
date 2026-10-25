@@ -12,13 +12,14 @@
 	import {
 		NUMERIC_FIELDS,
 		POSITIVE_INTEGER_FIELDS,
-		SETTINGS_CHAT_SECTIONS,
+		SETTINGS_CHAT_SECTIONS as ALL_SECTIONS,
 		SETTINGS_KEYS,
 		SETTINGS_SECTION_SLUGS
 	} from '$lib/constants';
 	import { ColorMode } from '$lib/enums/ui.enums';
-	import { modelsStore, serverStore, settingsStore } from '$lib/stores';
+	import { backendStore, modelsStore, serverStore, settingsStore } from '$lib/stores';
 	import type { SettingsSection, SettingsSectionTitle } from '$lib/types';
+	import { visibleSettingsSections } from '$lib/utils';
 	import { setMode } from 'mode-watcher';
 	import { fade } from 'svelte/transition';
 	interface Props {
@@ -28,6 +29,8 @@
 	}
 
 	let { initialSection, onClose, onSectionChange }: Props = $props();
+
+	const SETTINGS_CHAT_SECTIONS = $derived(visibleSettingsSections(ALL_SECTIONS, backendStore.kind));
 
 	let activeSlug = $derived(initialSection ?? 'general');
 

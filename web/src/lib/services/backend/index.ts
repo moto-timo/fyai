@@ -2,7 +2,13 @@
 import { llamaBackend } from './llama.backend';
 import type { Backend } from './types';
 
-export type { Backend, BackendCapabilities, BackendTurnRequest, BackendTurnResult } from './types';
+export type {
+	Backend,
+	BackendCapabilities,
+	BackendCommand,
+	BackendTurnRequest,
+	BackendTurnResult
+} from './types';
 export { llamaBackend };
 
 const registry: Backend[] = [];

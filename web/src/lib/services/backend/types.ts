@@ -35,8 +35,28 @@ export interface BackendTurnRequest {
  */
 export type BackendTurnResult = 'error' | 'ok' | 'skip';
 
+/** A slash command that the server runs, shown in the `/` picker. */
+export interface BackendCommand {
+	aliases: string[];
+	description: string;
+	name: string;
+	title: string;
+}
+
 export interface Backend {
 	capabilities: BackendCapabilities;
+	/**
+	 * A title for a new conversation from its first message, or null to let
+	 * the page ask the model. A backend with no title function uses the model.
+	 */
+	titleFor?: (firstMessage: string) => string | null;
+	/** Loads the slash commands of the server, for the `/` picker. */
+	loadCommands?: () => Promise<BackendCommand[]>;
+	/**
+	 * Takes a line the user sent before the page stores it. Resolves true when
+	 * the backend handled the line and nothing is sent.
+	 */
+	handleLine?: (line: string) => Promise<boolean>;
 	/** Stable name, used by `backendIs()` and the forced-backend setting. */
 	kind: string;
 	/**

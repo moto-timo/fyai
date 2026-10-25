@@ -352,6 +352,7 @@ export { getToolUi } from './tool-ui';
 // Chat command picker
 
 export { getChatCommands } from './chat-commands';
+export { visibleSettingsSections } from './backend-settings';
 
 // Sandbox tool definition
 // SANDBOX_TOOL_DEFINITION is deprecated; kept for backward compatibility.

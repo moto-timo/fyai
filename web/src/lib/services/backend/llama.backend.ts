@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { LLAMA_KIND } from './kinds';
 import type { Backend } from './types';
 
 /** llama-server: every part of the page applies, and a turn is a chat completion. */
@@ -10,5 +11,5 @@ export const llamaBackend: Backend = {
 		modelManager: true,
 		sampling: true
 	},
-	kind: 'llama'
+	kind: LLAMA_KIND
 };

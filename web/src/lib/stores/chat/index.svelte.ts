@@ -609,6 +609,8 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 	async sendMessage(content: string, extras?: DatabaseMessageExtra[]): Promise<void> {
 		if (!content.trim() && (!extras || extras.length === 0)) return;
 
+		if (await backendStore.active.handleLine?.(content)) return;
+
 		const activeConv = conversationsStore.activeConversation;
 
 		// If agentic loop is running, inject as a steering message instead of starting a new flow
@@ -1310,6 +1312,16 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 		assistantContent: string,
 		convId: string
 	): Promise<void> {
+		const ownTitle = backendStore.active.titleFor?.(userContent);
+
+		if (ownTitle !== undefined) {
+			if (ownTitle && ownTitle.length >= TITLE_GENERATION.MIN_LENGTH) {
+				await conversationsStore.updateConversationName(convId, ownTitle);
+			}
+
+			return;
+		}
+
 		const effectiveModel =
 			serverStore.isRouterMode && modelsStore.selectedModelName
 				? modelsStore.selectedModelName

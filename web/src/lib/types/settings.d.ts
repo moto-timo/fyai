@@ -38,6 +38,8 @@ export interface SettingsEntry {
 	min?: number;
 	max?: number;
 	dependsOn?: string;
+	/** Kinds of backend that show this setting; every backend when unset. */
+	backends?: string[];
 	sync?: {
 		serverKey: string;
 		paramType: SyncableParameterType;
@@ -63,6 +65,7 @@ export interface SettingsFieldConfig {
 	min?: number;
 	max?: number;
 	dependsOn?: string;
+	backends?: string[];
 	help?: string;
 	options?: Array<{ value: string; label: string; icon?: typeof Icon }>;
 	/** Options rendered for RADIO fields. Each entry maps a `value` (the radio's selected value) to the underlying config `key` whose boolean state mirrors it. */

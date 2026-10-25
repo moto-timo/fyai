@@ -11,6 +11,16 @@ import type { ChatCommandsOptions, ChatFormCommand } from '$lib/types';
  * themselves import from `$lib/utils`).
  */
 export function getChatCommands(options: ChatCommandsOptions): ChatFormCommand[] {
+	const own = new Set(['prompt', 'cwd', 'model']);
+	const backend = (options.backendCommands ?? [])
+		.filter((command) => !own.has(command.name))
+		.map((command) => ({
+			action: ChatFormCommandAction.BACKEND,
+			description: command.title || command.description,
+			disabled: false,
+			name: command.name
+		}));
+
 	return [
 		{
 			action: ChatFormCommandAction.PROMPT,
@@ -30,6 +40,7 @@ export function getChatCommands(options: ChatCommandsOptions): ChatFormCommand[]
 			description: 'Select model',
 			disabled: !options.showModelSelector,
 			name: 'model'
-		}
+		},
+		...backend
 	];
 }

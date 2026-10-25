@@ -1,4 +1,5 @@
 // direct imports, not via the barrel, to avoid circular deps
+import './fyai-backend.svelte';
 import { backendStore } from './backend.svelte';
 import { conversationsStore } from './conversations/index.svelte';
 import { permissionsStore } from './permissions.svelte';

@@ -80,6 +80,7 @@ export enum PdfViewMode {
 }
 
 export enum ChatFormCommandAction {
+	BACKEND = 'backend',
 	CWD = 'cwd',
 	MODEL = 'model',
 	PROMPT = 'prompt'

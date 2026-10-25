@@ -10,13 +10,16 @@
 import {
 	type Backend,
 	type BackendCapabilities,
+	type BackendCommand,
 	detectBackend,
 	llamaBackend
 } from '$lib/services/backend';
 
 class BackendStore {
 	active = $state<Backend>(llamaBackend);
+	commands = $state<BackendCommand[]>([]);
 	private detecting: Promise<void> | null = null;
+	private loadingCommands: Promise<void> | null = null;
 
 	get kind(): string {
 		return this.active.kind;
@@ -33,6 +36,19 @@ class BackendStore {
 
 	is(kind: string): boolean {
 		return this.active.kind === kind;
+	}
+
+	/** Loads the commands of the active backend once; a failure leaves the list empty. */
+	loadCommands(): Promise<void> {
+		this.loadingCommands ??= (this.active.loadCommands?.() ?? Promise.resolve([]))
+			.then((commands) => {
+				this.commands = commands;
+			})
+			.catch(() => {
+				this.commands = [];
+			});
+
+		return this.loadingCommands;
 	}
 
 	supports(capability: keyof BackendCapabilities): boolean {
