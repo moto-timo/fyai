@@ -298,3 +298,63 @@ export function conversationBranch(id) {
 
 	return session ? SDK_BRANCH_PREFIX + session : '';
 }
+
+/*
+ * Edit and regenerate. The page keeps a tree of messages, and a turn can come
+ * from any node of it, while a branch of fyai is one line. So each turn names
+ * the last user message that it follows, the anchor, and the bridge cuts the
+ * branch back to the end of that exchange before it runs the turn. The anchor
+ * is the text of the message and the count of equal messages up to it, because
+ * a prompt can be asked twice.
+ */
+
+/**
+ * The text of a stored message: a string, or the text parts of a list.
+ *
+ * @param {any} message
+ * @returns {string}
+ */
+export function messageTextOf(message) {
+	const content = message?.content;
+
+	if (typeof content === 'string') return content;
+
+	if (!Array.isArray(content)) return '';
+
+	return content.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('');
+}
+
+/**
+ * What to do to the branch so that it ends at the exchange of the anchor.
+ *
+ * - `none`: it ends there already, or the anchor is not in it, so there is
+ *   nothing that can be cut;
+ * - `delete`: the turn follows no user message, and the branch holds some, so
+ *   the branch goes and the turn starts a new one;
+ * - `reset`: cut back to `keep` messages, the ones before the next user
+ *   message.
+ *
+ * @param {object[]} history the stored messages of the branch
+ * @param {{ text: string, occurrence: number } | null} anchor
+ * @returns {{ action: 'none' } | { action: 'delete' } | { action: 'reset', keep: number }}
+ */
+export function rewindPlan(history, anchor) {
+	/** @type {number[]} */
+	const users = [];
+
+	history.forEach((message, index) => {
+		if (/** @type {any} */ (message).role === 'user') users.push(index);
+	});
+
+	if (!anchor) return users.length ? { action: 'delete' } : { action: 'none' };
+
+	const wanted = String(anchor.text ?? '').trim();
+	const same = users.filter((index) => messageTextOf(history[index]).trim() === wanted);
+	const at = same[(Number(anchor.occurrence) || 1) - 1];
+
+	if (at === undefined) return { action: 'none' };
+
+	const next = users.find((index) => index > at);
+
+	return next === undefined ? { action: 'none' } : { action: 'reset', keep: next };
+}

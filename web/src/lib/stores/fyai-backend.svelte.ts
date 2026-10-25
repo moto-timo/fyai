@@ -30,7 +30,12 @@ import {
 	readFyaiMessages,
 	renameFyaiConversation
 } from '$lib/services/fyai.conversations';
-import { buildFyaiPrompt, parseProviderKeys, streamFyaiTurn } from '$lib/services/fyai.service';
+import {
+	buildFyaiPrompt,
+	fyaiAnchor,
+	parseProviderKeys,
+	streamFyaiTurn
+} from '$lib/services/fyai.service';
 import { FyaiTurnAssembler } from '$lib/services/fyai.turn';
 import type { ChatMessageTimings } from '$lib/types';
 import { uuid } from '$lib/utils';
@@ -106,6 +111,7 @@ async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> 
 	try {
 		await streamFyaiTurn(
 			{
+				anchor: fyaiAnchor(request.allMessages),
 				apiKey: settingsStore.config.apiKey?.toString().trim() ?? '',
 				conversationId: convId,
 				fresh,

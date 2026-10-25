@@ -35,6 +35,7 @@ import {
 	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
+	rewindPlan,
 	sessionIdFor,
 	slashCommandArgs,
 	unknownCommandMessage
@@ -484,6 +485,8 @@ function spawnTurn(options) {
 
 /* The turn that runs for each session, so a change of its branch can wait for the turn. */
 const activeTurns = new Map();
+/* The prompt of the last turn of each session that completed, to skip a check of its branch. */
+const completedPrompts = new Map();
 
 /* ---------------------------------------------------------------- models */
 
@@ -841,6 +844,76 @@ function propsPayload(requested = '') {
 
 /* ----------------------------------------------------------------- routes */
 
+/**
+ * Cut the branch of a session back to the end of the exchange of @anchor (see
+ * `rewindPlan`). The turn counts of a reset are not the message counts of the
+ * page, so a copy of the branch is stepped back one turn at a time until its
+ * history has the length that the plan asks for, and the branch is reset by
+ * that many turns. The copy never touches the files of the project.
+ *
+ * @returns {Promise<string>} '' when the branch is as the turn needs it, else why it could not be
+ */
+async function rewindSession(sessionId, anchor, env) {
+	const branch = `sdk/${sessionId}`;
+	const verb = (args) => runCapture(config.bin, [...config.extraArgs, ...args], 60000, env);
+	const read = async (name) =>
+		parseHistory((await verb(['--branch', name, 'history', '--output', 'json'])).out);
+	const history = await read(branch);
+	const plan = rewindPlan(history, anchor);
+
+	if (plan.action === 'none') return '';
+
+	if (plan.action === 'delete') {
+		const out = await verb(['branch', 'delete', '--force', branch]);
+
+		return out.code === 0 ? '' : out.err.trim() || `cannot delete ${branch}`;
+	}
+
+	const copy = `${branch}-rewind-${process.pid}`;
+	const made = await verb(['branch', 'new', copy, branch]);
+
+	if (made.code !== 0) return made.err.trim() || `cannot make ${copy}`;
+
+	try {
+		let found = false;
+		let turns = 0;
+
+		/* A turn holds at least one message, so the history is never longer than this in turns. */
+		while (turns < history.length) {
+			const step = await verb([
+				'--set',
+				'view/track_project=false',
+				'--branch',
+				copy,
+				'reset',
+				`${copy}~1`
+			]);
+
+			if (step.code !== 0) return `cannot find the turn that ends at message ${plan.keep}`;
+
+			turns++;
+
+			const length = (await read(copy)).length;
+
+			if (length === plan.keep) {
+				found = true;
+
+				break;
+			}
+
+			if (length < plan.keep) return `no turn of ${branch} ends at message ${plan.keep}`;
+		}
+
+		if (!found) return `no turn of ${branch} ends at message ${plan.keep}`;
+
+		const out = await verb(['--branch', branch, 'reset', `${branch}~${turns}`]);
+
+		return out.code === 0 ? '' : out.err.trim() || `cannot reset ${branch}`;
+	} finally {
+		await verb(['branch', 'delete', '--force', copy]);
+	}
+}
+
 /** The route of one conversation: `/api/fyai/conversations/ID` and its `/messages`. */
 const CONVERSATION_ROUTE = /^\/api\/fyai\/conversations(?:\/([^/]+)(\/messages)?)?$/;
 
@@ -887,6 +960,8 @@ async function handleConversations(req, res, match) {
 		return sendError(res, 409, 'a turn of this conversation is running');
 
 	if (req.method === 'DELETE') {
+		completedPrompts.delete(sessionIdFor(decodeURIComponent(rawId)) ?? '');
+
 		const out = await verb(['branch', 'delete', '--force', branch]);
 
 		if (out.code !== 0)
@@ -1003,6 +1078,39 @@ async function handleChat(req, res) {
 
 	stream.send({ sessionId, subtype: 'start', type: 'bridge' });
 
+	/*
+	 * The page says which user message the turn follows. A branch that ends at
+	 * the last turn that this bridge saw complete needs no check; any other has
+	 * its history read and is cut back to that message when it goes further.
+	 */
+	if (body.anchor !== undefined) {
+		const anchor =
+			body.anchor && typeof body.anchor.text === 'string'
+				? { occurrence: Number(body.anchor.occurrence) || 1, text: body.anchor.text }
+				: null;
+
+		if (!anchor || completedPrompts.get(sessionId) !== anchor.text.trim()) {
+			completedPrompts.delete(sessionId);
+
+			const why = await rewindSession(sessionId, anchor, env);
+
+			if (why) {
+				stream.send({
+					message: `the conversation of fyai cannot be matched to the page: ${why}`,
+					subtype: 'error',
+					type: 'bridge'
+				});
+				stream.end();
+				req.off('close', abort);
+				res.off('close', abort);
+
+				return;
+			}
+		}
+	}
+
+	let succeeded = false;
+
 	const options = {
 		/* The environment of this request, which carries the provider keys. */
 		env,
@@ -1012,7 +1120,11 @@ async function handleChat(req, res) {
 			if (config.verbose)
 				log('turn ended', JSON.stringify(summary.code), summary.stderr.slice(0, 200));
 		},
-		onFrame: (frame) => stream.send(frame),
+		onFrame: (frame) => {
+			if (frame.type === 'result') succeeded = !frame.is_error;
+
+			stream.send(frame);
+		},
 		permissionMode:
 			typeof body.permissionMode === 'string' ? body.permissionMode : config.permissionMode,
 		prompt,
@@ -1033,6 +1145,10 @@ async function handleChat(req, res) {
 		summary = await active.done;
 
 		if (activeTurns.get(sessionId) === active) activeTurns.delete(sessionId);
+
+		/* A turn that completed leaves the branch at the end of this prompt. */
+		if (succeeded) completedPrompts.set(sessionId, prompt.trim());
+		else completedPrompts.delete(sessionId);
 
 		/*
 		 * A start and a resume differ in the one flag, and each is wrong for a

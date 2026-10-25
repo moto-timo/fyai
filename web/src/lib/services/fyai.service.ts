@@ -19,6 +19,12 @@ export interface FyaiFrame {
 	[key: string]: unknown;
 }
 
+/** A user message of the conversation: its prompt and how many equal ones come up to it. */
+export interface FyaiAnchor {
+	occurrence: number;
+	text: string;
+}
+
 export interface FyaiTurnRequest {
 	conversationId: string;
 	/**
@@ -33,6 +39,12 @@ export interface FyaiTurnRequest {
 	 * selected model, which the bridge resolves.
 	 */
 	apiKey?: string;
+	/**
+	 * The last user message that this turn follows, or null when it follows none.
+	 * The page can start a turn from any message of its tree, and the bridge cuts
+	 * the branch of fyai back to the end of this message's exchange first.
+	 */
+	anchor?: FyaiAnchor | null;
 	/** The session does not exist yet: start it rather than resume it. */
 	fresh: boolean;
 	model?: string | null;
@@ -185,6 +197,43 @@ export function parseProviderKeys(lines: string): Record<string, string> {
 	}
 
 	return keys;
+}
+
+/**
+ * The anchor of the turn that the last user message starts: the last user
+ * message before it. A message that the page made itself (a change of
+ * directory) was never sent, so it is not one.
+ */
+export function fyaiAnchor(messages: DatabaseMessage[]): FyaiAnchor | null {
+	const sent = (m: DatabaseMessage) => m.role === 'user' && !m.isSynthetic;
+
+	let last = -1;
+
+	for (let i = messages.length - 1; i >= 0; i--) {
+		if (sent(messages[i])) {
+			last = i;
+
+			break;
+		}
+	}
+
+	for (let i = last - 1; i >= 0; i--) {
+		if (!sent(messages[i])) continue;
+
+		const text = buildFyaiPrompt(messages.slice(0, i + 1));
+
+		if (!text) continue;
+
+		let occurrence = 0;
+
+		for (let j = 0; j <= i; j++) {
+			if (sent(messages[j]) && buildFyaiPrompt(messages.slice(0, j + 1)) === text) occurrence++;
+		}
+
+		return { occurrence, text };
+	}
+
+	return null;
 }
 
 /**
