@@ -239,14 +239,25 @@ by `fyai-desktop-package` and the release workflow, and is not installed.
 | `--cwd`             | `FYAI_BRIDGE_CWD`             | current directory   | project fyai works in                   |
 | `--model`           | `FYAI_BRIDGE_MODEL`           |                     | default model of a session              |
 | `--parent-pid`      | `FYAI_BRIDGE_PARENT_PID`      |                     | stop when this process stops            |
-| `--permission-mode` | `FYAI_PERMISSION_MODE`        | `bypassPermissions` | how fyai decides on tool calls          |
+| `--permission-mode` | `FYAI_PERMISSION_MODE`        | `bypassPermissions` | SDK permission mode; the sandbox confines the tools |
 | `--extra-arg`       | `FYAI_BRIDGE_ARGS`            |                     | extra arguments for `fyai claude-sdk`   |
 | `--turn-timeout-ms` | `FYAI_BRIDGE_TURN_TIMEOUT_MS` | `0`                 | stop a turn after this; 0 is no limit   |
+| `--token`           | `FYAI_BRIDGE_TOKEN`           | random at each start | the token an API request needs          |
+| `--allow-origin`    | `FYAI_BRIDGE_ALLOW_ORIGIN`    |                     | other origins that may call it, by comma |
+| `--allow-host`      | `FYAI_BRIDGE_ALLOW_HOST`      |                     | other host names a loopback bridge answers |
 | `--static`          | `FYAI_BRIDGE_STATIC`          | `dist`              | built page to serve                     |
 | `--verbose`         | `FYAI_BRIDGE_VERBOSE`         | off                 | log each process and request            |
 
-The bridge listens on loopback only by default. It runs tools in the project
-without asking, so do not bind it to a public address.
+The bridge listens on loopback only by default, and it runs tools in the
+project without asking. Every API request needs the token of the bridge, which
+it prints as a login link when it starts:
+`http://127.0.0.1:9331/api/fyai/login?token=...`. Open that link once; the
+browser keeps the token as a cookie, and the page loads without it only to say
+what is missing. A program sends the token in the `x-fyai-token` header.
+`scripts/run.sh --open` and the desktop app open the link for you, and
+`scripts/dev.sh` prints the link of the dev server. A request from another
+origin or host name is refused. Put a tunnel or a TLS proxy in front of a
+bridge on a non-loopback `--host`, because the bridge speaks plain HTTP.
 
 ## How a turn becomes a page
 
@@ -311,9 +322,11 @@ page then serves none of them.
 
 ## What is not wired yet
 
-- **Permissions**: `can_use_tool` round-trips are not shown. The bridge
-  starts fyai with `--permission-mode bypassPermissions` by default; choose
-  `default` to deny every call that no rule allows, or `acceptEdits`.
+- **Sandbox**: fyai confines its tools with a sandbox profile, not with a
+  question for each call, so the bridge runs fyai in `bypassPermissions`
+  and the page shows no prompt. The page does not show the profile yet; run
+  `/session lockdown` or `/sandbox on` (when the command picker lists them),
+  or `fyai sandbox` in the project, to change it.
 - **Images and audio**: the composer accepts them, but only text and text
   files reach the model. fyai media attachments (`@PATH`, `--image`) are not
   mapped yet.

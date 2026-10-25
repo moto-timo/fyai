@@ -165,8 +165,8 @@ open the models manager are still drawn; only their action is gated.
 
 | Use                     | Page served by             | Backend        | Authentication            |
 | ----------------------- | -------------------------- | -------------- | ------------------------- |
-| Desktop app             | its bridge, loopback       | `fyai-bridge`  | none yet (W1)             |
-| Browser on one machine  | the bridge, loopback       | `fyai-bridge`  | none yet (W1)             |
+| Desktop app             | its bridge, loopback       | `fyai-bridge`  | token of the app, login link |
+| Browser on one machine  | the bridge, loopback       | `fyai-bridge`  | token, login link         |
 | Remote session          | `fyai serve`, or a static host | `fyai-remote` | pairing and device token (SDD 6) |
 | Hosted page on a cloud service | a static host       | `fyai-remote`  | pairing and device token  |
 | Hosted page, fyai in the cloud | the same service    | `fyai-remote`  | the service signs the user in |
@@ -324,7 +324,7 @@ classes.
 | MCP client in the browser (`services/mcp.service.ts`) | the browser connects to MCP servers; fyai never gets their tools. `/cors-proxy` is not served. |
 | JavaScript sandbox and browser tools       | listed and switchable; they never run on the fyai path.                                   |
 | Tool store and per-conversation tool choice | built but not sent; the bridge never passes `--tools`.                                  |
-| Permission store and permission card       | fyai never asks the page; the bridge runs `bypassPermissions`.                            |
+| Permission store and permission card       | fyai never asks the page: its boundary is the sandbox profile, not a prompt for each call. |
 | Hugging Face discovery and model manager   | GGUF files, quantizations and downloads have no meaning for fyai.                         |
 | Context gauge                              | `prompt_n` is the input of the whole tool loop, and the usage is not stored with the message. |
 | Conversation import and export             | moves database rows only. An imported conversation has no fyai session.                   |
@@ -333,11 +333,11 @@ classes.
 
 ### Defects in the current tree
 
-- **The bridge has no authentication.** It answers every origin with
-  `access-control-allow-origin: *` (`bridge.mjs:209`, :250, :1007), and the
-  default permission mode is `bypassPermissions`. A web page that the same
-  user opens in any browser can post to `127.0.0.1:9331` and run tools in the
-  project. `--host` puts the same endpoint on the network.
+- **The page does not show the sandbox profile.** fyai confines its tools with
+  a sandbox profile (`doc/user-guide.md`, chapter 7), and the bridge runs fyai
+  in the SDK mode `bypassPermissions`, which only means that fyai does not
+  ask. A user of the page cannot see whether the tools run in `dev`,
+  `lockdown` or no sandbox, and cannot change it (W6).
 - The README says that the page shows the tool list of `system/init` and the
   cost of `result`. It shows neither.
 - The assembler ignores `thinking_delta`, `input_json_delta` and the `is_error`
@@ -370,15 +370,26 @@ classes.
 
 Each item states what changes, why, and which fyai interface it uses.
 
-**W1. Secure the bridge.** This item comes first, before any other.
+**W1. Secure the bridge.** Done.
 
-- Generate a token at each start. Serve the page with the token, and accept an
-  API request only with it.
-- Accept only the origin of the bridge. Remove `access-control-allow-origin:
-  *`.
-- Make `default` the default permission mode. Keep `bypassPermissions` as an
-  explicit option.
-- Refuse a non-loopback `--host` without a token.
+- The bridge has a token for each start: `--token`, `FYAI_BRIDGE_TOKEN`, or 256
+  random bits. An API request needs it, as the `x-fyai-token` header or as the
+  cookie `fyai_bridge` (`HttpOnly`, `SameSite=Strict`). The page files and a
+  minimal `/api/fyai/info` need none, so the page loads before a login and
+  can tell the user what to do.
+- The bridge prints a login link, `/api/fyai/login?token=T`. It sets the
+  cookie and goes on to `/`. `next` must be a path of the bridge. The desktop
+  app makes its own token and opens that link; `run.sh` and `dev.sh` print it.
+- A request whose `Origin` is not the bridge itself and not in `--allow-origin`
+  gets 403, and no answer carries `access-control-allow-origin: *`. A listed
+  origin gets its own origin, with credentials, never `*`.
+- A bridge on a loopback address answers loopback host names only (and
+  `--allow-host`), which stops DNS rebinding.
+- The token is the boundary of the bridge, and the sandbox profile of fyai is
+  the boundary of the tools. A client that holds the token runs tools as the
+  user does in a terminal, in the profile of the project.
+- Open: TLS for a non-loopback address (use a tunnel or a proxy until then),
+  and a token for each device (SDD 6).
 
 **W2. Detect the backend at run time.** Done, except the forced-backend setting and the hook list in `web/NOTICE.md` (now written).
 
@@ -423,17 +434,23 @@ Keep each part, unchanged, for llama-server. The gate is one predicate,
 - The message tree of the page shows the branches that fyai made. It does not
   hold its own tree.
 
-**W6. Permissions round-trip.**
+**W6. Show and choose the sandbox profile.** The first plan of this item was a
+permission prompt for each tool call, as the Claude Agent SDK has. It is
+dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
+(`dev`, `lockdown`, or none; `doc/user-guide.md`, chapter 7), and the
+`bypassPermissions` mode of the bridge only tells the SDK front not to ask.
 
-- Start fyai with `--permission-prompt-tool stdio`. fyai then sends
-  `can_use_tool` (`fyai_claude_sdk.c:1302`).
-- The bridge keeps standard input open after `result`, and forwards a
-  `control_request` to the page.
-- The page answers through a new request, `POST /api/fyai/control`, which the
-  bridge writes to the child as a `control_response`.
-- The existing `ChatMessageActionCardPermissionRequest.svelte` shows the
-  request. Its choices map to `allow`, `deny`, and an "always" rule that the
-  page sends as `updatedPermissions`.
+- The page shows the profile of the session: the bridge reads `sandbox_profile`
+  and the sandbox state from fyai and puts them in `/api/fyai/info`.
+- The user chooses the profile through the fyai commands that exist for it,
+  `/session dev|lockdown|yolo` and `sandbox on|off`, which the command picker
+  already offers where the schema lists them. The page does not keep a
+  second list of profiles.
+- A host that cannot make the sandbox warns once (`sandbox_on_failure`); the
+  page shows that warning with the turn, as it shows any diagnostic.
+- Open: what a remote client may change. A `config` key is `read`, `review`
+  or `write` for the model, and the remote design needs the same split for a
+  client (`x-fyai-remote`, SDD 11).
 
 **W7. Tool cards from fyai names.**
 
@@ -537,10 +554,10 @@ history.
 
 | Work item | Tests                                                                                   |
 | --------- | --------------------------------------------------------------------------------------- |
-| W1        | the bridge refuses no token, another origin, and a public host without a token          |
+| W1        | the bridge refuses no token, another origin, another host, and a public host with the default mode (`fyai-bridge-access.test.ts`) |
 | W2, W3    | the client tests run with the fyai backend and with a mock llama backend                |
 | W4, W5    | a bridge test against the mock provider: list, rename, delete, regenerate, edit         |
-| W6        | `test-turn.sh` with a scenario that asks for a tool; allow and deny                     |
+| W6        | a bridge test: `info` reports the profile; a command changes it                         |
 | W7        | assembler tests for each mapped tool, thinking, `is_error`, usage                       |
 | W8        | an image turn against the mock provider                                                 |
 | W10       | the protocol tests of the SDD; the page against `fyai serve`                            |
