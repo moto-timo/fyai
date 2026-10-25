@@ -114,16 +114,21 @@ exists. `fyai init` runs where a directory has no arena. The title of a window
 is the name of its directory.
 
 Each window has its own bridge, started with `--cwd DIR`, `ELECTRON_RUN_AS_NODE=1`,
-`--port 0` and `--parent-pid`. The app reads its address from the `listening
-on` line of its standard error. `FYAI_BRIDGE_PORT` fixes the port of the first
+`--parent-pid` and the port of the project (`--port`, below). The app reads its
+address from the `listening on` line of its standard error. `FYAI_BRIDGE_PORT` fixes the port of the first
 window only. The window has context isolation, no Node integration, no preload
 script and no IPC. Closing a window stops its bridge, and quitting stops all of
 them. `electron/projects.cjs` holds the choices that need no Electron, and a
 unit test covers it.
 
-A bridge picks a new port at each start, so the origin of the page changes at
-each launch and the IndexedDB cache of the page does not survive it. W4 makes
-fyai the history, so this is only a cache problem.
+The page keeps its conversations in IndexedDB, which the browser keeps for each
+origin, and the origin of a window is the address of its bridge. A project
+therefore keeps one port: `portForProject` takes it from the directory, in the
+range 20000 to 29999 below the ports that the system gives to outgoing
+connections, so each launch of a project finds its conversations again and two
+projects never share a cache. A port that is taken, by a development bridge or
+a stale one, falls back to a free port, and that launch starts with an empty
+cache. W4 makes fyai the history and the cache only a copy.
 
 ## Backends
 

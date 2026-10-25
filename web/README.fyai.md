@@ -114,7 +114,10 @@ directory wins, then the directory the app was started in. File > Open Project
 (Ctrl or Cmd+O) opens another project in a new window, and File > Open Recent
 lists the last ten. A project that is open gets its window back, and a second
 launch of the app opens its project in a new window. Each window has a bridge
-of its own, which stops when the window closes. A launcher starts
+of its own, which stops when the window closes. A project keeps the same port
+(20000 to 29999, from its directory), so its conversations are still in the
+window at the next launch; a port that is taken gives a free one and an empty
+history for that launch. A launcher starts
 it in the bundle, in `/` or in the home directory, which is no place for an
 arena, so the app then uses a directory of its own under the data directory of
 the platform (`~/.config/fyai/project` on Linux, `~/Library/Application
