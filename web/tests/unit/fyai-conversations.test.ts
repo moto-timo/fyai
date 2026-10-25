@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 import { MessageRole } from '$lib/enums';
-import { fyaiConversationRows, fyaiSessionId } from '$lib/services/fyai.conversations';
+import {
+	fyaiConversationRows,
+	fyaiSessionId,
+	storedImageBytes
+} from '$lib/services/fyai.conversations';
 import { describe, expect, it } from 'vitest';
 
 const ids = () => {
@@ -137,5 +141,56 @@ describe('fyaiConversationRows', () => {
 		expect([...times].sort((a, b) => a - b)).toEqual(times);
 		expect(times.at(-1)).toBeLessThan(summary.updated);
 		expect(conv.lastModified).toBe(summary.updated);
+	});
+});
+
+describe('the images of a stored message', () => {
+	const bytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x7f, 0x80, 0xff];
+	/* As the JSON of `history` writes them: a high byte is a lone surrogate. */
+	const stored = bytes.map((b) => String.fromCharCode(b < 0x80 ? b : 0xdc00 + b)).join('');
+
+	it('reads the bytes that the JSON of history writes', () => {
+		expect([...storedImageBytes(stored)!]).toEqual(bytes);
+	});
+
+	it('refuses text that is not a stored image', () => {
+		expect(storedImageBytes('caf\u00e9')).toBeNull();
+		expect(storedImageBytes('\ud83d\ude00')).toBeNull();
+	});
+
+	it('makes the image an attachment of the user message', () => {
+		const { messages } = fyaiConversationRows(
+			summary,
+			[
+				{
+					content: [
+						{ text: 'what is this', type: 'text' },
+						{ data: stored, media_type: 'image/png', name: 'shot.png', type: 'image' }
+					],
+					role: 'user'
+				}
+			],
+			ids()
+		);
+		const [extra] = messages[1].extra as Array<{ base64Url: string; name: string; size: number }>;
+
+		expect(messages[1].content).toBe('what is this');
+		expect(extra.name).toBe('shot.png');
+		expect(extra.size).toBe(bytes.length);
+		expect(extra.base64Url).toBe(`data:image/png;base64,${Buffer.from(bytes).toString('base64')}`);
+	});
+
+	it('leaves out an image that cannot be read and gives a plain message no attachment', () => {
+		const { messages } = fyaiConversationRows(
+			summary,
+			[
+				{ content: [{ data: 'é', media_type: 'image/png', type: 'image' }], role: 'user' },
+				{ content: 'plain', role: 'user' }
+			],
+			ids()
+		);
+
+		expect(messages[1].extra).toBeUndefined();
+		expect(messages[2].extra).toBeUndefined();
 	});
 });
