@@ -146,6 +146,55 @@ describe('fyaiConversationRows', () => {
 	});
 });
 
+describe('a call in the form of Chat Completions', () => {
+	const stored = [
+		{ content: 'Make a plan', role: 'user' },
+		{
+			content: null,
+			role: 'assistant',
+			tool_calls: [
+				{ function: { arguments: '{"todos":[]}', name: 'todo_write' }, id: 'c1', type: 'function' },
+				{ function: { arguments: '{"command":"ls"}', name: 'shell' }, id: 'c2', type: 'function' }
+			]
+		},
+		{ content: 'todo list updated', role: 'tool', tool_call_id: 'c1' },
+		{ content: 'a.txt\n', role: 'tool', tool_call_id: 'c2' },
+		{ content: 'Done.', role: 'assistant' }
+	];
+
+	it('puts the calls on the assistant message and each result under it', () => {
+		const { messages } = fyaiConversationRows(summary, stored, ids());
+		const calls = JSON.parse(messages[2].toolCalls!);
+
+		expect(messages.map((m) => m.role)).toEqual([
+			'system',
+			'user',
+			'assistant',
+			'tool',
+			'tool',
+			'assistant'
+		]);
+		expect(calls.map((c: { id: string }) => c.id)).toEqual(['c1', 'c2']);
+		expect(calls.map((c: { function: { name: string } }) => c.function.name)).toEqual([
+			'todo_write',
+			'exec_shell_command'
+		]);
+		expect(messages[3]).toMatchObject({ content: 'todo list updated', toolCallId: 'c1' });
+		expect(messages[4]).toMatchObject({ content: 'a.txt\n', toolCallId: 'c2' });
+		expect(messages[5].content).toBe('Done.');
+	});
+
+	it('leaves a plain assistant message with no calls', () => {
+		const { messages } = fyaiConversationRows(
+			summary,
+			[{ content: 'hi', role: 'assistant' }],
+			ids()
+		);
+
+		expect(messages[1].toolCalls).toBe('');
+	});
+});
+
 describe('the images of a stored message', () => {
 	const bytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x7f, 0x80, 0xff];
 	/* As the JSON of `history` writes them: a high byte is a lone surrogate. */
@@ -155,9 +204,16 @@ describe('the images of a stored message', () => {
 		expect([...storedImageBytes(stored)!]).toEqual(bytes);
 	});
 
-	it('refuses text that is not a stored image', () => {
-		expect(storedImageBytes('caf\u00e9')).toBeNull();
-		expect(storedImageBytes('\ud83d\ude00')).toBeNull();
+	it('reads a valid UTF-8 sequence among the bytes as the bytes it came from', () => {
+		/* 0xC4 0x89 is U+0109, and 0xF0 0x9F 0x98 0x80 is U+1F600: both are valid UTF-8. */
+		expect([...storedImageBytes('a\u0109\u{1f600}\udcff')!]).toEqual([
+			0x61, 0xc4, 0x89, 0xf0, 0x9f, 0x98, 0x80, 0xff
+		]);
+	});
+
+	it('refuses a surrogate that is not an escaped byte', () => {
+		expect(storedImageBytes('\ud83d')).toBeNull();
+		expect(storedImageBytes('\udc7f')).toBeNull();
 	});
 
 	it('makes the image an attachment of the user message', () => {
@@ -186,7 +242,7 @@ describe('the images of a stored message', () => {
 		const { messages } = fyaiConversationRows(
 			summary,
 			[
-				{ content: [{ data: 'é', media_type: 'image/png', type: 'image' }], role: 'user' },
+				{ content: [{ data: '\ud83d', media_type: 'image/png', type: 'image' }], role: 'user' },
 				{ content: 'plain', role: 'user' }
 			],
 			ids()
