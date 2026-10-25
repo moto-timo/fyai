@@ -159,3 +159,83 @@ describe('a turn that follows an earlier message', () => {
 		expect(await history('g')).toEqual(['one', 'answer to one', 'two', 'answer to two']);
 	});
 });
+
+describe('images of a turn', () => {
+	const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+
+	async function send(body: Record<string, unknown>) {
+		const res = await fetch(`${base}/api/fyai/chat`, {
+			body: JSON.stringify({ conversationId: 'img', fresh: true, ...body }),
+			headers,
+			method: 'POST'
+		});
+
+		return { status: res.status, text: await res.text() };
+	}
+
+	async function first(conversationId: string) {
+		const res = await fetch(`${base}/api/fyai/conversations/${conversationId}/messages`, {
+			headers
+		});
+
+		return (await res.json()).messages[0];
+	}
+
+	it('sends each image as a block of the user message', async () => {
+		const out = await send({
+			images: [
+				{ data: png.toString('base64'), mediaType: 'image/png', name: 'a.png' },
+				{ data: png.toString('base64'), mediaType: 'image/webp', name: 'b.webp' }
+			],
+			prompt: 'what is this'
+		});
+
+		expect(out.status).toBe(200);
+
+		const message = await first('img');
+
+		expect(message.content).toBe('what is this');
+		expect(message.images).toEqual([
+			{ mediaType: 'image/png', size: png.length },
+			{ mediaType: 'image/webp', size: png.length }
+		]);
+	});
+
+	it('takes a message of images alone', async () => {
+		const out = await send({
+			conversationId: 'img2',
+			images: [{ data: png.toString('base64'), mediaType: 'image/jpeg', name: 'a.jpg' }],
+			prompt: ''
+		});
+
+		expect(out.status).toBe(200);
+
+		const message = await first('img2');
+
+		expect(message.content).toBe('');
+		expect(message.images).toHaveLength(1);
+	});
+
+	it('sends no block for a turn with no image', async () => {
+		await send({ conversationId: 'img3', prompt: 'plain' });
+
+		expect((await first('img3')).images).toEqual([]);
+	});
+
+	it('refuses a type that fyai does not take, bad data, and no prompt at all', async () => {
+		const data = png.toString('base64');
+
+		expect((await send({ images: [{ data, mediaType: 'image/bmp' }], prompt: 'x' })).status).toBe(
+			400
+		);
+		expect(
+			(await send({ images: [{ data: 'not base64!', mediaType: 'image/png' }], prompt: 'x' }))
+				.status
+		).toBe(400);
+		expect(
+			(await send({ images: [{ data: '', mediaType: 'image/png' }], prompt: 'x' })).status
+		).toBe(400);
+		expect((await send({ images: 'x', prompt: 'x' })).status).toBe(400);
+		expect((await send({ prompt: '  ' })).status).toBe(400);
+	});
+});

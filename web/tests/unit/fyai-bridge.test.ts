@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import {
 	catalogueModelName,
+	checkImages,
 	commandsFromSchema,
 	conversationBranch,
 	conversationsFromBranches,
@@ -12,7 +13,8 @@ import {
 	rewindPlan,
 	sessionIdFor,
 	slashCommandArgs,
-	unknownCommandMessage
+	unknownCommandMessage,
+	userContent
 } from '../../server/protocol.mjs';
 import { describe, expect, it } from 'vitest';
 
@@ -295,5 +297,65 @@ describe('rewindPlan', () => {
 		expect(rewindPlan(history, null)).toEqual({ action: 'delete' });
 		expect(rewindPlan([], null)).toEqual({ action: 'none' });
 		expect(rewindPlan([{ content: 'x', role: 'assistant' }], null)).toEqual({ action: 'none' });
+	});
+});
+
+describe('checkImages', () => {
+	const data = Buffer.from('abc').toString('base64');
+
+	it('keeps the images that fyai takes, with a name', () => {
+		const out = checkImages([
+			{ data, mediaType: 'image/png', name: 'a.png' },
+			{ data, mediaType: 'image/jpeg' },
+			{ data, mediaType: 'image/gif' },
+			{ data, mediaType: 'image/webp' }
+		]) as { images: { mediaType: string; name: string }[] };
+
+		expect(out.images.map((i) => i.mediaType)).toEqual([
+			'image/png',
+			'image/jpeg',
+			'image/gif',
+			'image/webp'
+		]);
+		expect(out.images.map((i) => i.name)).toEqual(['a.png', 'image', 'image', 'image']);
+	});
+
+	it('takes no list as no images', () => {
+		expect(checkImages(undefined)).toEqual({ images: [] });
+		expect(checkImages([])).toEqual({ images: [] });
+	});
+
+	it('refuses another type, data that is not base64, no data and a value that is not a list', () => {
+		for (const bad of [
+			[{ data, mediaType: 'image/svg+xml' }],
+			[{ data, mediaType: undefined }],
+			[{ data: 'a b', mediaType: 'image/png' }],
+			[{ data: 7, mediaType: 'image/png' }],
+			[{ data: '', mediaType: 'image/png' }],
+			[null],
+			'x'
+		]) {
+			expect(checkImages(bad)).toHaveProperty('error');
+		}
+	});
+});
+
+describe('userContent', () => {
+	const image = { data: 'QUJD', mediaType: 'image/png', name: 'a.png' };
+
+	it('is the text and then a block for each image', () => {
+		expect(userContent('look', [image])).toEqual([
+			{ text: 'look', type: 'text' },
+			{
+				name: 'a.png',
+				source: { data: 'QUJD', media_type: 'image/png', type: 'base64' },
+				type: 'image'
+			}
+		]);
+	});
+
+	it('has no text block when there is no text', () => {
+		expect(userContent('  ', [image]).map((b) => b.type)).toEqual(['image']);
+		expect(userContent('hi', []).map((b) => b.type)).toEqual(['text']);
 	});
 });

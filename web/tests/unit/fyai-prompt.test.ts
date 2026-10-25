@@ -3,6 +3,8 @@ import { AttachmentType, MessageRole } from '$lib/enums';
 import {
 	buildFyaiPrompt,
 	fyaiAnchor,
+	fyaiImages,
+	fyaiUnsupportedAttachments,
 	messageText,
 	parseProviderKeys
 } from '$lib/services/fyai.service';
@@ -146,5 +148,52 @@ describe('fyaiAnchor', () => {
 		});
 
 		expect(fyaiAnchor([first, assistant('a'), user('two')])?.text).toBe(buildFyaiPrompt([first]));
+	});
+});
+
+describe('fyaiImages and fyaiUnsupportedAttachments', () => {
+	const withExtra = (extra: unknown[]) =>
+		[
+			{ content: 'look', extra, id: 'u', role: 'user' },
+			{ content: 'ok', role: 'assistant' }
+		] as DatabaseMessage[];
+
+	it('takes the images of the last user message as base64 with their type', () => {
+		const out = fyaiImages([
+			...withExtra([
+				{ base64Url: 'data:image/png;base64,QUJD', name: 'a.png', type: AttachmentType.IMAGE },
+				{ content: 'x', name: 'f.txt', type: AttachmentType.TEXT }
+			]),
+			{ content: 'next', extra: [], id: 'u2', role: 'user' } as unknown as DatabaseMessage
+		]);
+
+		expect(out).toEqual([]);
+		expect(
+			fyaiImages(
+				withExtra([
+					{ base64Url: 'data:image/png;base64,QUJD', name: 'a.png', type: AttachmentType.IMAGE }
+				])
+			)
+		).toEqual([{ data: 'QUJD', mediaType: 'image/png', name: 'a.png' }]);
+	});
+
+	it('leaves out an image that is not a data URL', () => {
+		expect(
+			fyaiImages(
+				withExtra([{ base64Url: 'http://x/y.png', name: 'y', type: AttachmentType.IMAGE }])
+			)
+		).toEqual([]);
+	});
+
+	it('names the audio and video that fyai cannot take', () => {
+		const out = fyaiUnsupportedAttachments(
+			withExtra([
+				{ name: 'a.mp3', type: AttachmentType.AUDIO },
+				{ name: 'v.mp4', type: AttachmentType.VIDEO },
+				{ name: 'i.png', type: AttachmentType.IMAGE }
+			])
+		);
+
+		expect(out).toEqual(['a.mp3', 'v.mp4']);
 	});
 });

@@ -36,10 +36,21 @@ if (args.includes('claude-sdk')) {
 
 	process.stdin.setEncoding('utf8');
 	process.stdin.once('data', (line) => {
-		const prompt = JSON.parse(line.split('\n')[0]).message.content[0].text;
+		const blocks = JSON.parse(line.split('\n')[0]).message.content;
+		const prompt = blocks
+			.filter((block) => block.type === 'text')
+			.map((block) => block.text)
+			.join('');
 		const b = (state.branches[name] ??= { bounds: [], messages: [], turns: 0, updated: 1 });
+		/* The image blocks as the SDK front takes them: the type and the decoded size. */
+		const images = blocks
+			.filter((block) => block.type === 'image' && block.source?.type === 'base64')
+			.map((block) => ({
+				mediaType: block.source.media_type,
+				size: Buffer.from(block.source.data, 'base64').length
+			}));
 
-		b.messages.push({ content: prompt, role: 'user' });
+		b.messages.push({ content: prompt, images, role: 'user' });
 		b.bounds.push(b.messages.length);
 		b.messages.push({ content: `answer to ${prompt}`, role: 'assistant' });
 		b.bounds.push(b.messages.length);
