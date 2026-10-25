@@ -1,19 +1,16 @@
 // SPDX-License-Identifier: MIT
 /*
  * The parts of the bridge that decide, with no process and no socket: the
- * session ID of a conversation, the slash commands, and the block that their
+ * branch of a conversation, the slash commands, and the block that their
  * output goes into. The test suite imports this module directly.
  */
-
-/** The branch prefix of a session, as `fyai claude-sdk` names it. */
-export const SDK_BRANCH_PREFIX = 'sdk/';
 
 /*
  * The slash commands of the page come from `fyai schema commands`, so the
  * page offers what the fyai it runs supports and keeps no list of its own.
  * fyai claude-sdk sends every other `/` line to the model as text, and
  * `/clear` there starts a session the page does not know, so each command
- * runs an fyai verb on the session branch instead. No shell sees the words:
+ * runs an fyai verb on the branch of the conversation instead. No shell sees the words:
  * they become argv.
  */
 
@@ -60,22 +57,6 @@ export function findCommand(commands, name) {
 }
 
 /**
- * The session ID of a conversation. fyai accepts only alphanumerics, '-' and
- * '_' in a session ID, so every other byte becomes an underscore. The same
- * conversation always maps to the same session.
- *
- * @param {unknown} conversationId
- * @returns {string | null}
- */
-export function sessionIdFor(conversationId) {
-	const id = String(conversationId ?? '')
-		.replace(/[^0-9A-Za-z_-]/g, '_')
-		.slice(0, 64);
-
-	return id || null;
-}
-
-/**
  * `/name rest` of a prompt, or null when the prompt is not a command.
  *
  * @param {unknown} prompt
@@ -96,14 +77,14 @@ export function parseSlashCommand(prompt) {
  * user typed. A model that only reads the session is told the model, because
  * a session carries no model of its own; `model NAME` stores one.
  *
- * @param {string} sessionId
+ * @param {string} branch
  * @param {{ name: string, rest: string[] }} command
  * @param {string} model
  * @param {string[]} [extraArgs]
  * @param {{ name: string, aliases: string[] }[]} [commands] what fyai supports
  * @returns {string[] | null}
  */
-export function slashCommandArgs(sessionId, command, model, extraArgs = [], commands = []) {
+export function slashCommandArgs(branch, command, model, extraArgs = [], commands = []) {
 	const entry = findCommand(commands, command.name);
 
 	if (!entry) return null;
@@ -115,13 +96,7 @@ export function slashCommandArgs(sessionId, command, model, extraArgs = [], comm
 	 */
 	const setsModel = entry.name === 'model';
 	/* Global options come before the command, as fyai reads them there. */
-	const args = [
-		...extraArgs,
-		'--set',
-		'display/markdown=false',
-		'--branch',
-		`${SDK_BRANCH_PREFIX}${sessionId}`
-	];
+	const args = [...extraArgs, '--set', 'display/markdown=false', '--branch', branch];
 
 	if (model && !setsModel) args.push('--model', model);
 
@@ -237,14 +212,15 @@ export function commandMarkdown(result) {
 }
 
 /*
- * Conversations are branches. The page keeps a copy of each for its own use,
- * and fyai holds the conversation itself, so the page lists, reads, renames
- * and deletes the branches of its sessions (`sdk/ID`) through these verbs.
+ * Conversations are branches, named as the CLI names them: a session starts
+ * as `session/TIME` and any branch with an exchange is a conversation. fyai
+ * holds the conversation, so the page lists, reads, renames and deletes the
+ * branches through these verbs and keeps nothing of its own.
  */
 
 /**
  * The conversations in the output of `fyai branch list --output json`: the
- * branches of the sessions of the page, newest first. The time is in
+ * branches that hold an exchange, newest first. The time is in
  * microseconds there and in milliseconds here, as the page counts it.
  *
  * @param {any} list the parsed output
@@ -254,15 +230,40 @@ export function conversationsFromBranches(list) {
 	if (!Array.isArray(list)) return [];
 
 	return list
-		.filter((b) => typeof b?.branch === 'string' && b.branch.startsWith(SDK_BRANCH_PREFIX))
+		.filter((b) => typeof b?.branch === 'string' && Number(b.turns) > 0)
 		.map((b) => ({
-			id: b.branch.slice(SDK_BRANCH_PREFIX.length),
+			id: b.branch,
 			model: typeof b.model === 'string' && b.model !== '-' ? b.model : '',
 			name: typeof b.description === 'string' ? b.description : '',
 			turns: Number(b.turns) || 0,
 			updated: Math.floor(Number(b.updated) / 1000) || 0
 		}))
 		.sort((a, b) => b.updated - a.updated);
+}
+
+/** The longest title that the page shows for a conversation. */
+const TITLE_MAX = 80;
+
+/**
+ * A title for a branch that has no description: the first line of its first
+ * user message. The CLI names a session by its time and sets no description,
+ * so the page reads one from what was asked.
+ *
+ * @param {object[]} messages the stored messages of the branch
+ * @returns {string} '' when no user message has text
+ */
+export function titleFromHistory(messages) {
+	for (const message of messages) {
+		if (message?.role !== 'user') continue;
+
+		const line = messageTextOf(message)
+			.split('\n')
+			.find((l) => l.trim().length > 0);
+
+		if (line) return line.trim().slice(0, TITLE_MAX);
+	}
+
+	return '';
 }
 
 /**
@@ -291,15 +292,40 @@ export function parseHistory(text) {
 }
 
 /**
- * The branch of the conversation @id, or '' when the ID cannot name one.
+ * The branch of the conversation @id, which is the name of the branch, or ''
+ * when the ID cannot be one. fyai checks the name again; this keeps a word
+ * that fyai would read as an option, and a name with control bytes, out of
+ * its argv.
  *
  * @param {unknown} id
  * @returns {string}
  */
 export function conversationBranch(id) {
-	const session = sessionIdFor(id);
+	const name = String(id ?? '');
 
-	return session ? SDK_BRANCH_PREFIX + session : '';
+	if (name.length > 200 || name.startsWith('-') || name.includes('..')) return '';
+
+	return /^[A-Za-z0-9_][A-Za-z0-9_.:@/+~-]*$/.test(name) ? name : '';
+}
+
+/**
+ * The name of a new session, in the form of the CLI: `session/` and the time
+ * in UTC to the microsecond. The branch exists when its first exchange is
+ * stored, as in the CLI.
+ *
+ * @param {number} [micros] microseconds since the epoch
+ * @returns {string}
+ */
+export function newSessionBranch(
+	micros = Math.floor((performance.timeOrigin + performance.now()) * 1000)
+) {
+	const date = new Date(Math.floor(micros / 1000));
+	const stamp = date
+		.toISOString()
+		.replace(/[-:]/g, '')
+		.replace(/\.\d+Z$/, '');
+
+	return `session/${stamp}.${String(micros % 1000000).padStart(6, '0')}`;
 }
 
 /*

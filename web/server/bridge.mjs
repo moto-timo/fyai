@@ -34,13 +34,14 @@ import {
 	conversationsFromBranches,
 	findCatalogueModel,
 	inputModalities,
+	newSessionBranch,
 	pageCapabilities,
 	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
 	rewindPlan,
-	sessionIdFor,
 	slashCommandArgs,
+	titleFromHistory,
 	unknownCommandMessage,
 	userContent
 } from './protocol.mjs';
@@ -333,15 +334,14 @@ class EventStream {
  */
 function spawnTurn(options) {
 	const {
+		branch,
 		env = process.env,
-		fresh = false,
 		images = [],
 		model = '',
 		onExit = () => {},
 		onFrame = () => {},
 		permissionMode = config.permissionMode,
 		prompt = '',
-		sessionId,
 		tools
 	} = options;
 	const mode = SDKMODES.has(permissionMode) ? permissionMode : config.permissionMode;
@@ -352,6 +352,8 @@ function spawnTurn(options) {
 	const globals = [...config.extraArgs];
 	const args = [
 		...globals,
+		'--branch',
+		branch,
 		'claude-sdk',
 		'--input-format',
 		'stream-json',
@@ -360,9 +362,7 @@ function spawnTurn(options) {
 		'--verbose',
 		'--include-partial-messages',
 		'--permission-mode',
-		mode,
-		fresh ? '--session-id' : '--resume',
-		sessionId
+		mode
 	];
 
 	if (model) args.push('--model', model);
@@ -490,6 +490,8 @@ function spawnTurn(options) {
 
 /* The turn that runs for each session, so a change of its branch can wait for the turn. */
 const activeTurns = new Map();
+/** The title of a branch with no description, by branch and time. */
+const titleCache = new Map();
 /* The prompt of the last turn of each session that completed, to skip a check of its branch. */
 const completedPrompts = new Map();
 
@@ -560,9 +562,9 @@ function announceModelStatus(name, status) {
  * Runs one slash command on the session branch and returns its output. The
  * verb writes its own result; this program only forwards it.
  */
-async function runSlashCommand(sessionId, command, model, env = process.env) {
+async function runSlashCommand(branch, command, model, env = process.env) {
 	const commands = await listCommands();
-	const args = slashCommandArgs(sessionId, command, model, config.extraArgs, commands);
+	const args = slashCommandArgs(branch, command, model, config.extraArgs, commands);
 
 	if (!args) return { ok: false, text: unknownCommandMessage(command.name, commands) };
 
@@ -884,8 +886,7 @@ function propsPayload(requested = '') {
  *
  * @returns {Promise<string>} '' when the branch is as the turn needs it, else why it could not be
  */
-async function rewindSession(sessionId, anchor, env) {
-	const branch = `sdk/${sessionId}`;
+async function rewindSession(branch, anchor, env) {
 	const verb = (args) => runCapture(config.bin, [...config.extraArgs, ...args], 60000, env);
 	const read = async (name) =>
 		parseHistory((await verb(['--branch', name, 'history', '--output', 'json'])).out);
@@ -950,7 +951,7 @@ const CONVERSATION_ROUTE = /^\/api\/fyai\/conversations(?:\/([^/]+)(\/messages)?
 
 /**
  * List, read, rename and delete the conversations of the page. A conversation
- * is the branch `sdk/ID`; each answer is the output of one fyai verb, run with
+ * is the branch of that name; each answer is the output of one fyai verb, run with
  * its words as argv and no shell.
  */
 async function handleConversations(req, res, match) {
@@ -958,17 +959,42 @@ async function handleConversations(req, res, match) {
 	const verb = (args) => runCapture(config.bin, [...config.extraArgs, ...args], 30000);
 
 	if (!rawId) {
+		/* A new conversation has a name and no branch until its first exchange. */
+		if (req.method === 'POST') return sendJson(res, 200, { id: newSessionBranch() });
+
 		if (req.method !== 'GET') return sendError(res, 405, 'method not allowed');
 
 		const out = await verb(['branch', 'list', '--output', 'json']);
 
 		if (out.code !== 0) return sendError(res, 502, out.err.trim() || 'fyai cannot list branches');
 
+		let conversations;
+
 		try {
-			return sendJson(res, 200, { conversations: conversationsFromBranches(JSON.parse(out.out)) });
+			conversations = conversationsFromBranches(JSON.parse(out.out));
 		} catch {
 			return sendError(res, 502, 'fyai listed the branches in a form that cannot be read');
 		}
+
+		/*
+		 * A branch with no description is titled by its first question. A title is
+		 * kept until the branch changes, which its time says.
+		 */
+		for (const conversation of conversations) {
+			if (conversation.name) continue;
+
+			const key = `${conversation.id}\0${conversation.updated}`;
+
+			if (!titleCache.has(key)) {
+				const history = await verb(['--branch', conversation.id, 'history', '--output', 'json']);
+
+				titleCache.set(key, history.code === 0 ? titleFromHistory(parseHistory(history.out)) : '');
+			}
+
+			conversation.name = titleCache.get(key);
+		}
+
+		return sendJson(res, 200, { conversations });
 	}
 
 	const branch = conversationBranch(decodeURIComponent(rawId));
@@ -987,11 +1013,10 @@ async function handleConversations(req, res, match) {
 	}
 
 	/* A turn that runs holds the branch: changing it under the turn would lose a publish. */
-	if (activeTurns.has(sessionIdFor(decodeURIComponent(rawId)) ?? ''))
-		return sendError(res, 409, 'a turn of this conversation is running');
+	if (activeTurns.has(branch)) return sendError(res, 409, 'a turn of this conversation is running');
 
 	if (req.method === 'DELETE') {
-		completedPrompts.delete(sessionIdFor(decodeURIComponent(rawId)) ?? '');
+		completedPrompts.delete(branch);
 
 		const out = await verb(['branch', 'delete', '--force', branch]);
 
@@ -1034,10 +1059,10 @@ async function handleChat(req, res) {
 		return;
 	}
 
-	const sessionId = sessionIdFor(body.conversationId);
+	const branch = conversationBranch(body.conversationId);
 
-	if (!sessionId) {
-		sendError(res, 400, 'conversationId is required and must hold a letter or a digit');
+	if (!branch) {
+		sendError(res, 400, 'conversationId is required and must name a branch');
 
 		return;
 	}
@@ -1071,7 +1096,7 @@ async function handleChat(req, res) {
 	const command = parseSlashCommand(prompt);
 
 	if (command) {
-		const result = await runSlashCommand(sessionId, command, model, env);
+		const result = await runSlashCommand(branch, command, model, env);
 
 		/*
 		 * With a name, `/model` changes the model of the session branch, which
@@ -1097,7 +1122,7 @@ async function handleChat(req, res) {
 
 		if (result.model) frame.model = result.model;
 
-		stream.send({ sessionId, subtype: 'start', type: 'bridge' });
+		stream.send({ conversationId: branch, subtype: 'start', type: 'bridge' });
 		stream.send(frame);
 		stream.send({ subtype: 'done', type: 'bridge' });
 		stream.end();
@@ -1114,7 +1139,7 @@ async function handleChat(req, res) {
 	req.on('close', abort);
 	res.on('close', abort);
 
-	stream.send({ sessionId, subtype: 'start', type: 'bridge' });
+	stream.send({ conversationId: branch, subtype: 'start', type: 'bridge' });
 
 	/*
 	 * The page says which user message the turn follows. A branch that ends at
@@ -1127,10 +1152,10 @@ async function handleChat(req, res) {
 				? { occurrence: Number(body.anchor.occurrence) || 1, text: body.anchor.text }
 				: null;
 
-		if (!anchor || completedPrompts.get(sessionId) !== anchor.text.trim()) {
-			completedPrompts.delete(sessionId);
+		if (!anchor || completedPrompts.get(branch) !== anchor.text.trim()) {
+			completedPrompts.delete(branch);
 
-			const why = await rewindSession(sessionId, anchor, env);
+			const why = await rewindSession(branch, anchor, env);
 
 			if (why) {
 				stream.send({
@@ -1151,8 +1176,8 @@ async function handleChat(req, res) {
 
 	const options = {
 		/* The environment of this request, which carries the provider keys. */
+		branch,
 		env,
-		fresh: !!body.fresh,
 		images: attached.images,
 		model,
 		onExit: (summary) => {
@@ -1166,46 +1191,23 @@ async function handleChat(req, res) {
 		},
 		permissionMode:
 			typeof body.permissionMode === 'string' ? body.permissionMode : config.permissionMode,
-		prompt,
-		sessionId
+		prompt
 	};
 
 	/*
 	 * The process is spawned here, not through a helper, so the turn can be
 	 * reachable by the abort handler while the frames arrive.
 	 */
-	let turns = 0;
-	let summary;
+	active = spawnTurn(options);
+	activeTurns.set(branch, active);
 
-	for (;;) {
-		turns++;
-		active = spawnTurn(options);
-		activeTurns.set(sessionId, active);
-		summary = await active.done;
+	const summary = await active.done;
 
-		if (activeTurns.get(sessionId) === active) activeTurns.delete(sessionId);
+	if (activeTurns.get(branch) === active) activeTurns.delete(branch);
 
-		/* A turn that completed leaves the branch at the end of this prompt. */
-		if (succeeded) completedPrompts.set(sessionId, prompt.trim());
-		else completedPrompts.delete(sessionId);
-
-		/*
-		 * A start and a resume differ in the one flag, and each is wrong for a
-		 * session that the other one names: a new conversation has no session,
-		 * and a turn retried after a failure has one already. fyai says which
-		 * before it writes a frame; the other mode is then the right one.
-		 */
-		const noFrames = !summary.sawResult && summary.frames === 0;
-		const missing =
-			!options.fresh && turns === 1 && noFrames && /no session with ID/.test(summary.stderr);
-		const exists =
-			options.fresh && turns === 1 && noFrames && /exists already/.test(summary.stderr);
-
-		if (!missing && !exists) break;
-
-		options.fresh = missing;
-		stream.send({ sessionId, subtype: missing ? 'fresh' : 'resume', type: 'bridge' });
-	}
+	/* A turn that completed leaves the branch at the end of this prompt. */
+	if (succeeded) completedPrompts.set(branch, prompt.trim());
+	else completedPrompts.delete(branch);
 
 	active = null;
 

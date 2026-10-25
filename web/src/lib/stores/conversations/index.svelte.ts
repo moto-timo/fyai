@@ -13,7 +13,6 @@ import { ROUTES } from '$lib/constants';
 import { MessageRole } from '$lib/enums';
 import { ConversationTransferService } from '$lib/services/conversation-transfer.service';
 import { DatabaseService } from '$lib/services/database.service';
-import { MigrationService } from '$lib/services/migration.service';
 import { RouterService } from '$lib/services/router.service';
 import { backendStore } from '$lib/stores/backend.svelte';
 // direct imports between stores, not via the barrel, to avoid circular deps
@@ -276,11 +275,16 @@ class ConversationsStore implements ConversationsPreferencesHost {
 		// the defaults. Working directory picked on the new-chat screen gets
 		// threaded in here too, then cleared so it doesn't bleed onto subsequent
 		// new chats.
-		const conversation = await DatabaseService.createConversation(conversationName, {
-			cwd: this.preferences.pendingCwd ?? undefined,
-			reasoningEffort: this.preferences.pendingReasoningEffort,
-			...this.preferences.getToolPolicySnapshot()
-		});
+		const conversation = await DatabaseService.createConversation(
+			conversationName,
+			{
+				cwd: this.preferences.pendingCwd ?? undefined,
+				reasoningEffort: this.preferences.pendingReasoningEffort,
+				...this.preferences.getToolPolicySnapshot()
+			},
+			/* A server that names its conversations gives the name. */
+			await backendStore.active.newConversationId?.()
+		);
 
 		this.preferences.pendingCwd = null;
 
@@ -508,8 +512,7 @@ class ConversationsStore implements ConversationsPreferencesHost {
 
 		this.initPromise = (async () => {
 			try {
-				await MigrationService.runAllMigrations();
-				/* The server holds the conversations; the page keeps a copy of them. */
+				/* The server holds the conversations; the page lists them from it. */
 				await backendStore.active.syncConversations?.().catch((error: unknown) => {
 					console.error('Failed to sync conversations with the server:', error);
 				});
@@ -531,6 +534,11 @@ class ConversationsStore implements ConversationsPreferencesHost {
 	 */
 	async loadConversation(convId: string): Promise<boolean> {
 		try {
+			/* A conversation that the server holds has its messages read on first use. */
+			await backendStore.active.hydrateConversation?.(convId).catch((error: unknown) => {
+				console.error('Failed to read the conversation from the server:', error);
+			});
+
 			const conversation = await DatabaseService.getConversation(convId);
 
 			if (!conversation) {

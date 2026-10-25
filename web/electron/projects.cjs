@@ -80,7 +80,7 @@ function recentSave(file, list) {
 
 /**
  * The port of the bridge of a project. The origin of the page is its address,
- * and the page keeps its conversations per origin, so a project needs the same
+ * and the page keeps its settings per origin, so a project needs the same
  * port at every launch to find them again. The port comes from the directory,
  * and a project with a port that is taken falls back to any free one.
  *

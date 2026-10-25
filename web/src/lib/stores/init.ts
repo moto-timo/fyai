@@ -9,6 +9,7 @@ import { toolsStore } from './tools.svelte';
 import { versionStore } from './version.svelte';
 import { browser } from '$app/environment';
 import { forcedBackend } from '$lib/services/backend/forced';
+import { DatabaseService } from '$lib/services/database.service';
 import { MigrationService } from '$lib/services/migration.service';
 
 let startup: Promise<void> | null = null;
@@ -17,7 +18,6 @@ export function initStores(): Promise<void> {
 	if (!browser) return Promise.resolve();
 
 	startup ??= (async () => {
-		await MigrationService.runAllMigrations();
 		await backendStore.detect(
 			forcedBackend({
 				build: import.meta.env?.VITE_PUBLIC_BACKEND,
@@ -25,6 +25,16 @@ export function initStores(): Promise<void> {
 				storage: (key) => localStorage.getItem(key)
 			})
 		);
+
+		/*
+		 * A server that keeps the conversations leaves none in the browser: the
+		 * tables are in memory, and the old database is neither read nor made.
+		 */
+		const serverConversations = backendStore.supports('serverConversations');
+
+		if (serverConversations) await DatabaseService.useMemory();
+
+		await MigrationService.runAllMigrations({ database: !serverConversations });
 
 		settingsStore.initialize();
 		permissionsStore.initialize();

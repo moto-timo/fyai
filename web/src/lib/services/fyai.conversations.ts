@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 /**
- * The conversations of fyai. A conversation is the branch `sdk/ID` of the
- * project, and the page keeps a copy of it in its own database. The bridge
- * lists, reads, renames and deletes the branches; this module calls it and
- * turns the stored messages of a branch into the rows that the page shows.
+ * The conversations of fyai. A conversation is a branch of the project, and
+ * its ID is the name of the branch. fyai holds it and the page keeps it in
+ * memory. The bridge lists, reads, renames and deletes the branches; this
+ * module calls it and turns the stored messages of a branch into the rows that
+ * the page shows.
  */
 
 import { AttachmentType, MessageRole } from '$lib/enums';
@@ -19,15 +20,6 @@ export interface FyaiConversationSummary {
 	turns: number;
 	/** Milliseconds since the epoch. */
 	updated: number;
-}
-
-/** The ID of the session of a conversation: the bytes that a branch name can hold. */
-export function fyaiSessionId(conversationId: string): string {
-	return (
-		String(conversationId ?? '')
-			.replace(/[^0-9A-Za-z_-]/g, '_')
-			.slice(0, 64) || ''
-	);
 }
 
 const TITLE_MAX = 80;
@@ -56,6 +48,15 @@ export async function listFyaiConversations(): Promise<FyaiConversationSummary[]
 	};
 
 	return Array.isArray(body.conversations) ? body.conversations : [];
+}
+
+/** The ID of a new conversation, which is the name that its branch will have. */
+export async function newFyaiConversationId(): Promise<string> {
+	const body = (await (await request('', { method: 'POST' })).json()) as { id?: string };
+
+	if (typeof body.id !== 'string' || !body.id) throw new Error('the bridge named no conversation');
+
+	return body.id;
 }
 
 export async function readFyaiMessages(id: string): Promise<unknown[]> {

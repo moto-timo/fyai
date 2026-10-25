@@ -38,7 +38,7 @@ const STATIC_DIR = join(ROOT, 'dist');
 
 /*
  * A project keeps the port that its directory gives (`portForProject`), so the
- * origin of the page is the same at each launch and the conversations that the
+ * origin of the page is the same at each launch and the settings that the
  * page keeps for that origin are found again. A port that is taken, by a
  * development bridge or a stale one, falls back to port 0, which asks the
  * system for a free one. FYAI_BRIDGE_PORT names the port of the first window

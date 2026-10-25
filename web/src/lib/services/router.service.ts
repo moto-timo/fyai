@@ -8,6 +8,7 @@ import { ROUTES } from '$lib/constants';
 
 export class RouterService {
 	static chat(id: string): string {
-		return `${ROUTES.CHAT}/${id}`;
+		/* An ID can be a branch name, which holds slashes. */
+		return `${ROUTES.CHAT}/${encodeURIComponent(id)}`;
 	}
 }

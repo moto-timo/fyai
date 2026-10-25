@@ -9,7 +9,8 @@ export const llamaBackend: Backend = {
 		browserMcp: true,
 		browserTools: true,
 		modelManager: true,
-		sampling: true
+		sampling: true,
+		serverConversations: false
 	},
 	kind: LLAMA_KIND
 };

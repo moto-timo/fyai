@@ -1,9 +1,11 @@
 /**
- * DatabaseService - IndexedDB persistence for conversations and messages
+ * DatabaseService - persistence for conversations and messages
  *
  * Thin Dexie layer over the conversations/messages tables: CRUD, tree
- * navigation (descendants, reparenting) and cascading deletes. No reactive
- * state; consumed by conversationsStore and the chat flows.
+ * navigation (descendants, reparenting) and cascading deletes. The tables live
+ * in IndexedDB, or in memory when the server keeps the conversations
+ * (`useMemory()`). No reactive state; consumed by conversationsStore and the
+ * chat flows.
  */
 
 import { IDXDB_STORES, IDXDB_TABLES, STORAGE_APP_NAME } from '$lib/constants';
@@ -11,20 +13,21 @@ import { MessageRole } from '$lib/enums';
 import type { McpServerOverride } from '$lib/types/database';
 import type { ExportedConversation } from '$lib/types/database';
 import { filterByLeafNodeId, findDescendantMessages, uuid } from '$lib/utils';
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type DexieOptions, type EntityTable } from 'dexie';
 
 class LlamaUiDatabase extends Dexie {
 	[IDXDB_TABLES.conversations]!: EntityTable<DatabaseConversation, string>;
 	[IDXDB_TABLES.messages]!: EntityTable<DatabaseMessage, string>;
 
-	constructor() {
-		super(STORAGE_APP_NAME);
+	constructor(options?: DexieOptions) {
+		super(STORAGE_APP_NAME, options);
 
 		this.version(1).stores(IDXDB_STORES);
 	}
 }
 
-const db = new LlamaUiDatabase();
+/* Dexie opens the database on its first use, so this touches no storage. */
+let db = new LlamaUiDatabase();
 
 export class DatabaseService {
 	/**
@@ -127,15 +130,17 @@ export class DatabaseService {
 	 *
 	 * @param name - Name of the conversation
 	 * @param fields - Optional extra fields (e.g. reasoningEffort)
+	 * @param id - The ID that the server gave it, else a new one is made
 	 * @returns The created conversation
 	 */
 	static async createConversation(
 		name: string,
-		fields?: Partial<Omit<DatabaseConversation, 'id' | 'name' | 'lastModified'>>
+		fields?: Partial<Omit<DatabaseConversation, 'id' | 'name' | 'lastModified'>>,
+		id?: string
 	): Promise<DatabaseConversation> {
 		const conversation: DatabaseConversation = {
 			currNode: '',
-			id: uuid(),
+			id: id ?? uuid(),
 			lastModified: Date.now(),
 			name,
 			...fields
@@ -554,6 +559,28 @@ export class DatabaseService {
 	}
 
 	/**
+	 * Writes a conversation and its messages, in place of the ones of that ID.
+	 * The server holds the conversation and sends it whole, so what the page
+	 * had of it is dropped first.
+	 *
+	 * @param data - The conversation and its messages
+	 */
+	static async replaceConversation(data: {
+		conv: DatabaseConversation;
+		messages: DatabaseMessage[];
+	}): Promise<void> {
+		await db.transaction(
+			'rw',
+			[db[IDXDB_TABLES.conversations], db[IDXDB_TABLES.messages]],
+			async () => {
+				await db[IDXDB_TABLES.messages].where('convId').equals(data.conv.id).delete();
+				await db[IDXDB_TABLES.conversations].put(data.conv);
+				await db[IDXDB_TABLES.messages].bulkPut(data.messages);
+			}
+		);
+	}
+
+	/**
 	 * Toggles the pinned status of a conversation.
 	 *
 	 * @param id - Conversation ID
@@ -613,6 +640,18 @@ export class DatabaseService {
 		updates: Partial<Omit<DatabaseMessage, 'id'>>
 	): Promise<void> {
 		await db[IDXDB_TABLES.messages].update(id, updates);
+	}
+
+	/**
+	 * Keeps the tables in memory instead of IndexedDB. The server holds the
+	 * conversations then, and the page reads them from it. Call it before the
+	 * first use of the service; what was held before is not carried over.
+	 */
+	static async useMemory(): Promise<void> {
+		const { IDBKeyRange, indexedDB } = await import('fake-indexeddb');
+
+		db.close();
+		db = new LlamaUiDatabase({ IDBKeyRange, indexedDB });
 	}
 
 	/**

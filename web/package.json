@@ -117,5 +117,8 @@
 		"valibot": "1.4.2",
 		"yauzl": "^3.2.0"
 	},
-	"main": "electron/main.cjs"
+	"main": "electron/main.cjs",
+	"dependencies": {
+		"fake-indexeddb": "6.2.6"
+	}
 }

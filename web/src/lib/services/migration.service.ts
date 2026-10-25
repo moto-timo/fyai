@@ -877,13 +877,16 @@ export const MigrationService = {
 	 * Run all pending migrations (non-destructive - preserves legacy data)
 	 * Should be called once at app initialization
 	 */
-	async runAllMigrations(): Promise<void> {
+	async runAllMigrations(options: { database?: boolean } = {}): Promise<void> {
 		const state = getMigrationState();
 
 		if (import.meta.env.DEV && import.meta.env.VITE_DEBUG)
 			console.log('[Migration] Starting migration run, state:', state);
 
 		for (const migration of migrations) {
+			/* The page that keeps no database has none to move. */
+			if (options.database === false && migration.id === IDXDB_MIGRATION_ID) continue;
+
 			if (isMigrationCompleted(migration.id)) {
 				if (import.meta.env.DEV && import.meta.env.VITE_DEBUG)
 					console.log(`[Migration] ${migration.id}: already completed, skipping`);

@@ -55,8 +55,6 @@ export interface FyaiTurnRequest {
 	anchor?: FyaiAnchor | null;
 	/** The images of the last user message; the bridge hands them to fyai as files. */
 	images?: FyaiImage[];
-	/** The session does not exist yet: start it rather than resume it. */
-	fresh: boolean;
 	model?: string | null;
 	permissionMode?: string;
 	prompt: string;

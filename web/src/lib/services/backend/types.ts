@@ -17,6 +17,11 @@ export interface BackendCapabilities {
 	modelManager: boolean;
 	/** Sampling, penalties and their sync with the server defaults. */
 	sampling: boolean;
+	/**
+	 * The server keeps the conversations. The page holds them in memory for
+	 * the session and loads them from the server, so the browser keeps none.
+	 */
+	serverConversations: boolean;
 }
 
 /** The arguments of one turn that a backend runs in place of the page. */
@@ -59,11 +64,21 @@ export interface Backend {
 	 */
 	handleLine?: (line: string) => Promise<boolean>;
 	/**
-	 * Makes the conversations that the page keeps match the server, which holds
-	 * them: it adds the ones the page lacks and removes the ones the server no
-	 * longer has. It runs before the page loads its list.
+	 * Loads the list of conversations that the server holds into the page. It
+	 * runs before the page shows its list, and the messages of a conversation
+	 * come with `hydrateConversation`.
 	 */
 	syncConversations?: () => Promise<void>;
+	/**
+	 * Loads the messages of a conversation of the server into the page, when
+	 * the page has not read them yet. It runs before a conversation opens.
+	 */
+	hydrateConversation?: (id: string) => Promise<void>;
+	/**
+	 * The ID of a new conversation. A server that names its conversations says
+	 * the name here; a backend with no such function lets the page make one.
+	 */
+	newConversationId?: () => Promise<string>;
 	/** Tells the server that the page renamed a conversation. */
 	renameConversation?: (id: string, name: string) => Promise<void>;
 	/** Tells the server that the page deleted a conversation. */

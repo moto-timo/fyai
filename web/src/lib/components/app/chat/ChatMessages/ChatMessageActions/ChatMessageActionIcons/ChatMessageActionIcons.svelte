@@ -11,7 +11,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import { getChatMessageActionsContext, getChatMessageEditContext } from '$lib/contexts';
 	import { MessageRole } from '$lib/enums';
-	import { conversationsStore } from '$lib/stores';
+	import { backendStore, conversationsStore } from '$lib/stores';
 
 	interface Props {
 		role: MessageRole.USER | MessageRole.ASSISTANT;
@@ -89,7 +89,7 @@
 				<ActionIcon icon={ArrowRight} onclick={onContinue} tooltip="Continue" />
 			{/if}
 
-			{#if messageActions.forkConversation}
+			{#if messageActions.forkConversation && !backendStore.supports('serverConversations')}
 				<ActionIcon icon={GitBranch} onclick={handleOpenForkDialog} tooltip="Fork conversation" />
 			{/if}
 

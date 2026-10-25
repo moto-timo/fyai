@@ -25,8 +25,8 @@ import { DatabaseService } from '$lib/services/database.service';
 import {
 	deleteFyaiConversation,
 	fyaiConversationRows,
-	fyaiSessionId,
 	listFyaiConversations,
+	newFyaiConversationId,
 	readFyaiMessages,
 	renameFyaiConversation
 } from '$lib/services/fyai.conversations';
@@ -69,12 +69,10 @@ async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> 
 	if (prompt === null) return 'skip';
 
 	/*
-	 * The session ID is the conversation ID. fyai stores the turns, so a
-	 * turn sends only what the user typed since the last one. A conversation
-	 * with no answer yet has no session, unless an earlier turn failed after
-	 * it started one: the bridge asks fyai for the other mode then.
+	 * The conversation ID is the name of the branch. fyai stores the
+	 * exchanges, so a turn sends only what the user typed since the last one.
 	 */
-	const fresh = !request.allMessages.some((m) => m.role === MessageRole.ASSISTANT);
+	hydrated.add(convId);
 
 	let timings: ChatMessageTimings | undefined;
 	let error = false;
@@ -131,7 +129,6 @@ async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> 
 				anchor: fyaiAnchor(request.allMessages),
 				apiKey: settingsStore.config.apiKey?.toString().trim() ?? '',
 				conversationId: convId,
-				fresh,
 				images,
 				model: request.model,
 				prompt,
@@ -161,43 +158,64 @@ async function loadCommands(): Promise<BackendCommand[]> {
 	return Array.isArray(res.commands) ? res.commands : [];
 }
 
+/*
+ * The conversations whose messages the page holds. A conversation that the page
+ * made or opened has them; one that only the list named does not.
+ */
+// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping that no view reads
+const hydrated = new Set<string>();
+
 /**
- * Make the conversations of the page match the branches of fyai. fyai holds
- * the conversation, so a branch that the page lacks is added, from its stored
- * messages, and a conversation that has an answer but no branch is gone: it
- * was deleted where fyai is. One with no answer yet has no branch either, and
- * stays. A list that cannot be read changes nothing.
+ * Load the list of branches of fyai as conversations of the page. fyai holds
+ * the conversation, so the page keeps no record from an earlier visit: the
+ * list replaces what is there, and the messages of a conversation come when it
+ * is opened. A list that cannot be read changes nothing.
  */
 async function syncConversations(): Promise<void> {
 	const remote = await listFyaiConversations();
-	const local = await DatabaseService.getAllConversations();
-	const known = new Map(local.map((conv) => [fyaiSessionId(conv.id), conv]));
-	const present = new Set(remote.map((summary) => summary.id));
+	const known = new Set((await DatabaseService.getAllConversations()).map((conv) => conv.id));
 
 	for (const summary of remote) {
-		const conv = known.get(summary.id);
+		if (known.has(summary.id)) continue;
 
-		if (conv) {
-			if (summary.name && summary.name !== conv.name)
-				await DatabaseService.updateConversation(conv.id, { name: summary.name });
-
-			continue;
-		}
-
-		const stored = await readFyaiMessages(summary.id);
-		const rows = fyaiConversationRows(summary, stored, uuid);
-
-		await DatabaseService.importConversations([rows]);
+		await DatabaseService.importConversations([
+			{
+				conv: {
+					currNode: '',
+					id: summary.id,
+					lastModified: summary.updated,
+					name: summary.name || summary.id
+				},
+				messages: []
+			}
+		]);
 	}
 
-	for (const conv of local) {
-		if (present.has(fyaiSessionId(conv.id))) continue;
+	const present = new Set(remote.map((summary) => summary.id));
 
-		const messages = await DatabaseService.getConversationMessages(conv.id);
+	/* One that has an exchange but no branch was deleted where fyai is. */
+	for (const id of known) {
+		if (present.has(id) || !hydrated.has(id)) continue;
+
+		const messages = await DatabaseService.getConversationMessages(id);
 
 		if (messages.some((m) => m.role === MessageRole.ASSISTANT))
-			await DatabaseService.deleteConversation(conv.id);
+			await DatabaseService.deleteConversation(id);
 	}
+}
+
+/** Read the messages of a branch into the conversation of the page, once. */
+async function hydrateConversation(id: string): Promise<void> {
+	if (hydrated.has(id)) return;
+
+	const summary = (await listFyaiConversations()).find((c) => c.id === id);
+
+	if (!summary) return;
+
+	const rows = fyaiConversationRows(summary, await readFyaiMessages(id), uuid);
+
+	await DatabaseService.replaceConversation(rows);
+	hydrated.add(id);
 }
 
 export const fyaiBackend: Backend = {
@@ -210,13 +228,14 @@ export const fyaiBackend: Backend = {
 		browserMcp: false,
 		browserTools: false,
 		modelManager: false,
-		sampling: false
+		sampling: false,
+		serverConversations: true
 	},
 	/*
 	 * Each conversation is its own fyai session, so a new conversation is what
 	 * clears the model context. The line is not stored.
 	 */
-	deleteConversation: (id) => deleteFyaiConversation(fyaiSessionId(id)),
+	deleteConversation: (id) => deleteFyaiConversation(id),
 	handleLine: async (line) => {
 		if (line.trim() !== '/clear') return false;
 
@@ -224,14 +243,16 @@ export const fyaiBackend: Backend = {
 
 		return true;
 	},
+	hydrateConversation,
 	kind: FYAI_BRIDGE_KIND,
 	loadCommands,
+	newConversationId: newFyaiConversationId,
 	probe: async () => {
 		const info = await apiFetch<{ backend?: string }>('/api/fyai/info');
 
 		return info.backend === 'fyai';
 	},
-	renameConversation: (id, name) => renameFyaiConversation(fyaiSessionId(id), name),
+	renameConversation: (id, name) => renameFyaiConversation(id, name),
 	runTurn,
 	syncConversations,
 	/*
