@@ -110,21 +110,28 @@ function contentText(content: unknown): string {
 
 /**
  * The bytes of the `data` of a stored image, which the JSON of `history` writes
- * as text: a byte below 0x80 is that character and any other byte is the lone
- * surrogate U+DC00 plus the byte. Null for a string that is not that.
+ * as text. The bytes are read as UTF-8 and a byte that is not part of a valid
+ * sequence is kept as the lone surrogate U+DC00 plus the byte, as Python's
+ * `surrogateescape` does. So a byte below 0x80 is that character, a lone
+ * surrogate from U+DC80 to U+DCFF is one byte, and any other character is the
+ * UTF-8 bytes that it came from.
  */
 export function storedImageBytes(data: string): Uint8Array | null {
-	const bytes = new Uint8Array(data.length);
+	const encoder = new TextEncoder();
+	const out: number[] = [];
 
-	for (let i = 0; i < data.length; i++) {
-		const unit = data.charCodeAt(i);
+	for (let i = 0; i < data.length; ) {
+		const code = data.codePointAt(i)!;
 
-		if (unit < 0x80) bytes[i] = unit;
-		else if (unit >= 0xdc80 && unit <= 0xdcff) bytes[i] = unit - 0xdc00;
-		else return null;
+		i += code > 0xffff ? 2 : 1;
+
+		if (code < 0x80) out.push(code);
+		else if (code >= 0xdc80 && code <= 0xdcff) out.push(code - 0xdc00);
+		else if (code >= 0xd800 && code <= 0xdfff) return null;
+		else out.push(...encoder.encode(String.fromCodePoint(code)));
 	}
 
-	return bytes;
+	return new Uint8Array(out);
 }
 
 /** The image parts of a stored content as the attachments of a page message. */
@@ -174,9 +181,12 @@ function titleOf(messages: unknown[]): string {
 }
 
 /**
- * The conversation and message rows for the stored messages of a branch. The
- * stored form is the canonical one of fyai: a message of a role, a
- * `function_call` and its `function_call_output`. The rows are the chain that
+/**
+ * The conversation and message rows for the stored messages of a branch. A
+ * message is stored in the form of the API that produced it: Responses keeps a
+ * call as a `function_call` item and its result as a `function_call_output`,
+ * and Chat Completions keeps the calls in `tool_calls` of the assistant message
+ * and each result as a message of the `tool` role. Both are read. The rows are the chain that
  * the page keeps: a root, then each message under the one before it. A call
  * belongs to the assistant message before it, or to an empty one when none
  * comes first, and its result is a message of the tool role. Anything that the
@@ -249,6 +259,17 @@ export function fyaiConversationRows(
 			continue;
 		}
 
+		if (item.role === MessageRole.TOOL) {
+			/* The Chat Completions form of a result: a message of the tool role. */
+			add({
+				content: contentText(item.content),
+				role: MessageRole.TOOL,
+				toolCallId: String(item.tool_call_id ?? '')
+			});
+
+			continue;
+		}
+
 		if (item.role === MessageRole.USER) {
 			const extra = imageExtras(item.content);
 
@@ -260,6 +281,26 @@ export function fyaiConversationRows(
 			openAssistant = null;
 		} else if (item.role === MessageRole.ASSISTANT) {
 			openAssistant = add({ content: contentText(item.content), role: MessageRole.ASSISTANT });
+
+			/* The Chat Completions form of a call: a list on the assistant message itself. */
+			const calls = Array.isArray(item.tool_calls) ? (item.tool_calls as unknown[]) : [];
+
+			if (calls.length)
+				openAssistant.toolCalls = JSON.stringify(
+					calls.map((call) => {
+						const { function: fn, id } = (call ?? {}) as {
+							function?: { arguments?: unknown; name?: unknown };
+							id?: unknown;
+						};
+						const view = fyaiStoredToolView(String(fn?.name ?? ''), String(fn?.arguments ?? ''));
+
+						return {
+							function: { arguments: view.arguments, name: view.name },
+							id: String(id ?? ''),
+							type: 'function'
+						};
+					})
+				);
 		}
 	}
 
