@@ -2,7 +2,10 @@
 import {
 	catalogueModelName,
 	commandsFromSchema,
+	conversationBranch,
+	conversationsFromBranches,
 	fencedOutput,
+	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
 	sessionIdFor,
@@ -193,5 +196,45 @@ describe('fencedOutput', () => {
 
 	it('says something for an empty result', () => {
 		expect(fencedOutput({ ok: true, text: '' })).toBe('```text\ndone\n```');
+	});
+});
+
+describe('conversationsFromBranches', () => {
+	it('keeps the branches of the page sessions, newest first, with the time in milliseconds', () => {
+		const list = [
+			{ branch: 'main', turns: 4, updated: 9e15 },
+			{ branch: 'sdk/a', description: 'Title', model: 'gpt', turns: 2, updated: 2000000 },
+			{ branch: 'sdk/b', description: '', model: '-', turns: 0, updated: 3000000 },
+			{ branch: 'agent/x', turns: 1, updated: 5000000 }
+		];
+
+		expect(conversationsFromBranches(list)).toEqual([
+			{ id: 'b', model: '', name: '', turns: 0, updated: 3000 },
+			{ id: 'a', model: 'gpt', name: 'Title', turns: 2, updated: 2000 }
+		]);
+	});
+
+	it('answers nothing for output that is not a list', () => {
+		expect(conversationsFromBranches(null)).toEqual([]);
+		expect(conversationsFromBranches({ branch: 'sdk/a' })).toEqual([]);
+		expect(conversationsFromBranches([null, { branch: 7 }])).toEqual([]);
+	});
+});
+
+describe('parseHistory', () => {
+	it('reads one message for each line and leaves out what is not one', () => {
+		const text = '{"role":"user","content":"a"}\nwarning: slow\n\n[1]\n{"type":"function_call"}\n';
+
+		expect(parseHistory(text)).toEqual([{ content: 'a', role: 'user' }, { type: 'function_call' }]);
+		expect(parseHistory('')).toEqual([]);
+	});
+});
+
+describe('conversationBranch', () => {
+	it('names the branch below sdk/ whatever the ID holds', () => {
+		expect(conversationBranch('4f3a-9b')).toBe('sdk/4f3a-9b');
+		expect(conversationBranch('../main')).toBe('sdk/___main');
+		expect(conversationBranch('')).toBe('');
+		expect(conversationBranch(undefined)).toBe('');
 	});
 });
