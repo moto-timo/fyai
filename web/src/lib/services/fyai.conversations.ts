@@ -6,9 +6,9 @@
  * turns the stored messages of a branch into the rows that the page shows.
  */
 
-import { MessageRole } from '$lib/enums';
+import { AttachmentType, MessageRole } from '$lib/enums';
 import { fyaiStoredToolView } from '$lib/services/fyai.tools';
-import type { DatabaseConversation, DatabaseMessage } from '$lib/types';
+import type { DatabaseConversation, DatabaseMessage, DatabaseMessageExtra } from '$lib/types';
 
 export interface FyaiConversationSummary {
 	id: string;
@@ -90,6 +90,54 @@ function contentText(content: unknown): string {
 				: ''
 		)
 		.join('');
+}
+
+/**
+ * The bytes of the `data` of a stored image, which the JSON of `history` writes
+ * as text: a byte below 0x80 is that character and any other byte is the lone
+ * surrogate U+DC00 plus the byte. Null for a string that is not that.
+ */
+export function storedImageBytes(data: string): Uint8Array | null {
+	const bytes = new Uint8Array(data.length);
+
+	for (let i = 0; i < data.length; i++) {
+		const unit = data.charCodeAt(i);
+
+		if (unit < 0x80) bytes[i] = unit;
+		else if (unit >= 0xdc80 && unit <= 0xdcff) bytes[i] = unit - 0xdc00;
+		else return null;
+	}
+
+	return bytes;
+}
+
+/** The image parts of a stored content as the attachments of a page message. */
+function imageExtras(content: unknown): DatabaseMessageExtra[] {
+	if (!Array.isArray(content)) return [];
+
+	const extras: DatabaseMessageExtra[] = [];
+
+	for (const part of content as Array<Record<string, unknown>>) {
+		if (part?.type !== 'image' || typeof part.data !== 'string') continue;
+
+		const bytes = storedImageBytes(part.data);
+
+		if (!bytes || !bytes.length || typeof part.media_type !== 'string') continue;
+
+		let binary = '';
+
+		for (let i = 0; i < bytes.length; i += 0x8000)
+			binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+
+		extras.push({
+			base64Url: `data:${part.media_type};base64,${btoa(binary)}`,
+			name: typeof part.name === 'string' && part.name ? part.name : 'image',
+			size: bytes.length,
+			type: AttachmentType.IMAGE
+		});
+	}
+
+	return extras;
 }
 
 /** The title of a conversation that has none: the first line of its first message. */
@@ -186,7 +234,13 @@ export function fyaiConversationRows(
 		}
 
 		if (item.role === MessageRole.USER) {
-			add({ content: contentText(item.content), role: MessageRole.USER });
+			const extra = imageExtras(item.content);
+
+			add({
+				content: contentText(item.content),
+				role: MessageRole.USER,
+				...(extra.length ? { extra } : {})
+			});
 			openAssistant = null;
 		} else if (item.role === MessageRole.ASSISTANT) {
 			openAssistant = add({ content: contentText(item.content), role: MessageRole.ASSISTANT });
