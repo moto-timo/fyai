@@ -10,8 +10,10 @@
 	import ChatMessageToolCallBlockReadMedia from './ChatMessageToolCallBlockReadMedia.svelte';
 	import ChatMessageToolCallBlockRunJavascript from './ChatMessageToolCallBlockRunJavascript.svelte';
 	import ChatMessageToolCallBlockSearchResults from './ChatMessageToolCallBlockSearchResults.svelte';
+	import ChatMessageToolCallBlockTodo from './ChatMessageToolCallBlockTodo.svelte';
 	import ChatMessageToolCallBlockWriteFile from './ChatMessageToolCallBlockWriteFile.svelte';
 	import { BuiltInTool } from '$lib/enums';
+	import { FYAI_TODO_TOOLS } from '$lib/services/fyai.tools';
 	import type { AgenticSection, DatabaseMessageExtra } from '$lib/types';
 	import {
 		extractSearchQuery,
@@ -45,6 +47,8 @@
 
 {#if isSearchCall}
 	<ChatMessageToolCallBlockSearchResults {isStreaming} {onToggle} {open} {section} />
+{:else if FYAI_TODO_TOOLS.includes(section.toolName ?? '')}
+	<ChatMessageToolCallBlockTodo {isStreaming} {section} />
 {:else if section.toolName === BuiltInTool.BROWSER_GET_DATETIME}
 	<ChatMessageToolCallBlockGetDatetime {isStreaming} {section} />
 {:else if section.toolName === BuiltInTool.SERVER_GET_INFO}

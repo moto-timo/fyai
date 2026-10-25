@@ -91,3 +91,50 @@ export function fyaiStoredToolView(name: string, args: string): ToolView {
 
 	return fyaiToolView(name, input);
 }
+
+/** The names under which a call of the task list tool is shown: the SDK name and the stored one. */
+export const FYAI_TODO_TOOLS: readonly string[] = ['TodoWrite', 'todo_write'];
+
+export type TodoStatus = 'cancelled' | 'completed' | 'in_progress' | 'pending';
+
+export interface TodoItem {
+	content: string;
+	status: TodoStatus;
+}
+
+const TODO_STATUSES: readonly string[] = ['pending', 'in_progress', 'completed', 'cancelled'];
+
+/**
+ * The items of a call of the task list tool, from its arguments as the JSON
+ * text arrives: an item with no text is left out, and a status that is not
+ * one of the four is a pending task. Arguments that are not JSON yet, or hold
+ * no list, give no item.
+ */
+export function parseTodos(toolArgs: string | undefined): TodoItem[] {
+	let args: unknown;
+
+	try {
+		args = JSON.parse(toolArgs ?? '');
+	} catch {
+		return [];
+	}
+
+	const todos = (args as { todos?: unknown } | null)?.todos;
+
+	if (!Array.isArray(todos)) return [];
+
+	const items: TodoItem[] = [];
+
+	for (const todo of todos) {
+		const { content, status } = (todo ?? {}) as { content?: unknown; status?: unknown };
+
+		if (typeof content !== 'string' || !content.trim()) continue;
+
+		items.push({
+			content: content.trim(),
+			status: TODO_STATUSES.includes(String(status)) ? (status as TodoStatus) : 'pending'
+		});
+	}
+
+	return items;
+}
