@@ -55,7 +55,7 @@ browser or Electron window (SvelteKit SPA, PWA)
 bridge (web/server/bridge.mjs)
         │  one process for each turn; stdin/stdout JSON lines
         ▼
-fyai claude-sdk --session-id|--resume ID   ──►  branch sdk/<conversation-id>
+fyai --branch NAME claude-sdk   ──►  the branch NAME, as in the CLI
 ```
 
 ### The bridge
@@ -63,23 +63,24 @@ fyai claude-sdk --session-id|--resume ID   ──►  branch sdk/<conversation-i
 The bridge holds no conversation state. A turn starts one `fyai claude-sdk`
 process (`spawnTurn`). The arguments are `--input-format stream-json
 --output-format stream-json --verbose --include-partial-messages
---permission-mode M`, and `--session-id ID` for a new conversation or
-`--resume ID` after it. The bridge writes one `user` frame, forwards each
+--permission-mode M`, after the global option `--branch NAME`. The bridge writes one `user` frame, forwards each
 output frame to the page, and closes standard input when the `result` frame
 arrives. The user frame holds the text of the prompt and one `image` block for
 each image (W8). fyai asks the bridge for no decision: its boundary is the
 sandbox profile, so the bridge runs it in `bypassPermissions`, which only tells
 the SDK front not to ask (W6).
 
-The session ID is the conversation ID of the page (`sessionIdFor`). fyai stores
-the conversation in branch `sdk/<conversation-id>` (`SDK_BRANCH_PREFIX`). Thus
-a turn sends only the new message, and a conversation survives a restart of the
-bridge. Before it runs a turn the bridge cuts the branch back when the turn
-follows an earlier message of the page (W5).
-
-If fyai reports that the session does not exist, the bridge tries again with
-`--session-id`. If fyai reports that it exists, the bridge tries again with
-`--resume`. An aborted request stops the child.
+The conversation ID of the page is the name of a branch, and the branch names
+are those of the CLI. A new conversation is `session/YYYYMMDDTHHMMSS.uuuuuu`
+(`newSessionBranch`, the form of `fyai_branch_session_name()`), which the bridge
+gives at `POST /api/fyai/conversations`. The branch exists when its first
+exchange is stored. A branch that exists continues, so a session of the CLI is
+a conversation of the page, and a conversation of the page can be continued in
+the CLI. `claude-sdk` serves the branch that `--branch` names, whatever its
+name (`doc/claude-sdk-compat.md`). Thus a turn sends only the new message, and
+a conversation survives a restart of the bridge. Before it runs a turn the
+bridge cuts the branch back when the turn follows an earlier message of the page
+(W5). An aborted request stops the child.
 
 Every API request needs the token of the bridge (W1). The routes:
 
@@ -131,15 +132,14 @@ script and no IPC. Closing a window stops its bridge, and quitting stops all of
 them. `electron/projects.cjs` holds the choices that need no Electron, and a
 unit test covers it.
 
-The page keeps its conversations in IndexedDB, which the browser keeps for each
-origin, and the origin of a window is the address of its bridge. A project
+The page keeps its settings in the local storage, which the browser keeps for
+each origin, and the origin of a window is the address of its bridge. A project
 therefore keeps one port: `portForProject` takes it from the directory, in the
 range 20000 to 29999 below the ports that the system gives to outgoing
-connections, so each launch of a project finds its conversations again and two
-projects never share a cache. A port that is taken, by a development bridge or
-a stale one, falls back to a free port, and that launch starts with an empty
-cache. W4 makes the cache a copy of what fyai holds: an empty cache is filled
-from the branches at the next start.
+connections, so each launch of a project finds its settings again and two
+projects never share them. A port that is taken, by a development bridge or a
+stale one, falls back to a free port, and that launch starts with the default
+settings. The conversations are not in the browser: fyai holds them.
 
 ## Backends
 
@@ -343,7 +343,7 @@ classes.
 
 | Part                                       | Conflict                                                                                   |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Conversation store (`database.service.ts`) | IndexedDB holds the copy that the page shows. W4 syncs it with the branches at start and passes a delete or a rename on. A fork of the page has no branch. |
+| Conversation store (`database.service.ts`) | with `serverConversations`, the tables are in memory and fyai holds the conversations (W4). The page lists the branches at start and reads the messages of a conversation when it opens. The fork action is hidden, because a fork has no branch. |
 | Regenerate, edit, message branches         | the tree of the page keeps every sibling and the branch of fyai is one line. W5 cuts the branch back before a turn; switching to another sibling moves it at the next turn, not at once. |
 | Agentic loop (`stores/agentic/*`)          | hidden and never run for fyai; a message with nothing to send gets an error message.      |
 | MCP client in the browser (`services/mcp.service.ts`) | the browser connects to MCP servers; fyai never gets their tools. The sidebar entry is hidden for fyai; the pickers in a chat are not. `/cors-proxy` is not served. |
@@ -352,8 +352,8 @@ classes.
 | Permission store and permission card       | fyai never asks the page: its boundary is the sandbox profile, not a prompt for each call. |
 | Hugging Face discovery and model manager   | GGUF files, quantizations and downloads have no meaning for fyai; the entries are hidden. |
 | Context gauge                              | `prompt_n` is the input of the whole tool loop; each message now stores the usage of its own frame (W7). |
-| Conversation import and export, fork       | move database rows only. An imported or forked conversation has no fyai session or branch. |
-| Search (`routes/search`)                   | searches IndexedDB, not the branches.                                                     |
+| Conversation import and export             | move rows of the page only. An imported conversation has no branch.                       |
+| Search (`routes/search`)                   | searches the conversations that the page loaded in this session, not all the branches.     |
 | Audio and video                            | the composer takes them; fyai takes images and text files only, so the page says so (W8). |
 
 ### Defects in the current tree
@@ -435,33 +435,41 @@ Each item states what changes, why, and which fyai interface it uses.
 Keep each part, unchanged, for llama-server. The gate is one predicate,
 `backendIs('fyai')`, at the hook points of W2.
 
-**W4. Conversations are branches.** Done in part: the page keeps a copy, and the
-copy follows fyai. The browser test checks a turn, the copy coming back from fyai
-when the page has lost its own, the tool cards and an image.
+**W4. Conversations are branches.** Done: fyai holds the conversations and the
+browser keeps none. The browser test checks a turn, a conversation coming back
+from fyai after a reload with no database in the browser, the name of the
+branch, the tool cards and an image.
 
-- The bridge serves `GET /api/fyai/conversations` (the `sdk/*` branches from
-  `branch list --output json`, newest first), `GET .../ID/messages` (`history
-  --output json`), `PATCH .../ID` (`branch describe`, so the title is the
-  description of the branch) and `DELETE .../ID` (`branch delete --force`). The
-  ID becomes a branch name below `sdk/` as for a turn, so no ID reaches another
-  branch. A change waits for a turn that runs (409).
-- At start the page makes its copy match fyai (`syncConversations`, before it
-  loads its list): a branch that the page lacks is added from its stored
-  messages (`fyaiConversationRows`: a root and a chain, a call on the assistant
-  message before it, its result as a tool message); a title that was changed
-  elsewhere is taken; a conversation that has an answer and no branch is
-  removed. A list that cannot be read changes nothing. A second browser, or a
-  launch with an empty cache, therefore sees the conversations of the project.
+- The bridge serves `GET /api/fyai/conversations` (the branches that hold an
+  exchange, from `branch list --output json`, newest first; a branch with no
+  description is titled by its first question, `titleFromHistory`),
+  `POST /api/fyai/conversations` (the name of a new session), `GET .../ID/messages`
+  (`history --output json`), `PATCH .../ID` (`branch describe`, so the title is
+  the description of the branch) and `DELETE .../ID` (`branch delete --force`).
+  The ID is the name of the branch, URL-encoded because it holds slashes
+  (`conversationBranch` refuses a name that fyai could read as an option). A
+  change waits for a turn that runs (409). The sub-agent branches (`agent:`) are
+  listed too, for now.
+- With the capability `serverConversations` the tables of the page are in
+  memory (`DatabaseService.useMemory()`, Dexie over `fake-indexeddb`), so the
+  page makes and reads no IndexedDB database and the migration of the old one is
+  skipped. At start the page lists the branches as conversations
+  (`syncConversations`); the messages of one are read when it opens
+  (`hydrateConversation`: `fyaiConversationRows`, a root and a chain, a call on
+  the assistant message before it, its result as a tool message). The siblings
+  of an edit or a regenerate live in memory for the session; fyai holds the one
+  line. A list that cannot be read changes nothing. A second browser, or a
+  reload, therefore sees the conversations of the project and of the CLI.
 - Delete and rename in the page reach the branch through the one place that
   tells the page of a deletion (`notifyConversationsDeleted`) and through
   `updateConversationName`.
 - An image of a stored user message comes back as an attachment: `history`
   writes its bytes as JSON text, a high byte as a lone surrogate, and
   `storedImageBytes` reads them back.
-- Open: the sync reads each missing history one at a time at start; the
-  reasoning of a stored message is not restored; search
-  and the export and import of the page still use the copy; the sync runs once
-  at start, so a change made elsewhere shows at the next load.
+- Open: the reasoning of a stored message is not restored; search and the
+  export and import of the page see only the conversations that it loaded; the
+  list is read once at start, so a change made elsewhere shows at the next
+  load; a fork needs `branch new` at a turn of the branch.
 
 **W5. Edit and regenerate move the branch.** Done. The browser test regenerates and edits and
 checks the requests that the mock got.

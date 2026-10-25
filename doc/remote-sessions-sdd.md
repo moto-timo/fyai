@@ -687,7 +687,7 @@ The page is one build for every server. It has a backend seam
 bridge forces the kind with `?backend=fyai-remote`, the local storage or the
 build setting, because it has nothing to probe. The conversations are the
 branches of the session already (the bridge lists, reads, renames and deletes
-`sdk/*`), so the page keeps only a copy, and a turn from an earlier message of
+them, under the names of the CLI), so the page keeps none, and a turn from an earlier message of
 its tree cuts the branch back first (the anchor of `doc/fyai-web.md`, W5). The
 protocol needs an equivalent of that cut, since the page keeps a tree and a
 session is one line.

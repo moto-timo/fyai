@@ -48,9 +48,13 @@ calls into a new file; merge them first when upstream moves:
 | File | Hook |
 | ---- | ---- |
 | `src/lib/stores/chat/index.svelte.ts` | `backendStore.active.runTurn` before the agentic loop; `handleLine` at the start of `sendMessage`; `titleFor` in `generateTitleWithLLM`; the agentic loop and the plain path only with the `agenticLoop` capability |
-| `src/lib/stores/init.ts` | registers the fyai backend and detects the backend at start, or takes the forced kind |
+| `src/lib/stores/init.ts` | registers the fyai backend and detects the backend at start, or takes the forced kind; with `serverConversations` the tables go to memory and the database migration is skipped |
 | `src/lib/stores/index.ts` | exports `backendStore` |
-| `src/lib/stores/conversations/index.svelte.ts` | the backend syncs the conversations before the list loads, and hears of a delete and a rename |
+| `src/lib/stores/conversations/index.svelte.ts` | the backend lists the conversations before the list loads, names a new one (`newConversationId`), reads one when it opens (`hydrateConversation`), and hears of a delete and a rename |
+| `src/lib/services/database.service.ts` | `useMemory()` swaps IndexedDB for memory (`fake-indexeddb`); `replaceConversation`; `createConversation` takes an ID |
+| `src/lib/services/migration.service.ts` | the IndexedDB migration is skipped when the page keeps no database |
+| `src/lib/services/router.service.ts` | the ID in the address is URL-encoded, because a branch name holds slashes |
+| `src/lib/components/app/chat/ChatMessages/ChatMessageActions/ChatMessageActionIcons/ChatMessageActionIcons.svelte` | the fork action needs a page that keeps the conversations |
 | `src/lib/components/app/chat/ChatMessages/ChatMessage/ChatMessageToolCall/ChatMessageToolCallBlock.svelte` | the task list tool has its block |
 | `src/lib/stores/ui.svelte.ts` | `openModelsManager` needs `modelManager` |
 | `src/lib/stores/models/index.svelte.ts` | `findModelByName` ignores provider prefix and punctuation |

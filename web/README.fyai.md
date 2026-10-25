@@ -21,9 +21,11 @@ fyai claude-sdk  ──►  provider, tools, branches, arena
 The browser cannot start a process and fyai has no daemon. The bridge is a
 small program that you run yourself; it holds no conversation state. Each
 turn starts one `fyai claude-sdk` process with the session of the
-conversation, and fyai stores the turn in the branch `sdk/<conversation-id>`.
-The session ID is the conversation ID of the page, so a turn only sends the
-new message and the conversation survives a bridge restart.
+conversation, and fyai stores the turn in the branch of the conversation. The
+conversation ID is the name of the branch, in the form that the CLI uses
+(`session/TIME`), so a turn only sends the new message, the conversation
+survives a bridge restart and a session of the CLI is a conversation of the
+page.
 
 ## Choosing the model
 
@@ -285,14 +287,13 @@ its own.
 
 ## Conversations
 
-fyai holds each conversation as the branch `sdk/ID` of the project. The page
-keeps a copy in the browser and makes it match the branches when it starts: a
-conversation that fyai has and the page lacks, such as one made in another
-browser or before the cache was cleared, is added with its messages; deleting
-or renaming one in the page deletes or renames the branch. The bridge serves
-this at `/api/fyai/conversations`. Editing or regenerating a message cuts the
+fyai holds each conversation as a branch of the project, and the browser keeps
+none: the page holds them in memory, lists the branches when it starts and reads
+the messages of a conversation when it opens. A conversation of the CLI shows
+there too. Deleting or renaming one in the page deletes or renames the branch.
+The bridge serves this at `/api/fyai/conversations`. Editing or regenerating a message cuts the
 branch back to the message before it runs the new turn, so fyai answers from
-the state that the page shows. Forking a conversation works on the copy only.
+the state that the page shows. Forking a conversation is not offered, because a fork has no branch.
 
 ## Provider keys
 
@@ -417,7 +418,7 @@ web/
 ├── scripts/dev.sh           bridge and Vite, for editing
 ├── server/bridge.mjs        HTTP, SSE, fyai processes, catalogue, conversations
 ├── server/auth.mjs          the token, origin and host rules
-├── server/protocol.mjs      session IDs, slash commands, the cut of a branch, images
+├── server/protocol.mjs      branch names, slash commands, the cut of a branch, images
 ├── server/test-turn.sh      one turn against the mock provider
 ├── server/e2e-mock.mjs      the page in a browser against the mock provider
 ├── server/e2e.mjs           the built page in Chrome, with a real provider
@@ -429,7 +430,7 @@ web/
 ├── src/lib/services/fyai.service.ts   turn transport and prompt
 ├── src/lib/services/fyai.turn.ts      frames to messages
 ├── src/lib/services/fyai.tools.ts     the cards of the tools
-├── src/lib/services/fyai.conversations.ts  the copy of the branches
+├── src/lib/services/fyai.conversations.ts  the branches as conversations
 └── src/…                    the fork of the llama.cpp UI
 ```
 
