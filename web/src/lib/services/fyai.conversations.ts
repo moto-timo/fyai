@@ -7,6 +7,7 @@
  */
 
 import { AttachmentType, MessageRole } from '$lib/enums';
+import { FyaiHttpError } from '$lib/services/fyai.service';
 import { fyaiStoredToolView } from '$lib/services/fyai.tools';
 import type { DatabaseConversation, DatabaseMessage, DatabaseMessageExtra } from '$lib/types';
 
@@ -46,7 +47,7 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
 		/* A body that is not JSON leaves the status as the reason. */
 	}
 
-	throw new Error(message);
+	throw new FyaiHttpError(message, response.status);
 }
 
 export async function listFyaiConversations(): Promise<FyaiConversationSummary[]> {
@@ -65,16 +66,31 @@ export async function readFyaiMessages(id: string): Promise<unknown[]> {
 	return Array.isArray(body.messages) ? body.messages : [];
 }
 
-export async function renameFyaiConversation(id: string, name: string): Promise<void> {
-	await request(`/${encodeURIComponent(id)}`, {
-		body: JSON.stringify({ name }),
-		headers: { 'content-type': 'application/json' },
-		method: 'PATCH'
-	});
+/**
+ * A conversation has no branch until its first turn is stored, so a rename or a
+ * delete before that finds none. That is not a failure: there is nothing to
+ * change.
+ */
+async function unlessMissing(call: Promise<unknown>): Promise<void> {
+	try {
+		await call;
+	} catch (error) {
+		if (!(error instanceof FyaiHttpError && error.status === 404)) throw error;
+	}
 }
 
-export async function deleteFyaiConversation(id: string): Promise<void> {
-	await request(`/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export function renameFyaiConversation(id: string, name: string): Promise<void> {
+	return unlessMissing(
+		request(`/${encodeURIComponent(id)}`, {
+			body: JSON.stringify({ name }),
+			headers: { 'content-type': 'application/json' },
+			method: 'PATCH'
+		})
+	);
+}
+
+export function deleteFyaiConversation(id: string): Promise<void> {
+	return unlessMissing(request(`/${encodeURIComponent(id)}`, { method: 'DELETE' }));
 }
 
 /** The text of the content of a stored message: a string, or the text parts of a list. */
