@@ -6,7 +6,9 @@ import {
 	conversationBranch,
 	conversationsFromBranches,
 	fencedOutput,
+	inputModalities,
 	messageTextOf,
+	pageCapabilities,
 	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
@@ -357,5 +359,30 @@ describe('userContent', () => {
 	it('has no text block when there is no text', () => {
 		expect(userContent('  ', [image]).map((b) => b.type)).toEqual(['image']);
 		expect(userContent('hi', []).map((b) => b.type)).toEqual(['text']);
+	});
+});
+
+describe('inputModalities and pageCapabilities', () => {
+	it('lists text and the other inputs that the page has a kind of file for', () => {
+		expect(inputModalities(['text', 'image', 'pdf', 'audio', 'video'])).toEqual([
+			'text',
+			'image',
+			'audio',
+			'video'
+		]);
+		expect(inputModalities(['text', 'pdf'])).toEqual(['text']);
+	});
+
+	it('is text alone when the catalogue says nothing', () => {
+		expect(inputModalities(undefined)).toEqual(['text']);
+		expect(inputModalities('image')).toEqual(['text']);
+	});
+
+	it('names the abilities as the page does and leaves out the others', () => {
+		expect(pageCapabilities(['tool_calling', 'json_mode', 'reasoning', 'logprobs'])).toEqual([
+			'tools',
+			'reasoning'
+		]);
+		expect(pageCapabilities(undefined)).toEqual([]);
 	});
 });
