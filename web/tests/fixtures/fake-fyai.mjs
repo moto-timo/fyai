@@ -30,9 +30,7 @@ while (args[0] === '--branch' || args[0] === '-b' || args[0] === '--set') {
 const [command, sub, ...rest] = args;
 
 if (args.includes('claude-sdk')) {
-	const at =
-		args.indexOf('--session-id') >= 0 ? args.indexOf('--session-id') : args.indexOf('--resume');
-	const name = `sdk/${args[at + 1]}`;
+	const name = branch;
 
 	process.stdin.setEncoding('utf8');
 	process.stdin.once('data', (line) => {
@@ -92,7 +90,7 @@ if (args.includes('claude-sdk')) {
 	}));
 
 	process.stdout.write(`${JSON.stringify(rows)}\n`);
-} else if (command === 'history' && branch === 'sdk/env') {
+} else if (command === 'history' && branch === 'env') {
 	/* What a program of the bridge finds in its environment. */
 	process.stdout.write(
 		`${JSON.stringify({ content: process.env.FYAI_BRIDGE_TOKEN ?? 'unset', role: 'user' })}\n`

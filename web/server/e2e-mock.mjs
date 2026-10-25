@@ -185,7 +185,9 @@ const branchLines = async () => {
 
 	if (!conversations.length) return [];
 
-	const { messages } = await bridgeJson(`/api/fyai/conversations/${conversations[0].id}/messages`);
+	const { messages } = await bridgeJson(
+		`/api/fyai/conversations/${encodeURIComponent(conversations[0].id)}/messages`
+	);
 
 	return messages
 		.filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -318,11 +320,8 @@ test('an image goes to fyai as an attachment of the message', async () => {
 });
 
 test('a conversation comes back from fyai when the page has lost its copy', async () => {
-	await page.evaluate(async () => {
-		for (const db of await indexedDB.databases()) indexedDB.deleteDatabase(db.name ?? '');
-
-		localStorage.clear();
-	});
+	/* The page holds no copy: a new load reads the conversation from fyai. */
+	await page.evaluate(() => localStorage.clear());
 	await page.goto(`${address}/`, { waitUntil: 'domcontentloaded' });
 	await composer().waitFor();
 	/* The list of the sidebar: the page made its copy again from fyai. */
@@ -331,6 +330,18 @@ test('a conversation comes back from fyai when the page has lost its copy', asyn
 	await visible('Mock answer 4');
 	await visible('Task list');
 	await visible('echo from the mock');
+
+	/* The browser keeps no database, and the branch is named as the CLI names one. */
+	assert(
+		(await page.evaluate(async () => (await indexedDB.databases()).length)) === 0,
+		'the browser holds a database'
+	);
+	assert(
+		/^session\/\d{8}T\d{6}\.\d{6}$/.test(
+			(await bridgeJson('/api/fyai/conversations')).conversations[0].id
+		),
+		'the branch does not have a name of the CLI'
+	);
 
 	/* The image of the last message came back with its bytes. */
 	assert(

@@ -8,36 +8,18 @@ import {
 	conversationsFromBranches,
 	inputModalities,
 	messageTextOf,
+	newSessionBranch,
 	pageCapabilities,
 	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
 	rewindPlan,
-	sessionIdFor,
 	slashCommandArgs,
+	titleFromHistory,
 	unknownCommandMessage,
 	userContent
 } from '../../server/protocol.mjs';
 import { describe, expect, it } from 'vitest';
-
-describe('sessionIdFor', () => {
-	it('keeps a plain conversation ID', () => {
-		expect(sessionIdFor('4f3a-9b_c')).toBe('4f3a-9b_c');
-	});
-
-	it('replaces the bytes that a session ID cannot hold', () => {
-		expect(sessionIdFor('a/../b c')).toBe('a____b_c');
-	});
-
-	it('gives nothing for an empty ID', () => {
-		expect(sessionIdFor('')).toBeNull();
-		expect(sessionIdFor(undefined)).toBeNull();
-	});
-
-	it('keeps the ID within the limit of fyai', () => {
-		expect(sessionIdFor('x'.repeat(200))).toHaveLength(64);
-	});
-});
 
 describe('parseSlashCommand', () => {
 	it('takes the name and the words after it', () => {
@@ -92,11 +74,13 @@ describe('commandsFromSchema', () => {
 
 describe('slashCommandArgs', () => {
 	it('names the session branch and the verb', () => {
-		expect(slashCommandArgs('c1', { name: 'context', rest: [] }, 'gpt-5.5', [], COMMANDS)).toEqual([
+		expect(
+			slashCommandArgs('session/c1', { name: 'context', rest: [] }, 'gpt-5.5', [], COMMANDS)
+		).toEqual([
 			'--set',
 			'display/markdown=false',
 			'--branch',
-			'sdk/c1',
+			'session/c1',
 			'--model',
 			'gpt-5.5',
 			'context'
@@ -104,35 +88,39 @@ describe('slashCommandArgs', () => {
 	});
 
 	it('passes the words of the user as separate arguments', () => {
-		expect(slashCommandArgs('c1', { name: 'compact', rest: ['a', 'b'] }, '', [], COMMANDS)).toEqual(
-			['--set', 'display/markdown=false', '--branch', 'sdk/c1', 'compact', 'a', 'b']
-		);
+		expect(
+			slashCommandArgs('session/c1', { name: 'compact', rest: ['a', 'b'] }, '', [], COMMANDS)
+		).toEqual(['--set', 'display/markdown=false', '--branch', 'session/c1', 'compact', 'a', 'b']);
 	});
 
 	it('does not override the model that /model stores', () => {
 		expect(
-			slashCommandArgs('c1', { name: 'model', rest: ['gpt-5.5'] }, 'other', [], COMMANDS)
-		).toEqual(['--set', 'display/markdown=false', '--branch', 'sdk/c1', 'model', 'gpt-5.5']);
+			slashCommandArgs('session/c1', { name: 'model', rest: ['gpt-5.5'] }, 'other', [], COMMANDS)
+		).toEqual(['--set', 'display/markdown=false', '--branch', 'session/c1', 'model', 'gpt-5.5']);
 	});
 
 	it('reports the model of the session when /model has no name', () => {
-		expect(slashCommandArgs('c1', { name: 'model', rest: [] }, 'other', [], COMMANDS)).toEqual([
-			'--set',
-			'display/markdown=false',
-			'--branch',
-			'sdk/c1',
-			'model'
-		]);
+		expect(
+			slashCommandArgs('session/c1', { name: 'model', rest: [] }, 'other', [], COMMANDS)
+		).toEqual(['--set', 'display/markdown=false', '--branch', 'session/c1', 'model']);
 	});
 
 	it('gives no arguments for a command that the page does not serve', () => {
-		expect(slashCommandArgs('c1', { name: 'nope', rest: [] }, '', [], COMMANDS)).toBeNull();
+		expect(slashCommandArgs('session/c1', { name: 'nope', rest: [] }, '', [], COMMANDS)).toBeNull();
 	});
 
 	it('puts the extra arguments of the bridge before the command', () => {
 		expect(
-			slashCommandArgs('c1', { name: 'todo', rest: [] }, '', ['--set', 'a=b'], COMMANDS)
-		).toEqual(['--set', 'a=b', '--set', 'display/markdown=false', '--branch', 'sdk/c1', 'todo']);
+			slashCommandArgs('session/c1', { name: 'todo', rest: [] }, '', ['--set', 'a=b'], COMMANDS)
+		).toEqual([
+			'--set',
+			'a=b',
+			'--set',
+			'display/markdown=false',
+			'--branch',
+			'session/c1',
+			'todo'
+		]);
 	});
 });
 
@@ -206,24 +194,53 @@ describe('commandMarkdown', () => {
 });
 
 describe('conversationsFromBranches', () => {
-	it('keeps the branches of the page sessions, newest first, with the time in milliseconds', () => {
+	it('keeps the branches that hold an exchange, newest first, with the time in milliseconds', () => {
 		const list = [
-			{ branch: 'main', turns: 4, updated: 9e15 },
-			{ branch: 'sdk/a', description: 'Title', model: 'gpt', turns: 2, updated: 2000000 },
-			{ branch: 'sdk/b', description: '', model: '-', turns: 0, updated: 3000000 },
+			{ branch: 'main', turns: 4, updated: 1000000 },
+			{ branch: 'session/a', description: 'Title', model: 'gpt', turns: 2, updated: 2000000 },
+			{ branch: 'session/b', description: '', model: '-', turns: 0, updated: 3000000 },
 			{ branch: 'agent/x', turns: 1, updated: 5000000 }
 		];
 
 		expect(conversationsFromBranches(list)).toEqual([
-			{ id: 'b', model: '', name: '', turns: 0, updated: 3000 },
-			{ id: 'a', model: 'gpt', name: 'Title', turns: 2, updated: 2000 }
+			{ id: 'agent/x', model: '', name: '', turns: 1, updated: 5000 },
+			{ id: 'session/a', model: 'gpt', name: 'Title', turns: 2, updated: 2000 },
+			{ id: 'main', model: '', name: '', turns: 4, updated: 1000 }
 		]);
 	});
 
 	it('answers nothing for output that is not a list', () => {
 		expect(conversationsFromBranches(null)).toEqual([]);
-		expect(conversationsFromBranches({ branch: 'sdk/a' })).toEqual([]);
+		expect(conversationsFromBranches({ branch: 'session/a' })).toEqual([]);
 		expect(conversationsFromBranches([null, { branch: 7 }])).toEqual([]);
+	});
+});
+
+describe('titleFromHistory', () => {
+	it('is the first line of the first user message that has text', () => {
+		expect(
+			titleFromHistory([
+				{ content: 'system text', role: 'system' },
+				{ content: '\n  First line\nsecond', role: 'user' },
+				{ content: 'later', role: 'user' }
+			])
+		).toBe('First line');
+	});
+
+	it('reads the text parts of a message and cuts a long line', () => {
+		expect(
+			titleFromHistory([{ content: [{ text: 'x'.repeat(200), type: 'text' }], role: 'user' }])
+		).toHaveLength(80);
+	});
+
+	it('is empty when no user message has text', () => {
+		expect(
+			titleFromHistory([
+				{ content: 'a', role: 'assistant' },
+				{ content: '  ', role: 'user' }
+			])
+		).toBe('');
+		expect(titleFromHistory([])).toBe('');
 	});
 });
 
@@ -237,11 +254,29 @@ describe('parseHistory', () => {
 });
 
 describe('conversationBranch', () => {
-	it('names the branch below sdk/ whatever the ID holds', () => {
-		expect(conversationBranch('4f3a-9b')).toBe('sdk/4f3a-9b');
-		expect(conversationBranch('../main')).toBe('sdk/___main');
+	it('is the name of the branch when fyai can take it', () => {
+		expect(conversationBranch('session/20260101T000000.000001')).toBe(
+			'session/20260101T000000.000001'
+		);
+		expect(conversationBranch('main/parser')).toBe('main/parser');
+	});
+
+	it('refuses what fyai could read as an option or as a path out', () => {
+		expect(conversationBranch('-x')).toBe('');
+		expect(conversationBranch('../main')).toBe('');
+		expect(conversationBranch('a b')).toBe('');
+		expect(conversationBranch('x'.repeat(201))).toBe('');
 		expect(conversationBranch('')).toBe('');
 		expect(conversationBranch(undefined)).toBe('');
+	});
+});
+
+describe('newSessionBranch', () => {
+	it('names the time to the microsecond as the CLI does', () => {
+		expect(newSessionBranch(Date.UTC(2026, 8, 8, 14, 23, 55, 123) * 1000 + 456)).toBe(
+			'session/20260908T142355.123456'
+		);
+		expect(newSessionBranch()).toMatch(/^session\/\d{8}T\d{6}\.\d{6}$/);
 	});
 });
 

@@ -51,8 +51,8 @@ const headers = { 'content-type': 'application/json', 'x-fyai-token': TOKEN };
 type Anchor = { occurrence: number; text: string } | null | undefined;
 
 /** Run one turn and return the text of its frames. */
-async function turn(conversationId: string, prompt: string, anchor: Anchor, fresh = false) {
-	const body: Record<string, unknown> = { conversationId, fresh, prompt };
+async function turn(conversationId: string, prompt: string, anchor: Anchor) {
+	const body: Record<string, unknown> = { conversationId, prompt };
 
 	if (anchor !== undefined) body.anchor = anchor;
 
@@ -74,14 +74,14 @@ async function history(conversationId: string): Promise<string[]> {
 
 describe('a turn that follows an earlier message', () => {
 	it('adds to the branch when the turn follows the last message', async () => {
-		await turn('a', 'one', null, true);
+		await turn('a', 'one', null);
 		await turn('a', 'two', { occurrence: 1, text: 'one' });
 
 		expect(await history('a')).toEqual(['one', 'answer to one', 'two', 'answer to two']);
 	});
 
 	it('cuts the last exchange when the turn follows an earlier message (regenerate)', async () => {
-		await turn('b', 'one', null, true);
+		await turn('b', 'one', null);
 		await turn('b', 'two', { occurrence: 1, text: 'one' });
 		await turn('b', 'two', { occurrence: 1, text: 'one' });
 
@@ -89,7 +89,7 @@ describe('a turn that follows an earlier message', () => {
 	});
 
 	it('cuts back to the anchor when the page edited an earlier message', async () => {
-		await turn('c', 'one', null, true);
+		await turn('c', 'one', null);
 		await turn('c', 'two', { occurrence: 1, text: 'one' });
 		await turn('c', 'three', { occurrence: 1, text: 'two' });
 		/* Edit of 'two': the turn follows 'one'. */
@@ -104,15 +104,15 @@ describe('a turn that follows an earlier message', () => {
 	});
 
 	it('starts the branch again when the first message is edited or regenerated', async () => {
-		await turn('d', 'one', null, true);
+		await turn('d', 'one', null);
 		await turn('d', 'two', { occurrence: 1, text: 'one' });
-		await turn('d', 'one edited', null, true);
+		await turn('d', 'one edited', null);
 
 		expect(await history('d')).toEqual(['one edited', 'answer to one edited']);
 	});
 
 	it('finds the right one of two equal messages by its count', async () => {
-		await turn('e', 'same', null, true);
+		await turn('e', 'same', null);
 		await turn('e', 'same', { occurrence: 1, text: 'same' });
 		await turn('e', 'next', { occurrence: 2, text: 'same' });
 		await turn('e', 'again', { occurrence: 1, text: 'same' });
@@ -121,7 +121,7 @@ describe('a turn that follows an earlier message', () => {
 	});
 
 	it('goes on when the anchor is not in the branch', async () => {
-		await turn('f', 'one', null, true);
+		await turn('f', 'one', null);
 
 		const text = await turn('f', 'two', { occurrence: 1, text: 'missing' });
 
@@ -130,13 +130,13 @@ describe('a turn that follows an earlier message', () => {
 	});
 
 	it('stops the turn when the branch cannot be cut back', async () => {
-		await turn('h', 'one', null, true);
+		await turn('h', 'one', null);
 		await turn('h', 'two', { occurrence: 1, text: 'one' });
 
 		const file = join(scratch, 'state.json');
 		const state = JSON.parse(readFileSync(file, 'utf8'));
 
-		state.branches['sdk/h'].stuck = true;
+		state.branches['h'].stuck = true;
 		writeFileSync(file, JSON.stringify(state));
 
 		const text = await turn('h', 'two again', { occurrence: 1, text: 'one' });
@@ -153,7 +153,7 @@ describe('a turn that follows an earlier message', () => {
 	});
 
 	it('does not check a request that names no anchor', async () => {
-		await turn('g', 'one', undefined, true);
+		await turn('g', 'one', undefined);
 		await turn('g', 'two', undefined);
 
 		expect(await history('g')).toEqual(['one', 'answer to one', 'two', 'answer to two']);
@@ -165,7 +165,7 @@ describe('images of a turn', () => {
 
 	async function send(body: Record<string, unknown>) {
 		const res = await fetch(`${base}/api/fyai/chat`, {
-			body: JSON.stringify({ conversationId: 'img', fresh: true, ...body }),
+			body: JSON.stringify({ conversationId: 'img', ...body }),
 			headers,
 			method: 'POST'
 		});

@@ -17,7 +17,8 @@ const caps = {
 	browserMcp: false,
 	browserTools: false,
 	modelManager: false,
-	sampling: false
+	sampling: false,
+	serverConversations: false
 };
 
 function backend(kind: string, probe?: () => Promise<boolean>): Backend {

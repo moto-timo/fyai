@@ -3,7 +3,6 @@ import { MessageRole } from '$lib/enums';
 import {
 	deleteFyaiConversation,
 	fyaiConversationRows,
-	fyaiSessionId,
 	renameFyaiConversation,
 	storedImageBytes
 } from '$lib/services/fyai.conversations';
@@ -15,14 +14,6 @@ const ids = () => {
 	return () => `id${++n}`;
 };
 const summary = { id: 'c1', model: '', name: '', turns: 2, updated: 10_000 };
-
-describe('fyaiSessionId', () => {
-	it('keeps the bytes of a branch name and makes the rest an underscore', () => {
-		expect(fyaiSessionId('4f3a-9b_c')).toBe('4f3a-9b_c');
-		expect(fyaiSessionId('a/../b c')).toBe('a____b_c');
-		expect(fyaiSessionId('x'.repeat(100))).toHaveLength(64);
-	});
-});
 
 describe('fyaiConversationRows', () => {
 	it('chains a root and each message under the one before', () => {

@@ -26,16 +26,16 @@ beforeAll(async () => {
 		JSON.stringify({
 			branches: {
 				'agent/other': { turns: 1, updated: 3000 },
+				env: { turns: 1, updated: 500 },
 				main: { turns: 0 },
-				'sdk/env': { turns: 1, updated: 500 },
-				'sdk/newer': {
+				newer: {
 					description: 'A title',
 					messages: MESSAGES,
 					model: 'm1',
 					turns: 2,
 					updated: 2000
 				},
-				'sdk/older': { turns: 2, updated: 1000 }
+				older: { turns: 2, updated: 1000 }
 			}
 		})
 	);
@@ -75,14 +75,23 @@ const call = (path: string, init: RequestInit = {}) =>
 	});
 
 describe('the conversations of the bridge', () => {
-	it('lists the branches of the page sessions, newest first', async () => {
+	it('lists the branches that hold an exchange, newest first', async () => {
 		const body = await (await call('')).json();
 
 		expect(body.conversations).toEqual([
+			{ id: 'agent/other', model: '', name: '', turns: 1, updated: 3000 },
 			{ id: 'newer', model: 'm1', name: 'A title', turns: 2, updated: 2000 },
 			{ id: 'older', model: '', name: '', turns: 2, updated: 1000 },
-			{ id: 'env', model: '', name: '', turns: 1, updated: 500 }
+			{ id: 'env', model: '', name: 'unset', turns: 1, updated: 500 }
 		]);
+	});
+
+	it('titles a branch that has no description by its first question', async () => {
+		const body = await (await call('')).json();
+		const named = body.conversations.map((c: { id: string; name: string }) => [c.id, c.name]);
+
+		expect(named).toContainEqual(['env', 'unset']);
+		expect(named).toContainEqual(['newer', 'A title']);
 	});
 
 	it('reads the stored messages of a conversation', async () => {
@@ -98,11 +107,11 @@ describe('the conversations of the bridge', () => {
 	});
 
 	it('refuses an ID that cannot name a branch of the page', async () => {
-		/* The name is made safe, so it can only name a branch below sdk/. */
 		const res = await call('/..%2Fmain', { method: 'DELETE' });
 
-		expect(res.status).toBe(404);
-		expect((await (await call('')).json()).conversations).toHaveLength(3);
+		expect(res.status).toBe(400);
+		expect((await call('/-x', { method: 'DELETE' })).status).toBe(400);
+		expect((await (await call('')).json()).conversations).toHaveLength(4);
 	});
 
 	it('needs the token', async () => {
@@ -120,7 +129,7 @@ describe('the conversations of the bridge', () => {
 		expect(res.status).toBe(200);
 		expect(
 			(await (await call('')).json()).conversations.map((c: { name: string }) => c.name)
-		).toEqual(['A title', 'Renamed', '']);
+		).toEqual(['', 'A title', 'Renamed', 'unset']);
 		expect((await call('/older', { body: '{}', method: 'PATCH' })).status).toBe(400);
 		expect((await call('/missing', { body: '{"name":"x"}', method: 'PATCH' })).status).toBe(404);
 	});
@@ -131,7 +140,7 @@ describe('the conversations of the bridge', () => {
 
 		const ids = (await (await call('')).json()).conversations.map((c: { id: string }) => c.id);
 
-		expect(ids).toEqual(['newer', 'env']);
+		expect(ids).toEqual(['agent/other', 'newer', 'env']);
 	});
 
 	it('allows no other method', async () => {
