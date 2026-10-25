@@ -681,6 +681,17 @@ W10 of that document). It asks for every extension. It renders the transcript
 with its Markdown renderer, the tool calls with its cards, the panels in a side
 column, and terminals and the screen mirror with xterm.js.
 
+The page is one build for every server. It has a backend seam
+(`web/src/lib/services/backend/`) with the kinds `llama`, `fyai-bridge` and
+`fyai-remote`; the last one is this protocol. A page on a host that has no
+bridge forces the kind with `?backend=fyai-remote`, the local storage or the
+build setting, because it has nothing to probe. The conversations are the
+branches of the session already (the bridge lists, reads, renames and deletes
+`sdk/*`), so the page keeps only a copy, and a turn from an earlier message of
+its tree cuts the branch back first (the anchor of `doc/fyai-web.md`, W5). The
+protocol needs an equivalent of that cut, since the page keeps a tree and a
+session is one line.
+
 ### 13.2 Desktop
 
 The Electron main process starts `fyai serve` as a child, with the launch
@@ -732,7 +743,7 @@ a client goes back to that client as an error with its cause, as
 
 | Phase | Work                                                                                        | Gate                                                                                                     |
 | ----- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| P0    | secure the web bridge: token, origin check, a default mode that is not bypass; `can_use_tool` in the page | the bridge refuses a request without the token and from another origin; an allow and a deny through the page |
+| P0    | secure the web bridge: token, origin and host checks (done, `doc/fyai-web.md` W1) | the bridge refuses a request without the token and from another origin (`web/tests/unit/fyai-bridge-access.test.ts`) |
 | P1    | the SDK dispatcher on any connection; negotiation; `fyai serve` with a Unix socket and workers | a stock SDK test over the socket; two sessions in parallel against the mock provider                      |
 | P2    | `status`, `transcript`, `tools`, `panels` (observe only); runtime directory                 | a functional case attaches to a session in a turn and gets the same transcript as `history`               |
 | P3    | input, cancel, `questions`, `commands`                                                      | a remote line, a remote cancel, a question answered remotely, and a refused command                       |
@@ -763,3 +774,10 @@ reads a YAML script of frames and waits on frames.
 6. **A relay.** Out of scope now. If one is added later, it carries the same
    frames end to end, encrypted between the session and the device, and a
    device pairs with the session, not with the relay.
+7. **Edit and regenerate.** The page keeps a tree of messages and a session is
+   one line. The bridge today takes the last user message that a turn follows
+   (the anchor) and cuts the branch back before it runs the turn. The protocol
+   can carry the same anchor in the user message, or have a request such as
+   `fyai_rewind {session_id, to}` that a client sends before the turn. The
+   request is the better fit for a client that is not a page, but it needs a
+   way to name a message, since the branch counts turns and not messages.

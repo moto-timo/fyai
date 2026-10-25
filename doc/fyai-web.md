@@ -61,43 +61,51 @@ fyai claude-sdk --session-id|--resume ID   ──►  branch sdk/<conversation-i
 ### The bridge
 
 The bridge holds no conversation state. A turn starts one `fyai claude-sdk`
-process (`spawnTurn`, `bridge.mjs:292`). The arguments are
-`--input-format stream-json --output-format stream-json --verbose
---include-partial-messages --permission-mode M`, and `--session-id ID` for a
-new conversation or `--resume ID` after it. The bridge writes one `user` frame,
-forwards each output frame to the page, and closes standard input when the
-`result` frame arrives. It does not answer a `control_request` frame.
+process (`spawnTurn`). The arguments are `--input-format stream-json
+--output-format stream-json --verbose --include-partial-messages
+--permission-mode M`, and `--session-id ID` for a new conversation or
+`--resume ID` after it. The bridge writes one `user` frame, forwards each
+output frame to the page, and closes standard input when the `result` frame
+arrives. The user frame holds the text of the prompt and one `image` block for
+each image (W8). fyai asks the bridge for no decision: its boundary is the
+sandbox profile, so the bridge runs it in `bypassPermissions`, which only tells
+the SDK front not to ask (W6).
 
-The session ID is the conversation ID of the page (`sessionIdFor`,
-`protocol.mjs:70`). fyai stores the conversation in branch
-`sdk/<conversation-id>` (`SDK_BRANCH_PREFIX`, `protocol.mjs:9`). Thus a turn
-sends only the new message, and a conversation survives a restart of the
-bridge.
+The session ID is the conversation ID of the page (`sessionIdFor`). fyai stores
+the conversation in branch `sdk/<conversation-id>` (`SDK_BRANCH_PREFIX`). Thus
+a turn sends only the new message, and a conversation survives a restart of the
+bridge. Before it runs a turn the bridge cuts the branch back when the turn
+follows an earlier message of the page (W5).
 
 If fyai reports that the session does not exist, the bridge tries again with
 `--session-id`. If fyai reports that it exists, the bridge tries again with
-`--resume` (`bridge.mjs:913-934`). An aborted request stops the child.
+`--resume`. An aborted request stops the child.
 
-| Endpoint                       | Handler                     | Result                                                           |
+Every API request needs the token of the bridge (W1). The routes:
+
+| Route                          | Handler                     | Result                                                           |
 | ------------------------------ | --------------------------- | ---------------------------------------------------------------- |
-| `POST /api/fyai/chat`          | `handleChat`, :804          | SSE of SDK frames between `bridge/start` and `bridge/done`       |
-| `GET /api/fyai/commands`       | `listCommands`, :457        | the commands of `fyai schema commands`, cached for 60 s          |
-| `GET /api/fyai/info`           | :1014                       | the binary, directory, model, permission mode (no caller)        |
-| `GET /v1/models`               | `modelsPayload`, :702       | the catalogue in the shape of a llama.cpp router                 |
-| `GET /props`                   | `propsPayload`, :730        | a router `props`; `n_ctx` from the catalogue                     |
-| `GET /models/sse`, `POST /models/load\|unload` | :1052, :1061 | a status map in memory; fyai has no load step             |
-| `GET /slots`, `GET /tools`, `GET /v1/streams/lookup` | :1089-1106 | constant empty answers                                  |
-| `/v1/chat/completions`         | :1112                       | 501                                                              |
-| other paths                    | `serveStatic`, :956         | the built page, with a fallback to `index.html`                  |
+| `GET /api/fyai/login?token=T`  | the server                  | sets the cookie and goes on to `/`; no token needed              |
+| `GET /api/fyai/info`           | the server                  | `{backend, protocol, authenticated}`; with the token also the binary, directory, model and models |
+| `POST /api/fyai/chat`          | `handleChat`                | SSE of SDK frames between `bridge/start` and `bridge/done`       |
+| `GET /api/fyai/commands`       | `listCommands`              | the commands of `fyai schema commands`, cached for 60 s          |
+| `GET /api/fyai/conversations`, `GET\|PATCH\|DELETE .../ID`, `GET .../ID/messages` | `handleConversations` | the branches of the sessions, their messages, the title, the delete (W4) |
+| `GET /v1/models`               | `modelsPayload`             | the catalogue in the shape of a llama.cpp router, with the input types and abilities of each model |
+| `GET /props`                   | `propsPayload`              | a router `props`; `n_ctx` and the modalities of the model from the catalogue |
+| `GET /models/sse`, `POST /models/load\|unload` | the server       | a status map in memory; fyai has no load step                    |
+| `GET /slots`, `GET /tools`, `GET /v1/streams/lookup` | the server  | constant empty answers                                           |
+| `/v1/chat/completions`         | the server                  | 501                                                              |
+| other paths                    | `serveStatic`               | the built page, with a fallback to `index.html`; no token needed |
 
 A prompt that starts with `/` does not go to the model. The bridge runs it as
-an fyai verb on the branch of the conversation (`runSlashCommand`, :515), with
-the words as `argv` and no shell (`slashCommandArgs`, `protocol.mjs:106`). The
-output arrives as one `bridge/command` frame, in a text fence.
+an fyai verb on the branch of the conversation (`runSlashCommand`), with the
+words as `argv` and no shell (`slashCommandArgs`). The output arrives as one
+`bridge/command` frame, in a text fence.
 
 The page sends provider keys with each turn. The bridge puts each key in the
-environment of the child as `<PROVIDER>_API_KEY` (`turnEnv`, :612). The bridge
-writes no key to a file.
+environment of the child as `<PROVIDER>_API_KEY` (`turnEnv`). The bridge writes
+no key to a file, and it removes its own token from the environment that its
+children get.
 
 ### The desktop app
 
@@ -313,7 +321,7 @@ classes.
 | Model picker in router mode            | `components/app/models/ModelsSelector/*`                 |
 | Conversation list and tabs             | `SidebarNavigation/*`, `stores/tabs.svelte.ts`           |
 | Settings dialog                        | `constants/settings.constants.ts`, `SettingsChat/*`      |
-| Text and PDF attachments               | `utils/process-uploaded-files.ts`, `fyai.service.ts`     |
+| Text and PDF attachments, and images   | `utils/process-uploaded-files.ts`, `fyai.service.ts`     |
 | Stop                                   | the abort controller; the bridge stops the child         |
 
 ### Parts that do nothing against the bridge
@@ -329,22 +337,22 @@ classes.
 | System message, model titles              | stored or shown, never sent                                |
 | Model load and unload                     | a status map in the bridge; Vite does not forward `/models` |
 | `/health`, `/metrics`, `/build.json`      | not served                                                 |
-| API key splash (`ServerErrorSplash.svelte`) | the bridge never returns 401                             |
+| API key splash (`ServerErrorSplash.svelte`) | the bridge answers 401 to a page with no token, and the splash then asks for an API key, which is not what is missing (open) |
 
 ### Parts that conflict with fyai
 
 | Part                                       | Conflict                                                                                   |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | Conversation store (`database.service.ts`) | IndexedDB holds the copy that the page shows. W4 syncs it with the branches at start and passes a delete or a rename on. A fork of the page has no branch. |
-| Regenerate, edit, message branches         | fyai appends to the session, so the tree of the page and the branch differ. An edit of the first message resumes the old context. |
-| Agentic loop (`stores/agentic/*`)          | a message with no text, such as an image alone, falls through to it and gets a 501.       |
-| MCP client in the browser (`services/mcp.service.ts`) | the browser connects to MCP servers; fyai never gets their tools. `/cors-proxy` is not served. |
-| JavaScript sandbox and browser tools       | listed and switchable; they never run on the fyai path.                                   |
-| Tool store and per-conversation tool choice | built but not sent; the bridge never passes `--tools`.                                  |
+| Regenerate, edit, message branches         | the tree of the page keeps every sibling and the branch of fyai is one line. W5 cuts the branch back before a turn; switching to another sibling moves it at the next turn, not at once. |
+| Agentic loop (`stores/agentic/*`)          | hidden and never run for fyai; a message with nothing to send gets an error message.      |
+| MCP client in the browser (`services/mcp.service.ts`) | the browser connects to MCP servers; fyai never gets their tools. The sidebar entry is hidden for fyai; the pickers in a chat are not. `/cors-proxy` is not served. |
+| JavaScript sandbox and browser tools       | hidden for fyai (the Tools section and menu); they never run on its path.                 |
+| Tool store and per-conversation tool choice | hidden for fyai with the Tools section; the bridge never passes `--tools`.              |
 | Permission store and permission card       | fyai never asks the page: its boundary is the sandbox profile, not a prompt for each call. |
-| Hugging Face discovery and model manager   | GGUF files, quantizations and downloads have no meaning for fyai.                         |
-| Context gauge                              | `prompt_n` is the input of the whole tool loop, and the usage is not stored with the message. |
-| Conversation import and export             | moves database rows only. An imported conversation has no fyai session.                   |
+| Hugging Face discovery and model manager   | GGUF files, quantizations and downloads have no meaning for fyai; the entries are hidden. |
+| Context gauge                              | `prompt_n` is the input of the whole tool loop; each message now stores the usage of its own frame (W7). |
+| Conversation import and export, fork       | move database rows only. An imported or forked conversation has no fyai session or branch. |
 | Search (`routes/search`)                   | searches IndexedDB, not the branches.                                                     |
 | Audio and video                            | the composer takes them; fyai takes images and text files only, so the page says so (W8). |
 
@@ -655,3 +663,21 @@ its tests.
 - Which wrapper for mobile: Capacitor, or a smaller WebView shell?
 - Do provider keys stay in the page, or does the page only name a key that the
   host already has (`api_key: {type: env, ...}`)?
+
+## What remains for the page
+
+- The session protocol (W10): the `fyai-remote` backend over a WebSocket, a
+  running turn that survives a reload, questions, the task panel, terminals and
+  the screen mirror. The seam, the forced kind and the conversations as
+  branches are in place for it.
+- Mobile and the hosted page (W11), with pairing, TLS and a token for each
+  device; the allowed-origins list of `fyai serve` for a static page on
+  another origin.
+- The sandbox profile in the page (W6).
+- A card for `apply_patch`, the tool list and the cost of a turn, and
+  `input_json_delta`, so a call shows while its arguments arrive (W7).
+- The 401 screen of a page that was opened with no token, which asks for an API
+  key; the MCP pickers inside a chat; switching to another sibling of the
+  message tree moves the branch only at the next turn.
+- A test of the desktop app itself; the browser test runs the page and the
+  bridge but not Electron.

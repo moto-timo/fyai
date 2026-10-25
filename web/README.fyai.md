@@ -45,6 +45,10 @@ step, so every model is reported as loaded.
   page takes the model it names.
 - An answer records the model that produced it, so a conversation reopened
   from history returns the picker to that model.
+- The catalogue says what each model takes and can do (`fyai catalog get
+  models`): the picker and `/props` report the input types, so the composer
+  accepts an image only for a model that takes one, and the abilities of the
+  model, such as reasoning and tool use.
 
 ## Requirements
 
@@ -346,13 +350,14 @@ page then serves none of them.
   JPEG, GIF, WebP) and text files only, so the page refuses the message and
   says so. An image reaches a model that takes images; for any other model
   fyai refuses it with its cause.
-- **Working directory per conversation**: the bridge runs every session in
-  one directory, given by `--cwd`.
-- **Regenerate and edit**: fyai appends to the stored session, so a
-  regenerated answer continues the conversation instead of replacing the
-  last turn. Use `/clear` or a new chat for a fresh session.
-- **Resume after reload**: the page keeps its own conversation store; a turn
-  in flight is not reattached.
+- **Working directory per conversation**: a bridge works in one project, given
+  by `--cwd`; the desktop app opens one window for each project. A conversation
+  has no directory of its own.
+- **Resume after reload**: a turn in flight is not reattached; the conversation
+  is read from fyai again.
+- **Fork, import and export of a conversation**: they work on the copy in the
+  browser only, so a forked or imported conversation has no branch in fyai.
+- **The tool list and the cost of a turn**, a card for `apply_patch`: not shown.
 - **Keys of an MCP server**: only provider keys travel from the page. An MCP
   server that needs a token takes it from the fyai configuration.
 
@@ -410,13 +415,21 @@ npx vitest --project=unit --run
 web/
 ├── scripts/run.sh           build and serve the page
 ├── scripts/dev.sh           bridge and Vite, for editing
-├── server/bridge.mjs        HTTP, SSE, fyai processes, catalogue
-├── server/protocol.mjs      session IDs and slash commands
+├── server/bridge.mjs        HTTP, SSE, fyai processes, catalogue, conversations
+├── server/auth.mjs          the token, origin and host rules
+├── server/protocol.mjs      session IDs, slash commands, the cut of a branch, images
 ├── server/test-turn.sh      one turn against the mock provider
-├── server/e2e.mjs           the built page in Chrome
+├── server/e2e-mock.mjs      the page in a browser against the mock provider
+├── server/e2e.mjs           the built page in Chrome, with a real provider
+├── electron/main.cjs        the desktop app: one window for each project
+├── electron/projects.cjs    the project choices that need no Electron
+├── tests/fixtures/fake-fyai.mjs   a stand-in for the branch verbs of fyai
+├── src/lib/services/backend/   the backend seam and the llama-server backend
+├── src/lib/stores/fyai-backend.svelte.ts  the fyai bridge as a backend
 ├── src/lib/services/fyai.service.ts   turn transport and prompt
 ├── src/lib/services/fyai.turn.ts      frames to messages
-├── src/lib/stores/chat/index.svelte.ts  maps frames to messages
+├── src/lib/services/fyai.tools.ts     the cards of the tools
+├── src/lib/services/fyai.conversations.ts  the copy of the branches
 └── src/…                    the fork of the llama.cpp UI
 ```
 
