@@ -5,9 +5,11 @@ import {
 	conversationBranch,
 	conversationsFromBranches,
 	fencedOutput,
+	messageTextOf,
 	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
+	rewindPlan,
 	sessionIdFor,
 	slashCommandArgs,
 	unknownCommandMessage
@@ -236,5 +238,62 @@ describe('conversationBranch', () => {
 		expect(conversationBranch('../main')).toBe('sdk/___main');
 		expect(conversationBranch('')).toBe('');
 		expect(conversationBranch(undefined)).toBe('');
+	});
+});
+
+describe('messageTextOf', () => {
+	it('reads a string, the text parts of a list, and nothing else', () => {
+		expect(messageTextOf({ content: 'a' })).toBe('a');
+		expect(messageTextOf({ content: [{ text: 'a' }, { type: 'image' }, { text: 'b' }] })).toBe(
+			'ab'
+		);
+		expect(messageTextOf({ content: 7 })).toBe('');
+		expect(messageTextOf(null)).toBe('');
+	});
+});
+
+describe('rewindPlan', () => {
+	const history = [
+		{ content: 'one', role: 'user' },
+		{ content: 'a1', role: 'assistant' },
+		{ call_id: 'k', name: 'shell', type: 'function_call' },
+		{ call_id: 'k', output: 'x', type: 'function_call_output' },
+		{ content: 'two', role: 'user' },
+		{ content: 'a2', role: 'assistant' },
+		{ content: 'one', role: 'user' },
+		{ content: 'a3', role: 'assistant' }
+	];
+
+	it('cuts back to the message before the next user message', () => {
+		expect(rewindPlan(history, { occurrence: 1, text: 'one' })).toEqual({
+			action: 'reset',
+			keep: 4
+		});
+		expect(rewindPlan(history, { occurrence: 1, text: 'two' })).toEqual({
+			action: 'reset',
+			keep: 6
+		});
+	});
+
+	it('picks the equal message by its count', () => {
+		expect(rewindPlan(history, { occurrence: 2, text: 'one' })).toEqual({ action: 'none' });
+	});
+
+	it('compares the text without its outer blanks', () => {
+		expect(rewindPlan(history, { occurrence: 1, text: '  two\n' })).toEqual({
+			action: 'reset',
+			keep: 6
+		});
+	});
+
+	it('cuts nothing when the anchor is the last exchange or is not there', () => {
+		expect(rewindPlan(history, { occurrence: 1, text: 'missing' })).toEqual({ action: 'none' });
+		expect(rewindPlan(history, { occurrence: 5, text: 'one' })).toEqual({ action: 'none' });
+	});
+
+	it('deletes the branch when the turn follows no message and the branch has some', () => {
+		expect(rewindPlan(history, null)).toEqual({ action: 'delete' });
+		expect(rewindPlan([], null)).toEqual({ action: 'none' });
+		expect(rewindPlan([{ content: 'x', role: 'assistant' }], null)).toEqual({ action: 'none' });
 	});
 });

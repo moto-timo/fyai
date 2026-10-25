@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 import { AttachmentType, MessageRole } from '$lib/enums';
-import { buildFyaiPrompt, messageText, parseProviderKeys } from '$lib/services/fyai.service';
+import {
+	buildFyaiPrompt,
+	fyaiAnchor,
+	messageText,
+	parseProviderKeys
+} from '$lib/services/fyai.service';
 import type { DatabaseMessage } from '$lib/types';
 import { describe, expect, it } from 'vitest';
 
@@ -99,5 +104,47 @@ describe('parseProviderKeys', () => {
 
 	it('gives nothing for an empty field', () => {
 		expect(parseProviderKeys('')).toEqual({});
+	});
+});
+
+describe('fyaiAnchor', () => {
+	const user = (content: string, extra: Partial<DatabaseMessage> = {}) =>
+		({ content, role: 'user', ...extra }) as DatabaseMessage;
+	const assistant = (content: string) => ({ content, role: 'assistant' }) as DatabaseMessage;
+
+	it('is null for the first message of a conversation', () => {
+		expect(fyaiAnchor([user('one')])).toBeNull();
+		expect(fyaiAnchor([])).toBeNull();
+	});
+
+	it('names the last user message before the one that starts the turn', () => {
+		const path = [user('one'), assistant('a'), user('two'), assistant('b'), user('three')];
+
+		expect(fyaiAnchor(path)).toEqual({ occurrence: 1, text: 'two' });
+	});
+
+	it('counts equal messages up to the anchor', () => {
+		const path = [user('same'), assistant('a'), user('same'), assistant('b'), user('next')];
+
+		expect(fyaiAnchor(path)).toEqual({ occurrence: 2, text: 'same' });
+	});
+
+	it('does not count a message that the page made itself', () => {
+		const path = [
+			user('one'),
+			assistant('a'),
+			user('cwd changed', { isSynthetic: true }),
+			user('two')
+		];
+
+		expect(fyaiAnchor(path)).toEqual({ occurrence: 1, text: 'one' });
+	});
+
+	it('uses the prompt that was sent, with the text of its files', () => {
+		const first = user('look', {
+			extra: [{ content: 'body', name: 'a.txt', type: AttachmentType.TEXT }] as never
+		});
+
+		expect(fyaiAnchor([first, assistant('a'), user('two')])?.text).toBe(buildFyaiPrompt([first]));
 	});
 });

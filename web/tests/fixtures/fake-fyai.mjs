@@ -20,15 +20,57 @@ const fail = (text) => {
 
 let branch = 'main';
 
-/* The global option comes before the command. */
-if (args[0] === '--branch' || args[0] === '-b') {
-	branch = args[1];
+/* The global options come before the command. */
+while (args[0] === '--branch' || args[0] === '-b' || args[0] === '--set') {
+	if (args[0] !== '--set') branch = args[1];
+
 	args.splice(0, 2);
 }
 
 const [command, sub, ...rest] = args;
 
-if (command === 'branch' && sub === 'list') {
+if (args.includes('claude-sdk')) {
+	const at =
+		args.indexOf('--session-id') >= 0 ? args.indexOf('--session-id') : args.indexOf('--resume');
+	const name = `sdk/${args[at + 1]}`;
+
+	process.stdin.setEncoding('utf8');
+	process.stdin.once('data', (line) => {
+		const prompt = JSON.parse(line.split('\n')[0]).message.content[0].text;
+		const b = (state.branches[name] ??= { bounds: [], messages: [], turns: 0, updated: 1 });
+
+		b.messages.push({ content: prompt, role: 'user' });
+		b.bounds.push(b.messages.length);
+		b.messages.push({ content: `answer to ${prompt}`, role: 'assistant' });
+		b.bounds.push(b.messages.length);
+		b.turns = b.bounds.length;
+		save();
+		process.stdout.write(
+			`${JSON.stringify({ is_error: false, result: 'ok', subtype: 'success', type: 'result' })}\n`
+		);
+		process.exit(0);
+	});
+} else if (command === 'branch' && sub === 'new') {
+	const [name, source] = rest;
+
+	if (state.branches[name]) fail(`branch '${name}' exists`);
+
+	state.branches[name] = structuredClone(state.branches[source]);
+	save();
+} else if (command === 'reset') {
+	const b = state.branches[branch];
+	const steps = Number(String(sub).split('~')[1]);
+
+	if (!b || !steps || steps >= b.bounds.length) fail('cannot go back that far');
+
+	/* A branch that cannot move: the reset reports success and changes nothing. */
+	if (b.stuck) process.exit(0);
+
+	b.bounds.length -= steps;
+	b.messages.length = b.bounds.at(-1);
+	b.turns = b.bounds.length;
+	save();
+} else if (command === 'branch' && sub === 'list') {
 	const rows = Object.entries(state.branches).map(([name, b]) => ({
 		branch: name,
 		current: name === 'main',
