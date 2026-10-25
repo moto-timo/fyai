@@ -8,6 +8,7 @@
 #   fyai-web-dev         the bridge and Vite, for editing (not a build)
 #   fyai-web-test        the unit tests of the page
 #   fyai-web-turn        the bridge and mock provider: one turn and its frames
+#   fyai-web-e2e         the page in a browser against the bridge and the mock provider
 #   fyai-desktop         the desktop window, from the built page
 #   fyai-desktop-package dist-app/fyai-linux-<arch>/, with fyai when bundled
 #
@@ -221,6 +222,19 @@ add_custom_target(fyai-web-turn
         bash "${FYAI_WEB_DIR}/server/test-turn.sh" chat_stream.json hello conv-1
     COMMENT "running one turn of the page against the mock provider"
     DEPENDS fyai fyai-web-stage fyai-web-install
+    USES_TERMINAL
+    VERBATIM)
+
+# The page in a browser, against the bridge, fyai and the mock provider. It needs
+# a Chrome or the Chromium of Playwright, so it is never part of CTest.
+add_custom_target(fyai-web-e2e
+    COMMAND "${CMAKE_COMMAND}" -E env "FYAI_BRIDGE_STATIC=${FYAI_WEB_DIR}/dist"
+        ${FYAI_NODE_EXECUTABLE} "${FYAI_WEB_DIR}/server/e2e-mock.mjs"
+        --fyai "$<TARGET_FILE:fyai>"
+        --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/scenarios/web_chat.json"
+    COMMENT "running the page in a browser against the mock provider"
+    DEPENDS fyai fyai-web
+    WORKING_DIRECTORY "${FYAI_WEB_DIR}"
     USES_TERMINAL
     VERBATIM)
 
