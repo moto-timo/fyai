@@ -11,8 +11,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 
 const { mkdirSync, readFileSync, statSync, writeFileSync } = require('node:fs');
+const { createHash } = require('node:crypto');
 const { dirname, resolve } = require('node:path');
 const RECENT_MAX = 10;
+/* Below the range that the system hands out to outgoing connections, so a port stays free. */
+const PORT_BASE = 20000;
+const PORT_COUNT = 10000;
 
 /** True when @path is a directory. */
 function isDirectory(path) {
@@ -74,4 +78,29 @@ function recentSave(file, list) {
 	}
 }
 
-module.exports = { isDirectory, projectFromArgs, RECENT_MAX, recentAdd, recentLoad, recentSave };
+/**
+ * The port of the bridge of a project. The origin of the page is its address,
+ * and the page keeps its conversations per origin, so a project needs the same
+ * port at every launch to find them again. The port comes from the directory,
+ * and a project with a port that is taken falls back to any free one.
+ *
+ * @param {string} dir the absolute directory of the project
+ * @returns {number}
+ */
+function portForProject(dir) {
+	const digest = createHash('sha256').update(resolve(dir)).digest();
+
+	return PORT_BASE + (digest.readUInt32BE(0) % PORT_COUNT);
+}
+
+module.exports = {
+	isDirectory,
+	PORT_BASE,
+	PORT_COUNT,
+	portForProject,
+	projectFromArgs,
+	RECENT_MAX,
+	recentAdd,
+	recentLoad,
+	recentSave
+};
