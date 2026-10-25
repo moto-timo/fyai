@@ -5,16 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const {
-	PORT_BASE,
-	PORT_COUNT,
-	portForProject,
-	projectFromArgs,
-	RECENT_MAX,
-	recentAdd,
-	recentLoad,
-	recentSave
-} = createRequire(import.meta.url)('../../electron/projects.cjs');
+const { projectFromArgs, RECENT_MAX, recentAdd, recentLoad, recentSave } = createRequire(
+	import.meta.url
+)('../../electron/projects.cjs');
 
 let scratch: string;
 
@@ -99,27 +92,5 @@ describe('recent projects', () => {
 		writeFileSync(file, '');
 
 		expect(recentSave(join(file, 'recent.json'), ['a'])).not.toBe('');
-	});
-});
-
-describe('portForProject', () => {
-	it('gives a project the same port at every call', () => {
-		expect(portForProject('/home/u/work/a')).toBe(portForProject('/home/u/work/a'));
-		expect(portForProject('/home/u/work/a/')).toBe(portForProject('/home/u/work/a'));
-	});
-
-	it('keeps the port below the range of outgoing connections', () => {
-		for (const dir of ['/', '/a', '/home/u/work/a', '/tmp/x y', '/very/long/'.repeat(30)]) {
-			const port = portForProject(dir);
-
-			expect(port).toBeGreaterThanOrEqual(PORT_BASE);
-			expect(port).toBeLessThan(PORT_BASE + PORT_COUNT);
-		}
-	});
-
-	it('spreads projects over the range', () => {
-		const ports = new Set(Array.from({ length: 50 }, (_, i) => portForProject(`/work/p${i}`)));
-
-		expect(ports.size).toBeGreaterThan(45);
 	});
 });

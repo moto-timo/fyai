@@ -320,8 +320,13 @@ test('an image goes to fyai as an attachment of the message', async () => {
 });
 
 test('a conversation comes back from fyai when the page has lost its copy', async () => {
-	/* The page holds no copy: a new load reads the conversation from fyai. */
+	/* The page holds no copy: a new load reads the conversation and the settings from fyai. */
 	await page.evaluate(() => localStorage.clear());
+	await bridgeJson('/api/fyai/settings', {
+		body: JSON.stringify({ config: { apiKey: 'secret', theme: 'dark' }, userOverrides: [] }),
+		headers: { 'content-type': 'application/json' },
+		method: 'PUT'
+	});
 	await page.goto(`${address}/`, { waitUntil: 'domcontentloaded' });
 	await composer().waitFor();
 	/* The list of the sidebar: the page made its copy again from fyai. */
@@ -330,6 +335,19 @@ test('a conversation comes back from fyai when the page has lost its copy', asyn
 	await visible('Mock answer 4');
 	await visible('Task list');
 	await visible('echo from the mock');
+
+	assert(
+		await page.evaluate(() => document.documentElement.classList.contains('dark')),
+		'the theme of the server was not applied'
+	);
+	assert(
+		(await page.evaluate(() => localStorage.getItem('LlamaUi.config'))) === null,
+		'the browser keeps the settings'
+	);
+	assert(
+		!JSON.stringify(await bridgeJson('/api/fyai/settings')).includes('secret'),
+		'the bridge kept a key'
+	);
 
 	/* The browser keeps no database, and the branch is named as the CLI names one. */
 	assert(

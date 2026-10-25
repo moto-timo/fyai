@@ -12,8 +12,8 @@ import {
 	pageCapabilities,
 	parseHistory,
 	parseSlashCommand,
-	providerKeyEnvName,
 	rewindPlan,
+	sanitizeSettings,
 	slashCommandArgs,
 	titleFromHistory,
 	unknownCommandMessage,
@@ -134,7 +134,7 @@ describe('unknownCommandMessage', () => {
 	});
 });
 
-describe('providerKeyEnvName', () => {
+describe('catalogueModelName', () => {
 	it('finds the catalogue name that /model typed out', () => {
 		const models = [{ name: 'claude-haiku-5.5' }, { name: 'gpt-5.4' }];
 
@@ -159,21 +159,34 @@ describe('providerKeyEnvName', () => {
 		/* The tag is not punctuation to drop: it names an offering of its own. */
 		expect(catalogueModelName([{ name: 'gpt-oss-120b:batch' }], 'gpt-oss-120b')).toBe('');
 	});
+});
 
-	it('names the variable of a provider', () => {
-		expect(providerKeyEnvName('anthropic')).toBe('ANTHROPIC_API_KEY');
-		expect(providerKeyEnvName('openai')).toBe('OPENAI_API_KEY');
+describe('sanitizeSettings', () => {
+	it('keeps plain values and drops the keys and anything else', () => {
+		expect(
+			sanitizeSettings({
+				config: {
+					apiKey: 'k',
+					list: [1],
+					n: 1,
+					nested: { a: 1 },
+					on: true,
+					providerApiKeys: 'a = b',
+					s: 'x'
+				},
+				userOverrides: ['n', 7, 'apiKey']
+			})
+		).toEqual({ config: { n: 1, on: true, s: 'x' }, userOverrides: ['n'] });
 	});
 
-	it('maps the characters that a variable name cannot hold', () => {
-		expect(providerKeyEnvName('open-router')).toBe('OPEN_ROUTER_API_KEY');
-		expect(providerKeyEnvName('meta.llama')).toBe('META_LLAMA_API_KEY');
+	it('has nothing for a body with no config', () => {
+		expect(sanitizeSettings(null)).toBeNull();
+		expect(sanitizeSettings({})).toBeNull();
+		expect(sanitizeSettings({ config: [] })).toBeNull();
 	});
 
-	it('gives nothing for a name that is not a provider', () => {
-		expect(providerKeyEnvName('')).toBeNull();
-		expect(providerKeyEnvName('a b')).toBeNull();
-		expect(providerKeyEnvName('x'.repeat(80))).toBeNull();
+	it('takes no overrides as none', () => {
+		expect(sanitizeSettings({ config: {} })).toEqual({ config: {}, userOverrides: [] });
 	});
 });
 

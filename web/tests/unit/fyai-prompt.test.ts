@@ -5,8 +5,7 @@ import {
 	fyaiAnchor,
 	fyaiImages,
 	fyaiUnsupportedAttachments,
-	messageText,
-	parseProviderKeys
+	messageText
 } from '$lib/services/fyai.service';
 import type { DatabaseMessage } from '$lib/types';
 import { describe, expect, it } from 'vitest';
@@ -81,31 +80,6 @@ describe('buildFyaiPrompt', () => {
 
 	it('gives nothing without a user message', () => {
 		expect(buildFyaiPrompt([message(MessageRole.ASSISTANT, 'x')])).toBeNull();
-	});
-});
-
-describe('parseProviderKeys', () => {
-	it('reads one provider a line', () => {
-		expect(parseProviderKeys('anthropic = sk-ant-1\nopenai = sk-oai-2')).toEqual({
-			anthropic: 'sk-ant-1',
-			openai: 'sk-oai-2'
-		});
-	});
-
-	it('takes the provider name in lower case and trims the parts', () => {
-		expect(parseProviderKeys('  OpenAI   =   sk-1  ')).toEqual({ openai: 'sk-1' });
-	});
-
-	it('leaves a blank row, a comment and a row with no value out', () => {
-		expect(parseProviderKeys('\n# openai = sk-1\nanthropic =\n= broken\n')).toEqual({});
-	});
-
-	it('keeps a key that holds an equals sign', () => {
-		expect(parseProviderKeys('deepseek = a=b=c')).toEqual({ deepseek: 'a=b=c' });
-	});
-
-	it('gives nothing for an empty field', () => {
-		expect(parseProviderKeys('')).toEqual({});
 	});
 });
 
