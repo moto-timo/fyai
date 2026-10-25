@@ -33,6 +33,8 @@ import {
 	conversationsFromBranches,
 	fencedOutput,
 	findCatalogueModel,
+	inputModalities,
+	pageCapabilities,
 	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
@@ -687,7 +689,11 @@ async function listModels(force = false) {
 	 */
 	const list = (extra) =>
 		runCapture(config.bin, ['catalog', 'list', 'models', ...extra, '--output', 'json'], 20000);
-	const [primary, keyed] = await Promise.all([projectModel(), list(['--available'])]);
+	const [primary, keyed, detail] = await Promise.all([
+		projectModel(),
+		list(['--available']),
+		runCapture(config.bin, ['catalog', 'get', 'models', '--output', 'json'], 20000)
+	]);
 
 	let res = keyed;
 
@@ -708,13 +714,31 @@ async function listModels(force = false) {
 		log('catalog list failed:', res.err.trim() || `status ${res.code}`);
 	}
 
+	/* The entries of the catalogue say what each model takes and can do. */
+	const details = new Map();
+
+	try {
+		for (const model of JSON.parse(detail.out)) details.set(model.name, model);
+	} catch {
+		log('cannot read the models of the catalogue:', detail.err.trim() || `status ${detail.code}`);
+	}
+
+	/* The model of the project can be named with its provider, `chat-prov/img-chat`. */
+	const detailOf = (name) => details.get(name) ?? findCatalogueModel([...details.values()], name);
+	const withDetail = (entry) => ({
+		...entry,
+		capabilities: pageCapabilities(detailOf(entry.name)?.capabilities),
+		modalities: inputModalities(detailOf(entry.name)?.modalities)
+	});
 	const entries = listed
 		.filter((model) => model && typeof model.name === 'string')
-		.map((model) => ({
-			context_window: Number(model.context_window) || 0,
-			max_output_tokens: Number(model.max_output_tokens) || 0,
-			name: model.name
-		}));
+		.map((model) =>
+			withDetail({
+				context_window: Number(model.context_window) || 0,
+				max_output_tokens: Number(model.max_output_tokens) || 0,
+				name: model.name
+			})
+		);
 	/*
 	 * The model of the project comes first, and keeps the context window and
 	 * the output limit the catalogue reports for it; it is usually the same
@@ -726,9 +750,9 @@ async function listModels(force = false) {
 	const models = primary
 		? [
 				{
+					...withDetail({ name: primary }),
 					context_window: Number(first?.context_window) || 0,
 					max_output_tokens: Number(first?.max_output_tokens) || 0,
-					name: primary,
 					primary: true
 				}
 			]
@@ -748,6 +772,7 @@ async function listModels(force = false) {
 function modelsPayload(models) {
 	return {
 		data: models.map((m) => ({
+			architecture: { input_modalities: m.modalities ?? ['text'] },
 			context_length: m.context_window,
 			created: 0,
 			id: m.name,
@@ -759,7 +784,7 @@ function modelsPayload(models) {
 			status: { args: [], value: statusOf(m.name) }
 		})),
 		models: models.map((m) => ({
-			capabilities: [],
+			capabilities: m.capabilities ?? [],
 			description: m.context_window ? `context ${m.context_window}` : '',
 			model: m.name,
 			name: m.name
@@ -831,7 +856,10 @@ function propsPayload(requested = '') {
 			},
 			speculative: false
 		},
-		modalities: { audio: false, vision: false },
+		modalities: {
+			audio: (known?.modalities ?? []).includes('audio'),
+			vision: (known?.modalities ?? []).includes('image')
+		},
 		model_alias: model,
 		model_path: model || 'fyai',
 		/*

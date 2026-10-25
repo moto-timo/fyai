@@ -422,3 +422,38 @@ export function userContent(prompt, images) {
 
 	return content;
 }
+
+/*
+ * What the page learns about a model. The page reads the input types of a model
+ * from the router form of /v1/models (`architecture.input_modalities`) and its
+ * abilities from `capabilities`, and refuses an image for a model with no
+ * `image` input, so the catalogue of fyai says both.
+ */
+
+/**
+ * The input types of a model for the page: text, and the others that the page
+ * has a kind of file for. A PDF is read as text by the page.
+ *
+ * @param {unknown} modalities the `modalities` of a catalogue entry
+ * @returns {string[]}
+ */
+export function inputModalities(modalities) {
+	const known = new Set(['audio', 'image', 'video']);
+	const listed = Array.isArray(modalities) ? modalities.filter((m) => known.has(m)) : [];
+
+	return ['text', ...listed];
+}
+
+/**
+ * The abilities of a model as the page names them.
+ *
+ * @param {unknown} capabilities the `capabilities` of a catalogue entry
+ * @returns {string[]}
+ */
+export function pageCapabilities(capabilities) {
+	const names = { reasoning: 'reasoning', tool_calling: 'tools' };
+
+	return Array.isArray(capabilities)
+		? capabilities.map((c) => names[/** @type {keyof typeof names} */ (c)]).filter(Boolean)
+		: [];
+}
