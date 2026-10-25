@@ -73,6 +73,15 @@ the prompt, after the `UserPromptSubmit` hooks. PATH is absolute, relative
 to the working directory, or starts with `~/`. A message that the SDK
 marks `client_composed`, as `verbatim_prompts` does, goes as written.
 
+A user message can carry images as blocks, `{type: image, source: {type:
+base64, media_type, data}}`. fyai attaches each one to that message as an
+image part (`doc/media.md`), so the request carries it in the form of the API
+and the session stores its bytes. A message of image blocks alone is a prompt.
+The types are PNG, JPEG, GIF and WebP, and the model must take images. A
+block that fyai cannot attach, such as bytes of no image type, ends the turn
+with an error result that names the image. A block with another source type
+is left out with a warning.
+
 A prompt that is `/clear` starts a new session with the configuration of
 the session and no conversation, as in Claude Code. A `conversation_reset`
 message names the session that ends, and a `result` gives the new one.
