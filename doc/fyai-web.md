@@ -136,7 +136,7 @@ from the branches at the next start.
 The page is one build for three servers. At start it asks each registered
 backend whether it is the server behind the page (`probe`), in registration
 order, and takes the first that answers. A server that answers none is
-llama-server. A setting or a call can force a kind.
+llama-server. A kind can be forced: the `backend` query parameter of the address (`?backend=fyai-bridge`), the `fyai-backend` entry of the local storage, or the build setting `VITE_PUBLIC_BACKEND`, in that order. A kind that is not registered is ignored and the probes run. A page served from a host that has no bridge is forced this way.
 
 | Kind           | Server                       | State                         |
 | -------------- | ---------------------------- | ----------------------------- |
@@ -394,7 +394,7 @@ Each item states what changes, why, and which fyai interface it uses.
 - Open: TLS for a non-loopback address (use a tunnel or a proxy until then),
   and a token for each device (SDD 6).
 
-**W2. Detect the backend at run time.** Done, except the forced-backend setting and the hook list in `web/NOTICE.md` (now written).
+**W2. Detect the backend at run time.** Done.
 
 - `GET /api/fyai/info` returns `{backend: "fyai", protocol, extensions}`. The
   page asks it at start. A 404 means llama-server.
