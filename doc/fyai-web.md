@@ -1,8 +1,9 @@
 # fyai web
 
-Status: implemented in part. The sections "Architecture", "Changes on top of
-llama.cpp" and "Upstream surface that remains" describe the tree as it is.
-The sections after them are a plan.
+Status: implemented in part. The sections "Architecture", "Backends", "Changes
+on top of llama.cpp" and "Upstream surface that remains" describe the tree as
+it is. The sections after them are a plan. W2, W3 and the project choice of
+W9 have landed; the work items say what remains.
 
 Related design: `doc/remote-sessions-sdd.md` (the session protocol that the
 page will use), `doc/claude-sdk-compat.md` (the protocol that the page uses
@@ -32,11 +33,14 @@ This document records:
   `web/dist`. It is installable as a PWA.
 - **Bridge**: `web/server/bridge.mjs`, a Node program with no dependencies. It
   serves the page and runs fyai.
-- **Desktop app**: `web/electron/main.cjs`, an Electron window that runs the
-  bridge as a child and loads the page from it.
-- **Backend**: the server that the page talks to. Upstream, this is
-  llama-server. In fyai web, it is the bridge.
-- **Upstream**: the llama.cpp `tools/ui` tree, imported at commit d7ac555e.
+- **Desktop app**: `web/electron/main.cjs`, an Electron app. Each window is
+  one project and runs a bridge of its own as a child.
+- **Backend**: the server that the page talks to, and the implementation of
+  the seam in `src/lib/services/backend/` for it. Upstream, the server is
+  llama-server (kind `llama`). In fyai web it is the bridge (`fyai-bridge`)
+  or, later, `fyai serve` (`fyai-remote`).
+- **Upstream**: the llama.cpp `tools/ui` tree. The import is llama.cpp commit
+  1801b7cd, and the fyai commit that holds it is d7ac555e.
 
 ## Architecture
 
@@ -96,14 +100,86 @@ writes no key to a file.
 ### The desktop app
 
 `electron/main.cjs` finds fyai in `FYAI_BIN`, then in `resources/fyai` of the
-bundle, then in the build tree, then on `PATH`. It selects the project
-directory: `FYAI_BRIDGE_CWD`, else the start directory, else a directory under
-the data directory of the platform. It runs `fyai init` where no arena exists.
+bundle, then in the build tree, then on `PATH`.
 
-The app starts the bridge with `ELECTRON_RUN_AS_NODE=1`, `--port 0` and
-`--parent-pid`, and reads the address from the `listening on` line of its
-standard error. The window has context isolation, no Node integration, no
-preload script and no IPC. The bridge stops with the app.
+**One window is one project.** A project is a directory that fyai uses as its
+project root. The app starts with the project that a command line argument
+names (`fyai-desktop DIR`), else `FYAI_BRIDGE_CWD`, else the start directory,
+else a directory under the data directory of the platform. File > Open Project
+(Ctrl or Cmd+O) asks for a directory and File > Open Recent lists the last ten
+(`recent-projects.json` in the data directory). A project that is open already
+gets its window back, so a project never has two bridges. A second launch of
+the app opens the project it names in a new window, or shows a window that
+exists. `fyai init` runs where a directory has no arena. The title of a window
+is the name of its directory.
+
+Each window has its own bridge, started with `--cwd DIR`, `ELECTRON_RUN_AS_NODE=1`,
+`--port 0` and `--parent-pid`. The app reads its address from the `listening
+on` line of its standard error. `FYAI_BRIDGE_PORT` fixes the port of the first
+window only. The window has context isolation, no Node integration, no preload
+script and no IPC. Closing a window stops its bridge, and quitting stops all of
+them. `electron/projects.cjs` holds the choices that need no Electron, and a
+unit test covers it.
+
+A bridge picks a new port at each start, so the origin of the page changes at
+each launch and the IndexedDB cache of the page does not survive it. W4 makes
+fyai the history, so this is only a cache problem.
+
+## Backends
+
+The page is one build for three servers. At start it asks each registered
+backend whether it is the server behind the page (`probe`), in registration
+order, and takes the first that answers. A server that answers none is
+llama-server. A setting or a call can force a kind.
+
+| Kind           | Server                       | State                         |
+| -------------- | ---------------------------- | ----------------------------- |
+| `llama`        | llama-server                 | upstream behaviour, unchanged |
+| `fyai-bridge`  | the bridge (`/api/fyai/info` answers `backend: "fyai"`) | implemented |
+| `fyai-remote`  | `fyai serve` over a WebSocket | planned (W10)                |
+
+The seam (`src/lib/services/backend/`) holds the capabilities of a kind, an
+optional `runTurn`, `loadCommands`, `handleLine` and `titleFor`, and its
+`probe`. `backendStore` (`src/lib/stores/backend.svelte.ts`) keeps the active
+backend and answers `backendIs(kind)` and `supports(capability)`. The fyai
+bridge backend registers itself in `src/lib/stores/fyai-backend.svelte.ts`.
+
+A part of the page that a server lacks is hidden by a capability, and it is
+kept, unchanged, for a server that has it:
+
+| Capability     | The part of the page                                   | fyai bridge |
+| -------------- | ------------------------------------------------------ | ----------- |
+| `agenticLoop`  | the tool loop in the page; the Agentic settings        | no          |
+| `browserTools` | the JavaScript sandbox, browser tools; the Tools settings and menu | no |
+| `browserMcp`   | MCP servers connected from the browser                 | no          |
+| `modelManager` | Hugging Face discovery and the models manager          | no          |
+| `sampling`     | sampling and penalties; their settings section         | no          |
+
+A settings field can name the kinds that show it (`backends`), as the Provider
+API keys field does. A backend whose `runTurn` returns `skip` for a message
+that has no text gets an error for the user when it has no `agenticLoop`,
+because the generic request paths speak to llama-server only. The buttons that
+open the models manager are still drawn; only their action is gated.
+
+### Deployments
+
+| Use                     | Page served by             | Backend        | Authentication            |
+| ----------------------- | -------------------------- | -------------- | ------------------------- |
+| Desktop app             | its bridge, loopback       | `fyai-bridge`  | none yet (W1)             |
+| Browser on one machine  | the bridge, loopback       | `fyai-bridge`  | none yet (W1)             |
+| Remote session          | `fyai serve`, or a static host | `fyai-remote` | pairing and device token (SDD 6) |
+| Hosted page on a cloud service | a static host       | `fyai-remote`  | pairing and device token  |
+| Hosted page, fyai in the cloud | the same service    | `fyai-remote`  | the service signs the user in |
+
+A hosted page is the same build as every other. It has no bridge, so its
+backend is chosen by the address it is given, not probed on its own origin.
+Two designs stay open, and the page supports both. In the first, the page is
+static and connects to the `fyai serve` of the user over a WebSocket on a
+network the user provides. That needs an origin list in `fyai serve`, because
+SDD 6.5 allows only the origin of the server that serves the page. In the
+second, the service runs fyai for each user and the page is served beside it.
+Both use the protocol of `doc/remote-sessions-sdd.md`, so the page differs only
+in the address and in how it gets its token.
 
 ## Changes on top of llama.cpp
 
@@ -115,7 +191,9 @@ preload script and no IPC. The bridge stops with the app.
 | ---------------------------------------- | ------------------------------------------------------ |
 | Turn transport over SSE from the bridge  | `src/lib/services/fyai.service.ts` (new)               |
 | SDK frames to chat messages              | `src/lib/services/fyai.turn.ts` (new)                  |
-| The chat store runs fyai turns           | `src/lib/stores/chat/index.svelte.ts`                  |
+| The backend seam and its store           | `src/lib/services/backend/*`, `stores/backend.svelte.ts` |
+| The fyai bridge as a backend             | `src/lib/stores/fyai-backend.svelte.ts`                |
+| The chat store calls the seam            | `src/lib/stores/chat/index.svelte.ts`                  |
 | Bridge and its decisions                 | `server/bridge.mjs`, `server/protocol.mjs` (new)       |
 | Dev proxy to the bridge                  | `vite.config.ts`, `.env.example`                       |
 
@@ -141,11 +219,12 @@ them.
 
 ### Chat store
 
-- `runFyaiTurn` (`chat/index.svelte.ts:1349`) runs before the upstream agentic
-  and plain paths, and replaces them for a message with text.
-- `/clear` starts a new conversation and sends nothing (:616).
-- The title is the first line of the first message (:1319). No model request
-  makes a title.
+- The chat store calls `backendStore.active.runTurn` before the agentic and
+  plain paths. The fyai bridge backend runs the whole turn there for a
+  message with text.
+- `handleLine` takes `/clear`: it starts a new conversation and sends nothing.
+- `titleFor` makes the title: the first line of the first message. No model
+  request makes a title.
 
 ### Models
 
@@ -161,8 +240,8 @@ them.
 
 ### Commands
 
-- `fyaiCommandsStore` (`stores/fyai-commands.svelte.ts`) loads the commands
-  from the bridge one time.
+- `backendStore.loadCommands()` loads the commands of the backend one time;
+  the bridge backend reads them from the bridge.
 - `commandsFromSchema` (`protocol.mjs:29`) keeps a command that has the surfaces
   `cli` and `session` and is not `interactive`.
 - The picker lists them after `prompt`, `cwd` and `model`
@@ -172,6 +251,7 @@ them.
 
 - **API Key** is the key for the provider of the selected model.
 - **Provider API keys** (new) holds one `provider = key` line for each provider.
+  It shows for the `fyai-bridge` backend only.
 
 ### Desktop, packaging and build
 
@@ -300,7 +380,7 @@ Each item states what changes, why, and which fyai interface it uses.
   explicit option.
 - Refuse a non-loopback `--host` without a token.
 
-**W2. Detect the backend at run time.**
+**W2. Detect the backend at run time.** Done, except the forced-backend setting and the hook list in `web/NOTICE.md` (now written).
 
 - `GET /api/fyai/info` returns `{backend: "fyai", protocol, extensions}`. The
   page asks it at start. A 404 means llama-server.
@@ -311,7 +391,7 @@ Each item states what changes, why, and which fyai interface it uses.
 - The fyai parts register through this seam. Upstream files call the seam at
   a small number of hook points, and `web/NOTICE.md` lists each hook point.
 
-**W3. Gate the llama.cpp surface.** With the fyai backend, hide the parts in
+**W3. Gate the llama.cpp surface.** Done for the settings sections, the tools menu and the models manager action; the buttons that open the manager and the browser MCP controls are still drawn. With the fyai backend, hide the parts in
 "Parts that do nothing" and the following parts of "Parts that conflict":
 
 - Hugging Face discovery and the model manager
@@ -370,7 +450,7 @@ Keep each part, unchanged, for llama-server. The gate is one predicate,
 as media parts (`doc/media.md`). An unsupported kind gets a message, not a
 silent drop.
 
-**W9. A working directory for each conversation.** The directory of a session
+**W9. A working directory for each conversation.** The desktop app has the project choice (one window for each project). The per-request `cwd` of the bridge is open. The directory of a session
 is `cwd` in the branch store. The bridge runs each turn in the directory of its
 branch, and `/cwd` changes it for a new conversation.
 
@@ -413,14 +493,45 @@ A patch that could go upstream has no fyai name in it. It adds a generic
 ability, such as a backend interface, a permission request from the server,
 or a list of conversations from the server.
 
-### Rebase on a new upstream
+### Syncing with upstream
 
-1. Import the new upstream tree on a branch at the old base.
-2. Rebase the series on it.
-3. Fix each hook point that moved. The list in `web/NOTICE.md` names all of
-   them.
-4. Run the unit tests, the client tests, `fyai-web-turn` and the e2e scripts
-   for both backends.
+`web/` is the `tools/ui` directory of llama.cpp with a prefix, so a subtree
+merge brings new upstream commits in. The fyai changes are small hooks and new
+files (`web/NOTICE.md` lists each hook), so a merge conflicts only where an
+upstream commit touches a hook. This procedure is designed and not yet run.
+
+Once, to record the upstream base:
+
+1. `git remote add llama-cpp https://github.com/ggml-org/llama.cpp.git`
+   and `git fetch llama-cpp master`.
+2. `git subtree split --prefix=tools/ui -b llama-ui llama-cpp/master` makes a
+   branch that holds the history of `tools/ui` only, with its files at the
+   root. Add `--onto` or a start point to cut the history short if the split
+   is slow.
+3. Find the commit of that branch whose tree is the import (llama.cpp
+   1801b7cd): `git log llama-ui --format='%H %s' | ...` and check it with
+   `git diff <commit> d7ac555e:web` (no difference).
+4. Record it as the merge base with `git merge -s ours
+   --allow-unrelated-histories <commit>`. The tree stays as it is and the
+   history now says where `web/` came from.
+
+At each sync:
+
+1. `git fetch llama-cpp master` and `git subtree split --prefix=tools/ui -b
+   llama-ui llama-cpp/master`.
+2. `git merge -Xsubtree=web llama-ui`. The merge base is the commit that step
+   4 recorded, or the last merged tip.
+3. Resolve each conflict against the hook list of `web/NOTICE.md`. A file
+   that is only an fyai file (`server/`, `electron/`, `README.fyai.md`) does
+   not conflict.
+4. Build the page, run `npm run test:unit` and `npm run test:client`, and run
+   the bridge test and `server/e2e.mjs`. An upstream test for a gated part must
+   still pass against the `llama` backend.
+5. Update the commit in `web/NOTICE.md` and the Upstream term above.
+
+`git subtree pull --prefix=web` is not used: it needs the subtree metadata
+that a plain import does not have, and the explicit merge shows the same
+history.
 
 ## Tests
 

@@ -27,13 +27,39 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-Changes from upstream:
+Upstream base: llama.cpp commit 1801b7cd, imported unchanged in fyai commit
+d7ac555e. `doc/fyai-web.md` describes how to merge a newer upstream.
 
-- `server/bridge.mjs` is new: it runs `fyai claude-sdk` and streams the
-  Agent SDK protocol.
-- `src/lib/services/fyai.service.ts` is new: the turn transport.
-- `src/lib/stores/chat/index.svelte.ts` maps protocol frames to chat
-  messages and no longer runs an agent loop.
-- The llama-server API surface is replaced by `/api/fyai/chat`, `/props`,
-  `/v1/models` and `/slots` of the bridge.
-- Titles come from the first line of a message, not from a model request.
+New files, none of which exists upstream:
+
+- `server/` (the bridge `bridge.mjs`, `protocol.mjs`, and the end-to-end
+  scripts), `electron/` (the desktop app), and the fyai scripts and launchers
+  in `scripts/`.
+- `src/lib/services/backend/` (the backend seam and the llama-server
+  backend), `src/lib/stores/backend.svelte.ts`,
+  `src/lib/stores/fyai-backend.svelte.ts`, `src/lib/services/fyai.service.ts`,
+  `src/lib/services/fyai.turn.ts`, `src/lib/utils/backend-settings.ts` and
+  `src/lib/constants/backend-capabilities.constants.ts`.
+- `README.fyai.md`, the manual of the fyai build. `README.md` is upstream's.
+
+Hook points, the upstream files that fyai changed. Each change is small and
+calls into a new file; merge them first when upstream moves:
+
+| File | Hook |
+| ---- | ---- |
+| `src/lib/stores/chat/index.svelte.ts` | `backendStore.active.runTurn` before the agentic loop; `handleLine` at the start of `sendMessage`; `titleFor` in `generateTitleWithLLM`; the agentic loop and the plain path only with the `agenticLoop` capability |
+| `src/lib/stores/init.ts` | registers the fyai backend and detects the backend at start |
+| `src/lib/stores/index.ts` | exports `backendStore` |
+| `src/lib/stores/ui.svelte.ts` | `openModelsManager` needs `modelManager` |
+| `src/lib/stores/models/index.svelte.ts` | `findModelByName` ignores provider prefix and punctuation |
+| `src/lib/components/app/chat/ChatForm/ChatForm.svelte` | `selectModel` for `/model NAME` |
+| `src/lib/components/app/chat/ChatForm/ChatFormActions/ChatFormActionAdd/ChatFormActionAddDropdown.svelte` | Tools submenu needs `browserTools` |
+| `src/lib/components/app/settings/SettingsChat/SettingsChat.svelte` | sections come from `visibleSettingsSections` |
+| `src/lib/hooks/use-chat-form-pickers.svelte.ts` | commands of the backend in the `/` picker |
+| `src/lib/utils/chat-commands.ts`, `src/lib/types/chat.d.ts`, `src/lib/enums/chat.enums.ts`, `src/lib/constants/icons.constants.ts` | the `backend` command action |
+| `src/lib/constants/settings.constants.ts`, `settings-keys.constants.ts`, `src/lib/types/settings.d.ts` | the Provider API keys field and the `backends` property of a field |
+| `src/lib/utils/index.ts` | exports `visibleSettingsSections` |
+| `src/routes/(chat)/chat/[id]/+page.svelte` | selects the first model of an empty conversation |
+| `src/lib/constants/app.constants.ts`, `pwa.constants.ts`, `src/routes/search/+page.svelte` | the name `fyai` |
+| `package.json`, `package-lock.json`, `vite.config.ts`, `.env.example`, `.gitignore`, `scripts/dev.sh` | scripts, Electron, the proxy to the bridge |
+| `CMakeLists.txt`, `sources.cmake`, `ui.cpp.in`, `ui.h.in` | removed: the llama-server embedding |

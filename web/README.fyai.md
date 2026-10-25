@@ -108,8 +108,13 @@ cd web
 ./scripts/desktop.sh --cwd ~/project     # another project
 ```
 
-The app works in the project of fyai that it finds. The `FYAI_BRIDGE_CWD`
-directory wins, then the directory the app was started in. A launcher starts
+Each window is one project. A directory on the command line is the first
+project (`fyai-desktop ~/project`). Without one, the `FYAI_BRIDGE_CWD`
+directory wins, then the directory the app was started in. File > Open Project
+(Ctrl or Cmd+O) opens another project in a new window, and File > Open Recent
+lists the last ten. A project that is open gets its window back, and a second
+launch of the app opens its project in a new window. Each window has a bridge
+of its own, which stops when the window closes. A launcher starts
 it in the bundle, in `/` or in the home directory, which is no place for an
 arena, so the app then uses a directory of its own under the data directory of
 the platform (`~/.config/fyai/project` on Linux, `~/Library/Application
