@@ -440,13 +440,36 @@ copy follows fyai. It is not checked in a browser.
   and the export and import of the page still use the copy; the sync runs once
   at start, so a change made elsewhere shows at the next load.
 
-**W5. Edit and regenerate move the branch.**
+**W5. Edit and regenerate move the branch.** Done, and not checked in a browser.
 
-- Regenerate is `reset <branch>~2` followed by the same prompt.
-- An edit of message N creates a new branch at the state before that message
-  (`checkout -b NAME <branch>~K`), then sends the edited text.
-- The message tree of the page shows the branches that fyai made. It does not
-  hold its own tree.
+The page keeps a tree of messages and can start a turn from any node of it,
+while a branch of fyai is one line. So each turn carries an anchor: the last
+user message that it follows (`fyaiAnchor`: the prompt as it was sent, and the
+count of equal prompts up to it). Before it runs the turn, the bridge cuts the
+branch back to the end of the exchange of the anchor (`rewindSession`):
+
+- the history of the branch is read and `rewindPlan` decides: nothing, when
+  the branch ends there already or the anchor is not in it; delete the branch,
+  when the turn follows no message and the branch holds some (the first message
+  was edited or regenerated, and the turn starts a new session); or reset,
+  to the message before the next user message;
+- fyai counts turns, not messages, and `reset` cannot go to a message, so a
+  copy of the branch is stepped back one turn at a time, with
+  `view/track_project` off, until its history has the length that the plan
+  names. The branch is then reset by that many turns, and the copy is
+  deleted. With `view/track_project` on, that last reset also rewinds the
+  project files, as `reset` does;
+- a branch that ends at the last turn that this bridge saw complete is not
+  read: the bridge remembers the prompt of that turn;
+- an anchor that is not found is not an error, because the prompt that fyai
+  stored may differ from the prompt of the page; the turn goes on as before.
+  A reset that fails stops the turn with its cause.
+
+The message tree of the page stays the page's own: a regenerated message is a
+sibling in the tree, and the branch of fyai holds only the line that was run
+last. Open: switching to another sibling in the page does not move the branch
+until the next turn from it, and the bridge is sent no anchor by a client that
+does not send one, which then checks nothing.
 
 **W6. Show and choose the sandbox profile.** The first plan of this item was a
 permission prompt for each tool call, as the Claude Agent SDK has. It is

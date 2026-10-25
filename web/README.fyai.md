@@ -285,8 +285,9 @@ keeps a copy in the browser and makes it match the branches when it starts: a
 conversation that fyai has and the page lacks, such as one made in another
 browser or before the cache was cleared, is added with its messages; deleting
 or renaming one in the page deletes or renames the branch. The bridge serves
-this at `/api/fyai/conversations`. Editing or regenerating a message and forking
-a conversation still work on the copy only.
+this at `/api/fyai/conversations`. Editing or regenerating a message cuts the
+branch back to the message before it runs the new turn, so fyai answers from
+the state that the page shows. Forking a conversation works on the copy only.
 
 ## Provider keys
 
