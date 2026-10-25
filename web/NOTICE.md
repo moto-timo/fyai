@@ -66,3 +66,4 @@ calls into a new file; merge them first when upstream moves:
 | `src/lib/constants/app.constants.ts`, `pwa.constants.ts`, `src/routes/search/+page.svelte` | the name `fyai` |
 | `package.json`, `package-lock.json`, `vite.config.ts`, `.env.example`, `.gitignore`, `scripts/dev.sh` | scripts, Electron, the proxy to the bridge |
 | `CMakeLists.txt`, `sources.cmake`, `ui.cpp.in`, `ui.h.in` | removed: the llama-server embedding |
+| `tests/client/chat-form-slash-commands.svelte.test.ts`, `tests/client/components/ChatFormPickersHarness.svelte` | the `selectModel` option of the picker hook |
