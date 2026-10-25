@@ -67,6 +67,12 @@ directory that changed last, else starts a new one. `fork_session` with
 the resumed one, which does not change. Use `fyai branch list` and
 `fyai -b sdk/ID history` to examine a session.
 
+A branch that `-b` names (or `$FYAI_BRANCH`) is the session, whatever its name.
+A branch that exists continues, and one that does not starts at that name with
+the configuration of `HEAD`. The `session_id` that the SDK reports is then the
+name of the branch, and no `sdk/` branch is made. A front that is not the SDK,
+such as the web page, uses this to work on the branches of the CLI.
+
 A prompt that names a file as `@PATH` carries the content of the file, as
 in Claude Code: fyai adds the call of `Read` and its result to the text of
 the prompt, after the `UserPromptSubmit` hooks. PATH is absolute, relative
