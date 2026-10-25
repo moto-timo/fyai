@@ -55,8 +55,8 @@ async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> 
 		messageDone: async (message) => {
 			await callbacks.onAssistantTurnComplete?.(
 				message.content,
-				undefined,
-				timings,
+				message.reasoning || undefined,
+				message.usage ?? timings,
 				message.toolCalls.length
 					? message.toolCalls.map((call) => ({
 							function: { arguments: call.arguments, name: call.name },
@@ -85,6 +85,7 @@ async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> 
 		 * page knows, so a later turn and the picker agree with it.
 		 */
 		onModel: (model) => callbacks.onModel?.(request.model ?? model),
+		onReasoning: (text) => callbacks.onReasoningChunk?.(text),
 		onText: (text) => callbacks.onChunk?.(text),
 		onTimings: (value) => {
 			timings = value;

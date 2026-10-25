@@ -94,7 +94,7 @@ describe('FyaiTurnAssembler', () => {
 		assembler.push(result());
 
 		expect(await assembler.settled()).toBe(false);
-		expect(c.messages).toEqual([{ content: 'Alpha beta.', toolCalls: [] }]);
+		expect(c.messages).toEqual([{ content: 'Alpha beta.', reasoning: '', toolCalls: [] }]);
 		expect(c.texts).toEqual(['Alpha ', 'beta.']);
 	});
 
@@ -107,7 +107,7 @@ describe('FyaiTurnAssembler', () => {
 
 		await assembler.settled();
 
-		expect(c.messages).toEqual([{ content: 'Whole answer.', toolCalls: [] }]);
+		expect(c.messages).toEqual([{ content: 'Whole answer.', reasoning: '', toolCalls: [] }]);
 		expect(c.texts).toEqual(['Whole answer.']);
 	});
 
@@ -126,9 +126,10 @@ describe('FyaiTurnAssembler', () => {
 		expect(c.messages).toEqual([
 			{
 				content: 'Looking.',
-				toolCalls: [{ arguments: '{"command":"ls"}', id: 'call_1', name: 'Bash' }]
+				reasoning: '',
+				toolCalls: [{ arguments: '{"command":"ls"}', id: 'call_1', name: 'exec_shell_command' }]
 			},
-			{ content: 'Done.', toolCalls: [] }
+			{ content: 'Done.', reasoning: '', toolCalls: [] }
 		]);
 		expect(c.toolResults).toEqual([{ id: 'call_1', text: 'a.txt' }]);
 		expect(c.counts()).toEqual({ created: 1, done: 2 });
@@ -145,7 +146,8 @@ describe('FyaiTurnAssembler', () => {
 		expect(c.messages).toEqual([
 			{
 				content: '',
-				toolCalls: [{ arguments: '{"file_path":"a"}', id: 'call_1', name: 'Read' }]
+				reasoning: '',
+				toolCalls: [{ arguments: '{"path":"a"}', id: 'call_1', name: 'read_file' }]
 			}
 		]);
 	});
@@ -172,7 +174,7 @@ describe('FyaiTurnAssembler', () => {
 
 		await assembler.settled();
 
-		expect(c.messages).toEqual([{ content: '```text\nrows\n```', toolCalls: [] }]);
+		expect(c.messages).toEqual([{ content: '```text\nrows\n```', reasoning: '', toolCalls: [] }]);
 		expect(c.commandModels).toEqual([]);
 	});
 
@@ -216,8 +218,8 @@ describe('FyaiTurnAssembler', () => {
 
 		await Promise.all([a.settled(), b.settled()]);
 
-		expect(first.messages).toEqual([{ content: 'one ', toolCalls: [] }]);
-		expect(second.messages).toEqual([{ content: 'two ', toolCalls: [] }]);
+		expect(first.messages).toEqual([{ content: 'one ', reasoning: '', toolCalls: [] }]);
+		expect(second.messages).toEqual([{ content: 'two ', reasoning: '', toolCalls: [] }]);
 	});
 });
 

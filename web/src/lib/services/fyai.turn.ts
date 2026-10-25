@@ -14,6 +14,7 @@
  */
 
 import type { FyaiFrame } from '$lib/services/fyai.service';
+import { fyaiToolView, toolResultForCard } from '$lib/services/fyai.tools';
 
 export interface TurnToolCall {
 	arguments: string;
@@ -23,7 +24,11 @@ export interface TurnToolCall {
 
 export interface TurnMessage {
 	content: string;
+	/** What the model thought, when fyai sent it. */
+	reasoning: string;
 	toolCalls: TurnToolCall[];
+	/** The token counts that fyai gave this message, when it gave any. */
+	usage?: TurnTimings;
 }
 
 export interface TurnTimings {
@@ -41,6 +46,8 @@ export interface TurnSink {
 	/** `/model NAME` succeeded: the session now uses this model. */
 	onCommandModel?: (model: string) => void;
 	onText?: (text: string) => void;
+	/** A piece of the thinking of the model. */
+	onReasoning?: (text: string) => void;
 	/** The open assistant message is complete. */
 	messageDone: (message: TurnMessage) => Promise<unknown> | unknown;
 	onTimings?: (timings: TurnTimings) => void;
@@ -66,10 +73,12 @@ export class FyaiTurnAssembler {
 	private failed = false;
 	private firstSegment = true;
 	private queue: Promise<void> = Promise.resolve();
+	private reasoning = '';
 	private segmentHasText = false;
 	private segmentOpen = false;
 	private timings: TurnTimings | undefined;
 	private toolCalls: TurnToolCall[] = [];
+	private usage: TurnTimings | undefined;
 
 	/** True once a failure frame or a sink error was seen. */
 	get hasFailed(): boolean {
@@ -127,6 +136,11 @@ export class FyaiTurnAssembler {
 		this.sink.onText?.(text);
 	}
 
+	private appendReasoning(text: string): void {
+		this.reasoning += text;
+		this.sink.onReasoning?.(text);
+	}
+
 	private async beginSegment(): Promise<void> {
 		if (this.segmentOpen) return;
 
@@ -135,6 +149,8 @@ export class FyaiTurnAssembler {
 		this.firstSegment = false;
 		this.segmentOpen = true;
 		this.content = '';
+		this.reasoning = '';
+		this.usage = undefined;
 		this.segmentHasText = false;
 		this.toolCalls = [];
 	}
@@ -154,9 +170,16 @@ export class FyaiTurnAssembler {
 	}
 
 	private async finishSegment(): Promise<void> {
-		await this.sink.messageDone({ content: this.content, toolCalls: this.toolCalls });
+		await this.sink.messageDone({
+			content: this.content,
+			reasoning: this.reasoning,
+			toolCalls: this.toolCalls,
+			usage: this.usage
+		});
 		this.segmentOpen = false;
 		this.content = '';
+		this.reasoning = '';
+		this.usage = undefined;
 		this.segmentHasText = false;
 		this.toolCalls = [];
 	}
@@ -170,13 +193,17 @@ export class FyaiTurnAssembler {
 			.filter((block) => block.type === 'text')
 			.map((block) => String(block.text ?? ''))
 			.join('');
+		const thinking = blocks
+			.filter((block) => block.type === 'thinking')
+			.map((block) => String(block.thinking ?? ''))
+			.join('');
 		const calls: TurnToolCall[] = blocks
 			.filter((block) => block.type === 'tool_use')
 			.map((block) => ({
-				arguments: JSON.stringify(block.input ?? {}),
 				id: String(block.id ?? ''),
-				name: String(block.name ?? '')
+				...fyaiToolView(String(block.name ?? ''), block.input)
 			}));
+		const usage = message?.usage ? usageTimings(message.usage) : undefined;
 
 		this.enqueue(async () => {
 			await this.beginSegment();
@@ -184,6 +211,10 @@ export class FyaiTurnAssembler {
 			/* Without partial messages the text comes only here. */
 			if (!this.segmentHasText && text) this.append(text);
 
+			/* Without partial messages the thinking comes only here. */
+			if (!this.reasoning && thinking) this.appendReasoning(thinking);
+
+			this.usage = usage;
 			this.toolCalls.push(...calls);
 			await this.finishSegment();
 		});
@@ -222,15 +253,23 @@ export class FyaiTurnAssembler {
 
 	private pushStreamEvent(frame: FyaiFrame): void {
 		const event = frame.event as
-			| { type?: string; delta?: { type?: string; text?: string } }
+			| { type?: string; delta?: { type?: string; text?: string; thinking?: string } }
 			| undefined;
 
-		if (
-			event?.type !== 'content_block_delta' ||
-			event.delta?.type !== 'text_delta' ||
-			typeof event.delta.text !== 'string'
-		)
+		if (event?.type !== 'content_block_delta') return;
+
+		if (event.delta?.type === 'thinking_delta' && typeof event.delta.thinking === 'string') {
+			const thinking = event.delta.thinking;
+
+			this.enqueue(async () => {
+				await this.beginSegment();
+				this.appendReasoning(thinking);
+			});
+
 			return;
+		}
+
+		if (event.delta?.type !== 'text_delta' || typeof event.delta.text !== 'string') return;
 
 		const text = event.delta.text;
 
@@ -247,7 +286,7 @@ export class FyaiTurnAssembler {
 		for (const block of blocks as Array<Record<string, unknown>>) {
 			if (block?.type !== 'tool_result') continue;
 
-			const text = toolResultText(block.content);
+			const text = toolResultForCard(toolResultText(block.content), block.is_error === true);
 			const toolUseId = String(block.tool_use_id ?? '');
 
 			this.enqueue(async () => {
@@ -269,4 +308,15 @@ function bridgeError(frame: FyaiFrame): Error {
 	return new Error(
 		typeof frame.message === 'string' && frame.message ? frame.message : 'the bridge ended the turn'
 	);
+}
+
+/** The token counts of the `usage` of an assistant message. */
+function usageTimings(usage: unknown): TurnTimings | undefined {
+	if (!usage || typeof usage !== 'object') return undefined;
+
+	const counts = usage as Record<string, unknown>;
+	const prompt = Number(counts.input_tokens) || 0;
+	const predicted = Number(counts.output_tokens) || 0;
+
+	return prompt || predicted ? { predicted_n: predicted, prompt_n: prompt } : undefined;
 }
