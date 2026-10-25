@@ -66,7 +66,7 @@ session '/session' '/status' '/exit'
 grep -qE 'credential transport: level-b' "$TEST_DIR/out" || fail "the session did not run with the transport: $(cat "$TEST_DIR/out" "$TEST_DIR/err")"
 if [ "$VIEW" = yes ]; then
 	grep -qF 'session view: session' "$TEST_DIR/out" || fail "the session did not run in its view: $(cat "$TEST_DIR/out")"
-	grep -qE '^ *View +│ +session' "$TEST_DIR/out" || fail "/status does not name the view: $(cat "$TEST_DIR/out")"
+	grep -qE '^\| *View *\| *session' "$TEST_DIR/out" || fail "/status does not name the view: $(cat "$TEST_DIR/out")"
 fi
 
 # yolo takes everything off. The session keeps its transport and its view, which end

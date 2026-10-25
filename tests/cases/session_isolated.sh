@@ -46,7 +46,7 @@ printf '/status\n/exit\n' | "$FYAI_BIN" -k test-key --color off --set view/isola
 	--set api_url="$MOCK_URL/v1/chat/completions" -m mock-model -i \
 	>"$TEST_DIR/status-view.out" 2>"$TEST_DIR/status-view.err"
 set -e
-grep -qE '^ *View +│ +session' "$TEST_DIR/status-view.out" || fail "/status does not name the view: $(cat "$TEST_DIR/status-view.out" "$TEST_DIR/status-view.err")"
+grep -qE '^\| *View *\| *session' "$TEST_DIR/status-view.out" || fail "/status does not name the view: $(cat "$TEST_DIR/status-view.out" "$TEST_DIR/status-view.err")"
 # Under the credential transport the session in the view is an agent of its own,
 # and says so.
 if [ -n "${FYAI_TEST_TRANSPORT:-}" ]; then
@@ -58,7 +58,7 @@ printf '/status\n/exit\n' | "$FYAI_BIN" -k test-key --color off --set view/isola
 	--set api_url="$MOCK_URL/v1/chat/completions" -m mock-model -i \
 	>"$TEST_DIR/status-plain.out" 2>/dev/null
 set -e
-grep -qE '^ *View +│ +none' "$TEST_DIR/status-plain.out" || fail "/status names a view outside one: $(cat "$TEST_DIR/status-plain.out")"
+grep -qE '^\| *View *\| *none' "$TEST_DIR/status-plain.out" || fail "/status names a view outside one: $(cat "$TEST_DIR/status-plain.out")"
 
 mock_stop 2
 pass

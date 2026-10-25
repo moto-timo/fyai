@@ -85,7 +85,7 @@ if answer < 0:
     raise SystemExit("the stalled answer never arrived")
 if status > answer:
     raise SystemExit("the /status report waited behind the turn")
-if not re.search(rb"Usage / calls\s+\xe2\x94\x82\s+0", plain[:answer]):
+if not re.search(rb"Usage / calls\s*\|\s*0", plain[:answer]):
     raise SystemExit("the /status report did not run mid-turn")
 EOF
 

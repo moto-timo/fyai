@@ -15,7 +15,7 @@ fyai_test_setup
 
 # The table wraps a long value: read the report as one line of words.
 words() {
-	tr '\n│' '  ' <"$TEST_DIR/stdout" | tr -s ' '
+	tr '\n│|' '   ' <"$TEST_DIR/stdout" | tr -s ' '
 }
 
 status_of() {

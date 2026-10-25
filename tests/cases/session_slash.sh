@@ -148,8 +148,8 @@ assert_stdout_contains "reasoning-effort: high"
 assert_stdout_contains "reasoning-summary: concise"
 assert_stdout_contains "/reasoning-effort"
 assert_stdout_contains "/effort"
-assert_stdout_contains "Index │ Role"
-assert_stdout_contains "Index │ Provider"
+assert_stdout_contains "Index | Role"
+assert_stdout_contains "Index | Provider"
 
 # Continuation after leaving the REPL keeps the switched provider/model.
 set +e
