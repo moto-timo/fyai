@@ -22,6 +22,9 @@ SESSION=${3:-conv-1}
 
 export HOME=$TD/home XDG_CONFIG_HOME=$TD/home/.config FYAI_AUTH_STORAGE=file
 export MOCK_API_KEY=test-key
+# A run starts clean: the catalogue and the configuration of an earlier run name
+# the port of an earlier mock.
+rm -rf "$TD/home" "$TD/work" "$TD/mock"
 mkdir -p "$HOME" "$TD/work" "$TD/mock"
 
 pkill -f "__mock-server" 2>/dev/null || true
@@ -53,7 +56,7 @@ providers:
     provider_model_id: mock-model
 EOF
 "$FY" catalog import cat.yaml >/dev/null 2>&1 || true
-"$FY" --set api=chat-completions --set api_url="http://127.0.0.1:$PORT/v1/chat/completions" >/dev/null 2>&1 || true
+"$FY" --set api=chat-completions --set api_url="http://127.0.0.1:$PORT/v1/chat/completions" --set 'api_key={type: env, value: MOCK_API_KEY}' >/dev/null 2>&1 || true
 
 export FYAI_BRIDGE_TOKEN=${FYAI_BRIDGE_TOKEN:-test-token}
 FYAI_BIN=$FY FYAI_BRIDGE_CWD=$TD/work FYAI_BRIDGE_STATIC=$REPO/web/dist \
