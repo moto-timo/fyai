@@ -311,7 +311,7 @@ classes.
 | Stream resume (`stores/chat/streams.svelte.ts`) | `/v1/streams/lookup` is empty; `/v1/stream` is 404   |
 | Pre-encode                                | only `onFlowComplete` starts it, and the fyai path does not call it |
 | Continue generation (`flows.svelte.ts`)   | it calls `/v1/chat/completions`, which is 501              |
-| Reasoning budget and reasoning blocks     | no control endpoint; the assembler ignores thinking        |
+| Reasoning budget                          | no control endpoint; the reasoning blocks show the thinking |
 | Server tools, `/cwd`, `@` mentions        | `/tools` is empty                                          |
 | Sampling, penalties, parameter sync       | read from a constant `/props`, never sent                  |
 | System message, model titles              | stored or shown, never sent                                |
@@ -343,12 +343,8 @@ classes.
   in the SDK mode `bypassPermissions`, which only means that fyai does not
   ask. A user of the page cannot see whether the tools run in `dev`,
   `lockdown` or no sandbox, and cannot change it (W6).
-- The README says that the page shows the tool list of `system/init` and the
-  cost of `result`. It shows neither.
-- The assembler ignores `thinking_delta`, `input_json_delta` and the `is_error`
-  flag of a tool result.
-- The usage of a turn usually arrives after the last message closes, so the
-  token counts are not stored.
+- The page shows neither the tool list of `system/init` nor the cost of
+  `result`, and the assembler ignores `input_json_delta` (W7).
 - About 85 upstream unit and client tests cover code that does not run against
   the bridge. The Storybook project calls `pnpm`.
 
@@ -457,16 +453,22 @@ dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
   or `write` for the model, and the remote design needs the same split for a
   client (`x-fyai-remote`, SDD 11).
 
-**W7. Tool cards from fyai names.**
+**W7. Tool cards from fyai names.** Done in part, and not checked in a browser.
 
-- Map Claude tool names (`Bash`, `Read`, `Write`, `Edit`, `TodoWrite`, `Task`)
-  and fyai names (`apply_patch`, `shell`) to the existing renderers: the edit
-  diff, the terminal block, the file view.
-- Add a todo block for `TodoWrite`.
-- Show a failed result as failed (`is_error`).
-- Show thinking in the reasoning block that upstream has.
-- Show the tool list of `system/init` and the cost of `result`.
-- Store the usage on the last message of the turn.
+- `Bash`, `Read`, `Write` and `Edit` are shown under the name and arguments of
+  the cards that fit them (`exec_shell_command`, `read_file`, `write_file`,
+  `edit_file`), by `fyaiToolView` in `fyai.tools.ts`. Any other tool, such as
+  `apply_patch`, keeps its name and the default card.
+- A tool result that fyai marks `is_error` is stored as `{"error": TEXT}`, the
+  form in which the cards show a failure.
+- The thinking of the model, from `thinking_delta` and from `thinking` blocks,
+  goes to the reasoning block of the message.
+- Each message stores the token counts of its own `assistant` frame. The
+  `result` frame still sets the counts of the turn for the context gauge.
+- Open: a todo block for `TodoWrite`, a card for `apply_patch` (a patch is not
+  an `edit_file`), the tool list of `system/init` and the cost of `result`,
+  which the page shows nowhere, and `input_json_delta`, so a call shows only
+  when its message is complete.
 
 **W8. Attachments.** Send images as SDK `image` content blocks. fyai stores them
 as media parts (`doc/media.md`). An unsupported kind gets a message, not a

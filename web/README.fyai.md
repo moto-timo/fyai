@@ -266,12 +266,12 @@ bridge on a non-loopback `--host`, because the bridge speaks plain HTTP.
 
 | SDK frame                            | Shown as                                    |
 | ------------------------------------ | ------------------------------------------- |
-| `system`/`init`                      | the model name and the tool list            |
-| `stream_event` `content_block_delta` | assistant text, appended live               |
+| `system`/`init`                      | the model name                              |
+| `stream_event` `content_block_delta` | assistant text and thinking, appended live  |
 | `assistant` with `text`              | the finished assistant message              |
-| `assistant` with `tool_use`          | a tool call card                            |
-| `user` with `tool_result`            | the result of that card                     |
-| `result`                             | token counts, cost, and the end of the turn |
+| `assistant` with `tool_use`          | a tool call card; `Bash`, `Read`, `Write` and `Edit` use the card of the like tool |
+| `user` with `tool_result`            | the result of that card; an error shows as a failure |
+| `result`                             | token counts and the end of the turn        |
 
 fyai runs the whole tool loop of a turn itself, so one HTTP response carries
 several assistant messages. Each becomes its own chat message, and the tool
