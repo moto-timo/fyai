@@ -1,0 +1,50 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "chatcmpl-sdkimg-1",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "img-chat",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "Saw the image."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 8,
+          "total_tokens": 28
+        }
+      }
+    },
+    {
+      "response": {
+        "id": "chatcmpl-sdkimg-2",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "img-chat",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "Saw only the image."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 8,
+          "total_tokens": 28
+        }
+      }
+    }
+  ]
+}

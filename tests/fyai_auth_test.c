@@ -21,6 +21,7 @@ FYAI_TEST_ENTRY(auth, plan_permission, auth_plan_permission)
 FYAI_TEST_ENTRY(auth, subscription_request, auth_subscription_request)
 FYAI_TEST_ENTRY(auth, subscription_errors, auth_subscription_errors)
 FYAI_TEST_ENTRY(auth, malformed_base64, auth_malformed_base64)
+FYAI_TEST_ENTRY(auth, base64_decode, auth_base64_decode)
 FYAI_TEST_ENTRY(auth, billing_route, auth_billing_route)
 FYAI_TEST_ENTRY(auth, recorded_usage, auth_recorded_usage)
 FYAI_TEST_ENTRY(auth, manual_input, auth_manual_input)
@@ -315,6 +316,26 @@ int auth_malformed_base64(void)
 	decoded = fyai_base64url_decode("SGVsbG8", &len);
 	FYAI_TCHECK(decoded && len == 5 && !memcmp(decoded, "Hello", 5));
 	free(decoded);
+	return 0;
+}
+
+int auth_base64_decode(void)
+{
+	unsigned char *decoded;
+	size_t len;
+
+	decoded = fyai_base64_decode("SGVsbG8=", &len);
+	FYAI_TCHECK(decoded && len == 5 && !memcmp(decoded, "Hello", 5));
+	free(decoded);
+	decoded = fyai_base64_decode("SGVs\nbG8", &len);
+	FYAI_TCHECK(decoded && len == 5 && !memcmp(decoded, "Hello", 5));
+	free(decoded);
+	decoded = fyai_base64_decode("-_8", &len);
+	FYAI_TCHECK(decoded && len == 2 && decoded[0] == 0xfb &&
+		    decoded[1] == 0xff);
+	free(decoded);
+	FYAI_TCHECK(!fyai_base64_decode("", &len));
+	FYAI_TCHECK(!fyai_base64_decode("A!B", &len));
 	return 0;
 }
 
