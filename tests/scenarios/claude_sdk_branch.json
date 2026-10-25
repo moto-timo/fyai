@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "response": {
+        "id": "chatcmpl-sdkbr-1",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "br-chat",
+        "choices": [
+          {"index": 0, "message": {"role": "assistant", "content": "First answer."}, "finish_reason": "stop"}
+        ],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14}
+      }
+    },
+    {
+      "response": {
+        "id": "chatcmpl-sdkbr-2",
+        "object": "chat.completion",
+        "created": 1735689600,
+        "model": "br-chat",
+        "choices": [
+          {"index": 0, "message": {"role": "assistant", "content": "Second answer."}, "finish_reason": "stop"}
+        ],
+        "usage": {"prompt_tokens": 20, "completion_tokens": 4, "total_tokens": 24}
+      }
+    }
+  ]
+}
