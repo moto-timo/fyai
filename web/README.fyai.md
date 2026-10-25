@@ -192,6 +192,7 @@ for them, and `FYAI_WEB=ON` makes the page part of a plain `ninja`:
 | `fyai-web-dev`         | the bridge and Vite, for editing      |
 | `fyai-web-test`        | the unit tests                        |
 | `fyai-web-turn`        | one turn against fyai's mock provider |
+| `fyai-web-e2e`         | the page in a browser against the bridge, fyai and the mock provider |
 | `fyai-desktop`         | opens the desktop window              |
 | `fyai-desktop-package` | `dist-app/`, with a bundled fyai      |
 
@@ -367,7 +368,15 @@ bash server/test-turn.sh chat_stream.json "hello" conv-1
 bash server/test-turn.sh chat_stream.json -
 ```
 
-`server/e2e.mjs` drives the built page in Chrome and waits for the answer:
+`server/e2e-mock.mjs` is the browser test to run: it needs no key and no
+network, because the provider is fyai's mock. `ninja fyai-web-e2e` (or `cmake
+--build build --target fyai-web-e2e`) builds the page and runs it; by hand,
+`node server/e2e-mock.mjs --fyai ../build/fyai` with `FYAI_BRIDGE_STATIC` set to
+the built page. `--chrome PATH` names a Chrome, and `--keep` keeps the
+directories and the screenshots of a failure.
+
+`server/e2e.mjs` drives the built page in Chrome against a real provider and
+waits for the answer:
 
 ```sh
 node server/e2e.mjs http://127.0.0.1:9331 "hello" "Streaming hello from the mock."

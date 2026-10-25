@@ -284,12 +284,20 @@ them.
 | `tests/unit/fyai-turn.test.ts`                   | frame assembly                                         |
 | `tests/unit/chat-commands.test.ts`               | the fyai commands in the picker                        |
 | `tests/client/chat-form-slash-commands.svelte.test.ts` | `/model NAME`                                    |
+| `tests/unit/fyai-bridge-*.test.ts`               | the bridge as a process: access, conversations, the cut of a branch, images, against a stand-in for the verbs of fyai (`tests/fixtures/fake-fyai.mjs`) |
+| `tests/unit/fyai-conversations.test.ts`, `fyai-tools.test.ts`, `backend-*.test.ts`, `electron-projects.test.ts` | the rows of a stored conversation, the cards of the tools, the backend seam, the projects of the desktop app |
+| `server/e2e-mock.mjs` (`fyai-web-e2e`)           | the page in a browser, against the bridge, the real fyai and the mock provider, with no key: a turn, the next turn, regenerate, edit, the task list and shell cards, an image, and a conversation that comes back from fyai |
 | `server/test-turn.sh`                            | one turn through the bridge against the mock provider  |
-| `server/e2e.mjs`, `e2e-key.mjs`, `e2e-electron.mjs` | the built page and the window, in Chrome            |
+| `server/e2e.mjs`, `e2e-key.mjs`, `e2e-electron.mjs` | the built page and the window, in Chrome, with a real provider and key |
 
 CTest runs `npm run test:unit` as `fyai/web-test` when `FYAI_WEB=ON`. The
-bridge handlers, `runFyaiTurn`, the command store and Electron have no unit
-test.
+browser test needs a Chrome or the Chromium of Playwright and the built page,
+so it is the target `fyai-web-e2e` and not a CTest test. It uses the scenario
+`tests/scenarios/web_chat.json`, which answers "Mock answer N" to the N-th
+request, so each step knows the answer it waits for, and it asserts on the
+requests that the mock got as well as on the page. Use it rather than the
+scripts that need a key: it is hermetic, with private directories and no key
+in the environment. Electron has no test.
 
 ## Upstream surface that remains
 
