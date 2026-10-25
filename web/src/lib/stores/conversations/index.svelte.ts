@@ -15,6 +15,7 @@ import { ConversationTransferService } from '$lib/services/conversation-transfer
 import { DatabaseService } from '$lib/services/database.service';
 import { MigrationService } from '$lib/services/migration.service';
 import { RouterService } from '$lib/services/router.service';
+import { backendStore } from '$lib/stores/backend.svelte';
 // direct imports between stores, not via the barrel, to avoid circular deps
 import {
 	ConversationPreferences,
@@ -125,6 +126,12 @@ class ConversationsStore implements ConversationsPreferencesHost {
 	 */
 	async bulkDeleteConversations(convIds: string[]): Promise<void> {
 		if (convIds.length === 0) return;
+
+		for (const id of convIds) {
+			void backendStore.active.deleteConversation?.(id)?.catch((error: unknown) => {
+				console.error('Failed to delete a conversation on the server:', error);
+			});
+		}
 
 		try {
 			const idsToRemove = new SvelteSet(convIds);
@@ -502,6 +509,10 @@ class ConversationsStore implements ConversationsPreferencesHost {
 		this.initPromise = (async () => {
 			try {
 				await MigrationService.runAllMigrations();
+				/* The server holds the conversations; the page keeps a copy of them. */
+				await backendStore.active.syncConversations?.().catch((error: unknown) => {
+					console.error('Failed to sync conversations with the server:', error);
+				});
 				await this.loadConversations();
 				this.isInitialized = true;
 			} catch (error) {
@@ -680,6 +691,9 @@ class ConversationsStore implements ConversationsPreferencesHost {
 			await DatabaseService.updateConversation(convId, { name });
 
 			this.applyConversationUpdate(convId, { name });
+			void backendStore.active.renameConversation?.(convId, name)?.catch((error: unknown) => {
+				console.error('Failed to rename a conversation on the server:', error);
+			});
 		} catch (error) {
 			console.error('Failed to update conversation name:', error);
 		}

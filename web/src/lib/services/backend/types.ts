@@ -58,6 +58,16 @@ export interface Backend {
 	 * the backend handled the line and nothing is sent.
 	 */
 	handleLine?: (line: string) => Promise<boolean>;
+	/**
+	 * Makes the conversations that the page keeps match the server, which holds
+	 * them: it adds the ones the page lacks and removes the ones the server no
+	 * longer has. It runs before the page loads its list.
+	 */
+	syncConversations?: () => Promise<void>;
+	/** Tells the server that the page renamed a conversation. */
+	renameConversation?: (id: string, name: string) => Promise<void>;
+	/** Tells the server that the page deleted a conversation. */
+	deleteConversation?: (id: string) => Promise<void>;
 	/** Stable name, used by `backendIs()` and the forced-backend setting. */
 	kind: string;
 	/**

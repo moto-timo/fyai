@@ -232,3 +232,69 @@ export function fencedOutput(result) {
 
 	return `${result.ok ? '' : '**The command failed.**\n\n'}\`\`\`text\n${body}\n\`\`\``;
 }
+
+/*
+ * Conversations are branches. The page keeps a copy of each for its own use,
+ * and fyai holds the conversation itself, so the page lists, reads, renames
+ * and deletes the branches of its sessions (`sdk/ID`) through these verbs.
+ */
+
+/**
+ * The conversations in the output of `fyai branch list --output json`: the
+ * branches of the sessions of the page, newest first. The time is in
+ * microseconds there and in milliseconds here, as the page counts it.
+ *
+ * @param {any} list the parsed output
+ * @returns {{ id: string, name: string, turns: number, model: string, updated: number }[]}
+ */
+export function conversationsFromBranches(list) {
+	if (!Array.isArray(list)) return [];
+
+	return list
+		.filter((b) => typeof b?.branch === 'string' && b.branch.startsWith(SDK_BRANCH_PREFIX))
+		.map((b) => ({
+			id: b.branch.slice(SDK_BRANCH_PREFIX.length),
+			model: typeof b.model === 'string' && b.model !== '-' ? b.model : '',
+			name: typeof b.description === 'string' ? b.description : '',
+			turns: Number(b.turns) || 0,
+			updated: Math.floor(Number(b.updated) / 1000) || 0
+		}))
+		.sort((a, b) => b.updated - a.updated);
+}
+
+/**
+ * The messages in the output of `fyai history --output json`, which is one
+ * stored message for each line. A line that is not an object is left out.
+ *
+ * @param {string} text
+ * @returns {object[]}
+ */
+export function parseHistory(text) {
+	const messages = [];
+
+	for (const line of String(text ?? '').split('\n')) {
+		if (!line.trim()) continue;
+
+		try {
+			const value = JSON.parse(line);
+
+			if (value && typeof value === 'object' && !Array.isArray(value)) messages.push(value);
+		} catch {
+			/* A line that is not JSON is a diagnostic, not a message. */
+		}
+	}
+
+	return messages;
+}
+
+/**
+ * The branch of the conversation @id, or '' when the ID cannot name one.
+ *
+ * @param {unknown} id
+ * @returns {string}
+ */
+export function conversationBranch(id) {
+	const session = sessionIdFor(id);
+
+	return session ? SDK_BRANCH_PREFIX + session : '';
+}

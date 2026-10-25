@@ -28,8 +28,11 @@ import {
 import {
 	catalogueModelName,
 	commandsFromSchema,
+	conversationBranch,
+	conversationsFromBranches,
 	fencedOutput,
 	findCatalogueModel,
+	parseHistory,
 	parseSlashCommand,
 	providerKeyEnvName,
 	sessionIdFor,
@@ -479,6 +482,9 @@ function spawnTurn(options) {
 	return { child, done, kill, summary };
 }
 
+/* The turn that runs for each session, so a change of its branch can wait for the turn. */
+const activeTurns = new Map();
+
 /* ---------------------------------------------------------------- models */
 
 let catalogue = { at: 0, models: [] };
@@ -835,6 +841,82 @@ function propsPayload(requested = '') {
 
 /* ----------------------------------------------------------------- routes */
 
+/** The route of one conversation: `/api/fyai/conversations/ID` and its `/messages`. */
+const CONVERSATION_ROUTE = /^\/api\/fyai\/conversations(?:\/([^/]+)(\/messages)?)?$/;
+
+/**
+ * List, read, rename and delete the conversations of the page. A conversation
+ * is the branch `sdk/ID`; each answer is the output of one fyai verb, run with
+ * its words as argv and no shell.
+ */
+async function handleConversations(req, res, match) {
+	const [, rawId, messages] = match;
+	const verb = (args) => runCapture(config.bin, [...config.extraArgs, ...args], 30000);
+
+	if (!rawId) {
+		if (req.method !== 'GET') return sendError(res, 405, 'method not allowed');
+
+		const out = await verb(['branch', 'list', '--output', 'json']);
+
+		if (out.code !== 0) return sendError(res, 502, out.err.trim() || 'fyai cannot list branches');
+
+		try {
+			return sendJson(res, 200, { conversations: conversationsFromBranches(JSON.parse(out.out)) });
+		} catch {
+			return sendError(res, 502, 'fyai listed the branches in a form that cannot be read');
+		}
+	}
+
+	const branch = conversationBranch(decodeURIComponent(rawId));
+
+	if (!branch) return sendError(res, 400, 'the conversation ID is not valid');
+
+	if (messages) {
+		if (req.method !== 'GET') return sendError(res, 405, 'method not allowed');
+
+		const out = await verb(['--branch', branch, 'history', '--output', 'json']);
+
+		if (out.code !== 0)
+			return sendError(res, 404, out.err.trim() || `the conversation ${rawId} has no history`);
+
+		return sendJson(res, 200, { messages: parseHistory(out.out) });
+	}
+
+	/* A turn that runs holds the branch: changing it under the turn would lose a publish. */
+	if (activeTurns.has(sessionIdFor(decodeURIComponent(rawId)) ?? ''))
+		return sendError(res, 409, 'a turn of this conversation is running');
+
+	if (req.method === 'DELETE') {
+		const out = await verb(['branch', 'delete', '--force', branch]);
+
+		if (out.code !== 0)
+			return sendError(res, 404, out.err.trim() || `the conversation ${rawId} cannot be deleted`);
+
+		return sendJson(res, 200, { ok: true });
+	}
+
+	if (req.method === 'PATCH') {
+		let body;
+
+		try {
+			body = JSON.parse(await readBody(req));
+		} catch (error) {
+			return sendError(res, 400, `cannot read the request: ${error.message}`);
+		}
+
+		if (typeof body?.name !== 'string') return sendError(res, 400, 'name is required');
+
+		const out = await verb(['branch', 'describe', branch, body.name.trim().slice(0, 200)]);
+
+		if (out.code !== 0)
+			return sendError(res, 404, out.err.trim() || `the conversation ${rawId} cannot be renamed`);
+
+		return sendJson(res, 200, { ok: true });
+	}
+
+	return sendError(res, 405, 'method not allowed');
+}
+
 async function handleChat(req, res) {
 	let body;
 
@@ -947,7 +1029,10 @@ async function handleChat(req, res) {
 	for (;;) {
 		turns++;
 		active = spawnTurn(options);
+		activeTurns.set(sessionId, active);
 		summary = await active.done;
+
+		if (activeTurns.get(sessionId) === active) activeTurns.delete(sessionId);
 
 		/*
 		 * A start and a resume differ in the one flag, and each is wrong for a
@@ -1124,6 +1209,14 @@ server = createServer(async (req, res) => {
 
 		if (pathname === '/api/fyai/commands') {
 			sendJson(res, 200, { commands: await listCommands() });
+
+			return;
+		}
+
+		const conversation = CONVERSATION_ROUTE.exec(pathname);
+
+		if (conversation) {
+			await handleConversations(req, res, conversation);
 
 			return;
 		}

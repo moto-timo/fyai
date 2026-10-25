@@ -68,3 +68,26 @@ export function fyaiToolView(name: string, input: unknown): ToolView {
 export function toolResultForCard(text: string, isError: boolean): string {
 	return isError ? JSON.stringify({ error: text || 'the tool failed' }) : text;
 }
+
+/**
+ * The name and arguments that the page shows for a call as fyai stores it. The
+ * stored names are those of fyai: `shell` and `exec_command` are the shell
+ * card, and `read_file` and `write_file` already have the arguments of their
+ * cards. A live turn shows the names of the SDK instead (`fyaiToolView`).
+ *
+ * @param name the stored name of the tool
+ * @param args the stored arguments, a JSON text
+ */
+export function fyaiStoredToolView(name: string, args: string): ToolView {
+	let input: unknown = {};
+
+	try {
+		input = JSON.parse(args);
+	} catch {
+		/* Arguments that are not JSON show as none. */
+	}
+
+	if (name === 'shell' || name === 'exec_command') return fyaiToolView('Bash', input);
+
+	return fyaiToolView(name, input);
+}

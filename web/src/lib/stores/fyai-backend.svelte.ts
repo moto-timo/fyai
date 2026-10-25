@@ -21,9 +21,19 @@ import {
 	registerBackend
 } from '$lib/services/backend';
 import { FYAI_BRIDGE_KIND } from '$lib/services/backend/kinds';
+import { DatabaseService } from '$lib/services/database.service';
+import {
+	deleteFyaiConversation,
+	fyaiConversationRows,
+	fyaiSessionId,
+	listFyaiConversations,
+	readFyaiMessages,
+	renameFyaiConversation
+} from '$lib/services/fyai.conversations';
 import { buildFyaiPrompt, parseProviderKeys, streamFyaiTurn } from '$lib/services/fyai.service';
 import { FyaiTurnAssembler } from '$lib/services/fyai.turn';
 import type { ChatMessageTimings } from '$lib/types';
+import { uuid } from '$lib/utils';
 import { apiFetch } from '$lib/utils/api-fetch';
 
 export { FYAI_BRIDGE_KIND };
@@ -127,6 +137,45 @@ async function loadCommands(): Promise<BackendCommand[]> {
 	return Array.isArray(res.commands) ? res.commands : [];
 }
 
+/**
+ * Make the conversations of the page match the branches of fyai. fyai holds
+ * the conversation, so a branch that the page lacks is added, from its stored
+ * messages, and a conversation that has an answer but no branch is gone: it
+ * was deleted where fyai is. One with no answer yet has no branch either, and
+ * stays. A list that cannot be read changes nothing.
+ */
+async function syncConversations(): Promise<void> {
+	const remote = await listFyaiConversations();
+	const local = await DatabaseService.getAllConversations();
+	const known = new Map(local.map((conv) => [fyaiSessionId(conv.id), conv]));
+	const present = new Set(remote.map((summary) => summary.id));
+
+	for (const summary of remote) {
+		const conv = known.get(summary.id);
+
+		if (conv) {
+			if (summary.name && summary.name !== conv.name)
+				await DatabaseService.updateConversation(conv.id, { name: summary.name });
+
+			continue;
+		}
+
+		const stored = await readFyaiMessages(summary.id);
+		const rows = fyaiConversationRows(summary, stored, uuid);
+
+		await DatabaseService.importConversations([rows]);
+	}
+
+	for (const conv of local) {
+		if (present.has(fyaiSessionId(conv.id))) continue;
+
+		const messages = await DatabaseService.getConversationMessages(conv.id);
+
+		if (messages.some((m) => m.role === MessageRole.ASSISTANT))
+			await DatabaseService.deleteConversation(conv.id);
+	}
+}
+
 export const fyaiBackend: Backend = {
 	/*
 	 * fyai runs the tool loop, holds the tools and the MCP servers, picks the
@@ -143,6 +192,7 @@ export const fyaiBackend: Backend = {
 	 * Each conversation is its own fyai session, so a new conversation is what
 	 * clears the model context. The line is not stored.
 	 */
+	deleteConversation: (id) => deleteFyaiConversation(fyaiSessionId(id)),
 	handleLine: async (line) => {
 		if (line.trim() !== '/clear') return false;
 
@@ -157,7 +207,9 @@ export const fyaiBackend: Backend = {
 
 		return info.backend === 'fyai';
 	},
+	renameConversation: (id, name) => renameFyaiConversation(fyaiSessionId(id), name),
 	runTurn,
+	syncConversations,
 	/*
 	 * The title comes from the message. A model request would start a session
 	 * that no conversation reads.
