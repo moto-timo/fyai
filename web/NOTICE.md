@@ -55,6 +55,7 @@ calls into a new file; merge them first when upstream moves:
 | `src/lib/stores/models/index.svelte.ts` | `findModelByName` ignores provider prefix and punctuation |
 | `src/lib/components/app/chat/ChatForm/ChatForm.svelte` | `selectModel` for `/model NAME` |
 | `src/lib/components/app/chat/ChatForm/ChatFormActions/ChatFormActionAdd/ChatFormActionAddDropdown.svelte` | Tools submenu needs `browserTools` |
+| `src/lib/components/app/navigation/SidebarNavigation/SidebarNavigationActions.svelte`, `src/lib/components/app/models/ModelsSelector/ModelsSelectorDropdown.svelte` | the entries of the models manager and the MCP client need `modelManager` and `browserMcp` |
 | `src/lib/components/app/settings/SettingsChat/SettingsChat.svelte` | sections come from `visibleSettingsSections` |
 | `src/lib/hooks/use-chat-form-pickers.svelte.ts` | commands of the backend in the `/` picker |
 | `src/lib/utils/chat-commands.ts`, `src/lib/types/chat.d.ts`, `src/lib/enums/chat.enums.ts`, `src/lib/constants/icons.constants.ts` | the `backend` command action |

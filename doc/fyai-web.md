@@ -164,8 +164,9 @@ kept, unchanged, for a server that has it:
 A settings field can name the kinds that show it (`backends`), as the Provider
 API keys field does. A backend whose `runTurn` returns `skip` for a message
 that has no text gets an error for the user when it has no `agenticLoop`,
-because the generic request paths speak to llama-server only. The buttons that
-open the models manager are still drawn; only their action is gated.
+because the generic request paths speak to llama-server only. The sidebar
+entries of the models manager and of the MCP client, and the manage models
+item of the model selector, are left out for a backend that lacks them.
 
 ### Deployments
 
@@ -404,7 +405,7 @@ Each item states what changes, why, and which fyai interface it uses.
 - The fyai parts register through this seam. Upstream files call the seam at
   a small number of hook points, and `web/NOTICE.md` lists each hook point.
 
-**W3. Gate the llama.cpp surface.** Done for the settings sections, the tools menu and the models manager action; the buttons that open the manager and the browser MCP controls are still drawn. With the fyai backend, hide the parts in
+**W3. Gate the llama.cpp surface.** Done for the settings sections, the tools menu, and the entries of the models manager and the MCP client. The MCP controls inside a chat (the resource and prompt pickers) are not gated; they list nothing when no browser MCP server is set. With the fyai backend, hide the parts in
 "Parts that do nothing" and the following parts of "Parts that conflict":
 
 - Hugging Face discovery and the model manager
