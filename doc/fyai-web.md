@@ -90,6 +90,7 @@ Every API request needs the token of the bridge (W1). The routes:
 | `GET /api/fyai/info`           | the server                  | `{backend, protocol, authenticated}`; with the token also the binary, directory, model and models |
 | `POST /api/fyai/chat`          | `handleChat`                | SSE of SDK frames between `bridge/start` and `bridge/done`       |
 | `GET /api/fyai/commands`       | `listCommands`              | the commands of `fyai schema commands`, cached for 60 s          |
+| `GET\|PUT /api/fyai/settings`  | `handleSettings`            | the settings of the page, without any key, in a file of the user |
 | `GET /api/fyai/conversations`, `GET\|PATCH\|DELETE .../ID`, `GET .../ID/messages` | `handleConversations` | the branches of the sessions, their messages, the title, the delete (W4) |
 | `GET /v1/models`               | `modelsPayload`             | the catalogue in the shape of a llama.cpp router, with the input types and abilities of each model |
 | `GET /props`                   | `propsPayload`              | a router `props`; `n_ctx` and the modalities of the model from the catalogue |
@@ -103,10 +104,12 @@ an fyai verb on the branch of the conversation (`runSlashCommand`), with the
 words as `argv` and no shell (`slashCommandArgs`). The output arrives as one
 `bridge/command` frame, in a text fence.
 
-The page sends provider keys with each turn. The bridge puts each key in the
-environment of the child as `<PROVIDER>_API_KEY` (`turnEnv`). The bridge writes
-no key to a file, and it removes its own token from the environment that its
-children get.
+The page holds no key and sends none. fyai reads the key of a provider from its
+own configuration (`api_key: {type: env, ...}`), from `<PROVIDER>_API_KEY` in
+the environment of the bridge, or from its secret store. The bridge writes no
+key to a file, and it removes its own token from the environment that its
+children get. A remote server keeps its keys at the server, stored securely
+there, and the page does not carry them.
 
 ### The desktop app
 
@@ -132,14 +135,11 @@ script and no IPC. Closing a window stops its bridge, and quitting stops all of
 them. `electron/projects.cjs` holds the choices that need no Electron, and a
 unit test covers it.
 
-The page keeps its settings in the local storage, which the browser keeps for
-each origin, and the origin of a window is the address of its bridge. A project
-therefore keeps one port: `portForProject` takes it from the directory, in the
-range 20000 to 29999 below the ports that the system gives to outgoing
-connections, so each launch of a project finds its settings again and two
-projects never share them. A port that is taken, by a development bridge or a
-stale one, falls back to a free port, and that launch starts with the default
-settings. The conversations are not in the browser: fyai holds them.
+The bridge of a window listens on a port that the system gives. The page keeps
+nothing in the browser that must survive: the conversations are branches of
+fyai, and the settings are in a file of the user (`GET` and `PUT
+/api/fyai/settings`, below). So the address of a window can change at each
+launch.
 
 ## Backends
 
@@ -266,9 +266,15 @@ them.
 
 ### Settings
 
-- **API Key** is the key for the provider of the selected model.
-- **Provider API keys** (new) holds one `provider = key` line for each provider.
-  It shows for the `fyai-bridge` backend only.
+- **API Key** shows for llama-server only. fyai keeps its keys itself, so the
+  `fyai-bridge` page has no key field. The Provider API keys field was removed.
+- With the `fyai-bridge` backend the settings are not in the local storage. The
+  bridge keeps them in `web-settings.json` in the configuration directory of the
+  user (`$XDG_CONFIG_HOME/fyai`, mode 0600), so every window, project and
+  browser has the same ones. The page loads them at start
+  (`settingsStore.useRemote`) and writes a change after 400 ms. A server with no
+  file takes the settings that the page held, which moves the ones of an earlier
+  visit. The bridge drops `apiKey` and `providerApiKeys` from what it is sent.
 
 ### Desktop, packaging and build
 
@@ -296,7 +302,7 @@ them.
 | `tests/unit/fyai-conversations.test.ts`, `fyai-tools.test.ts`, `backend-*.test.ts`, `electron-projects.test.ts` | the rows of a stored conversation, the cards of the tools, the backend seam, the projects of the desktop app |
 | `server/e2e-mock.mjs` (`fyai-web-e2e`)           | the page in a browser, against the bridge, the real fyai and the mock provider, with no key: a turn, the next turn, regenerate, edit, the task list and shell cards, an image, and a conversation that comes back from fyai |
 | `server/test-turn.sh`                            | one turn through the bridge against the mock provider  |
-| `server/e2e.mjs`, `e2e-key.mjs`, `e2e-electron.mjs` | the built page and the window, in Chrome, with a real provider and key |
+| `server/e2e.mjs`, `e2e-electron.mjs` | the built page and the window, in Chrome, with a real provider and key |
 
 CTest runs `npm run test:unit` as `fyai/web-test` when `FYAI_WEB=ON`. The
 browser test needs a Chrome or the Chromium of Playwright and the built page,

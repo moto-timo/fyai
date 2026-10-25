@@ -781,3 +781,19 @@ reads a YAML script of frames and waits on frames.
    `fyai_rewind {session_id, to}` that a client sends before the turn. The
    request is the better fit for a client that is not a page, but it needs a
    way to name a message, since the branch counts turns and not messages.
+8. **Keys requested from the client.** The default is that the remote holds its
+   keys, stored securely at the remote, and the client never carries one. A
+   second mode would leave the keys off the remote entirely. The credential
+   transport of `doc/agent-transport-isolation-sdd.md` already separates the
+   process that holds a key from the one that runs the model loop, so it can
+   ask for a key when a request needs one. The request goes to the attached
+   client as a frame, for example `credential/request {provider, session,
+   turn}`. The client answers from its own store, such as the secret store or
+   keychain of the device, and the transport process holds the value for that
+   request only, never in the arena, the configuration or the runtime
+   directory. The mode needs a client that is attached with a scope that may
+   answer, a refusal that ends the turn with a cause, and a rule for an
+   unattended session (a background sub-agent has no client to ask, so the
+   turn waits or fails). It changes guarantee 3 in one direction only: the
+   client supplies a key to the session, on demand, and still never receives
+   one. Not designed yet.

@@ -120,10 +120,9 @@ directory wins, then the directory the app was started in. File > Open Project
 (Ctrl or Cmd+O) opens another project in a new window, and File > Open Recent
 lists the last ten. A project that is open gets its window back, and a second
 launch of the app opens its project in a new window. Each window has a bridge
-of its own, which stops when the window closes. A project keeps the same port
-(20000 to 29999, from its directory), so its conversations are still in the
-window at the next launch; a port that is taken gives a free one and an empty
-history for that launch. A launcher starts
+of its own, which stops when the window closes. The port is one that the system gives;
+the conversations and the settings are not in the window, so they are there at
+the next launch. A launcher starts
 it in the bundle, in `/` or in the home directory, which is no place for an
 arena, so the app then uses a directory of its own under the data directory of
 the platform (`~/.config/fyai/project` on Linux, `~/Library/Application
@@ -297,31 +296,23 @@ the state that the page shows. Forking a conversation is not offered, because a 
 
 ## Provider keys
 
-fyai reads a key from its own configuration, its environment, or the secret
-store. The page adds a fourth source, in its settings:
+The page holds no key and sends none. fyai reads the key of a provider from its
+own configuration (`api_key: {type: env, value: NAME}`), from
+`<PROVIDER>_API_KEY` in the environment of the bridge, or from its secret
+store. Start the bridge with the variable set:
 
-- **API Key**: one key, for the provider of the model the conversation uses.
-  The bridge asks fyai which provider that is (`fyai model --output json`) and
-  sets `<PROVIDER>_API_KEY` for the turn.
-- **Provider API keys**: one `provider = key` a line, for several providers at
-  once. The provider name is the catalogue's, lower case:
+```sh
+ANTHROPIC_API_KEY=sk-ant-... npm run bridge
+```
 
-  ```text
-  anthropic = sk-ant-...
-  openai = sk-...
-  openrouter = sk-or-...
-  ```
+The bridge puts no key in a file, and it takes its own token out of the
+environment of the processes it starts. A conversation keeps working when you
+switch the model to another provider whose key fyai can find. A remote server
+keeps its keys at the server.
 
-The bridge puts each key in the environment of the fyai process it starts, as
-`<PROVIDER>_API_KEY`, so a conversation keeps working when you switch model to
-another provider. A key already in the environment of the bridge is replaced
-by the one from the page, and a provider the page does not name keeps
-whatever fyai's own configuration or environment gives it.
-
-The keys are stored in the browser (its local storage, on your machine) and
-sent with each turn; the bridge keeps them for the length of the process it
-starts and writes them nowhere. The settings field is a password field, so the
-value is not shown on the screen.
+The page settings are not keys. The bridge keeps them in
+`$XDG_CONFIG_HOME/fyai/web-settings.json` (mode 0600), so a new window, project
+or browser has the same ones, and drops any key it is sent.
 
 ## Slash commands
 
@@ -393,14 +384,6 @@ conversation is two pairs:
 
 ```sh
 node server/e2e.mjs http://127.0.0.1:9331 "first" "Alpha beta." "second" "Gamma."
-```
-
-`server/e2e-key.mjs` puts a key in the page's settings the way a person does
-and checks that the turn is answered. It needs a real key and a real project:
-
-```sh
-KEY=sk-ant-... node server/e2e-key.mjs http://127.0.0.1:9331 1   # Provider API keys
-KEY=sk-ant-... node server/e2e-key.mjs http://127.0.0.1:9331 0   # API Key
 ```
 
 The unit tests cover the frame assembly, the prompt and the bridge's

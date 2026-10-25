@@ -48,6 +48,7 @@ calls into a new file; merge them first when upstream moves:
 | File | Hook |
 | ---- | ---- |
 | `src/lib/stores/chat/index.svelte.ts` | `backendStore.active.runTurn` before the agentic loop; `handleLine` at the start of `sendMessage`; `titleFor` in `generateTitleWithLLM`; the agentic loop and the plain path only with the `agenticLoop` capability |
+| `src/lib/stores/settings/index.svelte.ts`, `src/lib/services/settings.service.ts` | `useRemote` keeps the settings on the server when the backend has `settings`, and the browser then keeps none |
 | `src/lib/stores/init.ts` | registers the fyai backend and detects the backend at start, or takes the forced kind; with `serverConversations` the tables go to memory and the database migration is skipped |
 | `src/lib/stores/index.ts` | exports `backendStore` |
 | `src/lib/stores/conversations/index.svelte.ts` | the backend lists the conversations before the list loads, names a new one (`newConversationId`), reads one when it opens (`hydrateConversation`), and hears of a delete and a rename |
@@ -64,7 +65,7 @@ calls into a new file; merge them first when upstream moves:
 | `src/lib/components/app/settings/SettingsChat/SettingsChat.svelte` | sections come from `visibleSettingsSections` |
 | `src/lib/hooks/use-chat-form-pickers.svelte.ts` | commands of the backend in the `/` picker |
 | `src/lib/utils/chat-commands.ts`, `src/lib/types/chat.d.ts`, `src/lib/enums/chat.enums.ts`, `src/lib/constants/icons.constants.ts` | the `backend` command action |
-| `src/lib/constants/settings.constants.ts`, `settings-keys.constants.ts`, `src/lib/types/settings.d.ts` | the Provider API keys field and the `backends` property of a field |
+| `src/lib/constants/settings.constants.ts`, `settings-keys.constants.ts`, `src/lib/types/settings.d.ts` | the API Key field is for llama-server only (`backends`) property of a field |
 | `src/lib/utils/index.ts` | exports `visibleSettingsSections` |
 | `src/routes/(chat)/chat/[id]/+page.svelte` | selects the first model of an empty conversation |
 | `src/lib/constants/app.constants.ts`, `pwa.constants.ts`, `src/routes/search/+page.svelte` | the name `fyai` |
