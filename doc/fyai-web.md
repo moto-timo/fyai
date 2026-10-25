@@ -1,13 +1,15 @@
 # fyai web
 
-Status: implemented in part. The sections "Architecture", "Backends", "Changes
-on top of llama.cpp" and "Upstream surface that remains" describe the tree as
-it is. The sections after them are a plan. W2, W3 and the project choice of
-W9 have landed; the work items say what remains.
+Status: the page for the bridge is done and the page for the session protocol
+is not. W1 to W8 and W12 have landed (none of the page work is checked in a
+browser yet), W9 is dropped, and W10 and W11 wait for `fyai serve`. The
+sections "Architecture", "Backends", "Changes on top of llama.cpp" and
+"Upstream surface that remains" describe the tree as it is; the work items say
+what each step did and what stays open.
 
 Related design: `doc/remote-sessions-sdd.md` (the session protocol that the
 page will use), `doc/claude-sdk-compat.md` (the protocol that the page uses
-now), `web/README.md` (how to build, run and package the page).
+now), `web/README.fyai.md` (how to build, run and package the page).
 
 ## Purpose
 
@@ -529,9 +531,14 @@ dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
 - Open: the page does not check the image modality of the model; fyai refuses
   an image for a model that takes none.
 
-**W9. A working directory for each conversation.** The desktop app has the project choice (one window for each project). The per-request `cwd` of the bridge is open. The directory of a session
-is `cwd` in the branch store. The bridge runs each turn in the directory of its
-branch, and `/cwd` changes it for a new conversation.
+**W9. A working directory for each conversation.** Dropped. A project is the
+unit of fyai: its arena, its configuration and its sandbox profile belong to
+the directory. The desktop app has one window and one bridge for each project,
+and a browser has one bridge for each `--cwd`, so a conversation needs no
+directory of its own. A server that serves several projects is the job of
+`fyai serve` (`doc/remote-sessions-sdd.md`), which names the project of each
+session. The `/cwd` command of the page needs the file tools of llama-server and
+is hidden with them.
 
 **W10. Move to the session protocol.** This item depends on
 `doc/remote-sessions-sdd.md`.
@@ -554,9 +561,10 @@ branch, and `/cwd` changes it for a new conversation.
 - Without a relay there is no push notification. The app reconnects and
   resynchronizes when it comes to the foreground.
 
-**W12. Restructure the existing patches.** The fyai commits change upstream
-files directly: the chat store, the pickers and the settings. Move this code
-behind the seam of W2 and rewrite the series in the order below.
+**W12. Restructure the existing patches.** Done: the upstream files were
+restored to the import in one commit and the fyai changes were applied again as
+the series below, behind the seam of W2. The old tip is tagged
+`web-pre-reseries`.
 
 ### Patch series order
 
