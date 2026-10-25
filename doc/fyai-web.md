@@ -436,8 +436,11 @@ copy follows fyai. It is not checked in a browser.
 - Delete and rename in the page reach the branch through the one place that
   tells the page of a deletion (`notifyConversationsDeleted`) and through
   `updateConversationName`.
-- Open: the sync reads each missing history one at a time at start; an image
-  of a message and the reasoning of a stored message are not restored; search
+- An image of a stored user message comes back as an attachment: `history`
+  writes its bytes as JSON text, a high byte as a lone surrogate, and
+  `storedImageBytes` reads them back.
+- Open: the sync reads each missing history one at a time at start; the
+  reasoning of a stored message is not restored; search
   and the export and import of the page still use the copy; the sync runs once
   at start, so a change made elsewhere shows at the next load.
 
@@ -523,9 +526,8 @@ dropped: fyai has no such prompt. A tool runs confined by the sandbox profile
   a message, not dropped.
 - The anchor of W5 is the text of the message, so an edit or a regenerate of a
   message that has images finds its place by the text alone.
-- Open: the images of a stored message are not restored when the page makes
-  its copy from fyai (W4), and the page does not check the image modality of
-  the model; fyai refuses an image for a model that takes none.
+- Open: the page does not check the image modality of the model; fyai refuses
+  an image for a model that takes none.
 
 **W9. A working directory for each conversation.** The desktop app has the project choice (one window for each project). The per-request `cwd` of the bridge is open. The directory of a session
 is `cwd` in the branch store. The bridge runs each turn in the directory of its
