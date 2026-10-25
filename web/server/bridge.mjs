@@ -38,8 +38,8 @@ import {
 	pageCapabilities,
 	parseHistory,
 	parseSlashCommand,
-	providerKeyEnvName,
 	rewindPlan,
+	sanitizeSettings,
 	slashCommandArgs,
 	titleFromHistory,
 	unknownCommandMessage,
@@ -47,8 +47,9 @@ import {
 } from './protocol.mjs';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { homedir } from 'node:os';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -530,8 +531,6 @@ async function listCommands(force = false) {
 	return commands;
 }
 
-/* The provider of each model, as the catalogue resolves it. */
-const providers = new Map();
 /*
  * fyai has no load step: any model of the catalogue answers a turn. The page
  * asks for a llama.cpp router, where a model is loaded before it is used, so
@@ -620,63 +619,6 @@ async function projectModel() {
 	const quoted = /^'(.*)'$/.exec(line) ?? /^"(.*)"$/.exec(line);
 
 	return (quoted ? quoted[1] : line) || config.model;
-}
-
-/**
- * The provider of a model, from `fyai model --output json`, which resolves it
- * through the catalogue. A model the catalogue does not know has none, and
- * the single API Key field then cannot name its variable.
- */
-async function providerOfModel(model) {
-	const cached = providers.get(model);
-
-	if (cached && Date.now() - cached.at < 60000) return cached.name;
-
-	const args = ['model', '--output', 'json'];
-	const res = await runCapture(config.bin, model ? ['-m', model, ...args] : args, 20000);
-
-	if (res.code !== 0) return '';
-
-	try {
-		const pos = res.out.lastIndexOf('{');
-		const parsed = JSON.parse(res.out.slice(pos));
-		const name = typeof parsed.provider === 'string' ? parsed.provider : '';
-
-		providers.set(model, { at: Date.now(), name });
-
-		return name;
-	} catch {
-		return '';
-	}
-}
-
-/**
- * The environment of one fyai process: this program's, with a key per
- * provider. fyai reads `<PROVIDER>_API_KEY` for the provider it resolved, so
- * every key the page holds is offered and the right one is used.
- *
- * @param keys keys by provider name
- * @param apiKey the key of the API Key field, whose provider is the model's
- * @param model the model of the turn, which names that provider
- */
-async function turnEnv(keys, apiKey, model) {
-	const env = { ...process.env };
-
-	for (const [provider, key] of Object.entries(keys ?? {})) {
-		const name = providerKeyEnvName(provider);
-
-		if (name && key) env[name] = String(key);
-	}
-
-	if (apiKey) {
-		const provider = await providerOfModel(model);
-		const name = providerKeyEnvName(provider);
-
-		/* A named provider keeps its own key; the single field is the fallback. */
-		if (name && !env[name]) env[name] = apiKey;
-	}
-
-	return env;
 }
 
 /** The catalogue of the project, with its own model first. */
@@ -946,6 +888,61 @@ async function rewindSession(branch, anchor, env) {
 	}
 }
 
+/**
+ * The file of the page settings: `web-settings.json` in the configuration
+ * directory of the user, so they follow the user and not the project or the
+ * address of the bridge.
+ */
+function settingsFile() {
+	const base = process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
+
+	return join(base, 'fyai', 'web-settings.json');
+}
+
+/** Read or write the settings of the page. The file is private to the user. */
+async function handleSettings(req, res) {
+	const file = settingsFile();
+
+	if (req.method === 'GET') {
+		try {
+			return sendJson(res, 200, {
+				settings: sanitizeSettings(JSON.parse(await readFile(file, 'utf8')))
+			});
+		} catch (error) {
+			/* No file yet, or one that is not settings: the page then keeps what it has. */
+			if (error?.code !== 'ENOENT') log('cannot read the settings:', error.message);
+
+			return sendJson(res, 200, { settings: null });
+		}
+	}
+
+	if (req.method !== 'PUT') return sendError(res, 405, 'method not allowed');
+
+	let settings;
+
+	try {
+		settings = sanitizeSettings(JSON.parse(await readBody(req, 1024 * 1024)));
+	} catch (error) {
+		return sendError(res, 400, `cannot read the request: ${error.message}`);
+	}
+
+	if (!settings) return sendError(res, 400, 'config is required');
+
+	try {
+		await mkdir(dirname(file), { mode: 0o700, recursive: true });
+
+		/* A write that stops half way must not leave a file that cannot be read. */
+		const temporary = `${file}.${process.pid}.tmp`;
+
+		await writeFile(temporary, JSON.stringify(settings), { mode: 0o600 });
+		await rename(temporary, file);
+	} catch (error) {
+		return sendError(res, 500, `cannot write the settings: ${error.message}`);
+	}
+
+	return sendJson(res, 200, { ok: true });
+}
+
 /** The route of one conversation: `/api/fyai/conversations/ID` and its `/messages`. */
 const CONVERSATION_ROUTE = /^\/api\/fyai\/conversations(?:\/([^/]+)(\/messages)?)?$/;
 
@@ -1069,9 +1066,6 @@ async function handleChat(req, res) {
 
 	const prompt = typeof body.prompt === 'string' ? body.prompt : '';
 	const model = typeof body.model === 'string' && body.model ? body.model : config.model;
-	const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
-	const providerKeys =
-		body.providerKeys && typeof body.providerKeys === 'object' ? body.providerKeys : {};
 	const attached = checkImages(body.images);
 
 	if ('error' in attached) {
@@ -1087,7 +1081,7 @@ async function handleChat(req, res) {
 	}
 
 	/* One environment for the command or the turn of this request. */
-	const env = await turnEnv(providerKeys, apiKey, model);
+	const env = { ...process.env };
 	const stream = new EventStream(req, res);
 	/*
 	 * A slash command is not a turn: it runs a verb and shows what it wrote.
@@ -1366,6 +1360,12 @@ server = createServer(async (req, res) => {
 
 		if (pathname === '/api/fyai/commands') {
 			sendJson(res, 200, { commands: await listCommands() });
+
+			return;
+		}
+
+		if (pathname === '/api/fyai/settings') {
+			await handleSettings(req, res);
 
 			return;
 		}

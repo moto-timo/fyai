@@ -13,6 +13,18 @@ import { CONFIG_LOCALSTORAGE_KEY, USER_OVERRIDES_LOCALSTORAGE_KEY } from '$lib/c
  * @see settingsStore in stores/settings/index.svelte.ts - reactive state + business logic
  */
 export class SettingsService {
+	/** Remove the config and the user overrides from localStorage. */
+	static clearConfig(): void {
+		if (!browser) return;
+
+		try {
+			localStorage.removeItem(CONFIG_LOCALSTORAGE_KEY);
+			localStorage.removeItem(USER_OVERRIDES_LOCALSTORAGE_KEY);
+		} catch (error) {
+			console.error('Failed to clear config from localStorage:', error);
+		}
+	}
+
 	/**
 	 * Read the raw config and user overrides from localStorage.
 	 * @returns Parsed values, or empty defaults when nothing is stored or parsing fails.

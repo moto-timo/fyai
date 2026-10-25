@@ -6,8 +6,10 @@ export type {
 	Backend,
 	BackendCapabilities,
 	BackendCommand,
+	BackendSettings,
 	BackendTurnRequest,
-	BackendTurnResult
+	BackendTurnResult,
+	PersistedSettings
 } from './types';
 export { llamaBackend };
 

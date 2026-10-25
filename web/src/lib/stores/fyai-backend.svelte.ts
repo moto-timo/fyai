@@ -11,7 +11,6 @@
 
 import { conversationsStore } from './conversations/index.svelte';
 import { modelsStore } from './models/index.svelte';
-import { settingsStore } from './settings/index.svelte';
 import { MessageRole } from '$lib/enums';
 import {
 	type Backend,
@@ -35,9 +34,9 @@ import {
 	fyaiAnchor,
 	fyaiImages,
 	fyaiUnsupportedAttachments,
-	parseProviderKeys,
 	streamFyaiTurn
 } from '$lib/services/fyai.service';
+import { fyaiSettings } from '$lib/services/fyai.settings';
 import { FyaiTurnAssembler } from '$lib/services/fyai.turn';
 import type { ChatMessageTimings } from '$lib/types';
 import { uuid } from '$lib/utils';
@@ -127,12 +126,10 @@ async function runTurn(request: BackendTurnRequest): Promise<BackendTurnResult> 
 		await streamFyaiTurn(
 			{
 				anchor: fyaiAnchor(request.allMessages),
-				apiKey: settingsStore.config.apiKey?.toString().trim() ?? '',
 				conversationId: convId,
 				images,
 				model: request.model,
-				prompt,
-				providerKeys: parseProviderKeys(settingsStore.config.providerApiKeys?.toString() ?? '')
+				prompt
 			},
 			(frame) => assembler.push(frame),
 			request.signal
@@ -254,6 +251,7 @@ export const fyaiBackend: Backend = {
 	},
 	renameConversation: (id, name) => renameFyaiConversation(id, name),
 	runTurn,
+	settings: fyaiSettings,
 	syncConversations,
 	/*
 	 * The title comes from the message. A model request would start a session

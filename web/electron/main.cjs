@@ -22,7 +22,6 @@ const { homedir } = require('node:os');
 const { basename, dirname, join, resolve, sep } = require('node:path');
 const {
 	isDirectory,
-	portForProject,
 	projectFromArgs,
 	recentAdd,
 	recentLoad,
@@ -37,12 +36,10 @@ const ROOT = app.isPackaged ? join(process.resourcesPath, 'app') : join(HERE, '.
 const STATIC_DIR = join(ROOT, 'dist');
 
 /*
- * A project keeps the port that its directory gives (`portForProject`), so the
- * origin of the page is the same at each launch and the settings that the
- * page keeps for that origin are found again. A port that is taken, by a
- * development bridge or a stale one, falls back to port 0, which asks the
- * system for a free one. FYAI_BRIDGE_PORT names the port of the first window
- * only: two bridges cannot share one.
+ * A bridge listens on a port that the system gives, because the page keeps no
+ * state in the browser: the bridge holds the conversations and the settings.
+ * FYAI_BRIDGE_PORT names the port of the first window only: two bridges cannot
+ * share one.
  */
 let firstPort = Number(process.env.FYAI_BRIDGE_PORT ?? 0);
 
@@ -352,14 +349,11 @@ async function openProject(dir) {
 
 		if (!projects.size) app.quit();
 	};
-	const wanted = firstPort || portForProject(key);
+	const wanted = firstPort;
 
 	firstPort = 0;
 
-	let address = await startBridge(project, wanted);
-
-	/* The bridge exits when its port is taken; any free port serves as well. */
-	if (!address) address = await startBridge(project, 0);
+	const address = await startBridge(project, wanted);
 
 	if (!address) {
 		fail(

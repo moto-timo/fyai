@@ -37,6 +37,7 @@ export function initStores(): Promise<void> {
 		await MigrationService.runAllMigrations({ database: !serverConversations });
 
 		settingsStore.initialize();
+		await settingsStore.useRemote(backendStore.active.settings);
 		permissionsStore.initialize();
 		toolsStore.initialize();
 		void versionStore.initialize();

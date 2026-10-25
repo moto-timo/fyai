@@ -49,6 +49,19 @@ export interface BackendCommand {
 	title: string;
 }
 
+/** The settings of the page as a server keeps them. */
+export interface PersistedSettings {
+	config: Record<string, unknown>;
+	userOverrides: string[];
+}
+
+/** Where a server keeps the settings of the page, in place of the browser. */
+export interface BackendSettings {
+	/** The settings, or null when the server has none yet. */
+	load: () => Promise<PersistedSettings | null>;
+	save: (settings: PersistedSettings) => Promise<void>;
+}
+
 export interface Backend {
 	capabilities: BackendCapabilities;
 	/**
@@ -56,6 +69,12 @@ export interface Backend {
 	 * the page ask the model. A backend with no title function uses the model.
 	 */
 	titleFor?: (firstMessage: string) => string | null;
+	/**
+	 * Keeps the settings of the page on the server, so they follow the user and
+	 * not the address of the page. A backend with none leaves them in the
+	 * local storage of the browser.
+	 */
+	settings?: BackendSettings;
 	/** Loads the slash commands of the server, for the `/` picker. */
 	loadCommands?: () => Promise<BackendCommand[]>;
 	/**

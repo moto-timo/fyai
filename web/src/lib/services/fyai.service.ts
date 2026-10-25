@@ -36,18 +36,6 @@ export interface FyaiImage {
 export interface FyaiTurnRequest {
 	conversationId: string;
 	/**
-	 * Keys by provider name, from the Provider API keys setting. The bridge
-	 * puts each one in the environment of its fyai process as
-	 * `<PROVIDER>_API_KEY`, so a conversation can move between providers. It
-	 * does not store them.
-	 */
-	providerKeys?: Record<string, string>;
-	/**
-	 * The key of the API Key setting. It belongs to the provider of the
-	 * selected model, which the bridge resolves.
-	 */
-	apiKey?: string;
-	/**
 	 * The last user message that this turn follows, or null when it follows none.
 	 * The page can start a turn from any message of its tree, and the bridge cuts
 	 * the branch of fyai back to the end of this message's exchange first.
@@ -176,35 +164,6 @@ function extraText(extra: DatabaseMessageExtra): string {
 			 */
 			return '';
 	}
-}
-
-/**
- * The `provider = key` lines of the Provider API keys setting. The provider
- * name is the one of the catalogue, lower case; a blank row and a row that
- * starts with '#' are left out.
- *
- * @param lines one `provider = key` a line
- */
-export function parseProviderKeys(lines: string): Record<string, string> {
-	const keys: Record<string, string> = {};
-
-	for (const line of lines.split('\n')) {
-		const row = line.trim();
-
-		/* A blank row and a comment are not a key. */
-		if (!row || row.startsWith('#')) continue;
-
-		const at = row.indexOf('=');
-
-		if (at <= 0) continue;
-
-		const name = row.slice(0, at).trim().toLowerCase();
-		const value = row.slice(at + 1).trim();
-
-		if (name && value) keys[name] = value;
-	}
-
-	return keys;
 }
 
 /**

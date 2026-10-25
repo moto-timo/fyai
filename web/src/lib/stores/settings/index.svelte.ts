@@ -2,7 +2,7 @@
  * settingsStore - Application configuration and theme management
  *
  * Owns generation parameters, UI preferences and theme, persisted to
- * localStorage with Svelte 5 runes. Applies the admin's server ui_settings
+ * localStorage, or to the server when it keeps them, with Svelte 5 runes. Applies the admin's server ui_settings
  * as defaults on first visit; sampling parameters sync with the server via
  * ParameterSyncService.
  */
@@ -10,6 +10,7 @@
 import { browser } from '$app/environment';
 import { SETTING_CONFIG_DEFAULT, SETTINGS_KEYS } from '$lib/constants';
 import { ColorMode } from '$lib/enums';
+import type { BackendSettings } from '$lib/services/backend';
 import { ParameterSyncService } from '$lib/services/parameter-sync.service';
 import { SettingsService } from '$lib/services/settings.service';
 import { deviceStore } from '$lib/stores/device.svelte';
@@ -32,6 +33,10 @@ class SettingsStore {
 	// True until a config exists in localStorage; gates the one-time
 	// application of server ui_settings defaults for new users.
 	private isFirstVisit = false;
+	// Where the server keeps the settings, when it does; the browser keeps none then.
+	private remote: BackendSettings | null = null;
+
+	private remoteTimer: ReturnType<typeof setTimeout> | null = null;
 
 	canSyncParameter(key: string): boolean {
 		return ParameterSyncService.canSyncParameter(key);
@@ -396,6 +401,16 @@ class SettingsStore {
 	}
 
 	/**
+	 * Update the theme setting.
+	 * @param newTheme - The new theme value
+	 */
+	updateTheme(newTheme: string) {
+		this.updateConfig(SETTINGS_KEYS.THEME, newTheme);
+
+		setMode(newTheme as ColorMode);
+	}
+
+	/**
 	 *
 	 *
 	 * Import / Export
@@ -404,13 +419,38 @@ class SettingsStore {
 	 */
 
 	/**
-	 * Update the theme setting.
-	 * @param newTheme - The new theme value
+	 * Keeps the settings on the server from now on. The ones that it holds
+	 * replace what the page read from the browser; a server that holds none
+	 * takes the ones the page has, which is how the settings of an earlier
+	 * visit move there. A server that cannot be read leaves the page as it is.
 	 */
-	updateTheme(newTheme: string) {
-		this.updateConfig(SETTINGS_KEYS.THEME, newTheme);
+	async useRemote(remote: BackendSettings | undefined): Promise<void> {
+		if (!browser || !remote) return;
 
-		setMode(newTheme as ColorMode);
+		try {
+			const stored = await remote.load();
+
+			if (stored) {
+				this.config = { ...SETTING_CONFIG_DEFAULT, ...stored.config };
+				this.userOverrides = new Set(stored.userOverrides);
+				this.isFirstVisit = false;
+				this.enforceDiscoverCoupling();
+				setMode(this.config[SETTINGS_KEYS.THEME] as ColorMode);
+			}
+
+			this.remote = remote;
+
+			/* The browser keeps no copy: what it held moved to the server. */
+			SettingsService.clearConfig();
+
+			if (!stored)
+				await remote.save({
+					config: { ...this.config },
+					userOverrides: Array.from(this.userOverrides)
+				});
+		} catch (error) {
+			console.error('Failed to load the settings from the server:', error);
+		}
 	}
 
 	/**
@@ -501,7 +541,25 @@ class SettingsStore {
 	private saveConfig() {
 		if (!browser) return;
 
-		SettingsService.saveConfig(this.config, Array.from(this.userOverrides));
+		const overrides = Array.from(this.userOverrides);
+
+		if (!this.remote) {
+			SettingsService.saveConfig(this.config, overrides);
+
+			return;
+		}
+
+		/* A burst of changes, such as a slider, is one write. */
+		const remote = this.remote;
+
+		if (this.remoteTimer) clearTimeout(this.remoteTimer);
+
+		this.remoteTimer = setTimeout(() => {
+			this.remoteTimer = null;
+			remote.save({ config: { ...this.config }, userOverrides: overrides }).catch((error) => {
+				console.error('Failed to save the settings on the server:', error);
+			});
+		}, 400);
 	}
 }
 

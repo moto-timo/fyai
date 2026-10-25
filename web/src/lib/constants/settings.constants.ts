@@ -18,7 +18,7 @@ import {
 import { SyncableParameterType } from '$lib/enums';
 import { SettingsFieldType } from '$lib/enums/settings.enums';
 import { ColorMode } from '$lib/enums/ui.enums';
-import { FYAI_BRIDGE_KIND } from '$lib/services/backend/kinds';
+import { LLAMA_KIND } from '$lib/services/backend/kinds';
 import type {
 	SettingsConfigValue,
 	SettingsEntry,
@@ -76,21 +76,14 @@ export const SETTINGS_REGISTRY: SettingsSectionEntry[] = [
 				type: SettingsFieldType.SELECT
 			},
 			{
+				/* fyai keeps the keys of its providers itself: in its environment, never in the page. */
+				backends: [LLAMA_KIND],
 				defaultValue: '',
 				help: `Set the API Key if you are using <code> ${CLI_FLAGS.API_KEY} </code> option for the server.`,
 				isPrivate: true,
 				key: SETTINGS_KEYS.API_KEY,
 				label: 'API Key',
 				type: SettingsFieldType.INPUT
-			},
-			{
-				backends: [FYAI_BRIDGE_KIND],
-				defaultValue: '',
-				help: 'Keys of other providers, one <CODE>provider = key</CODE> a line, such as <CODE>openai = sk-...</CODE>. The provider name is the one in the catalogue (anthropic, openai, openrouter, deepseek, fireworks, ...). The bridge sets <CODE>&lt;PROVIDER&gt;_API_KEY</CODE> for each line, so a conversation can move between providers.',
-				isPrivate: true,
-				key: SETTINGS_KEYS.PROVIDER_API_KEYS,
-				label: 'Provider API keys',
-				type: SettingsFieldType.TEXTAREA
 			},
 			{
 				defaultValue: '',

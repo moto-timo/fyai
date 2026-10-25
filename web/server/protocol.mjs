@@ -181,21 +181,45 @@ export function catalogueModelName(models, name) {
 	return findCatalogueModel(models, name)?.name ?? '';
 }
 
-/**
- * The environment name of a provider's key, as fyai reads it: the provider
- * name upper-cased, with each character that is not alphanumeric replaced by
- * '_', and `_API_KEY` after it. `anthropic` gives `ANTHROPIC_API_KEY` and
- * `open-router` gives `OPEN_ROUTER_API_KEY`.
- *
- * @param {string} provider
- * @returns {string | null}
+/*
+ * The settings of the page. The bridge keeps them in a file of the user, so
+ * every window, project and browser sees the same ones. A key is not a
+ * setting: fyai reads its keys from its own configuration and its environment,
+ * and a key sent here is dropped, not stored.
  */
-export function providerKeyEnvName(provider) {
-	const name = String(provider ?? '').trim();
 
-	if (!name || name.length > 64 || !/^[A-Za-z0-9_.-]+$/.test(name)) return null;
+/** The settings that hold a secret, which the bridge never keeps. */
+const SECRET_SETTINGS = new Set(['apiKey', 'providerApiKeys']);
 
-	return `${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY`;
+/**
+ * The settings in a request body, or null when the body holds none. Each value
+ * is a string, a number or a boolean, as the page keeps them; a secret and any
+ * other value are left out.
+ *
+ * @param {any} body `{config, userOverrides}`
+ * @returns {{ config: Record<string, string | number | boolean>, userOverrides: string[] } | null}
+ */
+export function sanitizeSettings(body) {
+	const config = body?.config;
+
+	if (!config || typeof config !== 'object' || Array.isArray(config)) return null;
+
+	/** @type {Record<string, string | number | boolean>} */
+	const kept = {};
+
+	for (const [key, value] of Object.entries(config)) {
+		if (SECRET_SETTINGS.has(key)) continue;
+
+		if (['string', 'number', 'boolean'].includes(typeof value)) kept[key] = value;
+	}
+
+	const overrides = Array.isArray(body.userOverrides)
+		? body.userOverrides.filter(
+				(/** @type {unknown} */ key) => typeof key === 'string' && !SECRET_SETTINGS.has(key)
+			)
+		: [];
+
+	return { config: kept, userOverrides: overrides };
 }
 
 /**
@@ -249,7 +273,7 @@ const TITLE_MAX = 80;
  * user message. The CLI names a session by its time and sets no description,
  * so the page reads one from what was asked.
  *
- * @param {object[]} messages the stored messages of the branch
+ * @param {any[]} messages the stored messages of the branch
  * @returns {string} '' when no user message has text
  */
 export function titleFromHistory(messages) {
