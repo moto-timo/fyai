@@ -43,6 +43,9 @@ export { modelsStore } from './models/index.svelte';
 // MODELS DISCOVER (HuggingFace browse state for the discover dialog)
 export { modelsDiscoverStore } from './models-discover/index.svelte';
 
+// BACKEND (which server the page talks to and what it can do)
+export { backendIs, backendStore } from './backend.svelte';
+
 // SERVER
 export { serverStore } from './server.svelte';
 

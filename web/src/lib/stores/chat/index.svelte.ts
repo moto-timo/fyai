@@ -21,6 +21,7 @@ import { ChatService } from '$lib/services/chat.service';
 import { DatabaseService } from '$lib/services/database.service';
 // direct imports between stores, not via the barrel, to avoid circular deps
 import { agenticStore } from '$lib/stores/agentic/index.svelte';
+import { backendStore } from '$lib/stores/backend.svelte';
 import { chatActivityStore } from '$lib/stores/chat/activity.svelte';
 import { type ChatFlowsHost, ChatMessageFlows } from '$lib/stores/chat/flows.svelte';
 import { chatProcessingStore } from '$lib/stores/chat/processing.svelte';
@@ -1126,6 +1127,39 @@ class ChatStore implements ChatStreamHost, ChatFlowsHost {
 			disabledToolCategories: conversationsStore.preferences.getDisabledToolCategories(),
 			disabledTools: conversationsStore.preferences.getDisabledTools()
 		};
+
+		{
+			/*
+			 * A backend that runs the whole turn itself, tool loop included,
+			 * takes it here. `skip` falls through to the generic paths.
+			 */
+			const backendResult = await backendStore.active.runTurn?.({
+				allMessages,
+				assistantMessage,
+				callbacks: streamCallbacks,
+				convId,
+				model: modelsStore.selectedModelName ?? effectiveModel ?? null,
+				signal: abortController.signal
+			});
+
+			if (backendResult && backendResult !== 'skip') {
+				if (backendResult === 'ok') {
+					cleanupStreamingState();
+
+					if (onComplete) await onComplete(streamedContent);
+
+					if (firstUserMessageContent) {
+						await this.generateTitleWithLLM(firstUserMessageContent, streamedContent, convId);
+					}
+
+					const pending = this.consumePendingMessage(convId);
+
+					if (pending) await this.sendMessage(pending.content, pending.extras);
+				}
+
+				return;
+			}
+		}
 
 		{
 			const agenticResult = await agenticStore.runAgenticFlow({
