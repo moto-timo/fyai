@@ -80,6 +80,28 @@ static enum fyai_event_action fyai_signal_cb(const struct fyai_event *ev)
 /* Maximum time to acknowledge SIGINT. */
 #define FYAI_INTERRUPT_WATCHDOG_MS 200
 
+/*
+ * SIGUSR2 appends the event-loop dump to ~/.fyai/dump.log, which the handler
+ * creates. A full-screen terminal garbles text written to it. Without a home
+ * directory the dump goes to the original standard error.
+ */
+static void fyai_dump_setup(struct fyai_ctx *ctx)
+{
+	const char *home = getenv("HOME");
+	int rc;
+
+	if (home && *home) {
+		rc = asprintf(&ctx->dump_dir, "%s/.fyai", home);
+		if (rc < 0)
+			ctx->dump_dir = NULL;
+		else if (asprintf(&ctx->dump_file, "%s/dump.log",
+				  ctx->dump_dir) < 0)
+			ctx->dump_file = NULL;
+	}
+	if (ctx->dump_fd >= 0)
+		(void)fyai_event_dump_open(ctx, SIGUSR2, ctx->dump_fd);
+}
+
 static int fyai_signals_open(struct fyai_ctx *ctx)
 {
 	/* The watchdog handles SIGINT. */
@@ -107,10 +129,10 @@ static int fyai_signals_open(struct fyai_ctx *ctx)
 	ctx->dump_fd = dup(STDERR_FILENO);
 	if (ctx->dump_fd >= 0) {
 		(void)fcntl(ctx->dump_fd, F_SETFD, FD_CLOEXEC);
-		(void)fyai_event_dump_open(ctx, SIGUSR2, ctx->dump_fd);
 		/* Past the UI stdio spool, so a crash still reaches it. */
 		fyai_crash_set_fd(ctx->dump_fd);
 	}
+	fyai_dump_setup(ctx);
 	return 0;
 }
 
@@ -2747,6 +2769,9 @@ void fyai_cleanup(struct fyai_ctx *ctx)
 		close(ctx->dump_fd);
 		ctx->dump_fd = -1;
 	}
+	free(ctx->dump_dir);
+	free(ctx->dump_file);
+	ctx->dump_dir = ctx->dump_file = NULL;
 }
 
 /* Apply the configured MCP state. This operation is idempotent. */

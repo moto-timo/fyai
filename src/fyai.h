@@ -726,6 +726,7 @@ struct fyai_ctx {
 	bool signal_mask_valid;
 	/* Diagnostic output descriptor. */
 	int dump_fd;
+	char *dump_dir, *dump_file;	/* the dump file; NULL for dump_fd */
 	struct fyai_ui *ui;
 	struct fyai_browser *browser;
 	struct fyai_agents *agents;

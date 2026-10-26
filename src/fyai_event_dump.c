@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -362,7 +363,7 @@ void fyai_event_dump_to_fd(struct fyai_event_loop *el, struct fyai_ctx *ctx,
  */
 static void fyai_event_dump_handler(int signo)
 {
-	int saved_errno = errno;
+	int saved_errno = errno, fd;
 
 	(void)signo;
 	/* One dump at a time: a second signal must not interleave output. */
@@ -371,8 +372,19 @@ static void fyai_event_dump_handler(int signo)
 		return;
 	}
 	fyai_dump_busy = 1;
-	dump_state(fyai_dump_loop, fyai_dump_ctx, (int)fyai_dump_fd,
-		   fyai_dump_crlf != 0);
+	fd = -1;
+	if (fyai_dump_ctx && fyai_dump_ctx->dump_file) {
+		(void)mkdir(fyai_dump_ctx->dump_dir, 0700);
+		fd = open(fyai_dump_ctx->dump_file,
+			  O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600);
+	}
+	if (fd >= 0) {
+		dump_state(fyai_dump_loop, fyai_dump_ctx, fd, false);
+		close(fd);
+	} else {
+		dump_state(fyai_dump_loop, fyai_dump_ctx, (int)fyai_dump_fd,
+			   fyai_dump_crlf != 0);
+	}
 	fyai_dump_busy = 0;
 	errno = saved_errno;
 }

@@ -166,7 +166,12 @@ void fyai_event_source_remove(struct fyai_event_source *src);
 
 void *fyai_event_source_userdata(const struct fyai_event_source *src);
 
-/* Arm the signal-context dump and probe the terminal mode of @fd. */
+/*
+ * Arm the signal-context dump and probe the terminal mode of @fd. The handler
+ * appends the dump to ctx->dump_file and creates ctx->dump_dir and the file
+ * when it runs: a run that never dumps adds none. Without a file, or when it
+ * cannot be opened, the dump goes to @fd.
+ */
 int fyai_event_dump_open(struct fyai_ctx *ctx, int signo, int fd);
 void fyai_event_dump_close(void);
 void fyai_event_dump_to_fd(struct fyai_event_loop *el, struct fyai_ctx *ctx,
