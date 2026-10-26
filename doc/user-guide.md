@@ -842,12 +842,13 @@ else the terminal). Output with no such byte is not changed.
 
 ### Background commands
 
-`exec_command` takes `background: true` to start a server, or any program that runs on
-while the model works. The command gets a session of its own and `/dev/null` for
-standard input, output and error, and the call returns at once. Redirect the output to a
-file to read it later. It has no time limit and no terminal, and it ends with the
-exchange, or earlier if it stops, as any process that a tool leaves (see the lifetime of
-the processes of a tool); `list daemons` names it. `tty` and `timeout` do not apply to it.
+`exec_command` takes `background: true` to start a build, a server, or any program that
+runs on while the model works. The call returns at once. The command has no terminal and no
+time limit, and its output is not kept: redirect it to a file to read it later. The invocation
+keeps it as a quiet monitor, and the model is told when it ends, as
+`[shell 'NAME' ended: status N]`. `name` names it; without one it is `bg-N`. `wait` with `for`
+holds the turn until it ends, `list` with kind `monitors` shows it, and `cancel` with its name
+stops it. `tty` and `timeout` do not apply to it.
 
 A `name` (letters, digits, `-` or `_`) labels the daemon: `list daemons` shows it as the
 `label`. The model stops it with `cancel` and the name, or with the pid that `list`
@@ -1469,7 +1470,7 @@ A named terminal session, a monitor and a background sub-agent keep the scope un
 
 - `sandbox_scope` chooses the lifetime: `exchange` (default), `session` (until the interactive session ends) or `call` (the process ends with its call). The model cannot change it.
 - `sandbox_grace_ms` is the time that the processes have to stop after SIGTERM before SIGKILL. The default is 5000. Give a build server more.
-- `exec_command` with `background` starts a detached command. `name` labels it in `list daemons`. `cancel` and `/kill` stop it by label or pid.
+- A program that a call detaches stays a daemon: `list daemons` shows it, and `cancel` and `/kill` stop it by label or pid. A command that the model starts with `background` is not one: it is a quiet monitor.
 
 See `doc/exchange-scope.md`.
 

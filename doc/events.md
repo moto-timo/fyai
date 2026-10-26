@@ -51,7 +51,7 @@ The registry (`doc/tools-yaml.md`) holds the properties of each tool.
 | Gap | Notes |
 |---|---|
 | Recurring and scheduled events | Waits are one-shot. A repeating timer for the life of a session is possible. A durable schedule needs the section "Durable events". |
-| Background command with one completion event | `monitor` sends every line. A plain command with `background` should send one end event, and a call should read the output so far. |
+| Read the output of a background command | A command with `background` sends one end event, `[shell 'NAME' ended: status N]`, but keeps no output. A call should read the output so far. |
 | Other event sources | No WebSocket, file watch, or webhook source. |
 | Push to the user | No terminal bell, desktop notification, or other channel outside the transcript. |
 | Lifecycle hooks | No user commands on tool use, turn end, or event. |
@@ -71,8 +71,8 @@ The registry (`doc/tools-yaml.md`) holds the properties of each tool.
 In this order:
 
 1. A `notify` command and a terminal bell for an event or a turn end.
-2. `exec_command` with `background`: one end event and a read of the output
-   so far.
+2. `exec_command` with `background`: a read of the output so far. The end
+   event exists.
 3. A repeating timer that lives with the session.
 4. Event records with an identity and a kind, stored apart from typed input.
 

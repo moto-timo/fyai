@@ -6166,8 +6166,8 @@ stop a shell session, a sub-agent or a daemon
 **Usage:** `/kill NAME`
 
 Stop the live shell session or sub-agent NAME. A name that neither has is
-a daemon: the label that a `background` call gave it, or the pid that
-`list daemons` shows. It gets SIGTERM, and SIGKILL after `sandbox_grace_ms`.
+a daemon: its label (the `FYAI_DAEMON` variable of the process), or the
+pid that `list daemons` shows. It gets SIGTERM, and SIGKILL after `sandbox_grace_ms`.
 
 
 ### Arguments

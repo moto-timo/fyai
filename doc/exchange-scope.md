@@ -140,8 +140,7 @@ environment, as it does today.
   `1 daemon still running (bitbake-server); it ends with this exchange`. The model then knows that the process is there and when it ends.
 - `list` has the kind `daemons`, which names the processes that the holder of
   the scope holds and the ones that the tracker keeps, each with its pid, its
-  name and the `label` that a `background` call gave it (`FYAI_DAEMON` in its
-  environment).
+  name and the `label` that its environment carries in `FYAI_DAEMON`.
 - `cancel` and `/kill` stop a daemon by its label or its pid
   (`fyai_scope_stop()`): SIGTERM through a pidfd, and SIGKILL after
   `sandbox_grace_ms`.
