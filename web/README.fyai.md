@@ -129,6 +129,12 @@ the platform (`~/.config/fyai/project` on Linux, `~/Library/Application
 Support/fyai/project` on macOS). A directory with no project gets one from
 `fyai init`.
 
+The sidebar of the page names the project of the window: the bridge reports
+its directory, its name and whether an arena exists for it (`project` of
+`/api/fyai/info`). In the app, the name opens a menu with Open Project and the
+recent projects, which act as the entries of the File menu. A browser tab shows
+the project but cannot open another.
+
 The window loads the built page, so run `npm run build` after you change it.
 Electron needs Node 20 or later, and a graphical session.
 
