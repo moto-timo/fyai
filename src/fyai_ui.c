@@ -36,6 +36,7 @@
 #include "fyai_terminal.h"
 #include "fyai_terminal_session.h"
 #include "fyai_ui.h"
+#include "fyai_wait.h"
 #include "fyai_ask.h"
 #include "fyai_page.h"
 #include "fyai_todo.h"
@@ -4479,6 +4480,7 @@ static bool ui_interrupt(struct fyai_ctx *ctx, bool quit)
 			return false;
 	}
 	ctx->interrupt_pending = true;
+	fyai_waiters_kick(ctx);
 	if (ui->busy)
 		ui_recall_pending(ui);
 	return false;

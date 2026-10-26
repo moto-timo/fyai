@@ -410,6 +410,7 @@ struct fyai_waiter {
 	size_t n;
 	bool all;
 	bool poll;		/* report what has ended and return at once */
+	bool sleep;		/* no target: ends at the deadline or earlier */
 	bool done;
 	double seconds;
 	fyai_event_ms_t deadline;
@@ -559,6 +560,35 @@ fail:
 }
 
 /* Look at the targets of one waiter; finish it when its condition holds. */
+/*
+ * A plain wait ends at its time, on an interrupt, or when an event waits for
+ * the model: a background task that ended must not leave the turn asleep.
+ */
+static void fyai_waiter_poll_sleep(struct fyai_waiter *w)
+{
+	struct fyai_ctx *ctx = w->ctx;
+	const char *text;
+
+	w->ok = true;
+	if (fyai_interrupt_pending(ctx)) {
+		text = fy_sprintfa("[wait interrupted after less than %.3g "
+				   "seconds]", w->seconds);
+		w->ok = false;
+	} else if (fyai_event_pending_prefix(ctx, "[")) {
+		text = "[wait ended early: an event arrived]";
+	} else if (fyai_event_now_ms() >= w->deadline) {
+		text = fy_sprintfa("[waited %.3g seconds]", w->seconds);
+	} else {
+		return;
+	}
+	w->result = strdup(text);
+	if (!w->result) {
+		w->result = strdup("tool error: out of memory");
+		w->ok = false;
+	}
+	w->done = true;
+}
+
 static void fyai_waiter_poll(struct fyai_waiter *w)
 {
 	struct fyai_ctx *ctx = w->ctx;
@@ -566,6 +596,10 @@ static void fyai_waiter_poll(struct fyai_waiter *w)
 
 	if (w->done)
 		return;
+	if (w->sleep) {
+		fyai_waiter_poll_sleep(w);
+		return;
+	}
 	for (i = 0; i < w->n; i++) {
 		struct fyai_wait_for_item *it = &w->items[i];
 
@@ -880,6 +914,33 @@ err:
 	return NULL;
 }
 
+/* Start a plain wait of @seconds on the loop. Return NULL with *errp set. */
+static struct fyai_waiter *fyai_waiter_start_sleep(struct fyai_ctx *ctx,
+						   double seconds,
+						   void (*complete)(void *),
+						   void *userdata, char **errp)
+{
+	struct fyai_waiter *w;
+
+	*errp = NULL;
+	w = calloc(1, sizeof(*w));
+	if (!w) {
+		fyai_waiter_refuse(ctx, errp, "tool error: out of memory");
+		return NULL;
+	}
+	w->ctx = ctx;
+	w->complete = complete;
+	w->userdata = userdata;
+	w->sleep = true;
+	w->seconds = seconds;
+	w->deadline = fyai_event_now_ms() + (fyai_event_ms_t)(seconds * 1000.0);
+	w->next = ctx->waiters;
+	ctx->waiters = w;
+	fyai_waiter_poll(w);
+	fyai_waiters_arm(ctx);
+	return w;
+}
+
 void fyai_waiters_release(struct fyai_ctx *ctx)
 {
 	if (!ctx)
@@ -939,9 +1000,10 @@ char *fyai_wait_tool(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	fy_generic reason;
 	const char *name, *reason_text;
 	double seconds;
+	volatile bool finished = false;
+	struct fyai_waiter *w;
 	char *why;
 	char *out;
-	int rc;
 
 	*okp = false;
 	if (fyai_wait_for_requested(args))
@@ -969,16 +1031,20 @@ char *fyai_wait_tool(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 		return out;
 	}
 
-	/* Sleep on the event loop so UI and interrupts remain active. */
+	/* Wait on the event loop so UI and interrupts remain active. */
 	el = fyai_ctx_loop(ctx);
 	if (!el)
 		return strdup("tool error: no event loop for a wait");
-	rc = fyai_event_sleep(el, (fyai_event_ms_t)(seconds * 1000.0));
-	if (rc || fyai_interrupt_pending(ctx))
-		return strdup(fy_sprintfa("[wait interrupted after less than "
-					  "%.3g seconds]", seconds));
-	*okp = true;
-	return strdup(fy_sprintfa("[waited %.3g seconds]", seconds));
+	w = fyai_waiter_start_sleep(ctx, seconds, fyai_wait_for_sync_done,
+				    (void *)&finished, &why);
+	if (!w)
+		return why;
+	if (!fyai_waiter_done(w))
+		(void)fyai_event_loop_run_until(el, &finished, -1);
+	fyai_waiter_cancel(w);
+	out = fyai_waiter_result(w, okp);
+	fyai_waiter_destroy(w);
+	return out ? out : strdup("tool error: out of memory");
 }
 
 char *fyai_time_tool(struct fyai_ctx *ctx, bool *okp)

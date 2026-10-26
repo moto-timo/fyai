@@ -24,6 +24,7 @@
 #include <libfyaml/libfyaml-util.h>
 
 #include "fyai_event_priv.h"
+#include "fyai_wait.h"
 
 /* Events dispatched per wait; a full batch simply means another pass. */
 #define FYAI_EVENT_BATCH 32
@@ -231,6 +232,9 @@ static volatile sig_atomic_t fyai_interrupt_wake_fd = -1;
 static enum fyai_event_action fyai_event_wake_dispatch(const struct fyai_event *ev)
 {
 	fyai_event_wakepipe_drain(ev->loop->wake_pipe[0]);
+	/* A wait in the loop sees an interrupt only when it looks. */
+	if (ev->loop->ctx && ev->loop->ctx->interrupt_pending)
+		fyai_waiters_kick(ev->loop->ctx);
 	return FYAIEA_CONTINUE;
 }
 
