@@ -167,6 +167,7 @@ export { default as SidebarNavigationSelectionBar } from './SidebarNavigation/Si
  * ```
  */
 export { default as SidebarNavigationConversationList } from './SidebarNavigation/SidebarNavigationConversationList.svelte';
+export { default as SidebarNavigationProject } from './SidebarNavigation/SidebarNavigationProject.svelte';
 export { default as SidebarNavigationActions } from './SidebarNavigation/SidebarNavigationActions.svelte';
 
 /**

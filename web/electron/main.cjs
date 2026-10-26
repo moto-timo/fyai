@@ -14,7 +14,7 @@
 
 /* A CommonJS main process: Electron loads it before a module graph exists. */
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { app, BrowserWindow, dialog, Menu, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell } = require('electron');
 const { spawn, spawnSync } = require('node:child_process');
 const { randomBytes } = require('node:crypto');
 const { existsSync, mkdirSync } = require('node:fs');
@@ -381,6 +381,7 @@ async function openProject(dir) {
 		webPreferences: {
 			contextIsolation: true,
 			nodeIntegration: false,
+			preload: join(HERE, 'preload.cjs'),
 			sandbox: true
 		},
 		width: 1200
@@ -441,6 +442,29 @@ async function chooseProject() {
 	if (res.canceled || !res.filePaths.length) return;
 
 	await openProject(res.filePaths[0]);
+}
+
+/**
+ * The page asks for the project actions of the menu. A channel is trusted only
+ * from the window of a project: its frame is the page of that bridge.
+ */
+function registerIpc() {
+	const known = (event) =>
+		[...projects.values()].some((p) => p.window && p.window.webContents === event.sender);
+
+	ipcMain.handle('fyai:project-choose', async (event) => {
+		if (known(event)) await chooseProject();
+	});
+	ipcMain.handle('fyai:project-open', async (event, dir) => {
+		if (!known(event) || typeof dir !== 'string' || !isDirectory(dir)) return false;
+
+		await openProject(dir);
+
+		return true;
+	});
+	ipcMain.handle('fyai:project-recent', (event) =>
+		known(event) ? recentLoad(RECENT_FILE()).filter(isDirectory) : []
+	);
 }
 
 /** The menu: File opens projects; the rest keeps the editing, view and window roles. */
@@ -505,6 +529,7 @@ if (!app.requestSingleInstanceLock()) {
 	app
 		.whenReady()
 		.then(() => {
+			registerIpc();
 			buildMenu();
 
 			return openProject(startProject());

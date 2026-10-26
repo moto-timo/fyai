@@ -11,7 +11,8 @@
 		DialogSettingsChat,
 		Logo,
 		SidebarNavigationActions,
-		SidebarNavigationConversationList
+		SidebarNavigationConversationList,
+		SidebarNavigationProject
 	} from '$lib/components/app';
 	import { ROUTES } from '$lib/constants';
 	import { TooltipSide } from '$lib/enums';
@@ -397,6 +398,10 @@
 				? 'transition-[opacity,height] duration-200 ease-out'
 				: ''} {deviceStore.isMobile && !uiStore.isSidebarExpanded ? 'opacity-0 !h-0' : ''}"
 		>
+			{#if uiStore.isSidebarExpanded || isOnMobile}
+				<SidebarNavigationProject class="px-2 pb-1" />
+			{/if}
+
 			<SidebarNavigationActions
 				bind:isSearchModeActive
 				bind:searchQuery

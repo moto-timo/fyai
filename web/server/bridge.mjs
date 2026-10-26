@@ -46,11 +46,11 @@ import {
 	userContent
 } from './protocol.mjs';
 import { spawn } from 'node:child_process';
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
-import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -599,6 +599,23 @@ function runCapture(bin, args, timeoutMs = 10000, env = process.env, input = nul
 			resolvePromise({ code, err, out });
 		});
 	});
+}
+
+/** The project the bridge serves: its directory, its name and whether an arena exists for it. */
+function projectInfo() {
+	let arena = false;
+
+	for (let at = config.cwd; ; at = dirname(at)) {
+		if (existsSync(join(at, '.fyai', 'arena'))) {
+			arena = true;
+
+			break;
+		}
+
+		if (dirname(at) === at) break;
+	}
+
+	return { arena, dir: config.cwd, name: basename(config.cwd) || config.cwd };
 }
 
 /**
@@ -1439,6 +1456,7 @@ server = createServer(async (req, res) => {
 				model: config.model,
 				models,
 				permissionMode: config.permissionMode,
+				project: projectInfo(),
 				version: 1
 			});
 
