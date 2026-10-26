@@ -59,6 +59,25 @@ if (args.includes('claude-sdk')) {
 		);
 		process.exit(0);
 	});
+} else if (command === 'catalog' && rest[0] === 'providers') {
+	process.stdout.write(JSON.stringify([{ name: 'anthropic' }, { name: 'openai' }]));
+} else if (command === 'secret') {
+	/* The secrets are kept in the state: {secrets: {NAME: VALUE}}. */
+	const secrets = (state.secrets ??= {});
+
+	if (sub === 'set') {
+		const value = readFileSync(0, 'utf8');
+
+		if (!value) fail('secret: empty value');
+
+		secrets[rest[0]] = value;
+		save();
+	} else if (sub === 'delete') {
+		delete secrets[rest[0]];
+		save();
+	} else {
+		process.stdout.write(`secret ${rest[0]}: ${rest[0] in secrets ? 'present' : 'absent'}\n`);
+	}
 } else if (command === 'branch' && sub === 'new') {
 	const [name, source] = rest;
 
