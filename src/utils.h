@@ -118,6 +118,13 @@ struct shell_command_result {
 };
 
 #define FYAI_SHELL_EXIT_WORKDIR	125
+
+/*
+ * The text of a shell result for a command that exits with a status. The
+ * monitor reads the status back from it, so both use these.
+ */
+#define FYAI_SHELL_EXIT_PREFIX	"command exited with status "
+#define FYAI_SHELL_EXIT_FMT	FYAI_SHELL_EXIT_PREFIX "%d"
 #define FYAI_SHELL_EXIT_SANDBOX	126
 #define FYAI_SHELL_EXIT_EXEC	127
 

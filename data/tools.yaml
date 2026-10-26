@@ -213,12 +213,13 @@
         background:
           type: boolean
           description: |-
-            Start the command detached and return at once, for a server or any program that runs
-            on while you work. The command gets a session of its own, and /dev/null for standard
-            input, output and error: redirect its output to a file to read it later. It has no
-            time limit and no terminal, and it ends with the exchange, or earlier if it stops.
-            `name` labels it (letters, digits, '-' or '_'): `list` with kind `daemons` shows the
-            label, and `cancel` with that name stops it. `tty` and `timeout` do not apply to it.
+            Start the command in the background and return at once, for a build, a server or any
+            program that runs on while you work. It has no terminal and no time limit, and its
+            output is not kept: redirect it to a file to read it later. You are told when it ends,
+            as `[shell 'NAME' ended: status N]`. `name` names it (letters, digits, '-' or '_');
+            without one it is `bg-N`, and the result says which. `wait` with `for` holds your turn
+            until it ends, `list` with kind `monitors` shows it, and `cancel` with its name stops it.
+            `tty` and `timeout` do not apply to it.
         description:
           type: string
           description: >-
@@ -388,9 +389,8 @@
     name: cancel
     description: >-
       Stop something you started in the background, by its name: a named `wait`, a sub-agent (also
-      one started with `background`), a `monitor`, a question, an agent message receipt, an
-      open terminal session, or a daemon: a command that you started with `background` under a
-      `name` (all processes with that name), or any process that `list` shows under `daemons`, by
+      one started with `background`), a `monitor`, a shell started with `background`, a question, an agent message receipt, an
+      open terminal session, or a daemon: any process that `list` shows under `daemons`, by
       its pid. A daemon gets SIGTERM, and SIGKILL after the grace time if it stays. Cancelling a receipt stops waiting for its acknowledgement; the
       message may still be queued. Stopping a sub-agent
       also stops the processes it started, and you are told in a new turn that it ended. A terminal
@@ -727,7 +727,7 @@
       List what you can name in other calls. `agents`: the sub-agents you started, running or ended,
       with their state and whether they left a view for `project_view`. `views`: those views.
       `shells`: your open terminal sessions. `waits`: your pending named waits. `monitors`: your
-      running monitors. `daemons`: the programs that your calls left running after the call ended, which end with the
+      running monitors and the commands you started with `background`. `daemons`: the programs that your calls left running after the call ended, which end with the
       exchange. `questions`: the named questions awaiting a user or parent answer.
       `messages`: agent message receipts awaiting acknowledgement. Each name is
       the one you gave it. You only see your own: those of the user and of other agents are not

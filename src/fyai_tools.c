@@ -246,7 +246,7 @@ static bool fyai_shell_named_call(struct fyai_ctx *ctx, fy_generic tool_call)
 	args = fyai_tool_call_args(ctx, tool_call);
 	if (!fy_is_mapping(args))
 		return false;
-	/* The name of a command in the background labels its daemon. */
+	/* The name of a command in the background names a monitor, not a session. */
 	if (fy_get(args, "background", false))
 		return false;
 	name = fy_get(args, "name", "");
@@ -1427,43 +1427,10 @@ err:
 	return NULL;
 }
 
-/*
- * The command that starts @command detached, for a call with `background`. The
- * program gets a session of its own (setsid, where there is one) and /dev/null for
- * standard input, output and error. @label, which is valid and safe to put in a
- * shell word, is its FYAI_DAEMON: `list daemons` shows it, and a stop can name it. The shell that starts it waits until it has
- * the session and has closed the pipe of the call, so the group of the call, which
- * the call ends when it returns, no longer holds it. Returns an allocated string,
- * or NULL.
- */
-static char *fyai_shell_background_command(const char *shell, bool login,
-					   const char *command, const char *label)
+/* A command in the background is kept in the parent: it returns at once. */
+static bool fyai_shell_background_requested(fy_generic args)
 {
-	struct response_buffer cmd = { 0 };
-	int rc;
-
-	/* Use setsid where the host has it: the program leaves the group of the call. */
-	rc = response_buffer_append(&cmd,
-		"if command -v setsid >/dev/null 2>&1; then S=setsid; else S=; fi; ");
-	/*
-	 * The program starts in a subshell that this shell waits for: the subshell
-	 * prints "ok" once it has its session, and then closes the pipe of the call.
-	 */
-	rc = rc ?: response_buffer_append(&cmd, ": $( FYAI_DAEMON=");
-	rc = rc ?: response_buffer_append(&cmd, label);
-	rc = rc ?: response_buffer_append(&cmd, " $S /bin/sh -c '"
-		"echo ok; "				/* the waiting shell reads this */
-		"exec >/dev/null 2>&1 </dev/null; "	/* nothing is shared with the call */
-		"exec \"$0\" \"$1\" \"$2\"' ");	/* the shell, its flag, the command */
-	rc = rc ?: fyai_shell_quote(&cmd, shell);
-	rc = rc ?: response_buffer_append(&cmd, login ? " -lc " : " -c ");
-	rc = rc ?: fyai_shell_quote(&cmd, command);
-	rc = rc ?: response_buffer_append(&cmd, " & )");
-	if (rc) {
-		free(cmd.data);
-		return NULL;
-	}
-	return cmd.data;
+	return fy_get(args, "background", false);
 }
 
 static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
@@ -1477,9 +1444,6 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 	const struct fyai_sandbox_spec *sandbox;
 	fy_generic command, workdir;
 	size_t budget, out_bytes, err_bytes;
-	char *detached = NULL;
-	const char *label;
-	bool background;
 	char why_buf[FYAI_CHILD_START_TEXT_MAX];
 	const char *start_why;
 	const char *msg;
@@ -1490,6 +1454,9 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 	char *tty_text;
 
 	*okp = false;
+	/* The invocation keeps a command in the background; no child runs it. */
+	if (!ctx->cfg->tool_child && fy_get(args, "background", false))
+		return fyai_monitor_background(ctx, args, okp);
 	if (fyai_shell_sandbox_begin(ctx, &sb, &sandbox))
 		return NULL;
 
@@ -1499,23 +1466,7 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 	opts.timeout_ms = fyai_shell_timeout_ms(ctx, args, false);
 	opts.shell = fyai_shell_shell_requested(ctx, args);
 	opts.login = fyai_shell_login_requested(ctx, args);
-	/* A command in the background has no terminal and no limit of its own. */
-	background = fy_get(args, "background", false);
-	if (background) {
-		label = fy_get(args, "name", "");
-		if (!fy_str_empty(label) && !fyai_shell_session_name_valid(label)) {
-			ret = strdup("tool error: the name of a command in the background "
-				     "is letters, digits, '-' or '_'");
-			goto out;
-		}
-		detached = fyai_shell_background_command(opts.shell, opts.login,
-							 fy_castp(&command, ""),
-							 fy_str_empty(label) ? "''" : label);
-		fyai_error_check(ctx, detached, out,
-				 "shell: could not make the command for the background");
-		command = fy_value(ctx->transient_gb, detached);
-	}
-	if (!background && fyai_shell_tty_requested(ctx, args)) {
+	if (fyai_shell_tty_requested(ctx, args)) {
 		tty_text = fyai_shell_tty_run(ctx, args, fy_castp(&command, ""),
 					      opts.workdir, sandbox,
 					      opts.timeout_ms, &tty_result);
@@ -1560,7 +1511,7 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 				opts.workdir);
 		} else if (tty_result.exit_code) {
 			msg = fy_sprintfa(
-				"\ntool error: command exited with status %d\n",
+				"\ntool error: " FYAI_SHELL_EXIT_FMT "\n",
 				tty_result.exit_code);
 		} else {
 			msg = NULL;
@@ -1650,19 +1601,12 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 				opts.workdir);
 		else
 			msg = fy_sprintfa(
-				"\ntool error: command exited with status %d\n",
+				"\ntool error: " FYAI_SHELL_EXIT_FMT "\n",
 				result.exit_code);
 		if (response_buffer_append(&buf, msg))
 			goto out;
 	} else {
 		*okp = true;
-		if (background &&
-		    response_buffer_append(&buf, "The command runs in the background. Its standard "
-					   "input, output and error are /dev/null, so redirect "
-					   "its output to a file to read it. It ends with this "
-					   "exchange, or earlier if it stops; `list daemons` "
-					   "names it.\n"))
-			goto out;
 	}
 
 	ret = buf.data;
@@ -1670,7 +1614,6 @@ static char *fyai_run_shell_command(struct fyai_ctx *ctx, fy_generic args,
 out:
 	fyai_shell_live_close(ctx);
 	fyai_shell_sandbox_end(&sb);
-	free(detached);
 	free(buf.data);
 	fyai_terminal_result_cleanup(&tty_result);
 	shell_command_result_cleanup(&result);
@@ -2489,7 +2432,8 @@ const struct fyai_tool_def fyai_tools_defs[] = {
 	  .head = fyai_tool_head_apply_patch, .flags = FYAI_TOOL_MARKED,
 	  .effect = FYAI_TOOL_EFFECT_FILES },
 	{ .name = "shell", .run_text = fyai_run_shell_command,
-	  .head = fyai_tool_head_shell, .flags = FYAI_TOOL_MARKED,
+	  .head = fyai_tool_head_shell, .in_parent = fyai_shell_background_requested,
+	  .flags = FYAI_TOOL_MARKED | FYAI_TOOL_INSTANT,
 	  .effect = FYAI_TOOL_EFFECT_PROCESS },
 	{ .name = "shell_input", .run_text = fyai_shell_input_tool,
 	  .flags = FYAI_TOOL_PARENT | FYAI_TOOL_SILENT,

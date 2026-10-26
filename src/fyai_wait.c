@@ -446,8 +446,13 @@ static char *fyai_wait_for_check(struct fyai_ctx *ctx,
 		return fyai_event_peek_prefix(ctx,
 				fy_sprintfa("[wait '%s' fired", it->name));
 	case FYAI_WAIT_FOR_MONITOR:
-		return fyai_event_peek_prefix(ctx,
+		text = fyai_event_peek_prefix(ctx,
 				fy_sprintfa("[monitor '%s'", it->name));
+		if (text)
+			return text;
+		/* A command in the background reports its end as a shell. */
+		return fyai_event_peek_prefix(ctx,
+				fy_sprintfa("[shell '%s' ended", it->name));
 	case FYAI_WAIT_FOR_QUESTION:
 		return fyai_event_peek_prefix(ctx,
 				fy_sprintfa("[question '%s' ", it->name));
@@ -499,7 +504,9 @@ static enum fyai_wait_for_kind fyai_wait_for_resolve(struct fyai_ctx *ctx,
 	    fyai_event_pending_prefix(ctx, fy_sprintfa("[agent '%s' ", target)))
 		return FYAI_WAIT_FOR_AGENT;
 	if (fyai_monitor_running(ctx, target) ||
-	    fyai_event_pending_prefix(ctx, fy_sprintfa("[monitor '%s'", target)))
+	    fyai_event_pending_prefix(ctx, fy_sprintfa("[monitor '%s'", target)) ||
+	    fyai_event_pending_prefix(ctx, fy_sprintfa("[shell '%s' ended",
+						       target)))
 		return FYAI_WAIT_FOR_MONITOR;
 	free(fyai_shell_session_ended_text(ctx, target, &known));
 	if (known)

@@ -30,6 +30,8 @@
 #define FYAI_MONITOR_NAME_MAX	32
 #define FYAI_MONITOR_DEFAULT_MS	(5 * 60 * 1000LL)
 #define FYAI_MONITOR_MAX_MS	(30 * 60 * 1000LL)
+/* A command in the background has no limit of its own: a week is no limit. */
+#define FYAI_BACKGROUND_MS	(7 * 24 * 3600 * 1000LL)
 /* A monitor that sends more events than this is a firehose, and is stopped. */
 #define FYAI_MONITOR_MAX_EVENTS	200
 /* The longest line kept; a longer one is cut. */
@@ -46,6 +48,7 @@ struct fyai_monitor_run {
 	size_t partial_len;
 	unsigned int events;
 	bool stopped;		/* too many events: later output is dropped */
+	bool quiet;		/* a command in the background: only its end is reported */
 };
 
 static struct fyai_monitor_run *monitor_find(struct fyai_ctx *ctx,
@@ -107,7 +110,7 @@ void fyai_monitor_output(struct fyai_ctx *ctx, const char *name,
 	char *nl, *buf, *line;
 	size_t total;
 
-	if (!run || run->stopped || !len)
+	if (!run || run->stopped || run->quiet || !len)
 		return;
 	/* Join the kept part and the chunk, then cut at each line end. */
 	total = run->partial_len + len;
@@ -159,6 +162,24 @@ out:
 	return;
 }
 
+/*
+ * How a command in the background ended, from the text of its result: the
+ * status that the shell tool reports, else that it failed. The answer is in
+ * @buf of @size bytes.
+ */
+static const char *monitor_status(const char *text, bool failed, char *buf,
+				  size_t size)
+{
+	const char *p = strstr(text, FYAI_SHELL_EXIT_PREFIX);
+	int status;
+
+	if (p && sscanf(p, FYAI_SHELL_EXIT_FMT, &status) == 1) {
+		snprintf(buf, size, "status %d", status);
+		return buf;
+	}
+	return failed ? "failed" : "status 0";
+}
+
 /* The command ended: report how, after the last complete line. */
 static void monitor_finish(void *userdata)
 {
@@ -166,6 +187,7 @@ static void monitor_finish(void *userdata)
 	struct fyai_ctx *ctx = run->ctx;
 	fy_generic result = fy_invalid;
 	const char *text;
+	char status[32];
 	bool ok = false;
 	int rc;
 
@@ -178,6 +200,12 @@ static void monitor_finish(void *userdata)
 						      run->name, run->partial)));
 	if (run->stopped)
 		goto release;
+	if (run->quiet) {
+		monitor_event(run, strdup(fy_sprintfa("[shell '%s' ended: %s]",
+			run->name,
+			monitor_status(text, rc || !ok, status, sizeof(status)))));
+		goto release;
+	}
 	if (strstr(text, "timed out after"))
 		monitor_event(run, strdup(fy_sprintfa("[monitor '%s' ended: "
 			"its time limit of %lld seconds passed; start it again "
@@ -201,7 +229,28 @@ static void monitor_complete(struct fyai_tool_job_group *group, void *userdata)
 	(void)fyai_event_defer(fyai_ctx_loop(run->ctx), monitor_finish, run);
 }
 
-static fy_generic tool_monitor(struct fyai_ctx *ctx, fy_generic args, bool *okp)
+/*
+ * A name for a command in the background that the model did not name: the
+ * first "bg-N" that no monitor holds. The result of the call says the name.
+ * Return fy_invalid when every name is taken.
+ */
+static fy_generic monitor_auto_name(struct fyai_ctx *ctx,
+				    struct fy_generic_builder *gb)
+{
+	char name[32];
+	unsigned int n;
+
+	for (n = 1; n < 10000; n++) {
+		snprintf(name, sizeof(name), "bg-%u", n);
+		if (!monitor_find(ctx, name))
+			return fy_stringf(gb, "%s", name);
+	}
+	return fy_invalid;
+}
+
+/* Start @args as a monitor, or as a command in the background when @quiet. */
+static fy_generic monitor_start(struct fyai_ctx *ctx, fy_generic args,
+				bool quiet, bool *okp)
 {
 	struct fy_generic_builder *gb = ctx->transient_gb;
 	struct fyai_monitor_run *run = NULL;
@@ -214,6 +263,10 @@ static fy_generic tool_monitor(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	*okp = false;
 	gname = fy_get(args, "name", fy_invalid);
 	name = fy_is_string(gname) ? fy_castp(&gname, "") : "";
+	if (quiet && !*name) {
+		gname = monitor_auto_name(ctx, gb);
+		name = fy_castp(&gname, "");
+	}
 	if (!monitor_name_valid(name))
 		return fy_value(gb, "tool error: name the monitor with letters, "
 				"digits, '-' or '_'");
@@ -223,21 +276,32 @@ static fy_generic tool_monitor(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 				  "it", name);
 	if (!fy_is_string(fy_get(args, "command", fy_invalid)))
 		return fy_value(gb, "tool error: give the command to monitor");
-	ms = fy_get(args, "timeout", FYAI_MONITOR_DEFAULT_MS);
-	if (ms < 1000)
-		ms = 1000;
-	if (ms > FYAI_MONITOR_MAX_MS)
-		ms = FYAI_MONITOR_MAX_MS;
+	if (quiet) {
+		ms = FYAI_BACKGROUND_MS;
+	} else {
+		ms = fy_get(args, "timeout", FYAI_MONITOR_DEFAULT_MS);
+		if (ms < 1000)
+			ms = 1000;
+		if (ms > FYAI_MONITOR_MAX_MS)
+			ms = FYAI_MONITOR_MAX_MS;
+	}
 
 	shell_args = fy_mapping(gb,
 		"command", fy_get(args, "command"),
 		"timeout", ms,
-		"description", fy_get(args, "description", "monitor"),
+		"description", fy_get(args, "description",
+				      quiet ? "background" : "monitor"),
 		"_fyai_background", true,
 		"_fyai_monitor", gname);
 	if (fy_is_string(fy_get(args, "workdir", fy_invalid)))
 		shell_args = fy_assoc(gb, shell_args, "workdir",
 				      fy_get(args, "workdir"));
+	if (quiet && fy_is_valid(fy_get(args, "shell", fy_invalid)))
+		shell_args = fy_assoc(gb, shell_args, "shell",
+				      fy_get(args, "shell"));
+	if (quiet && fy_is_valid(fy_get(args, "login", fy_invalid)))
+		shell_args = fy_assoc(gb, shell_args, "login",
+				      fy_get(args, "login"));
 	json = emit_json_string(gb, shell_args);
 	fyai_error_check(ctx, json, err,
 			 "monitor: could not encode the command");
@@ -253,6 +317,7 @@ static fy_generic tool_monitor(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	fyai_error_check(ctx, run, err, "monitor: could not allocate the run");
 	run->ctx = ctx;
 	run->limit_ms = ms;
+	run->quiet = quiet;
 	run->name = strdup(name);
 	fyai_error_check(ctx, run->name, err,
 			 "monitor: could not keep the name");
@@ -284,6 +349,13 @@ static fy_generic tool_monitor(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 			fy_value(gb, "tool error: the monitor did not start");
 	}
 	*okp = true;
+	if (quiet)
+		return fy_stringf(gb, "[shell '%s' started in the background]\n"
+				  "It does not hold your turn. Its output is not kept: "
+				  "redirect it to a file to read it. You are told when "
+				  "it ends and with what status; `wait` with `for` "
+				  "holds your turn until then, and `cancel` stops it.",
+				  name);
 	return fy_stringf(gb, "[monitor '%s' started: %lld seconds]\n"
 			  "Each line the command prints reaches you as an "
 			  "event, and its end is the last one. It does not "
@@ -297,6 +369,19 @@ err:
 	if (run)
 		monitor_free(run);
 	return fy_value(gb, "tool error: the monitor could not start");
+}
+
+static fy_generic tool_monitor(struct fyai_ctx *ctx, fy_generic args, bool *okp)
+{
+	return monitor_start(ctx, args, false, okp);
+}
+
+char *fyai_monitor_background(struct fyai_ctx *ctx, fy_generic args, bool *okp)
+{
+	fy_generic result = monitor_start(ctx, args, true, okp);
+	const char *text = fy_is_string(result) ? fy_castp(&result, "") : "";
+
+	return strdup(text);
 }
 
 static void tool_head_monitor(struct fyai_ctx *ctx, FILE *mf,

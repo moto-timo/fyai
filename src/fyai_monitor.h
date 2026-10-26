@@ -17,6 +17,13 @@ struct fyai_ctx;
 void fyai_monitor_output(struct fyai_ctx *ctx, const char *name,
 			 const char *data, size_t len);
 
+/*
+ * Run the command of a shell call with `background` as a quiet monitor: its
+ * output is dropped and its end reaches the model as an event, `[shell 'NAME'
+ * ended: status N]`. Returns the result text, which the caller frees.
+ */
+char *fyai_monitor_background(struct fyai_ctx *ctx, fy_generic args, bool *okp);
+
 /* Whether the monitor @name has not ended. */
 bool fyai_monitor_running(struct fyai_ctx *ctx, const char *name);
 
