@@ -64,6 +64,12 @@ project(fyai
     VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 set(PROJECT_VERSION "${FYAI_VERSION_FULL}")
 
+# A build with no type has no optimisation, and the compiler then skips the
+# analyses that CI runs. Build as CI does unless the user names a type.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 # Export compile commands by default for clangd LSP support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
