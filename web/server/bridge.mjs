@@ -575,7 +575,7 @@ async function runSlashCommand(branch, command, model, env = process.env) {
 	return { ok: false, text: text || `/${command.name} failed with status ${res.code}` };
 }
 
-function runCapture(bin, args, timeoutMs = 10000, env = process.env) {
+function runCapture(bin, args, timeoutMs = 10000, env = process.env, input = null) {
 	return new Promise((resolvePromise) => {
 		const child = trackChild(spawn(bin, args, { cwd: config.cwd, env }));
 
@@ -586,6 +586,8 @@ function runCapture(bin, args, timeoutMs = 10000, env = process.env) {
 
 		child.stdout.setEncoding('utf8');
 		child.stderr.setEncoding('utf8');
+		child.stdin.on('error', () => {});
+		child.stdin.end(input ?? '');
 		child.stdout.on('data', (chunk) => (out += chunk));
 		child.stderr.on('data', (chunk) => (err += chunk));
 		child.on('error', () => {
@@ -939,6 +941,91 @@ async function handleSettings(req, res) {
 	} catch (error) {
 		return sendError(res, 500, `cannot write the settings: ${error.message}`);
 	}
+
+	return sendJson(res, 200, { ok: true });
+}
+
+/** The route of the key of one provider: `/api/fyai/keys/PROVIDER`. */
+const KEY_ROUTE = /^\/api\/fyai\/keys(?:\/([^/]+))?$/;
+
+/**
+ * Store, replace and remove the provider keys in the secret store of fyai.
+ * A value goes to `fyai secret set` on its standard input: it is in no
+ * argument, no file and no log, and no answer carries one back.
+ */
+async function handleKeys(req, res, match) {
+	const listed = await runCapture(config.bin, ['catalog', 'list', 'providers', '--output', 'json']);
+
+	let providers = [];
+
+	try {
+		providers = JSON.parse(listed.out).map((p) => p.name);
+	} catch {
+		return sendError(res, 502, 'cannot read the providers of the catalogue');
+	}
+
+	if (!match[1]) {
+		if (req.method !== 'GET') return sendError(res, 405, 'method not allowed');
+
+		const keys = await Promise.all(
+			providers.map(async (name) => {
+				const status = await runCapture(config.bin, ['secret', 'status', `api-key/${name}`]);
+
+				return {
+					env: Boolean(process.env[`${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY`]),
+					provider: name,
+					stored: /: present\b|: set\b/.test(status.out)
+				};
+			})
+		);
+
+		return sendJson(res, 200, { keys });
+	}
+
+	let provider;
+
+	try {
+		provider = decodeURIComponent(match[1]);
+	} catch {
+		return sendError(res, 400, 'bad provider name');
+	}
+
+	if (!providers.includes(provider)) return sendError(res, 404, 'unknown provider');
+
+	const name = `api-key/${provider}`;
+
+	if (req.method === 'DELETE') {
+		const out = await runCapture(config.bin, ['secret', 'delete', name]);
+
+		if (out.code !== 0) return sendError(res, 500, out.err.trim() || 'cannot remove the key');
+	} else if (req.method === 'PUT') {
+		let value;
+
+		try {
+			value = JSON.parse(await readBody(req, 64 * 1024)).key;
+		} catch (error) {
+			return sendError(res, 400, `cannot read the request: ${error.message}`);
+		}
+
+		if (typeof value !== 'string' || !value.trim() || /[\r\n]/.test(value)) {
+			return sendError(res, 400, 'key is required');
+		}
+
+		const out = await runCapture(
+			config.bin,
+			['secret', 'set', name, '--stdin'],
+			10000,
+			process.env,
+			value.trim()
+		);
+
+		if (out.code !== 0) return sendError(res, 500, out.err.trim() || 'cannot store the key');
+	} else {
+		return sendError(res, 405, 'method not allowed');
+	}
+
+	/* The models offered depend on the providers that have a key. */
+	catalogue.at = 0;
 
 	return sendJson(res, 200, { ok: true });
 }
@@ -1366,6 +1453,14 @@ server = createServer(async (req, res) => {
 
 		if (pathname === '/api/fyai/settings') {
 			await handleSettings(req, res);
+
+			return;
+		}
+
+		const keyRoute = KEY_ROUTE.exec(pathname);
+
+		if (keyRoute) {
+			await handleKeys(req, res, keyRoute);
 
 			return;
 		}

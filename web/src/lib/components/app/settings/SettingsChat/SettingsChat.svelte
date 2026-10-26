@@ -6,7 +6,8 @@
 		SettingsChatImportExportTab,
 		SettingsChatMobileHeader,
 		SettingsChatToolsTab,
-		SettingsFooter
+		SettingsFooter,
+		SettingsProviderKeys
 	} from '$lib/components/app/settings';
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -169,6 +170,10 @@
 								onConfigChange={handleConfigChange}
 								onThemeChange={handleThemeChange}
 							/>
+
+							{#if currentSection.slug === SETTINGS_SECTION_SLUGS.GENERAL && backendStore.active.capabilities.serverConversations}
+								<SettingsProviderKeys />
+							{/if}
 
 							{#if currentSection.slug === SETTINGS_SECTION_SLUGS.GENERAL}
 								<div class="flex justify-end">

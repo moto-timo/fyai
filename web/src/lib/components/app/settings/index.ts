@@ -74,3 +74,9 @@ export { default as SettingsChatFields } from './SettingsChat/SettingsChatFields
  * server favicons and permission management controls.
  */
 export { default as SettingsChatToolsTab } from './SettingsChat/SettingsChatToolsTab.svelte';
+
+/**
+ * **SettingsProviderKeys** - Stores the provider keys in the secret store of
+ * fyai, for a backend that keeps conversations on the server
+ */
+export { default as SettingsProviderKeys } from './SettingsProviderKeys.svelte';
