@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.4.2 - 2026-10-26
+
+### Added
+
+- **A web page for fyai.** `web/` is a fork of the llama.cpp web UI. A small
+  bridge (`web/server/bridge.mjs`) runs `fyai claude-sdk` for each turn and
+  streams the frames to the page. The page installs as a PWA, and the Electron
+  app opens it in a window. See `doc/fyai-web.md`.
+  - A conversation is a branch of the project, named as the CLI names it, so a
+    session of the CLI is a conversation of the page. An edit or a regenerate cuts
+    the branch back before the new turn.
+  - The picker lists the models of the catalogue that have a key, with the input
+    types and abilities of each. Images go to fyai as attachments, and stored images
+    come back with the conversation.
+  - The page shows the tools, thinking, usage and task lists of a turn, and
+    renders the output of a slash command as Markdown.
+  - The bridge requires a token and a known origin. The page settings live in the
+    bridge, and a provider key goes to the secret store of fyai, never to the page.
+  - Each window of the desktop app is one project, on a fixed port. The sidebar
+    names the project, and the app opens another one or a recent one from it.
+    `/api/fyai/info` reports the project.
+- **`claude-sdk` serves the branch that `-b` names**, and attaches the image blocks
+  of a user message.
+- **A command in the background ends as a monitor.** The end of the command is
+  reported to the model. See `doc/events.md`.
+
+### Changed
+
+- **The default build is Release.**
+- **A table is written as Markdown source when `display/markdown` is off.**
+- **A plain wait ends on an interrupt or an event**, and the nested loops of a call
+  stop on an interrupt. The synchronous MCP call wrappers are gone.
+- **The SIGUSR2 dump goes to `~/.fyai/dump.log`.**
+
 ## 0.4.1 - 2026-10-24
 
 ### Added
