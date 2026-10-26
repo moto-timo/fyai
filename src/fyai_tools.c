@@ -4468,7 +4468,8 @@ static void fyai_shell_session_idle_gate(struct fyai_shell_session *sess,
 		owed = deadline - now;
 		if (owed > FYAI_SHELL_FIRST_DRAW_POLL_MS)
 			owed = FYAI_SHELL_FIRST_DRAW_POLL_MS;
-		(void)fyai_event_sleep(el, owed);
+		if (!fyai_wait_sleep(sess->ctx, owed))
+			break;
 		now = fyai_event_now_ms();
 	}
 	for (;;) {
@@ -4483,7 +4484,8 @@ static void fyai_shell_session_idle_gate(struct fyai_shell_session *sess,
 		owed = idle_ms - quiet;
 		if (owed > deadline - now)
 			owed = deadline - now;
-		(void)fyai_event_sleep(el, owed);
+		if (!fyai_wait_sleep(sess->ctx, owed))
+			break;
 		now = fyai_event_now_ms();
 	}
 	sess->feeding = false;
@@ -4559,7 +4561,6 @@ static char *fyai_shell_input_tool(struct fyai_ctx *ctx, fy_generic args,
 	struct fyai_terminal_region region = {};
 	struct fyai_shell_session *sess;
 	struct fy_generic_builder *gb;
-	struct fyai_event_loop *el;
 	struct response_buffer in = {};
 	fy_generic input;
 	const char *text;
@@ -4616,10 +4617,8 @@ static char *fyai_shell_input_tool(struct fyai_ctx *ctx, fy_generic args,
 		wait = 0;
 	if (wait > FYAI_SHELL_INPUT_WAIT_MAX_MS)
 		wait = FYAI_SHELL_INPUT_WAIT_MAX_MS;
-	el = fyai_ctx_loop(ctx);
-	assert(el);
 	if (wait)
-		(void)fyai_event_sleep(el, wait);
+		(void)fyai_wait_sleep(ctx, wait);
 
 	fyai_shell_session_idle_arm(sess);
 	*okp = true;

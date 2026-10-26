@@ -411,6 +411,7 @@ struct fyai_waiter {
 	bool all;
 	bool poll;		/* report what has ended and return at once */
 	bool sleep;		/* no target: ends at the deadline or earlier */
+	bool on_event;		/* a sleep also ends when an event is queued */
 	bool done;
 	double seconds;
 	fyai_event_ms_t deadline;
@@ -574,7 +575,7 @@ static void fyai_waiter_poll_sleep(struct fyai_waiter *w)
 		text = fy_sprintfa("[wait interrupted after less than %.3g "
 				   "seconds]", w->seconds);
 		w->ok = false;
-	} else if (fyai_event_pending_prefix(ctx, "[")) {
+	} else if (w->on_event && fyai_event_pending_prefix(ctx, "[")) {
 		text = "[wait ended early: an event arrived]";
 	} else if (fyai_event_now_ms() >= w->deadline) {
 		text = fy_sprintfa("[waited %.3g seconds]", w->seconds);
@@ -916,7 +917,7 @@ err:
 
 /* Start a plain wait of @seconds on the loop. Return NULL with *errp set. */
 static struct fyai_waiter *fyai_waiter_start_sleep(struct fyai_ctx *ctx,
-						   double seconds,
+						   double seconds, bool on_event,
 						   void (*complete)(void *),
 						   void *userdata, char **errp)
 {
@@ -932,6 +933,7 @@ static struct fyai_waiter *fyai_waiter_start_sleep(struct fyai_ctx *ctx,
 	w->complete = complete;
 	w->userdata = userdata;
 	w->sleep = true;
+	w->on_event = on_event;
 	w->seconds = seconds;
 	w->deadline = fyai_event_now_ms() + (fyai_event_ms_t)(seconds * 1000.0);
 	w->next = ctx->waiters;
@@ -994,6 +996,34 @@ static char *fyai_wait_for_sync(struct fyai_ctx *ctx, fy_generic args,
 	return result ? result : strdup("tool error: out of memory");
 }
 
+bool fyai_wait_sleep(struct fyai_ctx *ctx, long long ms)
+{
+	struct fyai_event_loop *el = fyai_ctx_loop(ctx);
+	volatile bool finished = false;
+	struct fyai_waiter *w;
+	char *err, *result;
+	bool ok;
+
+	if (ms <= 0)
+		return !fyai_interrupt_pending(ctx);
+	if (!el)
+		return false;
+	w = fyai_waiter_start_sleep(ctx, ms / 1000.0, false,
+				    fyai_wait_for_sync_done,
+				    (void *)&finished, &err);
+	if (!w) {
+		free(err);
+		return false;
+	}
+	if (!fyai_waiter_done(w))
+		(void)fyai_event_loop_run_until(el, &finished, -1);
+	fyai_waiter_cancel(w);
+	result = fyai_waiter_result(w, &ok);
+	free(result);
+	fyai_waiter_destroy(w);
+	return ok;
+}
+
 char *fyai_wait_tool(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 {
 	struct fyai_event_loop *el;
@@ -1035,7 +1065,8 @@ char *fyai_wait_tool(struct fyai_ctx *ctx, fy_generic args, bool *okp)
 	el = fyai_ctx_loop(ctx);
 	if (!el)
 		return strdup("tool error: no event loop for a wait");
-	w = fyai_waiter_start_sleep(ctx, seconds, fyai_wait_for_sync_done,
+	w = fyai_waiter_start_sleep(ctx, seconds, true,
+				    fyai_wait_for_sync_done,
 				    (void *)&finished, &why);
 	if (!w)
 		return why;

@@ -51,6 +51,12 @@ void fyai_waiter_destroy(struct fyai_waiter *w);
  * pass of the loop. An event that is queued does this itself.
  */
 void fyai_waiters_kick(struct fyai_ctx *ctx);
+/*
+ * Sleep @ms on the loop of the invocation. Return false when an interrupt
+ * ended the sleep early: a nested loop must stop and let the owner of the
+ * interrupt act on it.
+ */
+bool fyai_wait_sleep(struct fyai_ctx *ctx, long long ms);
 /* Drop every waiter at the end of the invocation. */
 void fyai_waiters_release(struct fyai_ctx *ctx);
 /* Drop the waiters of the parent in a forked child, without ending them. */

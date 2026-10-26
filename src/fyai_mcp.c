@@ -2556,7 +2556,8 @@ int fyai_mcp_refresh(struct fyai_ctx *ctx)
 		return -1;
 	el = fyai_ctx_loop(ctx);
 	while (el && !fyai_mcp_settled(ctx)) {
-		if (fyai_event_loop_step(el, -1) < 0)
+		if (fyai_interrupt_pending(ctx) ||
+		    fyai_event_loop_step(el, -1) < 0)
 			break;
 	}
 	fyai_mcp_publish_tools(ctx);
@@ -3049,7 +3050,9 @@ fy_generic fyai_mcp_call(struct fyai_ctx *ctx, const char *name,
 		return fy_value(ctx->transient_gb, "tool error: MCP call failed");
 	el = fyai_ctx_loop(ctx);
 	while (el && !done) {
-		rc = fyai_event_loop_step(el, -1);
+		/* The owner of the interrupt acts on it once this call returns. */
+		rc = fyai_interrupt_pending(ctx) ? -1 :
+		     fyai_event_loop_step(el, -1);
 		if (rc < 0) {
 			fyai_mcp_call_cancel(request);
 			break;
@@ -3133,7 +3136,9 @@ static fy_generic mcp_resource_tool(struct fyai_ctx *ctx, fy_generic args,
 			"tool error: MCP resource request failed");
 	el = fyai_ctx_loop(ctx);
 	while (el && !done) {
-		rc = fyai_event_loop_step(el, -1);
+		/* The owner of the interrupt acts on it once this call returns. */
+		rc = fyai_interrupt_pending(ctx) ? -1 :
+		     fyai_event_loop_step(el, -1);
 		if (rc < 0) {
 			fyai_mcp_call_cancel(request);
 			break;
