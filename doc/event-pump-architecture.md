@@ -77,8 +77,10 @@ can then stop the process.
 No subsystem can register a SIGINT `signalfd` source. SIGALRM belongs to the
 watchdog. Curl handles must use `CURLOPT_NOSIGNAL`.
 
-SIGUSR2 writes event-loop state to the original standard error descriptor. The
-handler uses async-signal-safe operations only.
+SIGUSR2 appends event-loop state to `~/.fyai/dump.log`, because a full-screen
+terminal garbles text that is written to it. If the file cannot be opened, the
+dump goes to the original standard error descriptor. The handler uses
+async-signal-safe operations only.
 
 ## Child processes
 
