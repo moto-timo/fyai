@@ -3025,47 +3025,6 @@ void fyai_mcp_call_destroy(struct fyai_mcp_call_request *request)
 	free(request);
 }
 
-static void fyai_mcp_call_sync_done(struct fyai_mcp_call_request *request,
-				    void *userdata)
-{
-	(void)request;
-	*(volatile bool *)userdata = true;
-}
-
-/* Synchronous compatibility wrapper over the asynchronous call operation:
- * submit, pump the shared loop until it completes, collect. */
-fy_generic fyai_mcp_call(struct fyai_ctx *ctx, const char *name,
-			 fy_generic args)
-{
-	struct fyai_mcp_call_request *request;
-	struct fyai_event_loop *el;
-	volatile bool done = false;
-	fy_generic result = fy_invalid;
-	bool ok = false;
-	int rc;
-
-	request = fyai_mcp_call_submit(ctx, name, args,
-				       fyai_mcp_call_sync_done, (void *)&done);
-	if (!request)
-		return fy_value(ctx->transient_gb, "tool error: MCP call failed");
-	el = fyai_ctx_loop(ctx);
-	while (el && !done) {
-		/* The owner of the interrupt acts on it once this call returns. */
-		rc = fyai_interrupt_pending(ctx) ? -1 :
-		     fyai_event_loop_step(el, -1);
-		if (rc < 0) {
-			fyai_mcp_call_cancel(request);
-			break;
-		}
-	}
-	if (fyai_mcp_call_done(request))
-		result = fyai_mcp_call_collect(request, &ok);
-	fyai_mcp_call_destroy(request);
-	if (fy_is_invalid(result))
-		return fy_value(ctx->transient_gb, "tool error: MCP call failed");
-	return result;
-}
-
 struct fyai_mcp_call_request *
 fyai_mcp_resource_submit(struct fyai_ctx *ctx, fy_generic args,
 			 fyai_mcp_call_complete_fn complete, void *userdata)
@@ -3118,38 +3077,17 @@ err_out:
 	return NULL;
 }
 
-/* Direct callers use a synchronous wrapper; model tool groups submit above. */
+/*
+ * A resource request is submitted by the tool group, which runs it beside the
+ * other calls. The registry entry only names the tool.
+ */
 static fy_generic mcp_resource_tool(struct fyai_ctx *ctx, fy_generic args,
 				    bool *okp)
 {
-	struct fyai_mcp_call_request *request;
-	struct fyai_event_loop *el;
-	fy_generic result = fy_invalid;
-	volatile bool done = false;
-	int rc;
-
+	(void)args;
 	*okp = false;
-	request = fyai_mcp_resource_submit(ctx, args,
-			fyai_mcp_call_sync_done, (void *)&done);
-	if (!request)
-		return fy_value(ctx->transient_gb,
-			"tool error: MCP resource request failed");
-	el = fyai_ctx_loop(ctx);
-	while (el && !done) {
-		/* The owner of the interrupt acts on it once this call returns. */
-		rc = fyai_interrupt_pending(ctx) ? -1 :
-		     fyai_event_loop_step(el, -1);
-		if (rc < 0) {
-			fyai_mcp_call_cancel(request);
-			break;
-		}
-	}
-	if (fyai_mcp_call_done(request))
-		result = fyai_mcp_call_collect(request, okp);
-	fyai_mcp_call_destroy(request);
-	return fy_is_valid(result) ? result :
-		fy_value(ctx->transient_gb,
-			"tool error: MCP resource request failed");
+	return fy_value(ctx->transient_gb,
+			"tool error: mcp_resource runs in a tool group");
 }
 
 static void mcp_delete_complete(struct fyai_curl_transfer *xfer, void *userdata)

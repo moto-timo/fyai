@@ -280,8 +280,6 @@ fy_generic fyai_mcp_tools(struct fyai_ctx *ctx);
 bool fyai_mcp_deferred(struct fyai_ctx *ctx);
 bool fyai_mcp_tool_active(struct fyai_ctx *ctx, const char *name);
 bool fyai_mcp_tool_name(const char *name);
-fy_generic fyai_mcp_call(struct fyai_ctx *ctx, const char *name,
-			 fy_generic args);
 struct fyai_mcp_call_request *
 fyai_mcp_call_submit(struct fyai_ctx *ctx, const char *name,
 		     fy_generic args, fyai_mcp_call_complete_fn complete,

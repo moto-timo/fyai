@@ -2124,10 +2124,10 @@ fy_generic fyai_execute_tool_call(struct fyai_ctx *ctx,
 		return fy_value(ctx->transient_gb,
 				fy_sprintfa("tool error: %s is not one of the "
 					    "tools of this skill", name));
-	if (fyai_mcp_tool_name(name)) {
-		result_generic = fyai_mcp_call(ctx, name, args);
-		goto out;
-	}
+	/* A tool group submits an MCP call; no call runs one here. */
+	if (fyai_mcp_tool_name(name))
+		return fy_value(ctx->transient_gb,
+				"tool error: MCP calls run in a tool group");
 
 	result_generic = fyai_tool_run_one(ctx, name, args, okp);
 	/* Retain the resolved patch for display. */
