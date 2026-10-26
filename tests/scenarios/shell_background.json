@@ -1,78 +1,134 @@
 {
-  "steps": [
-    {
-      "response": {
-        "id": "c1",
-        "object": "chat.completion",
-        "created": 1735689600,
-        "model": "mock-model",
-        "choices": [
-          {
-            "index": 0,
-            "message": {
-              "role": "assistant",
-              "content": null,
-              "tool_calls": [
-                {
-                  "id": "t1",
-                  "type": "function",
-                  "function": {
-                    "name": "shell",
-                    "arguments": "{\"command\": \"exec 3>work/bg.lock; flock 3; readlink /proc/$$/fd/0 > work/bg.fd0; readlink /proc/$$/fd/2 > work/bg.fd2; ps -o sid= -p $$ | tr -d ' ' > work/bg.sid; echo $$ > work/bg.pid; exec sleep 600\", \"background\": true}"
-                  }
-                }
-              ]
-            },
-            "finish_reason": "tool_calls"
-          }
-        ]
-      }
-    },
-    {
-      "response": {
-        "id": "c2",
-        "object": "chat.completion",
-        "created": 1735689600,
-        "model": "mock-model",
-        "choices": [
-          {
-            "index": 0,
-            "message": {
-              "role": "assistant",
-              "content": null,
-              "tool_calls": [
-                {
-                  "id": "t2",
-                  "type": "function",
-                  "function": {
-                    "name": "shell",
-                    "arguments": "{\"command\": \"while [ ! -s work/bg.pid ]; do :; done; echo fd0=$(cat work/bg.fd0) fd2=$(cat work/bg.fd2); [ \\\"$(cat work/bg.sid)\\\" = \\\"$(cat work/bg.pid)\\\" ] && echo OWN-SESSION; flock -n work/bg.lock true && echo LOCK-FREE || echo LOCK-HELD\"}"
-                  }
-                }
-              ]
-            },
-            "finish_reason": "tool_calls"
-          }
-        ]
-      }
-    },
-    {
-      "response": {
-        "id": "f3",
-        "object": "chat.completion",
-        "created": 1735689600,
-        "model": "mock-model",
-        "choices": [
-          {
-            "index": 0,
-            "message": {
-              "role": "assistant",
-              "content": "finished."
-            },
-            "finish_reason": "stop"
-          }
-        ]
-      }
-    }
-  ]
+ "steps": [
+  {
+   "response": {
+    "id": "c1",
+    "object": "chat.completion",
+    "created": 1735689600,
+    "model": "mock-model",
+    "choices": [
+     {
+      "index": 0,
+      "message": {
+       "role": "assistant",
+       "content": null,
+       "tool_calls": [
+        {
+         "id": "c1",
+         "type": "function",
+         "function": {
+          "name": "shell",
+          "arguments": "{\"command\":\"echo ran > work/bg.out; exit 3\",\"background\":true,\"name\":\"job\"}"
+         }
+        }
+       ]
+      },
+      "finish_reason": "tool_calls"
+     }
+    ]
+   }
+  },
+  {
+   "response": {
+    "id": "c2",
+    "object": "chat.completion",
+    "created": 1735689600,
+    "model": "mock-model",
+    "choices": [
+     {
+      "index": 0,
+      "message": {
+       "role": "assistant",
+       "content": null,
+       "tool_calls": [
+        {
+         "id": "c2",
+         "type": "function",
+         "function": {
+          "name": "wait",
+          "arguments": "{\"for\":\"job\"}"
+         }
+        }
+       ]
+      },
+      "finish_reason": "tool_calls"
+     }
+    ]
+   }
+  },
+  {
+   "response": {
+    "id": "c3",
+    "object": "chat.completion",
+    "created": 1735689600,
+    "model": "mock-model",
+    "choices": [
+     {
+      "index": 0,
+      "message": {
+       "role": "assistant",
+       "content": null,
+       "tool_calls": [
+        {
+         "id": "c3",
+         "type": "function",
+         "function": {
+          "name": "shell",
+          "arguments": "{\"command\":\"exit 0\",\"background\":true}"
+         }
+        }
+       ]
+      },
+      "finish_reason": "tool_calls"
+     }
+    ]
+   }
+  },
+  {
+   "response": {
+    "id": "c4",
+    "object": "chat.completion",
+    "created": 1735689600,
+    "model": "mock-model",
+    "choices": [
+     {
+      "index": 0,
+      "message": {
+       "role": "assistant",
+       "content": null,
+       "tool_calls": [
+        {
+         "id": "c4",
+         "type": "function",
+         "function": {
+          "name": "wait",
+          "arguments": "{\"for\":\"bg-1\"}"
+         }
+        }
+       ]
+      },
+      "finish_reason": "tool_calls"
+     }
+    ]
+   }
+  },
+  {
+   "response": {
+    "id": "z",
+    "object": "chat.completion",
+    "created": 1735689600,
+    "model": "mock-model",
+    "choices": [
+     {
+      "index": 0,
+      "message": {
+       "role": "assistant",
+       "content": "finished."
+      },
+      "finish_reason": "stop"
+     }
+    ]
+   }
+  }
+ ]
 }

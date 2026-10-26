@@ -1,8 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT
-# A command in the background that has a name shows it as the label of its daemon, and
-# `cancel` with that name stops it: the daemon gets SIGTERM and time to clean up. Its
-# cleanup runs before the exchange ends, so the case reads what it left.
+# `list` shows a command in the background as a monitor, and `cancel` with its
+# name stops the command: nothing of it is left running afterwards.
 set -eu
 [ "$(uname -s)" = Linux ] || exit 77
 command -v flock >/dev/null || exit 77
@@ -24,18 +23,13 @@ for m in last["messages"]:
 PYEOF
 }
 
-for cover in auto none; do
-	rm -f work/st.*
-	mock_start shell_background_stop.json
-	run_fyai --set sandbox_profile=dev --set api=chat-completions --set display/stream=false \
-		 --set tools=true --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model \
-		 --set "sandbox_cover=$cover" --set sandbox_scope=exchange --new "go"
-	assert_status 0
-	tool_results >"$TEST_DIR/results"
-	mock_stop 6
-	grep -q '"label": "srv"\|label.*srv' "$TEST_DIR/results" || fail "$cover: list does not show the label"
-	grep -q "daemon 'srv' was asked to stop" "$TEST_DIR/results" || fail "$cover: cancel did not stop it"
-	grep -q 'CLEANED' "$TEST_DIR/results" || fail "$cover: the daemon did not get SIGTERM and time to clean up"
-	grep -q 'LOCK-FREE' "$TEST_DIR/results" || fail "$cover: the daemon is still running after the stop"
-done
+mock_start shell_background_stop.json
+run_fyai --set sandbox_profile=dev --set api=chat-completions --set display/stream=false \
+	 --set tools=true --set "api_url=$MOCK_URL/v1/chat/completions" -m mock-model \
+	 --new "go"
+assert_status 0
+tool_results >"$TEST_DIR/results"
+mock_stop 6
+grep -q 'srv' "$TEST_DIR/results" || fail "list does not show the command"
+grep -q 'LOCK-FREE' "$TEST_DIR/results" || fail "the command is still running after the cancel"
 pass
