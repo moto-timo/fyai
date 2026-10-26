@@ -305,6 +305,11 @@ store. Start the bridge with the variable set:
 ANTHROPIC_API_KEY=sk-ant-... npm run bridge
 ```
 
+You can also enter a key in Settings, General, Provider keys. The bridge gives
+it to `fyai secret set` and keeps nothing. The macOS Keychain keeps it; on
+Linux the kernel keyring keeps it until the machine restarts, and a key in the
+environment is used before it.
+
 The bridge puts no key in a file, and it takes its own token out of the
 environment of the processes it starts. A conversation keeps working when you
 switch the model to another provider whose key fyai can find. A remote server

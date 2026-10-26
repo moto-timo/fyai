@@ -38,7 +38,7 @@ New files, none of which exists upstream:
 - `src/lib/services/backend/` (the backend seam and the llama-server
   backend), `src/lib/stores/backend.svelte.ts`,
   `src/lib/stores/fyai-backend.svelte.ts`, `src/lib/services/fyai.service.ts`,
-  `src/lib/services/fyai.turn.ts`, `src/lib/services/fyai.tools.ts`, `src/lib/services/fyai.conversations.ts`, `src/lib/services/backend/forced.ts`, `ChatMessageToolCallBlockTodo.svelte`, `src/lib/utils/backend-settings.ts` and
+  `src/lib/services/fyai.turn.ts`, `src/lib/services/fyai.tools.ts`, `src/lib/services/fyai.conversations.ts`, `src/lib/services/fyai.keys.ts`, `SettingsProviderKeys.svelte`, `src/lib/services/backend/forced.ts`, `ChatMessageToolCallBlockTodo.svelte`, `src/lib/utils/backend-settings.ts` and
   `src/lib/constants/backend-capabilities.constants.ts`.
 - `README.fyai.md`, the manual of the fyai build. `README.md` is upstream's.
 
@@ -62,7 +62,7 @@ calls into a new file; merge them first when upstream moves:
 | `src/lib/components/app/chat/ChatForm/ChatForm.svelte` | `selectModel` for `/model NAME` |
 | `src/lib/components/app/chat/ChatForm/ChatFormActions/ChatFormActionAdd/ChatFormActionAddDropdown.svelte` | Tools submenu needs `browserTools` |
 | `src/lib/components/app/navigation/SidebarNavigation/SidebarNavigationActions.svelte`, `src/lib/components/app/models/ModelsSelector/ModelsSelectorDropdown.svelte` | the entries of the models manager and the MCP client need `modelManager` and `browserMcp` |
-| `src/lib/components/app/settings/SettingsChat/SettingsChat.svelte` | sections come from `visibleSettingsSections` |
+| `src/lib/components/app/settings/SettingsChat/SettingsChat.svelte` | sections come from `visibleSettingsSections`; the provider keys panel with `serverConversations` |
 | `src/lib/hooks/use-chat-form-pickers.svelte.ts` | commands of the backend in the `/` picker |
 | `src/lib/utils/chat-commands.ts`, `src/lib/types/chat.d.ts`, `src/lib/enums/chat.enums.ts`, `src/lib/constants/icons.constants.ts` | the `backend` command action |
 | `src/lib/constants/settings.constants.ts`, `settings-keys.constants.ts`, `src/lib/types/settings.d.ts` | the API Key field is for llama-server only (`backends`) property of a field |

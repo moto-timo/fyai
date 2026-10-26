@@ -90,6 +90,7 @@ Every API request needs the token of the bridge (W1). The routes:
 | `GET /api/fyai/info`           | the server                  | `{backend, protocol, authenticated}`; with the token also the binary, directory, model and models |
 | `POST /api/fyai/chat`          | `handleChat`                | SSE of SDK frames between `bridge/start` and `bridge/done`       |
 | `GET /api/fyai/commands`       | `listCommands`              | the commands of `fyai schema commands`, cached for 60 s          |
+| `GET\|PUT\|DELETE /api/fyai/keys[/PROVIDER]` | `handleKeys` | the provider keys in the secret store of fyai; an answer says only whether a key is set |
 | `GET\|PUT /api/fyai/settings`  | `handleSettings`            | the settings of the page, without any key, in a file of the user |
 | `GET /api/fyai/conversations`, `GET\|PATCH\|DELETE .../ID`, `GET .../ID/messages` | `handleConversations` | the branches of the sessions, their messages, the title, the delete (W4) |
 | `GET /v1/models`               | `modelsPayload`             | the catalogue in the shape of a llama.cpp router, with the input types and abilities of each model |
@@ -108,8 +109,14 @@ The page holds no key and sends none. fyai reads the key of a provider from its
 own configuration (`api_key: {type: env, ...}`), from `<PROVIDER>_API_KEY` in
 the environment of the bridge, or from its secret store. The bridge writes no
 key to a file, and it removes its own token from the environment that its
-children get. A remote server keeps its keys at the server, stored securely
-there, and the page does not carry them.
+children get. The Provider keys panel of the settings stores a key with
+`fyai secret set api-key/PROVIDER --stdin`: the value goes through standard
+input, in no argument and no file, and the bridge never returns it. On macOS
+the store is the Keychain. On Linux it is the kernel keyring of the user,
+which does not survive a reboot, so the panel then shows the provider as not
+set. A key in the environment of the bridge wins over the stored key. A remote
+server keeps its keys at the server, stored securely there, through the same
+routes, and the page does not carry them.
 
 ### The desktop app
 
@@ -294,6 +301,7 @@ them.
 | Test                                             | What it checks                                         |
 | ------------------------------------------------ | ------------------------------------------------------ |
 | `tests/unit/fyai-bridge.test.ts`                 | all decisions of `protocol.mjs`                        |
+| `tests/unit/fyai-bridge-keys.test.ts`            | the provider key routes: set, replace, remove, no value in an answer |
 | `tests/unit/fyai-prompt.test.ts`                 | the prompt and the key lines                           |
 | `tests/unit/fyai-turn.test.ts`                   | frame assembly                                         |
 | `tests/unit/chat-commands.test.ts`               | the fyai commands in the picker                        |
