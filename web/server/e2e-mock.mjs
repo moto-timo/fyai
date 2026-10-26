@@ -17,7 +17,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
@@ -235,6 +235,10 @@ test('the page knows the bridge and hides what fyai does not use', async () => {
 	const info = await bridgeJson('/api/fyai/info');
 
 	assert(info.authenticated === true && info.backend === 'fyai', JSON.stringify(info));
+	assert(
+		typeof info.project?.dir === 'string' && info.project.name === basename(info.project.dir),
+		JSON.stringify(info.project)
+	);
 
 	const buttons = await page.evaluate(() =>
 		[...document.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? '')
